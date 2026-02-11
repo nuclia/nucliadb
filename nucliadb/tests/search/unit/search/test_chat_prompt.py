@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
-from nucliadb.search.search.chat import old_prompt as chat_prompt
+from nucliadb.search.search.chat import prompt as chat_prompt
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.search import (
     SCORE_TYPE,
@@ -84,7 +84,7 @@ def kb(field_obj):
 
 async def test_get_next_conversation_messages(field_obj, messages):
     # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
+    from nucliadb.search.search.chat import prompt as chat_prompt
 
     assert (
         len(
@@ -115,7 +115,7 @@ async def test_get_next_conversation_messages(field_obj, messages):
 
 async def test_find_conversation_message(field_obj, messages):
     # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
+    from nucliadb.search.search.chat import prompt as chat_prompt
 
     assert await chat_prompt.find_conversation_message(field_obj, mident="3") == (
         messages[2],
@@ -126,7 +126,7 @@ async def test_find_conversation_message(field_obj, messages):
 
 async def test_get_expanded_conversation_messages(kb, messages):
     # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
+    from nucliadb.search.search.chat import prompt as chat_prompt
 
     assert await chat_prompt.get_expanded_conversation_messages(
         kb=kb, rid="rid", field_id="field_id", mident="3"
@@ -135,7 +135,7 @@ async def test_get_expanded_conversation_messages(kb, messages):
 
 async def test_get_expanded_conversation_messages_question(kb, messages):
     # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
+    from nucliadb.search.search.chat import prompt as chat_prompt
 
     assert (
         await chat_prompt.get_expanded_conversation_messages(
@@ -150,7 +150,7 @@ async def test_get_expanded_conversation_messages_question(kb, messages):
 
 async def test_get_expanded_conversation_messages_missing(kb, messages):
     # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
+    from nucliadb.search.search.chat import prompt as chat_prompt
 
     assert (
         await chat_prompt.get_expanded_conversation_messages(
@@ -188,13 +188,13 @@ def _create_find_result(
 
 
 async def test_default_prompt_context(kb):
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
+    from nucliadb.search.search.chat import prompt as chat_prompt
 
     result_text = " ".join(["text"] * 10)
     with (
-        patch("nucliadb.search.search.chat.old_prompt.get_driver"),
-        patch("nucliadb.search.search.chat.old_prompt.get_storage"),
-        patch("nucliadb.search.search.chat.old_prompt.KnowledgeBoxORM", return_value=kb),
+        patch("nucliadb.search.search.chat.prompt.get_driver"),
+        patch("nucliadb.search.search.chat.prompt.get_storage"),
+        patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb),
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         find_results = KnowledgeboxFindResults(
@@ -344,7 +344,7 @@ def test_capped_prompt_context():
 
 async def test_hierarchy_promp_context(kb):
     with mock.patch(
-        "nucliadb.search.search.chat.old_prompt.get_paragraph_text",
+        "nucliadb.search.search.chat.prompt.get_paragraph_text",
         side_effect=["Title text", "Summary text"],
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
@@ -425,7 +425,7 @@ async def test_extend_prompt_context_with_metadata():
     resource.get_field = AsyncMock(return_value=field)
     resource.get_extra = AsyncMock(return_value=extra)
     with mock.patch(
-        "nucliadb.search.search.chat.old_prompt.cache.get_resource",
+        "nucliadb.search.search.chat.prompt.cache.get_resource",
         return_value=resource,
     ):
         paragraph_id = ParagraphId.from_string("r1/f/f1/0-10")
@@ -510,13 +510,13 @@ async def test_prompt_context_image_context_builder():
         image_strategies=[PageImageStrategy(count=10), TableImageStrategy(), ParagraphImageStrategy()],
     )
     with (
-        mock.patch("nucliadb.search.search.chat.old_prompt.get_paragraph_page_number", return_value=1),
+        mock.patch("nucliadb.search.search.chat.prompt.get_paragraph_page_number", return_value=1),
         mock.patch(
-            "nucliadb.search.search.chat.old_prompt.get_page_image",
+            "nucliadb.search.search.chat.prompt.get_page_image",
             return_value=Image(b64encoded="page_image_data", content_type="image/png"),
         ),
         mock.patch(
-            "nucliadb.search.search.chat.old_prompt.get_paragraph_image",
+            "nucliadb.search.search.chat.prompt.get_paragraph_image",
             return_value=Image(b64encoded="table_image_data", content_type="image/png"),
         ),
     ):
@@ -545,7 +545,7 @@ async def test_prompt_context_builder_with_extra_image_context():
         ordered_paragraphs=[],
         user_image_context=[user_image],
     )
-    with patch("nucliadb.search.search.chat.old_prompt.default_prompt_context"):
+    with patch("nucliadb.search.search.chat.prompt.default_prompt_context"):
         # context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         _, _, context_images, _ = await builder.build()
 
@@ -566,7 +566,7 @@ async def test_prompt_context_builder_with_query_image():
         query_image=query_image,
     )
 
-    with patch("nucliadb.search.search.chat.old_prompt.default_prompt_context"):
+    with patch("nucliadb.search.search.chat.prompt.default_prompt_context"):
         # context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         _, _, context_images, _ = await builder.build()
 

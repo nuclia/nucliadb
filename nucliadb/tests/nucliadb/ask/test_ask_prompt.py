@@ -112,13 +112,11 @@ def _create_find_result(
 
 
 async def test_default_prompt_context(kb):
-    from nucliadb.search.search.chat import old_prompt as chat_prompt
-
     result_text = " ".join(["text"] * 10)
     with (
-        patch("nucliadb.search.search.chat.old_prompt.get_driver"),
-        patch("nucliadb.search.search.chat.old_prompt.get_storage"),
-        patch("nucliadb.search.search.chat.old_prompt.KnowledgeBoxORM", return_value=kb),
+        patch("nucliadb.search.search.chat.prompt.get_driver"),
+        patch("nucliadb.search.search.chat.prompt.get_storage"),
+        patch("nucliadb.search.search.chat.prompt.KnowledgeBoxORM", return_value=kb),
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         find_results = KnowledgeboxFindResults(
@@ -266,42 +264,28 @@ def test_capped_prompt_context():
     assert context.size == 0
 
 
-@pytest.mark.deploy_modes("standalone")
-async def test_hierarchy_promp_context(nucliadb_search: AsyncClient, kb):
-    rid = uuid4().hex
-
-    async def _get_paragraph_text(field, paragraph_id: ParagraphId):
-        return {
-            f"{rid}/f/f1/0-10": "First paragraph text",
-            f"{rid}/f/f1/10-20": "Second paragraph text",
-            f"{rid}/a/title/0-500": "Title text",
-            f"{rid}/a/summary/0-1000": "Summary text",
-        }[paragraph_id.full()]
-
-    with (
-        mock.patch("nucliadb.search.augmentor.paragraphs.cache.get_resource"),
-        mock.patch(
-            "nucliadb.search.augmentor.paragraphs.get_paragraph_text",
-            side_effect=_get_paragraph_text,
-        ),
+async def test_hierarchy_promp_context(kb):
+    with mock.patch(
+        "nucliadb.search.search.chat.prompt.get_paragraph_text",
+        side_effect=["Title text", "Summary text"],
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         find_results = KnowledgeboxFindResults(
             resources={
-                f"{rid}": FindResource(
-                    id=f"{rid}",
+                "r1": FindResource(
+                    id="r1",
                     fields={
                         "f/f1": FindField(
                             paragraphs={
-                                f"{rid}/f/f1/0-10": FindParagraph(
-                                    id=f"{rid}/f/f1/0-10",
+                                "r1/f/f1/0-10": FindParagraph(
+                                    id="r1/f/f1/0-10",
                                     score=10,
                                     score_type=SCORE_TYPE.BM25,
                                     order=0,
-                                    text="First paragraph text",
+                                    text="First Paragraph text",
                                 ),
-                                f"{rid}/f/f1/10-20": FindParagraph(
-                                    id=f"{rid}/f/f1/10-20",
+                                "r1/f/f1/10-20": FindParagraph(
+                                    id="r1/f/f1/10-20",
                                     score=8,
                                     score_type=SCORE_TYPE.BM25,
                                     order=1,
@@ -324,16 +308,16 @@ async def test_hierarchy_promp_context(nucliadb_search: AsyncClient, kb):
             augmented_context=augmented_context,
         )
         assert (
-            context.output[f"{rid}/f/f1/0-10"]
-            == "DOCUMENT: Title text \n SUMMARY: Summary text \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n First paragraph text \n\n \n EXTRACTED BLOCK: \n Second paragraph text"
+            context.output["r1/f/f1/0-10"]
+            == "DOCUMENT: Title text \n SUMMARY: Summary text \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n First Paragraph text \n\n \n EXTRACTED BLOCK: \n Second paragraph text"
         )
         # Chec that the original text of the paragraphs is preserved
-        assert ordered_paragraphs[0].text == "First paragraph text"
+        assert ordered_paragraphs[0].text == "First Paragraph text"
         assert ordered_paragraphs[1].text == "Second paragraph text"
 
-        assert augmented_context.paragraphs[f"{rid}/f/f1/0-10"].id == f"{rid}/f/f1/0-10"
-        assert augmented_context.paragraphs[f"{rid}/f/f1/0-10"].text.startswith("DOCUMENT: Title")
-        assert augmented_context.paragraphs[f"{rid}/f/f1/0-10"].augmentation_type == "hierarchy"
+        assert augmented_context.paragraphs["r1/f/f1/0-10"].id == "r1/f/f1/0-10"
+        assert augmented_context.paragraphs["r1/f/f1/0-10"].text.startswith("DOCUMENT: Title")
+        assert augmented_context.paragraphs["r1/f/f1/0-10"].augmentation_type == "hierarchy"
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -460,18 +444,13 @@ async def test_prompt_context_image_context_builder():
     )
     with (
         mock.patch("nucliadb.search.search.chat.prompt.get_paragraph_page_number", return_value=1),
-        mock.patch("nucliadb.search.search.chat.old_prompt.get_paragraph_page_number", return_value=1),
         mock.patch(
-            "nucliadb.search.search.chat.old_prompt.get_page_image",
+            "nucliadb.search.search.chat.prompt.get_page_image",
             return_value=Image(b64encoded="page_image_data", content_type="image/png"),
         ),
         mock.patch(
-            "nucliadb.search.search.chat.old_prompt.get_paragraph_image",
+            "nucliadb.search.search.chat.prompt.get_paragraph_image",
             return_value=Image(b64encoded="table_image_data", content_type="image/png"),
-        ),
-        mock.patch(
-            "nucliadb.search.search.chat.prompt.rpc.download_image",
-            return_value=Image(b64encoded=f"an-image", content_type="image/png"),
         ),
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
