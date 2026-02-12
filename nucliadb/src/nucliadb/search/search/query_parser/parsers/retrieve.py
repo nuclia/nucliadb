@@ -92,6 +92,7 @@ class _RetrievalParser:
         )
         return retrieval
 
+    @query_parser_observer.wrap({"type": "retrieve_parse_query"})
     async def _parse_query(self) -> Query:
         keyword = None
         if self.item.query.keyword is not None:
@@ -153,6 +154,7 @@ class _RetrievalParser:
             query_vector = user_vector[:matryoshka_dimension]
         return vectorset, query_vector
 
+    @query_parser_observer.wrap({"type": "retrieve_parse_filters"})
     async def _parse_filters(self) -> Filters:
         filters = Filters()
         if self.item.filters is None:

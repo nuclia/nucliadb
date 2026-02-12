@@ -77,6 +77,7 @@ async def augment_resources(
     return augmented
 
 
+@augmentor_observer.wrap({"type": "resource"})
 async def augment_resource(
     kbid: str,
     rid: str,

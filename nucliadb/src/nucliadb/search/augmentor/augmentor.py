@@ -32,6 +32,7 @@ from nucliadb.models.internal.augment import (
     AugmentedParagraph,
     AugmentedResource,
 )
+from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb_models.common import FieldTypeName
@@ -42,6 +43,7 @@ from .paragraphs import augment_paragraph
 from .resources import augment_resource, augment_resource_deep
 
 
+@augmentor_observer.wrap({"type": "augment"})
 async def augment(
     kbid: str,
     augmentations: list[Augment],
