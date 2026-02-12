@@ -30,9 +30,6 @@ from nucliadb_utils.settings import nuclia_settings, running_settings
 class Settings(pydantic_settings.BaseSettings):
     flag_settings_url: str | None = None
 
-    # temporary flag to test this FF enabled/disabled easily
-    disable_ask_decoupled_ff: bool = False
-
 
 DEFAULT_FLAG_DATA: dict[str, Any] = {
     # These are just defaults to use for local dev and tests
@@ -47,10 +44,6 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
     const.Features.IGNORE_EXTRACTED_IN_SEARCH: {
         "rollout": 0,
         "variants": {"environment": ["local"]},
-    },
-    const.Features.ASK_DECOUPLED: {
-        "rollout": 0,
-        "variants": {"environment": [] if Settings().disable_ask_decoupled_ff else ["local"]},
     },
     const.Features.SEMANTIC_GRAPH: {
         "rollout": 0,

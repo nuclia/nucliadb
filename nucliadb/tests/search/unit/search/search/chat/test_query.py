@@ -39,10 +39,7 @@ from nucliadb_models.search import (
 @pytest.fixture()
 def predict():
     predict = mock.AsyncMock()
-    with (
-        mock.patch("nucliadb.search.search.chat.query.get_predict", return_value=predict),
-        mock.patch("nucliadb.search.search.chat.fetcher.get_predict", return_value=predict),
-    ):
+    with mock.patch("nucliadb.search.search.chat.query.get_predict", return_value=predict):
         yield predict
 
 

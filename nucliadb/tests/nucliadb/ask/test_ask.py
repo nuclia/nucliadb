@@ -54,8 +54,6 @@ from nucliadb_models.search import (
 from nucliadb_protos import resources_pb2 as rpb2
 from nucliadb_protos import writer_pb2 as wpb2
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 from tests.ndbfixtures.resources import cookie_tale_resource
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
@@ -949,7 +947,6 @@ async def test_ask_rag_strategy_metadata_extension(
     # Make sure the text blocks of the context are extended with the metadata
     origin_found = False
     classification_labels_found = False
-    ners_found = False
     extra_found = False
     for text_block in ask_response.prompt_context:
         if "DOCUMENT METADATA AT ORIGIN" in text_block:
@@ -963,24 +960,10 @@ async def test_ask_rag_strategy_metadata_extension(
             classification_labels_found = True
             # resource classification
             assert "- rs-0 (ls)" in text_block or "- rs-1 (ls)" in text_block
-            # we can't easily mock this for the coupled ask
-            if has_feature(const.Features.ASK_DECOUPLED, context={}):
-                # field classifications
-                assert "- book (object)" in text_block
-                assert "- computer (object)" in text_block
-        if "DOCUMENT NAMED ENTITIES (NERs)" in text_block:
-            # we can't easily mock this for the coupled ask
-            if has_feature(const.Features.ASK_DECOUPLED, context={}):
-                ners_found = True
-                assert "- PLACE" in text_block
-                assert "  - Amsterdam" in text_block
-                assert "  - Paris" in text_block
 
     assert origin_found, ask_response.prompt_context
     assert extra_found, ask_response.prompt_context
     assert classification_labels_found, ask_response.prompt_context
-    if has_feature(const.Features.ASK_DECOUPLED, context={}):
-        assert ners_found, ask_response.prompt_context
 
     # Try now combining metadata_extension with another strategy
     for strategy in [
