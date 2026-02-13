@@ -254,7 +254,7 @@ class Histogram:
 
 
 gc_collection_time = Histogram(
-    "garbage_collector_collection_time",
+    "garbage_collector_collection_time_seconds",
     buckets=[
         0.000_250,  # 250µs
         0.000_500,  # 500µs
