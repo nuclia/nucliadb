@@ -67,6 +67,7 @@ from nucliadb.models.internal.augment import (
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.augmentor import augmentor
 from nucliadb.search.search.cache import request_caches
+from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb_models.augment import (
     AugmentedConversationField,
     AugmentedConversationMessage,
@@ -157,6 +158,7 @@ async def augment_endpoint(
     return response
 
 
+@query_parser_observer.wrap({"type": "parse_augment_1st"})
 def parse_first_augments(item: AugmentRequest) -> list[Augment]:
     """Parse an augment request and return a list of internal augments to
     fulfill as much as the requested information as it can.
@@ -514,6 +516,7 @@ def build_augment_response(item: AugmentRequest, augmented: Augmented) -> Augmen
     return response
 
 
+@query_parser_observer.wrap({"type": "parse_augment_2nd"})
 def parse_second_augments(item: AugmentRequest, augmented: Augmented) -> list[Augment]:
     """Given an augment request an a first augmentation, return a list of
     augments required to fulfill the requested data.

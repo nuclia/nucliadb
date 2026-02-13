@@ -74,6 +74,7 @@ async def augment_paragraphs(
     return augmented
 
 
+@augmentor_observer.wrap({"type": "paragraph"})
 async def augment_paragraph(
     kbid: str,
     paragraph_id: ParagraphId,
@@ -98,6 +99,7 @@ async def augment_paragraph(
     return await db_augment_paragraph(resource, field, paragraph_id, select, metadata)
 
 
+@augmentor_observer.wrap({"type": "db_paragraph"})
 async def db_augment_paragraph(
     resource: Resource,
     field: Field,

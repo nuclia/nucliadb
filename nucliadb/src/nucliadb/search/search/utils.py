@@ -22,6 +22,7 @@ import logging
 from pydantic import BaseModel
 
 from nucliadb.common.datamanagers.atomic import kb
+from nucliadb.search.search.metrics import query_parse_dependency_observer
 from nucliadb_models.search import MinScore
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
@@ -29,6 +30,7 @@ from nucliadb_utils.utilities import has_feature
 logger = logging.getLogger(__name__)
 
 
+@query_parse_dependency_observer.wrap({"type": "filter_hidden_resources"})
 async def filter_hidden_resources(kbid: str, show_hidden: bool) -> bool | None:
     kb_config = await kb.get_config(kbid=kbid)
     hidden_enabled = kb_config and kb_config.hidden_resources_enabled
