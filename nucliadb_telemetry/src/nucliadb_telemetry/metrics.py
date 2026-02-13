@@ -254,19 +254,19 @@ class Histogram:
 
 
 gc_collection_time = Histogram(
-    "garbage_collector_collection_time_ms",
+    "garbage_collector_collection_time",
     buckets=[
-        0.25,  # 250µs
-        0.5,  # 500µs
-        1.0,  # 1ms
-        2.5,  # 2.5ms
-        5.0,  # 5ms
-        10.0,  # 10ms
-        25.0,  # 25ms
-        50.0,  # 50ms
-        100.0,  # 100ms
-        250.0,  # 250ms
-        500.0,  # 0.5s
+        0.000_250,  # 250µs
+        0.000_500,  # 500µs
+        0.001,  # 1ms
+        0.002_5,  # 2.5ms
+        0.005,  # 5ms
+        0.010,  # 10ms
+        0.025,  # 25ms
+        0.050,  # 50ms
+        0.100,  # 100ms
+        0.250,  # 250ms
+        0.500,  # 0.5s
         INF,
     ],
 )
@@ -287,14 +287,14 @@ class GarbageCollectorObserver:
         info: dict[Literal["generation"] | Literal["collected"] | Literal["uncollectable"], int],
     ):
         if phase == "start":
-            self.collection_start = time.monotonic_ns()
+            self.collection_start = time.monotonic()
 
         elif phase == "stop":
             if self.collection_start is None:
                 return
 
-            collection_time_ms = (time.monotonic_ns() - self.collection_start) / 1_000_000
-            gc_collection_time.observe(collection_time_ms)
+            collection_time_s = time.monotonic() - self.collection_start
+            gc_collection_time.observe(collection_time_s)
             self.collection_start = None
 
         else:
