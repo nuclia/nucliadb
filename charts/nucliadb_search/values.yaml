@@ -20,7 +20,6 @@ env:
   SEARCH_TIMEOUT: "10" # seconds
   SEARCH_CACHE_REDIS_HOST: "redis-master.namespace.svc"
   SEARCH_CACHE_REDIS_PORT: "6379"
-  OBSERVE_GARBAGE_COLLECTOR: "true"
 
 # Configmap and/or secrets to mount into the environment
 envFrom:
