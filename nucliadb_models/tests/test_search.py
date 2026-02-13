@@ -35,6 +35,12 @@ def test_field_extension_strategy_fields_field_validator():
         fields=["f/myfield"],
     )
 
+    strategy = search.FieldExtensionStrategy(
+        name="field_extension",
+        fields=["/f/myfield"],
+    )
+    assert strategy.fields == ["f/myfield"]
+
     # not a set of fields
     with pytest.raises(ValidationError):
         search.FieldExtensionStrategy(
