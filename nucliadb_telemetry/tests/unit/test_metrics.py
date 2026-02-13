@@ -13,12 +13,14 @@
 # limitations under the License.
 #
 import asyncio
+import gc
 import time
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from nucliadb_telemetry import metrics
+from nucliadb_telemetry.metrics import instrument_garbage_collector
 
 
 class TestObserver:
@@ -206,3 +208,13 @@ class TestHistogram:
         assert (
             next(s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0").value == 1.0
         )
+
+
+def test_garbage_collector_instrumentation():
+    with patch("nucliadb_telemetry.metrics.gc_collection_time") as metric:
+        assert metric.observe.call_count == 0
+
+        instrument_garbage_collector()
+        gc.collect()
+
+        assert metric.observe.call_count == 1

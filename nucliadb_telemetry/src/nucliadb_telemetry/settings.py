@@ -26,6 +26,10 @@ class TelemetrySettings(BaseSettings):
     jaeger_query_port: int = 16686
     jaeger_query_host: str = "jaeger.observability.svc.cluster.local"
 
+    observe_garbage_collector: bool = pydantic.Field(
+        default=False, description="Instrument and observe GC metrics"
+    )
+
 
 telemetry_settings = TelemetrySettings()
 

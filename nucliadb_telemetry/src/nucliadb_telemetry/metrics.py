@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import gc
 import os
 import time
 from collections.abc import Callable
 from functools import wraps
 from inspect import isasyncgenfunction, iscoroutinefunction, isgeneratorfunction
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import prometheus_client
+from typing_extensions import assert_never
 
 if TYPE_CHECKING:  # pragma: no cover
     from traceback import StackSummary
@@ -251,6 +253,59 @@ class Histogram:
             self.histo.observe(value)
 
 
+gc_collection_time = Histogram(
+    "garbage_collector_collection_time_seconds",
+    buckets=[
+        0.000_250,  # 250µs
+        0.000_500,  # 500µs
+        0.001,  # 1ms
+        0.002_5,  # 2.5ms
+        0.005,  # 5ms
+        0.010,  # 10ms
+        0.025,  # 25ms
+        0.050,  # 50ms
+        0.100,  # 100ms
+        0.250,  # 250ms
+        0.500,  # 0.5s
+        INF,
+    ],
+)
+
+
+class GarbageCollectorObserver:
+    """See https://docs.python.org/3/library/gc.html#gc.callbacks for more
+    details on the Python garbage collector
+
+    """
+
+    def __init__(self):
+        self.collection_start = None
+
+    def callback(
+        self,
+        phase: Literal["start"] | Literal["stop"],
+        info: dict[Literal["generation"] | Literal["collected"] | Literal["uncollectable"], int],
+    ):
+        if phase == "start":
+            self.collection_start = time.monotonic()
+
+        elif phase == "stop":
+            if self.collection_start is None:
+                return
+
+            collection_time_s = time.monotonic() - self.collection_start
+            gc_collection_time.observe(collection_time_s)
+            self.collection_start = None
+
+        else:
+            assert_never(phase)
+
+
+def instrument_garbage_collector():
+    observer = GarbageCollectorObserver()
+    gc.callbacks.append(observer.callback)
+
+
 __all__ = (
     "ERROR",
     "OK",
@@ -259,4 +314,5 @@ __all__ = (
     "Histogram",
     "Observer",
     "ObserverRecorder",
+    "instrument_garbage_collector",
 )

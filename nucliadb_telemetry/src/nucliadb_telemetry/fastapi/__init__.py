@@ -30,6 +30,8 @@ from nucliadb_telemetry.fastapi.tracing import (
     OpenTelemetryMiddleware,
     ServerRequestHookT,
 )
+from nucliadb_telemetry.metrics import instrument_garbage_collector
+from nucliadb_telemetry.settings import telemetry_settings
 
 from .context import ContextInjectorMiddleware
 
@@ -74,6 +76,9 @@ def instrument_app(
     if metrics:
         # b/w compat
         app.add_middleware(PrometheusMiddleware)
+
+        if telemetry_settings.observe_garbage_collector:
+            instrument_garbage_collector()
 
     excluded_urls_obj = ExcludeList(excluded_urls)
 
