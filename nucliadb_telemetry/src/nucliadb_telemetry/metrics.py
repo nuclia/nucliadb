@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import gc
 import os
 import time
 from collections.abc import Callable
 from functools import wraps
 from inspect import isasyncgenfunction, iscoroutinefunction, isgeneratorfunction
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import prometheus_client
+from typing_extensions import assert_never
 
 if TYPE_CHECKING:  # pragma: no cover
     from traceback import StackSummary
@@ -251,6 +253,74 @@ class Histogram:
             self.histo.observe(value)
 
 
+_last_garbage_collection = time.monotonic_ns()
+gc_collection_time = Histogram(
+    "garbage_collector_collection_time_ms",
+    buckets=[
+        0.25,  # 250µs
+        0.5,  # 500µs
+        1.0,  # 1ms
+        2.5,  # 2.5ms
+        5.0,  # 5ms
+        10.0,  # 10ms
+        25.0,  # 25ms
+        50.0,  # 50ms
+        100.0,  # 100ms
+        250.0,  # 250ms
+        500.0,  # 0.5s
+        INF,
+    ],
+)
+
+
+def _observe_garbage_collector(
+    phase: Literal["start"] | Literal["end"],
+    info: dict[Literal["generation"] | Literal["collected"] | Literal["uncollectable"], int],
+):
+    global _last_garbage_collection
+
+    if phase == "start":
+        _last_garbage_collection = time.monotonic_ns()
+    elif phase == "end":
+        pass
+    else:
+        assert_never(phase)
+
+
+class GarbageCollectorObserver:
+    """See https://docs.python.org/3/library/gc.html#gc.callbacks for more
+    details on the Python garbage collector
+
+    """
+
+    def __init__(self):
+        self.collection_start = None
+
+    def callback(
+        self,
+        phase: Literal["start"] | Literal["stop"],
+        info: dict[Literal["generation"] | Literal["collected"] | Literal["uncollectable"], int],
+    ):
+        if phase == "start":
+            self.collection_start = time.monotonic_ns()
+
+        elif phase == "stop":
+            if self.collection_start is None:
+                return
+
+            collection_time_ms = (time.monotonic_ns() - self.collection_start) / 1_000_000
+            gc_collection_time.observe(collection_time_ms)
+            self.collection_start = None
+
+        else:
+            assert_never(phase)
+
+
+def instrument_garbage_collector():
+    observer = GarbageCollectorObserver()
+    gc.callbacks.append(observer.callback)
+
+
 __all__ = (
     "ERROR",
     "OK",
@@ -259,4 +329,5 @@ __all__ = (
     "Histogram",
     "Observer",
     "ObserverRecorder",
+    "instrument_garbage_collector",
 )
