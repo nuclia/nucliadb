@@ -1216,10 +1216,14 @@ class FieldExtensionStrategy(RagStrategy):
 
     @model_validator(mode="after")
     def field_extension_strategy_validator(self) -> Self:
+        # We also accept /{field_type}/{field_name} for legacy/usability but we
+        # remove it so we don't deal with it
+        self.fields = [field.strip("/") for field in self.fields]
+
         # Check that the fields are in the format {field_type}/{field_name}
         for field in self.fields:
             try:
-                field_type, _ = field.strip("/").split("/")
+                field_type, _ = field.split("/")
             except ValueError:
                 raise ValueError(f"Field '{field}' is not in the format {{field_type}}/{{field_name}}")
             if field_type not in ALLOWED_FIELD_TYPES:
