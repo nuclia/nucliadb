@@ -253,7 +253,6 @@ class Histogram:
             self.histo.observe(value)
 
 
-_last_garbage_collection = time.monotonic_ns()
 gc_collection_time = Histogram(
     "garbage_collector_collection_time_ms",
     buckets=[
@@ -271,20 +270,6 @@ gc_collection_time = Histogram(
         INF,
     ],
 )
-
-
-def _observe_garbage_collector(
-    phase: Literal["start"] | Literal["end"],
-    info: dict[Literal["generation"] | Literal["collected"] | Literal["uncollectable"], int],
-):
-    global _last_garbage_collection
-
-    if phase == "start":
-        _last_garbage_collection = time.monotonic_ns()
-    elif phase == "end":
-        pass
-    else:
-        assert_never(phase)
 
 
 class GarbageCollectorObserver:
