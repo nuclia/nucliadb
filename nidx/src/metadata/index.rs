@@ -184,6 +184,22 @@ impl Index {
         .await
     }
 
+    pub async fn update_config(
+        &self,
+        meta: impl Executor<'_, Database = Postgres>,
+        config: IndexConfig,
+    ) -> Result<(), anyhow::Error> {
+        let json_config = serde_json::to_value(&config)?;
+        sqlx::query!(
+            "UPDATE indexes SET configuration = $1, updated_at = NOW() WHERE id = $2",
+            json_config,
+            self.id as IndexId,
+        )
+        .execute(meta)
+        .await?;
+        Ok(())
+    }
+
     /// Mark indexes as updated. If there is a transaction already updating the index (holding a lock), it will skip
     /// the update since it's already being updated by another transaction. This means this function should be called
     /// after the changes it made are committed, in another transaction.

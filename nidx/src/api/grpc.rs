@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashMap;
 use std::io::Write;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -147,7 +148,39 @@ impl NidxApi for ApiServer {
         }))
     }
 
-    async fn configure_shards(&self, _request: Request<ShardsConfig>) -> Result<Response<EmptyQuery>> {
+    async fn configure_shards(&self, request: Request<ShardsConfig>) -> Result<Response<EmptyQuery>> {
+        let request = request.into_inner();
+
+        let mut shard_prewarm = HashMap::new();
+        let mut shard_ids = vec![];
+        for config in request.configs {
+            let shard_id = Uuid::from_str(&config.shard_id).map_err(NidxError::from)?;
+            shard_prewarm.insert(shard_id, config.prewarm_enabled);
+            shard_ids.push(shard_id);
+        }
+
+        let mut tx = self.meta.transaction().await.map_err(NidxError::from)?;
+        let indexes = Index::for_shards(&mut *tx, &shard_ids).await.map_err(NidxError::from)?;
+
+        for index in indexes {
+            if index.kind != IndexKind::Vector {
+                continue;
+            }
+
+            let mut config = index.config::<VectorConfig>().unwrap();
+            let prewarm = *shard_prewarm.get(&index.shard_id).unwrap();
+            if prewarm == config.prewarm_enabled {
+                continue;
+            }
+
+            config.prewarm_enabled = prewarm;
+            index
+                .update_config(&mut *tx, config.into())
+                .await
+                .map_err(NidxError::from)?
+        }
+        tx.commit().await.map_err(NidxError::from)?;
+
         Ok(Response::new(EmptyQuery {}))
     }
 
