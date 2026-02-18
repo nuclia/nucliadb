@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT shard_id\n                FROM (\n                    SELECT shard_id, bool_or(configuration::json->>'prewarm_enabled' = 'true') as prewarm\n                    FROM indexes\n                    WHERE kind = $1\n                    GROUP BY shard_id\n                ) AS shards_prewarm\n                WHERE prewarm IS true",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "shard_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        {
+          "Custom": {
+            "name": "index_kind",
+            "kind": {
+              "Enum": [
+                "text",
+                "paragraph",
+                "vector",
+                "relation",
+                "vector_relation_node",
+                "vector_relation_edge"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "dab3d4125f9b927af57bacc511c4b1c474cbafeb98ed66dc08c23169502967c4"
+}

@@ -79,6 +79,10 @@ pub async fn run_sync(
     // We only retry once every few sync rounds to avoid failing indexes to block other syncs
     let mut retry_interval = 0;
 
+    // Keeps track of shards with prewarm enabled in order to prewarm new shards
+    // marked as prewarmed
+    let mut shards_with_prewarm: HashSet<Uuid> = HashSet::new();
+
     let mut initial_sync = true;
 
     while !shutdown.is_cancelled() {
@@ -86,7 +90,14 @@ pub async fn run_sync(
             let t = Instant::now();
             let all_shards = Shard::list_ids(&meta.pool).await?;
             let selected_shards: Vec<_> = shard_selector.select_shards(all_shards);
-            let (shard_ids_to_sync, indexes_to_delete) = index_metadata.set_synced_shards(&selected_shards).await;
+            let (mut shard_ids_to_sync, indexes_to_delete) = index_metadata.set_synced_shards(&selected_shards).await;
+            let current_prewarm_shards = get_all_shards_with_prewarm(&meta.pool).await?;
+            for new_prewarm_shard_id in current_prewarm_shards.difference(&shards_with_prewarm) {
+                if !shard_ids_to_sync.contains(new_prewarm_shard_id) {
+                    shard_ids_to_sync.push(*new_prewarm_shard_id);
+                }
+            }
+            shards_with_prewarm = current_prewarm_shards;
             let indexes_to_sync = if !shard_ids_to_sync.is_empty() {
                 Index::for_shards(&meta.pool, &shard_ids_to_sync).await?
             } else {
@@ -608,6 +619,27 @@ impl GuardedIndexMetadata {
         let m = self.guard.get(&self.index_id)?;
         Some(m.read().await)
     }
+}
+
+async fn get_all_shards_with_prewarm<'a>(meta: impl Executor<'a, Database = Postgres>) -> sqlx::Result<HashSet<Uuid>> {
+    // although prewarm is set at index level, we prewarm at shard level, so any shard with an index
+    // with prewarm enabled is considered to have prewarm enabled
+    let shard_ids = sqlx::query_scalar!(
+        r#"
+                SELECT shard_id
+                FROM (
+                    SELECT shard_id, bool_or(configuration::json->>'prewarm_enabled' = 'true') as prewarm
+                    FROM indexes
+                    WHERE kind = $1
+                    GROUP BY shard_id
+                ) AS shards_prewarm
+                WHERE prewarm IS true"#,
+        IndexKind::Vector as IndexKind,
+    )
+    .fetch_all(meta)
+    .await?;
+
+    Ok(HashSet::from_iter(shard_ids.into_iter()))
 }
 
 #[cfg(test)]

@@ -37,6 +37,7 @@ const CONFIG: VectorConfig = VectorConfig {
     flags: vec![],
     vector_cardinality: VectorCardinality::Single,
     entity: IndexEntity::Paragraph,
+    prewarm_enabled: false,
 };
 
 fn create_query() -> Vec<f32> {

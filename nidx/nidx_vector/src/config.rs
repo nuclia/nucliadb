@@ -116,6 +116,8 @@ pub struct VectorConfig {
     pub flags: Vec<String>,
     #[serde(default)]
     pub entity: IndexEntity,
+    #[serde(default)]
+    pub prewarm_enabled: bool,
 }
 
 impl VectorConfig {
@@ -127,6 +129,7 @@ impl VectorConfig {
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
             entity: IndexEntity::Paragraph,
+            prewarm_enabled: false,
         }
     }
 
@@ -138,6 +141,7 @@ impl VectorConfig {
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
             entity: IndexEntity::RelationNode,
+            prewarm_enabled: false,
         }
     }
 
@@ -149,6 +153,7 @@ impl VectorConfig {
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
             entity: IndexEntity::RelationEdge,
+            prewarm_enabled: false,
         }
     }
 
@@ -205,6 +210,7 @@ impl VectorConfig {
             flags: vec![],
             vector_cardinality: VectorCardinality::Single,
             entity,
+            prewarm_enabled: false,
         })
     }
 }
