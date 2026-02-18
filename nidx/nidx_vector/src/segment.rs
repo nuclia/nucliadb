@@ -42,8 +42,7 @@ use std::time::Instant;
 use tracing::{debug, trace};
 
 pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<OpenSegment> {
-    // TODO: we should get this flag from the VectorConfig or some other place
-    let prewarm = false;
+    let prewarm = config.prewarm_enabled;
 
     let path = &metadata.path;
     let data_store: Box<dyn DataStore> = if DataStoreV1::exists(path)? {
