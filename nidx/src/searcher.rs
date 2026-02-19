@@ -42,7 +42,7 @@ use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
 use tracing::*;
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -64,7 +64,7 @@ pub struct SyncedSearcher {
     meta: NidxMetadata,
 }
 
-async fn refresher_task(mut rx: Receiver<IndexId>, index_cache: Arc<IndexCache>) -> anyhow::Result<()> {
+async fn refresher_task(mut rx: Receiver<(IndexId, bool)>, index_cache: Arc<IndexCache>) -> anyhow::Result<()> {
     let mut try_later = Vec::new();
     loop {
         // Read all available messages to a set in order to deduplicated requests for the same index
@@ -74,20 +74,29 @@ async fn refresher_task(mut rx: Receiver<IndexId>, index_cache: Arc<IndexCache>)
             return Ok(());
         }
 
-        let unique_indexes: HashSet<IndexId> =
-            HashSet::from_iter(try_later.drain(std::ops::RangeFull).chain(recv_buf.into_iter()));
-        for index_id in unique_indexes {
-            match index_cache.reload(&index_id, false).await {
+        let mut unique_indexes = HashMap::new();
+        for (index_id, force) in try_later.drain(std::ops::RangeFull).chain(recv_buf.into_iter()) {
+            unique_indexes
+                .entry(index_id)
+                .and_modify(|f| *f = *f || force)
+                .or_insert(force);
+        }
+        for (index_id, force) in unique_indexes {
+            match index_cache.reload(&index_id, force).await {
                 Ok(true) => {
                     // Index is currently loading, no need to reload now, nut will enqueue a reload for later
-                    debug!(?index_id, "Index being loaded by cache, will reload it later");
-                    try_later.push(index_id);
+                    debug!(?index_id, ?force, "Index being loaded by cache, will reload it later");
+                    try_later.push((index_id, force));
                 }
                 Ok(false) => {
-                    debug!(?index_id, "Index reloaded");
+                    debug!(?index_id, ?force, "Index reloaded");
                 }
                 Err(e) => {
-                    error!(?index_id, "Index failed to reload, might become out of date: {e:?}");
+                    error!(
+                        ?index_id,
+                        ?force,
+                        "Index failed to reload, might become out of date: {e:?}"
+                    );
                 }
             }
         }

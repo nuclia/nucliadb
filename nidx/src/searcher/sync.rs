@@ -25,6 +25,7 @@ use crate::settings::SearcherSettings;
 use crate::{NidxMetadata, segment_store::download_segment};
 use anyhow::anyhow;
 use nidx_types::Seq;
+use nidx_vector::config::VectorConfig;
 use object_store::DynObjectStore;
 use sqlx::postgres::types::PgInterval;
 use sqlx::types::time::PrimitiveDateTime;
@@ -64,7 +65,7 @@ pub async fn run_sync(
     index_metadata: Arc<SyncMetadata>,
     settings: SearcherSettings,
     shutdown: CancellationToken,
-    notifier: Sender<IndexId>,
+    notifier: Sender<(IndexId, bool)>,
     sync_status: Option<watch::Sender<SyncStatus>>,
     mut request_sync: Option<Receiver<()>>,
     shard_selector: ShardSelector,
@@ -225,7 +226,7 @@ async fn sync_index(
     storage: Arc<DynObjectStore>,
     sync_metadata: Arc<SyncMetadata>,
     index: Index,
-    notifier: &Sender<IndexId>,
+    notifier: &Sender<(IndexId, bool)>,
 ) -> anyhow::Result<()> {
     let operations = Operations::load_for_index(&meta.pool, &index.id).await?;
     let diff = sync_metadata.diff(&index.id, &operations).await;
@@ -270,8 +271,14 @@ async fn sync_index(
 
     // Switch meta
     let index_id = index.id;
+    let force_reload = if index.kind == IndexKind::Vector {
+        let config = index.config::<VectorConfig>().unwrap();
+        config.prewarm
+    } else {
+        false
+    };
     sync_metadata.set(index, operations).await;
-    notifier.send(index_id).await?;
+    notifier.send((index_id, force_reload)).await?;
     let pending_refreshes = notifier.max_capacity() - notifier.capacity();
     metrics::searcher::REFRESH_QUEUE_LEN.set(pending_refreshes as i64);
 
@@ -287,10 +294,10 @@ async fn delete_index(
     shard_id: Uuid,
     index_id: IndexId,
     sync_metadata: Arc<SyncMetadata>,
-    notifier: &Sender<IndexId>,
+    notifier: &Sender<(IndexId, bool)>,
 ) -> anyhow::Result<()> {
     if sync_metadata.delete(&shard_id, &index_id).await {
-        notifier.send(index_id).await?;
+        notifier.send((index_id, false)).await?;
         // remove directory for the index, effectively deleting all segment data
         // stored locally
         let index_location = sync_metadata.index_location(&index_id);
@@ -740,7 +747,7 @@ mod tests {
             &tx,
         )
         .await?;
-        assert_eq!(rx.try_recv()?, index.id);
+        assert_eq!(rx.try_recv()?, (index.id, false));
         assert_eq!(downloaded_segments(&index_path)?, vec![s1.id]);
         {
             let index_meta_guard = sync_metadata.get(&index.id).await;
@@ -764,7 +771,7 @@ mod tests {
             &tx,
         )
         .await?;
-        assert_eq!(rx.try_recv()?, index.id);
+        assert_eq!(rx.try_recv()?, (index.id, false));
         assert_eq!(downloaded_segments(&index_path)?, vec![s1.id, s2.id]);
         {
             let index_meta_guard = sync_metadata.get(&index.id).await;
@@ -791,7 +798,7 @@ mod tests {
             &tx,
         )
         .await?;
-        assert_eq!(rx.try_recv()?, index.id);
+        assert_eq!(rx.try_recv()?, (index.id, false));
         assert_eq!(downloaded_segments(&index_path)?, vec![s3.id]);
         {
             let index_meta_guard = sync_metadata.get(&index.id).await;
@@ -813,7 +820,7 @@ mod tests {
             &tx,
         )
         .await?;
-        assert_eq!(rx.try_recv()?, index.id);
+        assert_eq!(rx.try_recv()?, (index.id, false));
         assert_eq!(downloaded_segments(&index_path)?, vec![s3.id]);
         {
             let index_meta_guard = sync_metadata.get(&index.id).await;
