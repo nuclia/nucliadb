@@ -489,7 +489,9 @@ impl SyncMetadata {
         let read_meta = self.synced_metadata.read().await;
         let existing_meta = read_meta.get(&index.id);
         if let Some(existing_meta) = existing_meta {
-            existing_meta.write().await.operations = operations;
+            let mut index_meta = existing_meta.write().await;
+            index_meta.index = index;
+            index_meta.operations = operations;
         } else {
             drop(read_meta);
             let shard_id = index.shard_id;
