@@ -77,7 +77,7 @@ async fn refresher_task(mut rx: Receiver<IndexId>, index_cache: Arc<IndexCache>)
         let unique_indexes: HashSet<IndexId> =
             HashSet::from_iter(try_later.drain(std::ops::RangeFull).chain(recv_buf.into_iter()));
         for index_id in unique_indexes {
-            match index_cache.reload(&index_id).await {
+            match index_cache.reload(&index_id, false).await {
                 Ok(true) => {
                     // Index is currently loading, no need to reload now, nut will enqueue a reload for later
                     debug!(?index_id, "Index being loaded by cache, will reload it later");
