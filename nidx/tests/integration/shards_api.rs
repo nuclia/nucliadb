@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use nidx_types::Seq;
@@ -161,14 +161,13 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
 #[sqlx::test]
 async fn test_configure_shards_with_prewarm(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let meta = NidxMetadata::new_with_pool(pool).await?;
-    let storage: Arc<dyn ObjectStore> = Arc::new(InMemory::new());
 
     // Create 2 shards for a KB with 2 vectorsets
     let kbid = Uuid::new_v4();
-    let vector_configs = HashMap::from([
+    let vector_configs = vec![
         ("multilingual".to_string(), VECTOR_CONFIG),
         ("english".to_string(), VECTOR_CONFIG),
-    ]);
+    ];
     let shard_1 = shards::create_shard(&meta, kbid, vector_configs.clone()).await?;
     let shard_2 = shards::create_shard(&meta, kbid, vector_configs).await?;
 

@@ -136,6 +136,7 @@ impl VectorConfig {
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
             entity: IndexEntity::Paragraph,
+            prewarm: false,
         }
     }
 
@@ -147,6 +148,7 @@ impl VectorConfig {
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
             entity: IndexEntity::RelationNode,
+            prewarm: false,
         }
     }
 
@@ -158,6 +160,7 @@ impl VectorConfig {
             vector_cardinality: VectorCardinality::Single,
             flags: vec![],
             entity: IndexEntity::RelationEdge,
+            prewarm: false,
         }
     }
 

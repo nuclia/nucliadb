@@ -73,10 +73,16 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
         Box::new(data_store)
     };
 
-    let index = open_disk_hnsw(path, prewarm)?;
+    let index = open_disk_hnsw(path, config.prewarm)?;
 
-    let inverted_indexes =
-        InvertedIndexes::open(config, path, metadata.records, inverted_index::OpenOptions { prewarm })?;
+    let inverted_indexes = InvertedIndexes::open(
+        config,
+        path,
+        metadata.records,
+        inverted_index::OpenOptions {
+            prewarm: config.prewarm,
+        },
+    )?;
     let alive_bitset = FilterBitSet::new(metadata.records, true);
 
     Ok(OpenSegment {
