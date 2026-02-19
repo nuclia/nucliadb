@@ -159,10 +159,10 @@ impl IndexCache {
     }
 
     /// Reload an index, returns true if it needs to be retried later
-    pub async fn reload(&self, id: &IndexId) -> anyhow::Result<bool> {
+    pub async fn reload(&self, id: &IndexId, force: bool) -> anyhow::Result<bool> {
         let cached = { self.cache.lock().await.peek(id) };
-        match cached {
-            CachePeekResult::Cached(_arc) => {
+        match (cached, force) {
+            (CachePeekResult::Cached, _) | (CachePeekResult::NotPresent, true) => {
                 match self.load(id).await {
                     Ok(new_searcher) => {
                         self.cache.lock().await.insert(id, &new_searcher);
@@ -176,8 +176,8 @@ impl IndexCache {
                     Err(e) => Err(e.into()),
                 }
             }
-            CachePeekResult::Loading => Ok(true),
-            CachePeekResult::NotPresent => Ok(false),
+            (CachePeekResult::Loading, _) => Ok(true),
+            (CachePeekResult::NotPresent, false) => Ok(false),
         }
     }
 
@@ -250,8 +250,8 @@ enum CacheResult<K, V> {
     Wait(ResourceWaiter),
 }
 
-enum CachePeekResult<V> {
-    Cached(Arc<V>),
+enum CachePeekResult {
+    Cached,
     Loading,
     NotPresent,
 }
@@ -322,9 +322,9 @@ where
     }
 
     /// Check if an entry is present in the cache
-    pub fn peek(&mut self, id: &K) -> CachePeekResult<V> {
-        if let Some(v) = self.get_cached(id) {
-            CachePeekResult::Cached(v)
+    pub fn peek(&mut self, id: &K) -> CachePeekResult {
+        if self.get_cached(id).is_some() {
+            CachePeekResult::Cached
         } else if self.loading.contains_key(id) {
             CachePeekResult::Loading
         } else {
@@ -668,11 +668,11 @@ mod tests {
             sync_meta.set(index, operations).await;
 
             // Cache is empty, reloading something that does not exists -> Ok (nothing happened)
-            assert!(matches!(cache.reload(&2i64.into()).await, Ok(false)));
+            assert!(matches!(cache.reload(&2i64.into(), false).await, Ok(false)));
             assert!(cache.cache.lock().await.live.is_empty());
 
             // Cache is empty, reloading something that exists -> Ok (nothing happened)
-            assert!(matches!(cache.reload(&index_id).await, Ok(false)));
+            assert!(matches!(cache.reload(&index_id, false).await, Ok(false)));
             assert!(cache.cache.lock().await.live.is_empty());
 
             // Load the index
@@ -680,12 +680,18 @@ mod tests {
             assert_eq!(cache.cache.lock().await.live.len(), 1);
 
             // Cache has an index, reloading it -> Ok
-            assert!(matches!(cache.reload(&index_id).await, Ok(false)));
+            assert!(matches!(cache.reload(&index_id, false).await, Ok(false)));
+            assert_eq!(cache.cache.lock().await.live.len(), 1);
+
+            // Remove from cache and force reload, which brings it back -> Ok
+            cache.remove(&index_id).await;
+            assert_eq!(cache.cache.lock().await.live.len(), 0);
+            assert!(matches!(cache.reload(&index_id, true).await, Ok(false)));
             assert_eq!(cache.cache.lock().await.live.len(), 1);
 
             // Index deleted from metadata, reload should remove it from cache
             sync_meta.delete(&shard_id, &index_id).await;
-            assert!(matches!(cache.reload(&index_id).await, Ok(false)));
+            assert!(matches!(cache.reload(&index_id, false).await, Ok(false)));
             assert!(cache.cache.lock().await.live.is_empty());
 
             Ok(())

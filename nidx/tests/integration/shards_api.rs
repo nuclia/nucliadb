@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use nidx_types::Seq;
@@ -29,7 +29,7 @@ use uuid::Uuid;
 
 use nidx::api::shards;
 use nidx::indexer::{delete_resource, index_resource};
-use nidx::metadata::{Deletion, Index, Segment};
+use nidx::metadata::{Deletion, Index, IndexKind, Segment};
 use nidx::scheduler::{purge_deleted_shards_and_indexes, purge_deletions, purge_segments};
 use nidx::{NidxMetadata, metadata::Shard};
 use nidx_tests::*;
@@ -154,6 +154,58 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
     assert_eq!(count_segments(&meta.pool).await?, expected_segments);
     assert_eq!(count_merge_jobs(&meta.pool).await?, 0);
     assert_eq!(count_deletions(&meta.pool).await?, expected_deletions);
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn test_configure_shards_with_prewarm(pool: sqlx::PgPool) -> anyhow::Result<()> {
+    let meta = NidxMetadata::new_with_pool(pool).await?;
+
+    // Create 2 shards for a KB with 2 vectorsets
+    let kbid = Uuid::new_v4();
+    let vector_configs = vec![
+        ("multilingual".to_string(), VECTOR_CONFIG),
+        ("english".to_string(), VECTOR_CONFIG),
+    ];
+    let shard_1 = shards::create_shard(&meta, kbid, vector_configs.clone()).await?;
+    let shard_2 = shards::create_shard(&meta, kbid, vector_configs).await?;
+
+    let shard_ids = [shard_1.id, shard_2.id];
+
+    let indexes = Index::for_shards(&meta.pool, &shard_ids).await?;
+    for index in indexes {
+        if index.kind == IndexKind::Vector {
+            let config = index.config::<VectorConfig>()?;
+            assert!(!config.prewarm);
+        }
+    }
+
+    // Now configure the KB with pre-warming
+
+    let shards_config = HashMap::from_iter([(shard_1.id, true), (shard_2.id, true)]);
+    shards::configure_prewarm(&meta, shards_config).await?;
+
+    let indexes = Index::for_shards(&meta.pool, &shard_ids).await?;
+    for index in indexes {
+        if index.kind == IndexKind::Vector {
+            let config = index.config::<VectorConfig>()?;
+            assert!(config.prewarm);
+        }
+    }
+
+    // And disable it again
+
+    let shards_config = HashMap::from_iter([(shard_1.id, false), (shard_2.id, false)]);
+    shards::configure_prewarm(&meta, shards_config).await?;
+
+    let indexes = Index::for_shards(&meta.pool, &shard_ids).await?;
+    for index in indexes {
+        if index.kind == IndexKind::Vector {
+            let config = index.config::<VectorConfig>()?;
+            assert!(!config.prewarm);
+        }
+    }
 
     Ok(())
 }

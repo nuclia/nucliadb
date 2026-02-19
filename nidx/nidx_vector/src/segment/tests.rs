@@ -34,6 +34,7 @@ const CONFIG: VectorConfig = VectorConfig {
     similarity: Similarity::Cosine,
     normalize_vectors: false,
     vector_type: crate::config::VectorType::DenseF32 { dimension: 128 },
+    prewarm: false,
     flags: vec![],
     vector_cardinality: VectorCardinality::Single,
     entity: IndexEntity::Paragraph,

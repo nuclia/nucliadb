@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashMap;
 use std::io::Write;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -147,7 +148,17 @@ impl NidxApi for ApiServer {
         }))
     }
 
-    async fn configure_shards(&self, _request: Request<ShardsConfig>) -> Result<Response<EmptyQuery>> {
+    async fn configure_shards(&self, request: Request<ShardsConfig>) -> Result<Response<EmptyQuery>> {
+        let request = request.into_inner();
+
+        let mut shard_configs = HashMap::new();
+        for config in request.configs {
+            let shard_id = Uuid::from_str(&config.shard_id).map_err(NidxError::from)?;
+            shard_configs.insert(shard_id, config.prewarm_enabled);
+        }
+
+        shards::configure_prewarm(&self.meta, shard_configs).await?;
+
         Ok(Response::new(EmptyQuery {}))
     }
 
