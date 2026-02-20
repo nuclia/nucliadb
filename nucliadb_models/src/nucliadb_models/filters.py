@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 from collections.abc import Sequence
 from enum import Enum
-from typing import Annotated, Any, Generic, Literal, TypeVar
+from typing import Annotated, Any, Generic, Literal, TypeVar, get_args
 from uuid import UUID
 
 import pydantic
 from pydantic import AliasChoices, BaseModel, Discriminator, Tag, field_validator, model_validator
 from pydantic.config import ConfigDict
-from typing_extensions import Self
+from typing_extensions import Self, assert_never
 
 from .common import FieldTypeName, Paragraph
 from .metadata import ResourceProcessingStatus
@@ -378,6 +377,24 @@ ResourceFilterExpression = Annotated[
 ]
 
 
+# Filters that end up as a facet
+FacetFilter = (
+    OriginTag
+    | Label
+    | ResourceMimetype
+    | FieldMimetype
+    | Entity
+    | Language
+    | OriginMetadata
+    | OriginPath
+    | Generated
+    | Kind
+    | OriginCollaborator
+    | OriginSource
+    | Status
+)
+
+
 class FilterExpression(BaseModel, extra="forbid"):
     """Returns only documents that match this filter expression.
     Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters
@@ -406,6 +423,39 @@ class FilterExpression(BaseModel, extra="forbid"):
         ),
     )
 
+    @classmethod
+    def from_field_facets(
+        cls, facets: list[str], operator: Literal["and", "or"] = "and"
+    ) -> "FilterExpression":
+        """
+        Helper function to create a FilterExpression from a list of simple facet labels.
+        This is useful for backward compatibility with old filter parameters.
+        """
+        filters = [filter_from_facet(facet) for facet in facets]
+        # Get allowed types from FieldFilterExpression (excluding logical operators)
+        allowed_types = tuple(
+            get_args(arg)[0]  # Get the first arg from the Annotated[Class, Tag(...)]
+            for arg in get_args(get_args(FieldFilterExpression)[0])
+            if hasattr(arg, "__metadata__") and arg.__metadata__[0].tag not in ("and", "or", "not")
+        )
+        field_filters = []
+        for fltr in filters:
+            if not isinstance(fltr, allowed_types):
+                raise ValueError(
+                    f"Invalid filter type: {type(fltr).__name__}. Only filters of type {allowed_types} are allowed in FilterExpression.field"
+                )
+            field_filters.append(fltr)
+        if len(field_filters) == 0:
+            raise ValueError("At least one filter must be a field filter")
+        if len(field_filters) == 1:
+            return cls(field=field_filters[0])
+        if operator == "and":
+            return cls(field=And(operands=field_filters))
+        elif operator == "or":
+            return cls(field=Or(operands=field_filters))
+        else:
+            raise ValueError(f"Invalid operand: {operator}")
+
 
 class CatalogFilterExpression(BaseModel, extra="forbid"):
     """Returns only documents that match this filter expression.
@@ -418,3 +468,197 @@ class CatalogFilterExpression(BaseModel, extra="forbid"):
     resource: ResourceFilterExpression = pydantic.Field(
         title="Resource filters", description="Filter to apply to resources"
     )
+
+    @classmethod
+    def from_facets(
+        cls, facets: list[str], operator: Literal["and", "or"] = "and"
+    ) -> "CatalogFilterExpression":
+        """
+        Helper function to create a CatalogFilterExpression from a list of simple facet labels.
+        This is useful for backward compatibility with old filter parameters.
+        """
+        filters = [filter_from_facet(facet) for facet in facets]
+        # Get allowed types from ResourceFilterExpression (excluding logical operators)
+        allowed_types = tuple(
+            get_args(arg)[0]  # Get the first arg from the Annotated[Class, Tag(...)]
+            for arg in get_args(get_args(ResourceFilterExpression)[0])
+            if hasattr(arg, "__metadata__") and arg.__metadata__[0].tag not in ("and", "or", "not")
+        )
+        resource_filters = []
+        for fltr in filters:
+            if not isinstance(fltr, allowed_types):
+                raise ValueError(
+                    f"Invalid filter type: {type(fltr).__name__}. Only filters of type {allowed_types} are allowed in CatalogFilterExpression"
+                )
+            resource_filters.append(fltr)
+        if len(resource_filters) == 0:
+            raise ValueError("At least one filter must be a resource filter")
+        if len(resource_filters) == 1:
+            return cls(resource=resource_filters[0])
+        if operator == "and":
+            return cls(resource=And(operands=resource_filters))
+        elif operator == "or":
+            return cls(resource=Or(operands=resource_filters))
+        else:
+            raise ValueError(f"Invalid operand: {operator}")
+
+
+def facet_from_filter(expr: FacetFilter) -> str:
+    if isinstance(expr, OriginTag):
+        facet = f"/t/{expr.tag}"
+    elif isinstance(expr, Label):
+        facet = f"/l/{expr.labelset}"
+        if expr.label:
+            facet += f"/{expr.label}"
+    elif isinstance(expr, ResourceMimetype):
+        facet = f"/n/i/{expr.type}"
+        if expr.subtype:
+            facet += f"/{expr.subtype}"
+    elif isinstance(expr, FieldMimetype):
+        facet = f"/mt/{expr.type}"
+        if expr.subtype:
+            facet += f"/{expr.subtype}"
+    elif isinstance(expr, Entity):
+        facet = f"/e/{expr.subtype}"
+        if expr.value:
+            facet += f"/{expr.value}"
+    elif isinstance(expr, Language):
+        if expr.only_primary:
+            facet = f"/s/p/{expr.language}"
+        else:
+            facet = f"/s/s/{expr.language}"
+    elif isinstance(expr, OriginMetadata):
+        facet = f"/m/{expr.field}"
+        if expr.value:
+            facet += f"/{expr.value}"
+    elif isinstance(expr, OriginPath):
+        facet = "/p"
+        if expr.prefix:
+            # Remove leading/trailing slashes for better compatibility
+            clean_prefix = expr.prefix.strip("/")
+            facet += f"/{clean_prefix}"
+    elif isinstance(expr, Generated):
+        facet = "/g/da"
+        if expr.da_task:
+            facet += f"/{expr.da_task}"
+    elif isinstance(expr, Kind):
+        facet = f"/k/{expr.kind.lower()}"
+    elif isinstance(expr, OriginCollaborator):
+        facet = f"/u/o/{expr.collaborator}"
+    elif isinstance(expr, OriginSource):
+        facet = "/u/s"
+        if expr.id:
+            facet += f"/{expr.id}"
+    elif isinstance(expr, Status):
+        facet = f"/n/s/{expr.status.value}"
+    else:
+        assert_never(expr)
+
+    return facet
+
+
+def filter_from_facet(facet: str) -> FacetFilter:
+    expr: FacetFilter
+
+    if facet.startswith("/t/"):
+        value = facet.removeprefix("/t/")
+        expr = OriginTag(tag=value)
+
+    elif facet.startswith("/l/"):
+        value = facet.removeprefix("/l/")
+        parts = value.split("/", maxsplit=1)
+        if len(parts) == 1:
+            type = parts[0]
+            expr = Label(labelset=type)
+        else:
+            type, subtype = parts
+            expr = Label(labelset=type, label=subtype)
+
+    elif facet.startswith("/n/i/"):
+        value = facet.removeprefix("/n/i/")
+        parts = value.split("/", maxsplit=1)
+        if len(parts) == 1:
+            type = parts[0]
+            expr = ResourceMimetype(type=type)
+        else:
+            type, subtype = parts
+            expr = ResourceMimetype(type=type, subtype=subtype)
+
+    elif facet.startswith("/mt/"):
+        value = facet.removeprefix("/mt/")
+        parts = value.split("/", maxsplit=1)
+        if len(parts) == 1:
+            type = parts[0]
+            expr = FieldMimetype(type=type)
+        else:
+            type, subtype = parts
+            expr = FieldMimetype(type=type, subtype=subtype)
+
+    elif facet.startswith("/e/"):
+        value = facet.removeprefix("/e/")
+        parts = value.split("/", maxsplit=1)
+        if len(parts) == 1:
+            subtype = parts[0]
+            expr = Entity(subtype=subtype)
+        else:
+            subtype, value = parts
+            expr = Entity(subtype=subtype, value=value)
+
+    elif facet.startswith("/s/p"):
+        value = facet.removeprefix("/s/p/")
+        expr = Language(language=value, only_primary=True)
+
+    elif facet.startswith("/s/s"):
+        value = facet.removeprefix("/s/s/")
+        expr = Language(language=value, only_primary=False)
+
+    elif facet.startswith("/m/"):
+        value = facet.removeprefix("/m/")
+        parts = value.split("/", maxsplit=1)
+        if len(parts) == 1:
+            field = parts[0]
+            expr = OriginMetadata(field=field)
+        else:
+            field, value = parts
+            expr = OriginMetadata(field=field, value=value)
+
+    elif facet.startswith("/p/"):
+        value = facet.removeprefix("/p/")
+        expr = OriginPath(prefix=value)
+
+    elif facet.startswith("/g/da"):
+        value = facet.removeprefix("/g/da")
+        expr = expr = Generated(by="data-augmentation")
+        if value.removeprefix("/"):
+            expr.da_task = value.removeprefix("/")
+
+    elif facet.startswith("/k/"):
+        value = facet.removeprefix("/k/")
+        try:
+            kind = Paragraph.TypeParagraph(value.upper())
+        except ValueError:
+            raise ValueError(f"invalid paragraph kind: {value}")
+        expr = Kind(kind=kind)
+
+    elif facet.startswith("/u/o/"):
+        value = facet.removeprefix("/u/o/")
+        expr = OriginCollaborator(collaborator=value)
+
+    elif facet.startswith("/u/s"):
+        value = facet.removeprefix("/u/s")
+        expr = OriginSource()
+        if value.removeprefix("/"):
+            expr.id = value.removeprefix("/")
+
+    elif facet.startswith("/n/s/"):
+        value = facet.removeprefix("/n/s/")
+        try:
+            status = ResourceProcessingStatus(value.upper())
+        except ValueError:
+            raise ValueError(f"invalid resource processing status: {value}")
+        expr = Status(status=status)
+
+    else:
+        raise ValueError(f"invalid filter: {facet}")
+
+    return expr

@@ -21,10 +21,13 @@
 import pytest
 
 from nucliadb.common.exceptions import InvalidQueryError
-from nucliadb.common.filter_expression import FacetFilter, facet_from_filter, filter_from_facet
+from nucliadb.common.filter_expression import facet_from_filter, filter_from_facet
 from nucliadb_models.common import Paragraph
 from nucliadb_models.filters import (
+    And,
+    CatalogFilterExpression,
     Entity,
+    FacetFilter,
     FieldMimetype,
     Generated,
     Kind,
@@ -112,3 +115,27 @@ def test_facet_to_filter_conversions(facet: str, expr: FacetFilter):
 def test_invalid_filters(facet: str):
     with pytest.raises(InvalidQueryError):
         filter_from_facet(facet)
+
+
+def test_catalog_from_facets():
+    filter_expression = CatalogFilterExpression.from_facets(
+        ["/t/mytag", "/l/labelset/label", "/n/i/image/png"]
+    )
+    assert isinstance(filter_expression.resource, And)
+    assert len(filter_expression.resource.operands) == 3
+    assert isinstance(filter_expression.resource.operands[0], OriginTag)
+    assert filter_expression.resource.operands[0].tag == "mytag"
+    assert isinstance(filter_expression.resource.operands[1], Label)
+    assert filter_expression.resource.operands[1].labelset == "labelset"
+    assert filter_expression.resource.operands[1].label == "label"
+    assert isinstance(filter_expression.resource.operands[2], ResourceMimetype)
+    assert filter_expression.resource.operands[2].type == "image"
+    assert filter_expression.resource.operands[2].subtype == "png"
+
+    # Check that non-catalog facets are ignored
+    with pytest.raises(ValueError):
+        CatalogFilterExpression.from_facets(["/k/text"])
+
+    # Check that empty facets raise an error
+    with pytest.raises(ValueError):
+        CatalogFilterExpression.from_facets([])
