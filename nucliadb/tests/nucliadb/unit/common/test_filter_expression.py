@@ -29,10 +29,12 @@ from nucliadb_models.filters import (
     Entity,
     FacetFilter,
     FieldMimetype,
+    FilterExpression,
     Generated,
     Kind,
     Label,
     Language,
+    Or,
     OriginCollaborator,
     OriginMetadata,
     OriginPath,
@@ -132,6 +134,16 @@ def test_catalog_from_facets():
     assert filter_expression.resource.operands[2].type == "image"
     assert filter_expression.resource.operands[2].subtype == "png"
 
+    # Check single filter
+    single_filter = CatalogFilterExpression.from_facets(["/l/labelset"])
+    assert isinstance(single_filter.resource, Label)
+    assert single_filter.resource.labelset == "labelset"
+
+    # Check OR operator
+    or_filter = CatalogFilterExpression.from_facets(["/t/tag1", "/t/tag2"], operator="or")
+    assert isinstance(or_filter.resource, Or)
+    assert len(or_filter.resource.operands) == 2
+
     # Check that non-catalog facets are ignored
     with pytest.raises(ValueError):
         CatalogFilterExpression.from_facets(["/k/text"])
@@ -139,3 +151,37 @@ def test_catalog_from_facets():
     # Check that empty facets raise an error
     with pytest.raises(ValueError):
         CatalogFilterExpression.from_facets([])
+
+
+def test_filter_expression_from_field_facets():
+    filter_expression = FilterExpression.from_field_facets(
+        ["/t/mytag", "/l/labelset/label", "/mt/image/png", "/e/PERSON/Alice"]
+    )
+    assert filter_expression.field is not None
+    assert isinstance(filter_expression.field, And)
+    assert len(filter_expression.field.operands) == 4
+    assert isinstance(filter_expression.field.operands[0], OriginTag)
+    assert filter_expression.field.operands[0].tag == "mytag"
+    assert isinstance(filter_expression.field.operands[1], Label)
+    assert filter_expression.field.operands[1].labelset == "labelset"
+    assert filter_expression.field.operands[1].label == "label"
+    assert isinstance(filter_expression.field.operands[2], FieldMimetype)
+    assert filter_expression.field.operands[2].type == "image"
+    assert filter_expression.field.operands[2].subtype == "png"
+    assert isinstance(filter_expression.field.operands[3], Entity)
+    assert filter_expression.field.operands[3].subtype == "PERSON"
+    assert filter_expression.field.operands[3].value == "Alice"
+
+    # Check single filter
+    single_filter = FilterExpression.from_field_facets(["/l/labelset"])
+    assert isinstance(single_filter.field, Label)
+    assert single_filter.field.labelset == "labelset"
+
+    # Check OR operator
+    or_filter = FilterExpression.from_field_facets(["/t/tag1", "/t/tag2"], operator="or")
+    assert isinstance(or_filter.field, Or)
+    assert len(or_filter.field.operands) == 2
+
+    # Check that empty facets raise an error
+    with pytest.raises(ValueError):
+        FilterExpression.from_field_facets([])
