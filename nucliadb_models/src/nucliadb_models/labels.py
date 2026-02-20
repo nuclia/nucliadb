@@ -59,6 +59,9 @@ LABEL_HIDDEN = "/q/h"
 
 
 def translate_alias_to_system_label(label: str) -> str:
+    """
+    This assumes that the label comes in the format of /namespace/name, for example /entities/person/JohnDoe.
+    """
     parts = label.split("/")
     if parts[1] in LABEL_QUERY_ALIASES:
         parts = [""] + [LABEL_QUERY_ALIASES[parts[1]]] + parts[2:]
