@@ -136,6 +136,8 @@ class S3StorageField(StorageField):
         if self.field is not None and self.field.upload_uri != "":
             # Field has already a file beeing uploaded, cancel
             await self._abort_multipart()
+            self.field.Clear()
+            self.field = None
 
         if self.field is not None and self.field.uri != "":
             # If exist the file copy the old url to delete
