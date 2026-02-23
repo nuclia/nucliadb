@@ -146,7 +146,7 @@ class TestVectorSetAndMatryoshkaParsing:
                 new=AsyncMock(return_value=(vectorset is not None)),
             ),
             patch(
-                "nucliadb.search.search.query_parser.fetcher.Fetcher.get_matryoshka_dimension_cached",
+                "nucliadb.search.search.query_parser.fetcher.Fetcher.get_matryoshka_dimension",
                 new=AsyncMock(return_value=matryoshka_dimension),
             ),
             patch("nucliadb.common.datamanagers.utils.get_driver"),

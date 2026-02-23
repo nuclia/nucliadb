@@ -108,7 +108,7 @@ class Fetcher:
 
     async def get_matryoshka_dimension(self) -> int | None:
         vectorset = await self.get_vectorset()
-        return await self.get_matryoshka_dimension_cached(self.kbid, vectorset)
+        return await get_matryoshka_dimension_cached(self.kbid, vectorset)
 
     async def get_user_vectorset(self) -> str | None:
         """Returns the user's requested vectorset and validates if it does exist
@@ -331,17 +331,13 @@ class Fetcher:
 
         return detected_entities
 
+    @alru_cache(maxsize=1)
     async def validate_vectorset(self, kbid: str, vectorset: str):
         async with datamanagers.with_ro_transaction() as txn:
             if not await datamanagers.vectorsets.exists(txn, kbid=kbid, vectorset_id=vectorset):
                 raise InvalidQueryError(
                     "vectorset", f"Vectorset {vectorset} doesn't exist in your Knowledge Box"
                 )
-
-    @alru_cache(maxsize=10)
-    async def get_matryoshka_dimension_cached(self, kbid: str, vectorset: str) -> int | None:
-        # This can be safely cached as the matryoshka dimension is not expected to change
-        return await get_matryoshka_dimension(kbid, vectorset)
 
 
 @query_parse_dependency_observer.wrap({"type": "query_information"})
@@ -371,6 +367,13 @@ async def query_information(
 async def detect_entities(kbid: str, query: str) -> list[utils_pb2.RelationNode]:
     predict = get_predict()
     return await predict.detect_entities(kbid, query)
+
+
+# in case we see more KBs being searched simultaneously we can increase this value
+@alru_cache(maxsize=100)
+async def get_matryoshka_dimension_cached(kbid: str, vectorset: str | None) -> int | None:
+    # This can be safely cached as the matryoshka dimension is not expected to change
+    return await get_matryoshka_dimension(kbid, vectorset)
 
 
 @query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})
