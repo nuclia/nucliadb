@@ -92,6 +92,16 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
     if "semantic_model" in user_learning_config:
         user_learning_config["semantic_models"] = [user_learning_config.pop("semantic_model")]
 
+    deprecated_keys = [
+        "semantic_vector_similarity",
+        "semantic_vector_size",
+        "semantic_matryoshka_dimensions",
+        "semantic_model_configs",
+        "semantic_threshold",
+    ]
+    for key in deprecated_keys:
+        user_learning_config.pop(key, None)
+
     # we rely on learning to return the updated configuration with defaults and
     # any other needed values (e.g. matryoshka settings if available)
     learning_config = await learning_proxy.set_configuration(kbid, config=user_learning_config)
