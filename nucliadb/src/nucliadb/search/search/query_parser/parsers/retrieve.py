@@ -134,14 +134,14 @@ class _RetrievalParser:
         return keyword_query, is_synonyms_query
 
     async def _parse_semantic_query(self) -> tuple[str, list[float]]:
-        # Make sure the vectorset exists in the KB
         assert self.item.query.semantic is not None
-        vectorset = self.item.query.semantic.vectorset
-        await self.fetcher.validate_vectorset(self.kbid, vectorset)
+        # Make sure the vectorset exists in the KB and is valid
+        vectorset = await self.fetcher.get_user_vectorset()
+        assert vectorset is not None, "retrieve always enforces a vectorset on semantic search"
 
         # Calculate the matryoshka dimension if applicable
         user_vector = self.item.query.semantic.query
-        matryoshka_dimension = await self.fetcher.get_matryoshka_dimension_cached(self.kbid, vectorset)
+        matryoshka_dimension = await self.fetcher.get_matryoshka_dimension()
         if matryoshka_dimension is not None:
             if len(user_vector) < matryoshka_dimension:
                 raise InvalidQueryError(
