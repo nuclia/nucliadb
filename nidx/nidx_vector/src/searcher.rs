@@ -235,6 +235,14 @@ impl Searcher {
         self.open_segments.iter().map(|dp| dp.space_usage()).sum()
     }
 
+    pub fn prewarm_space_usage(&self) -> usize {
+        if self.config.prewarm {
+            self.open_segments.iter().map(|dp| dp.prewarm_space_usage()).sum()
+        } else {
+            0
+        }
+    }
+
     fn _search(
         &self,
         request: &SearchRequest,

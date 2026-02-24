@@ -146,6 +146,10 @@ impl VectorSearcher {
     pub fn space_usage(&self) -> usize {
         self.searcher.space_usage()
     }
+
+    pub fn prewarm_space_usage(&self) -> usize {
+        self.searcher.prewarm_space_usage()
+    }
 }
 
 fn open_segments(

@@ -496,6 +496,12 @@ impl OpenSegment {
         self.data_store.size_bytes() + self.index.size() + self.inverted_indexes.space_usage()
     }
 
+    pub fn prewarm_space_usage(&self) -> usize {
+        // this is a really naive way to compute this metric, we simply sum all
+        // the components we prewarm, but we aren't sure if they're still in memory
+        self.data_store.prewarm_size_bytes() + self.index.size() + self.inverted_indexes.space_usage()
+    }
+
     pub fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef<'_> {
         self.data_store.get_paragraph(id)
     }

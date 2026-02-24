@@ -192,6 +192,7 @@ pub mod searcher {
 
         INDEX_CACHE_COUNT: Gauge as "searcher_index_cache_count" ("Number of indexes in the searcher cache"),
         INDEX_CACHE_BYTES: Gauge as "searcher_index_cache_size_bytes" ("Total size of open indexes in the searcher cache"),
+        INDEX_CACHE_PREWARM_BYTES: Gauge as "searcher_index_cache_prewarm_size_bytes" ("Total size of open prewarmed indexes in the searcher cache"),
     }
 }
 

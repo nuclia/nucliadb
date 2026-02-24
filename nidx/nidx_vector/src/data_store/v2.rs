@@ -156,7 +156,17 @@ impl DataStore for DataStoreV2 {
     }
 
     fn size_bytes(&self) -> usize {
-        self.vectors.size_bytes() + self.paragraphs.size_bytes()
+        self.vectors.size_bytes()
+            + self.paragraphs.size_bytes()
+            + self.quantized.as_ref().map_or(0, |quantized| quantized.size_bytes())
+    }
+
+    fn prewarm_size_bytes(&self) -> usize {
+        if let Some(quantized) = &self.quantized {
+            quantized.size_bytes()
+        } else {
+            0
+        }
     }
 
     fn stored_paragraph_count(&self) -> u32 {

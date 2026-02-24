@@ -51,6 +51,11 @@ impl DataStore for DataStoreV1 {
         self.nodes.len()
     }
 
+    fn prewarm_size_bytes(&self) -> usize {
+        // we don't prewarm
+        0
+    }
+
     fn stored_paragraph_count(&self) -> u32 {
         store::stored_elements(&self.nodes) as u32
     }
