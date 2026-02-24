@@ -91,6 +91,10 @@ impl QuantVectorStore {
 
     #[cfg(target_os = "windows")]
     pub fn will_need(src: &[u8], id: usize, vector_len: usize) {}
+
+    pub fn size_bytes(&self) -> usize {
+        self.data.len()
+    }
 }
 
 pub struct QuantVectorStoreWriter {

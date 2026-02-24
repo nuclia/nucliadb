@@ -93,6 +93,15 @@ impl MemoryUsage for IndexSearcher {
             IndexSearcher::Vector(vector_searcher) => vector_searcher.space_usage(),
         }
     }
+
+    fn prewarm_memory_usage(&self) -> usize {
+        match self {
+            IndexSearcher::Paragraph(_) => 0,
+            IndexSearcher::Relation(_) => 0,
+            IndexSearcher::Text(_) => 0,
+            IndexSearcher::Vector(vector_searcher) => vector_searcher.prewarm_space_usage(),
+        }
+    }
 }
 
 /// This structure (its trait) is passed to the indexes in order to open a searcher.
@@ -258,6 +267,7 @@ enum CachePeekResult {
 
 trait MemoryUsage {
     fn memory_usage(&self) -> usize;
+    fn prewarm_memory_usage(&self) -> usize;
 }
 
 struct ResourceCache<K, V: MemoryUsage> {
@@ -342,6 +352,7 @@ where
         if let Some(v) = self.live.pop(k) {
             INDEX_CACHE_COUNT.dec();
             INDEX_CACHE_BYTES.dec_by(v.memory_usage() as i64);
+            INDEX_CACHE_PREWARM_BYTES.dec_by(v.prewarm_memory_usage() as i64);
         }
     }
 
@@ -359,10 +370,12 @@ where
         }
         INDEX_CACHE_COUNT.inc();
         INDEX_CACHE_BYTES.inc_by(v.memory_usage() as i64);
+        INDEX_CACHE_PREWARM_BYTES.inc_by(v.prewarm_memory_usage() as i64);
         if let Some((_, out)) = self.live.push(k.clone(), Arc::clone(v)) {
             // The previous condition ensures this only happens if updating an existing key with a new value
             INDEX_CACHE_COUNT.dec();
             INDEX_CACHE_BYTES.dec_by(out.memory_usage() as i64);
+            INDEX_CACHE_PREWARM_BYTES.dec_by(out.prewarm_memory_usage() as i64);
         }
     }
 
@@ -370,6 +383,7 @@ where
         if let Some((evicted_k, evicted_v)) = self.live.pop_lru() {
             INDEX_CACHE_COUNT.dec();
             INDEX_CACHE_BYTES.dec_by(evicted_v.memory_usage() as i64);
+            INDEX_CACHE_PREWARM_BYTES.dec_by(evicted_v.prewarm_memory_usage() as i64);
             self.eviction.insert(evicted_k, Arc::downgrade(&evicted_v));
         }
     }
@@ -424,10 +438,18 @@ mod tests {
             fn memory_usage(&self) -> usize {
                 123
             }
+
+            fn prewarm_memory_usage(&self) -> usize {
+                63
+            }
         }
 
         impl MemoryUsage for usize {
             fn memory_usage(&self) -> usize {
+                8
+            }
+
+            fn prewarm_memory_usage(&self) -> usize {
                 8
             }
         }

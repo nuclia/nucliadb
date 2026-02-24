@@ -90,6 +90,7 @@ impl ParagraphRef<'_> {
 
 pub trait DataStore: Sync + Send {
     fn size_bytes(&self) -> usize;
+    fn prewarm_size_bytes(&self) -> usize;
     fn stored_paragraph_count(&self) -> u32;
     fn stored_vector_count(&self) -> u32;
     fn get_paragraph(&self, id: ParagraphAddr) -> ParagraphRef<'_>;
