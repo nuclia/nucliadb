@@ -47,11 +47,12 @@ pub enum ControlRequest {
 struct Alive {
     database: bool,
     check_database: bool,
+    nats_connected: Option<bool>,
 }
 
 impl Alive {
     fn all_ok(&self) -> bool {
-        !self.check_database || self.database
+        (!self.check_database || self.database) && self.nats_connected.unwrap_or(true)
     }
 }
 
@@ -69,7 +70,6 @@ enum ControlResponse {
         alive: Alive,
         searcher_sync_delay: Option<f64>,
         searcher_initally_synced: Option<bool>,
-        nats_connected: Option<bool>,
     },
 }
 
@@ -137,15 +137,21 @@ impl ControlServer {
     }
 
     async fn alive(&self) -> Alive {
+        let nats_connected = self
+            .nats_client
+            .as_ref()
+            .map(|c| c.connection_state() == async_nats::connection::State::Connected);
         if self.check_database {
             Alive {
                 database: self.meta.pool.acquire().await.is_ok(),
                 check_database: true,
+                nats_connected,
             }
         } else {
             Alive {
                 database: true,
                 check_database: false,
+                nats_connected,
             }
         }
     }
@@ -165,10 +171,6 @@ impl ControlServer {
             alive: self.alive().await,
             searcher_sync_delay,
             searcher_initally_synced: self.searcher_synced,
-            nats_connected: self
-                .nats_client
-                .as_ref()
-                .map(|c| c.connection_state() == async_nats::connection::State::Connected),
         }
     }
 }
@@ -191,10 +193,9 @@ pub fn control_client(settings: &EnvSettings, request: ControlRequest) -> anyhow
     } else if let ControlResponse::Ready {
         alive,
         searcher_initally_synced,
-        nats_connected,
         ..
     } = response
-        && !(alive.all_ok() && searcher_initally_synced.unwrap_or(true) && nats_connected.unwrap_or(true))
+        && !(alive.all_ok() && searcher_initally_synced.unwrap_or(true))
     {
         return Err(anyhow!("Not ready"));
     }
