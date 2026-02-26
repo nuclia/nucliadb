@@ -182,13 +182,6 @@ class Processor:
                 extra={"seqid": seqid, "partition": partition},
             )
 
-    async def get_resource_uuid(self, kb: KnowledgeBox, message: writer_pb2.BrokerMessage) -> str:
-        if message.uuid is None:
-            uuid = await kb.get_resource_uuid_by_slug(message.slug)
-        else:
-            uuid = message.uuid
-        return uuid
-
     @processor_observer.wrap({"type": "delete_resource"})
     async def delete_resource(
         self,
@@ -197,15 +190,31 @@ class Processor:
         partition: str,
         transaction_check: bool = True,
     ) -> None:
-        async with locking.distributed_lock(
-            locking.RESOURCE_LOCK.format(kbid=message.kbid, resource_id=message.uuid)
-        ):
+        kbid = message.kbid
+        uuid = (
+            message.uuid
+            if message.uuid
+            else await datamanagers.atomic.resources.get_resource_uuid_from_slug(
+                kbid=kbid, slug=message.slug
+            )
+        )
+        if uuid is None:
+            logger.info(
+                "Resource or KB does not exist: skipping delete",
+                extra={"kbid": kbid, "slug": message.slug, "uuid": uuid},
+            )
+            if transaction_check:
+                async with datamanagers.with_rw_transaction() as txn:
+                    await sequence_manager.set_last_seqid(txn, partition, seqid)
+                    await txn.commit()
+            return
+
+        async with locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)):
             async with self.driver.rw_transaction() as txn:
                 try:
-                    kb = KnowledgeBox(txn, self.storage, message.kbid)
-                    uuid = await self.get_resource_uuid(kb, message)
+                    kb = KnowledgeBox(txn, self.storage, kbid)
                     shard_id = await datamanagers.resources.get_resource_shard_id(
-                        txn, kbid=message.kbid, rid=uuid
+                        txn, kbid=kbid, rid=uuid
                     )
                     if shard_id is None:
                         logger.warning(f"Resource {uuid} does not exist")
@@ -214,23 +223,23 @@ class Processor:
                         if shard is None:
                             raise AttributeError("Shard not available")
 
-                        await catalog_delete(txn, message.kbid, uuid)
-                        external_index_manager = await get_external_index_manager(kbid=message.kbid)
+                        await catalog_delete(txn, kbid, uuid)
+                        external_index_manager = await get_external_index_manager(kbid=kbid)
                         if external_index_manager is not None:
                             await self.external_index_delete_resource(external_index_manager, uuid)
                         else:
                             await self.index_node_shard_manager.delete_resource(
-                                shard, message.uuid, seqid, partition, message.kbid
+                                shard, uuid, seqid, partition, kbid
                             )
                         try:
-                            await kb.delete_resource(message.uuid)
+                            await kb.delete_resource(uuid)
                         except Exception as exc:
                             await txn.abort()
                             await self.notify_abort(
                                 partition=partition,
                                 seqid=seqid,
-                                kbid=message.kbid,
-                                rid=message.uuid,
+                                kbid=kbid,
+                                rid=uuid,
                                 source=message.source,
                             )
                             raise exc
