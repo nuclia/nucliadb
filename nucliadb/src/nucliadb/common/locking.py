@@ -33,7 +33,7 @@ from .maindb.utils import get_driver
 logger = logging.getLogger(__name__)
 
 NEW_SHARD_LOCK = "new-shard-{kbid}"
-RESOURCE_INDEX_LOCK = "resource-index-{kbid}-{resource_id}"
+RESOURCE_LOCK = "resource-{kbid}-{resource_id}"
 RESOURCE_CREATION_SLUG_LOCK = "resource-creation-{kbid}-{resource_slug}"
 KB_SHARDS_LOCK = "shards-kb-{kbid}"
 MIGRATIONS_LOCK = "migration"
