@@ -123,6 +123,11 @@ ingest_processed_consumer_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
 ingest_processed_consumer_podLabels: {}
 ingest_processed_consumer_podAnnotations: {}
 ingest_processed_consumer:
