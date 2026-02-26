@@ -322,7 +322,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             rid = request.rid
             async with (
                 locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=rid)),
-                self.driver.rw_transaction as txn,
+                self.driver.rw_transaction() as txn,
             ):
                 kbobj = KnowledgeBoxORM(txn, self.storage, kbid)
                 resobj = ResourceORM(txn, self.storage, kbid, rid)
