@@ -16,4 +16,6 @@ spec:
   minReplicas: {{.Values.ingest_processed_consumer_autoscaling.minReplicas}}
   maxReplicas: {{.Values.ingest_processed_consumer_autoscaling.maxReplicas}}
   metrics: {{- toYaml .Values.ingest_processed_consumer_autoscaling.metrics | nindent 4}}
+  {{- if .Values.ingest_processed_consumer_autoscaling.behavior }}
   behavior: {{- toYaml .Values.ingest_processed_consumer_autoscaling.behavior | nindent 4}}
+  {{- end }}

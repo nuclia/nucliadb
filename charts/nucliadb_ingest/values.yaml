@@ -123,7 +123,6 @@ ingest_processed_consumer_autoscaling:
         target:
           type: Utilization
           averageUtilization: 75
-  behavior: {}
 ingest_processed_consumer_podLabels: {}
 ingest_processed_consumer_podAnnotations: {}
 ingest_processed_consumer:
