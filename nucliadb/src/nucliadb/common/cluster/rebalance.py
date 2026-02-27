@@ -465,10 +465,8 @@ async def move_resource_to_shard(
     deleted_from_old = False
     try:
         async with (
+            locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=resource_id)),
             datamanagers.with_transaction() as txn,
-            locking.distributed_lock(
-                locking.RESOURCE_INDEX_LOCK.format(kbid=kbid, resource_id=resource_id)
-            ),
         ):
             found_shard_id = await datamanagers.resources.get_resource_shard_id(
                 txn, kbid=kbid, rid=resource_id, for_update=True
