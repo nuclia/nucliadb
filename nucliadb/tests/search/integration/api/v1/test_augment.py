@@ -70,6 +70,87 @@ async def test_augment_api(
 
 
 @pytest.mark.deploy_modes("standalone")
+async def test_augment_api_resource_fields(
+    nucliadb_search: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
+) -> None:
+    kbid = knowledgebox
+    rid = await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    # Validate how the resource fields text is returned depending on the filters
+
+    resp = await nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/augment",
+        json={
+            "resources": [
+                {
+                    "given": [rid],
+                    "fields": {
+                        "text": True,
+                        # no filters means all resource fields
+                        "filters": [],
+                    },
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 200
+
+    body = AugmentResponse.model_validate(resp.json())
+    field = body.fields[f"{rid}/f/smb-wonder"]
+    assert field.text is not None and len(field.text) == 234
+
+    resp = await nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/augment",
+        json={
+            "resources": [
+                {
+                    "given": [rid],
+                    "fields": {
+                        "text": True,
+                        "filters": [
+                            # only text fields
+                            {"prop": "field", "type": "file"}
+                        ],
+                    },
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 200
+
+    body = AugmentResponse.model_validate(resp.json())
+    field = body.fields[f"{rid}/f/smb-wonder"]
+    assert field.text is not None and len(field.text) == 234
+
+    resp = await nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/augment",
+        json={
+            "resources": [
+                {
+                    "given": [rid],
+                    "fields": {
+                        "text": True,
+                        "filters": [
+                            # try with all other field types
+                            {"prop": "field", "type": t}
+                            for t in ["text", "link", "generic", "conversation"]
+                        ],
+                    },
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 200
+
+    body = AugmentResponse.model_validate(resp.json())
+    # no field returned, as the resource only has a file field
+    assert len(body.fields) == 0
+
+
+@pytest.mark.deploy_modes("standalone")
 async def test_augment_api_images(
     nucliadb_search: AsyncClient,
     nucliadb_writer: AsyncClient,
