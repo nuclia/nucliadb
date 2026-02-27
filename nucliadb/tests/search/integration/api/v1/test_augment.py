@@ -112,7 +112,7 @@ async def test_augment_api_resource_fields(
                         "text": True,
                         "filters": [
                             # only text fields
-                            {"prop": "field", "type": "text"}
+                            {"prop": "field", "type": "file"}
                         ],
                     },
                 }
@@ -136,7 +136,7 @@ async def test_augment_api_resource_fields(
                         "filters": [
                             # try with all other field types
                             {"prop": "field", "type": t}
-                            for t in ["file", "link", "generic", "conversation"]
+                            for t in ["text", "link", "generic", "conversation"]
                         ],
                     },
                 }
@@ -146,7 +146,7 @@ async def test_augment_api_resource_fields(
     assert resp.status_code == 200
 
     body = AugmentResponse.model_validate(resp.json())
-    # no field returned, as the resource only has a text field
+    # no field returned, as the resource only has a file field
     assert len(body.fields) == 0
 
 
