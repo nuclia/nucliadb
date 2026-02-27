@@ -119,7 +119,7 @@ async def augment(
                 for field_id in unfiltered_field_ids:
                     for filter in augmentation.filter:
                         if isinstance(filter, nucliadb_models.filters.Field):
-                            if filter.type == field_id.type and (
+                            if filter.type == field_id.type_name and (
                                 filter.name is None or filter.name == field_id.key
                             ):
                                 field_ids.append(field_id)
