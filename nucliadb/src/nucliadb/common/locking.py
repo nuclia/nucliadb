@@ -193,7 +193,7 @@ class _Lock:
             wait_duration = 0.0
         lock_wait_duration_histogram.observe(wait_duration, labels={"lock_type": self.lock_type})
         lock_acquired_counter.inc(labels={"lock_type": self.lock_type})
-        locks_active_gauge.inc(1, labels={"type": self.lock_type})
+        locks_active_gauge.inc(1, labels={"lock_type": self.lock_type})
         self.acquired_at = time.time()
 
         self.task = asyncio.create_task(self._refresh_task())
