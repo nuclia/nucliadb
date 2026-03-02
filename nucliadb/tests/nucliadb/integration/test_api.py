@@ -1981,3 +1981,95 @@ async def test_client_errors_can_be_logged_on_server_side(
                 "response_payload": resp_bytes,
             },
         )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_concurrent_patch_operations(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox,
+):
+    """
+    Test that multiple concurrent patch operations on the same resource work correctly.
+    """
+    import asyncio
+
+    kbid = standalone_knowledgebox
+
+    # Create a resource
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Initial Title",
+            "texts": {
+                "text1": {"body": "Initial text 1"},
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Define multiple patch operations to run in parallel
+    async def patch_title(index: int):
+        resp = await nucliadb_writer.patch(
+            f"/kb/{kbid}/resource/{rid}",
+            json={"title": f"Updated Title {index}"},
+        )
+        return resp.status_code
+
+    async def patch_text_field(field_name: str, content: str):
+        resp = await nucliadb_writer.patch(
+            f"/kb/{kbid}/resource/{rid}",
+            json={"texts": {field_name: {"body": content}}},
+        )
+        return resp.status_code
+
+    async def patch_metadata(index: int):
+        resp = await nucliadb_writer.patch(
+            f"/kb/{kbid}/resource/{rid}",
+            json={
+                "usermetadata": {
+                    "classifications": [{"labelset": f"labelset{index}", "label": f"label{index}"}]
+                }
+            },
+        )
+        return resp.status_code
+
+    # Run multiple patch operations concurrently
+    tasks = [
+        patch_title(1),
+        patch_title(2),
+        patch_title(3),
+        patch_text_field("text2", "New text field 2"),
+        patch_text_field("text3", "New text field 3"),
+        patch_text_field("text4", "New text field 4"),
+        patch_metadata(1),
+        patch_metadata(2),
+    ]
+
+    results = await asyncio.gather(*tasks)
+
+    # All operations should succeed
+    for status_code, task in zip(results, tasks):
+        identifier = task.__name__
+        assert status_code == 200, f"Patch operation {identifier} failed with status {status_code}"
+
+    # Verify the resource state after all patches
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}?show=values&show=basic",
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # Check that all text fields were added
+    assert "text1" in data["data"]["texts"]
+    assert "text2" in data["data"]["texts"]
+    assert "text3" in data["data"]["texts"]
+    assert "text4" in data["data"]["texts"]
+
+    # The title should be one of the updated titles
+    assert data["title"].startswith("Updated Title")
+
+    # At least some classifications should be present
+    assert "classifications" in data["usermetadata"]
+    assert len(data["usermetadata"]["classifications"]) > 0

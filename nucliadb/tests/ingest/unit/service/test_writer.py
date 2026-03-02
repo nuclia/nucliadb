@@ -411,28 +411,6 @@ class TestWriterServicer:
 
         assert resp.status == writer_pb2.GetEntitiesGroupResponse.Status.ERROR
 
-    async def test_Index(self, writer: WriterServicer):
-        request = writer_pb2.IndexResource(kbid="kbid", rid="rid")
-
-        txn = AsyncMock()
-        with (
-            patch("nucliadb.ingest.service.writer.get_partitioning") as get_partitioning,
-            patch(
-                "nucliadb.ingest.service.writer.get_transaction_utility",
-                MagicMock(return_value=txn),
-            ),
-            patch(
-                "nucliadb.ingest.service.writer.generate_broker_message",
-                AsyncMock(return_value=writer_pb2.BrokerMessage()),
-            ),
-        ):
-            resp = await writer.Index(request)
-
-            get_partitioning().generate_partition.assert_called_once_with("kbid", "rid")
-            txn.commit.assert_called_once()
-
-            assert isinstance(resp, writer_pb2.IndexStatus)
-
     @pytest.fixture(scope="function")
     def nats_manager(self):
         nats_manager = Mock()

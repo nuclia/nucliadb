@@ -182,13 +182,6 @@ class Processor:
                 extra={"seqid": seqid, "partition": partition},
             )
 
-    async def get_resource_uuid(self, kb: KnowledgeBox, message: writer_pb2.BrokerMessage) -> str:
-        if message.uuid is None:
-            uuid = await kb.get_resource_uuid_by_slug(message.slug)
-        else:
-            uuid = message.uuid
-        return uuid
-
     @processor_observer.wrap({"type": "delete_resource"})
     async def delete_resource(
         self,
@@ -197,19 +190,32 @@ class Processor:
         partition: str,
         transaction_check: bool = True,
     ) -> None:
-        async with self.driver.rw_transaction() as txn:
-            try:
-                kb = KnowledgeBox(txn, self.storage, message.kbid)
+        kbid = message.kbid
+        uuid = (
+            message.uuid
+            if message.uuid
+            else await datamanagers.atomic.resources.get_resource_uuid_from_slug(
+                kbid=kbid, slug=message.slug
+            )
+        )
+        if uuid is None:
+            logger.info(
+                "Resource or KB does not exist: skipping delete",
+                extra={"kbid": kbid, "slug": message.slug, "uuid": uuid},
+            )
+            if transaction_check:
+                async with datamanagers.with_rw_transaction() as txn:
+                    await sequence_manager.set_last_seqid(txn, partition, seqid)
+                    await txn.commit()
+            return
 
-                uuid = await self.get_resource_uuid(kb, message)
-                async with locking.distributed_lock(
-                    locking.RESOURCE_INDEX_LOCK.format(kbid=message.kbid, resource_id=uuid)
-                ):
-                    # we need to have a lock at indexing time because we don't know if
-                    # a resource was in the process of being moved when a delete occurred
-                    shard_id = await datamanagers.resources.get_resource_shard_id(
-                        txn, kbid=message.kbid, rid=uuid
-                    )
+        async with (
+            locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)),
+            self.driver.rw_transaction() as txn,
+        ):
+            try:
+                kb = KnowledgeBox(txn, self.storage, kbid)
+                shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
                 if shard_id is None:
                     logger.warning(f"Resource {uuid} does not exist")
                 else:
@@ -217,23 +223,23 @@ class Processor:
                     if shard is None:
                         raise AttributeError("Shard not available")
 
-                    await catalog_delete(txn, message.kbid, uuid)
-                    external_index_manager = await get_external_index_manager(kbid=message.kbid)
+                    await catalog_delete(txn, kbid, uuid)
+                    external_index_manager = await get_external_index_manager(kbid=kbid)
                     if external_index_manager is not None:
                         await self.external_index_delete_resource(external_index_manager, uuid)
                     else:
                         await self.index_node_shard_manager.delete_resource(
-                            shard, message.uuid, seqid, partition, message.kbid
+                            shard, uuid, seqid, partition, kbid
                         )
                     try:
-                        await kb.delete_resource(message.uuid)
+                        await kb.delete_resource(uuid)
                     except Exception as exc:
                         await txn.abort()
                         await self.notify_abort(
                             partition=partition,
                             seqid=seqid,
-                            kbid=message.kbid,
-                            rid=message.uuid,
+                            kbid=kbid,
+                            rid=uuid,
                             source=message.source,
                         )
                         raise exc
@@ -271,19 +277,31 @@ class Processor:
         transaction_check: bool = True,
     ) -> None:
         kbid = message.kbid
-        if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
-            logger.info(f"KB {kbid} is deleted: skiping txn")
+        kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+        uuid: str | None = None
+        if not kb_exists:
+            logger.info("Deleted KB: skipping txn", extra={"kbid": kbid})
+        else:
+            uuid = message.uuid or await datamanagers.atomic.resources.get_resource_uuid_from_slug(
+                kbid=kbid, slug=message.slug
+            )
+            if not uuid:
+                logger.info(
+                    "Resource does not exist: skipping txn", extra={"kbid": kbid, "slug": message.slug}
+                )
+        if not kb_exists or not uuid:
             if transaction_check:
                 async with datamanagers.with_rw_transaction() as txn:
                     await sequence_manager.set_last_seqid(txn, partition, seqid)
                     await txn.commit()
             return None
 
-        async with self.driver.rw_transaction() as txn:
+        async with (
+            locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)),
+            self.driver.rw_transaction() as txn,
+        ):
             try:
                 kb = KnowledgeBox(txn, self.storage, kbid)
-                uuid = await self.get_resource_uuid(kb, message)
-
                 resource: Resource | None = None
                 handled_exception = None
                 created = False
@@ -432,40 +450,34 @@ class Processor:
                         await self._mark_resource_error(kb, resource, partition, seqid)
                     raise DeadletteredError() from handled_exception
 
-        return None
+            return None
 
     async def get_or_assign_resource_shard(
         self, txn: Transaction, kb: KnowledgeBox, uuid: str
     ) -> writer_pb2.ShardObject:
         kbid = kb.kbid
-        async with locking.distributed_lock(
-            locking.RESOURCE_INDEX_LOCK.format(kbid=kbid, resource_id=uuid)
-        ):
-            # we need to have a lock at indexing time because we don't know if
-            # a resource was move to another shard while it was being indexed
-            shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
-
-            shard = None
-            if shard_id is not None:
-                # Resource already has a shard assigned
-                shard = await kb.get_resource_shard(shard_id)
-                if shard is None:
-                    raise AttributeError("Shard not available")
-            else:
-                # It's a new resource, get KB's current active shard to place new resource on
-                shard = await self.index_node_shard_manager.get_current_active_shard(txn, kbid)
-                if shard is None:
-                    # No current shard available, create a new one
-                    async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
-                        kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
-                        prewarm = kb_config is not None and kb_config.prewarm_enabled
-                        shard = await self.index_node_shard_manager.create_shard_by_kbid(
-                            txn, kbid, prewarm_enabled=prewarm
-                        )
-                await datamanagers.resources.set_resource_shard_id(
-                    txn, kbid=kbid, rid=uuid, shard=shard.shard
-                )
-            return shard
+        shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
+        shard = None
+        if shard_id is not None:
+            # Resource already has a shard assigned
+            shard = await kb.get_resource_shard(shard_id)
+            if shard is None:
+                raise AttributeError("Shard not available")
+        else:
+            # It's a new resource, get KB's current active shard to place new resource on
+            shard = await self.index_node_shard_manager.get_current_active_shard(txn, kbid)
+            if shard is None:
+                # No current shard available, create a new one
+                async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
+                    kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
+                    prewarm = kb_config is not None and kb_config.prewarm_enabled
+                    shard = await self.index_node_shard_manager.create_shard_by_kbid(
+                        txn, kbid, prewarm_enabled=prewarm
+                    )
+            await datamanagers.resources.set_resource_shard_id(
+                txn, kbid=kbid, rid=uuid, shard=shard.shard
+            )
+        return shard
 
     @processor_observer.wrap({"type": "index_resource"})
     async def index_resource(
