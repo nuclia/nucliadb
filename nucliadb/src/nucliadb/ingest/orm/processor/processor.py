@@ -209,45 +209,45 @@ class Processor:
                     await txn.commit()
             return
 
-        async with locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)):
-            async with self.driver.rw_transaction() as txn:
-                try:
-                    kb = KnowledgeBox(txn, self.storage, kbid)
-                    shard_id = await datamanagers.resources.get_resource_shard_id(
-                        txn, kbid=kbid, rid=uuid
-                    )
-                    if shard_id is None:
-                        logger.warning(f"Resource {uuid} does not exist")
-                    else:
-                        shard = await kb.get_resource_shard(shard_id)
-                        if shard is None:
-                            raise AttributeError("Shard not available")
+        async with (
+            locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)),
+            self.driver.rw_transaction() as txn,
+        ):
+            try:
+                kb = KnowledgeBox(txn, self.storage, kbid)
+                shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
+                if shard_id is None:
+                    logger.warning(f"Resource {uuid} does not exist")
+                else:
+                    shard = await kb.get_resource_shard(shard_id)
+                    if shard is None:
+                        raise AttributeError("Shard not available")
 
-                        await catalog_delete(txn, kbid, uuid)
-                        external_index_manager = await get_external_index_manager(kbid=kbid)
-                        if external_index_manager is not None:
-                            await self.external_index_delete_resource(external_index_manager, uuid)
-                        else:
-                            await self.index_node_shard_manager.delete_resource(
-                                shard, uuid, seqid, partition, kbid
-                            )
-                        try:
-                            await kb.delete_resource(uuid)
-                        except Exception as exc:
-                            await txn.abort()
-                            await self.notify_abort(
-                                partition=partition,
-                                seqid=seqid,
-                                kbid=kbid,
-                                rid=uuid,
-                                source=message.source,
-                            )
-                            raise exc
-                finally:
-                    if txn.open:
-                        if transaction_check:
-                            await sequence_manager.set_last_seqid(txn, partition, seqid)
-                        await txn.commit()
+                    await catalog_delete(txn, kbid, uuid)
+                    external_index_manager = await get_external_index_manager(kbid=kbid)
+                    if external_index_manager is not None:
+                        await self.external_index_delete_resource(external_index_manager, uuid)
+                    else:
+                        await self.index_node_shard_manager.delete_resource(
+                            shard, uuid, seqid, partition, kbid
+                        )
+                    try:
+                        await kb.delete_resource(uuid)
+                    except Exception as exc:
+                        await txn.abort()
+                        await self.notify_abort(
+                            partition=partition,
+                            seqid=seqid,
+                            kbid=kbid,
+                            rid=uuid,
+                            source=message.source,
+                        )
+                        raise exc
+            finally:
+                if txn.open:
+                    if transaction_check:
+                        await sequence_manager.set_last_seqid(txn, partition, seqid)
+                    await txn.commit()
         await self.notify_commit(
             partition=partition,
             seqid=seqid,
@@ -296,161 +296,159 @@ class Processor:
                     await txn.commit()
             return None
 
-        async with locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)):
-            async with self.driver.rw_transaction() as txn:
-                try:
-                    kb = KnowledgeBox(txn, self.storage, kbid)
-                    resource: Resource | None = None
-                    handled_exception = None
-                    created = False
+        async with (
+            locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)),
+            self.driver.rw_transaction() as txn,
+        ):
+            try:
+                kb = KnowledgeBox(txn, self.storage, kbid)
+                resource: Resource | None = None
+                handled_exception = None
+                created = False
 
-                    if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
-                        resource = await kb.get(uuid)
-                        if resource is None:
-                            # It's a new resource
-                            resource = await kb.add_resource(uuid, message.slug, message.basic)
-                            created = True
-                        else:
-                            # It's an update from writer for an existing resource
-                            ...
-
-                    elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
-                        resource = await kb.get(uuid)
-                        if resource is None:
-                            logger.info(
-                                f"Processor message for resource received but the resource does not exist, ignoring.",
-                                extra={
-                                    "kbid": kbid,
-                                    "rid": uuid,
-                                    "seqid": seqid,
-                                },
-                            )
-                            return None
-                        else:
-                            # It's an update from processor for an existing resource
-                            ...
-
-                        generated_fields = await get_generated_fields(message, resource)
-                        if generated_fields.is_not_empty():
-                            await send_generated_fields_to_process(
-                                kbid, resource, generated_fields, message
-                            )
-                            # TODO: remove this when processor sends the field set
-                            for generated_text in generated_fields.texts:
-                                message.texts[
-                                    generated_text
-                                ].generated_by.data_augmentation.SetInParent()
-
-                    else:  # pragma: no cover
-                        raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
-
-                    # apply changes from the broker message to the resource
-                    await self.apply_resource(message, resource, update=(not created))
-
-                    # index message
-                    if resource and resource.modified:
-                        index_message = await self.generate_index_message(resource, message, created)
-                        try:
-                            warnings = await self.index_resource(
-                                index_message=index_message,
-                                txn=txn,
-                                uuid=uuid,
-                                kbid=kbid,
-                                seqid=seqid,
-                                partition=partition,
-                                kb=kb,
-                                source=to_index_message_source(message),
-                            )
-                            # Save indexing warnings
-                            for field_id, warning in warnings:
-                                await resource.add_field_error(
-                                    field_id, warning, writer_pb2.Error.Severity.WARNING
-                                )
-                        except ResourceNotIndexable as e:
-                            await resource.add_field_error(
-                                e.field_id, e.message, writer_pb2.Error.Severity.ERROR
-                            )
-                            # Catalog takes status from index message labels, override it to error
-                            current_status = [x for x in index_message.labels if x.startswith("/n/s/")]
-                            if current_status:
-                                index_message.labels.remove(current_status[0])
-                                index_message.labels.append("/n/s/ERROR")
-
-                        await catalog_update(txn, kbid, resource, index_message)
-                        if transaction_check:
-                            await sequence_manager.set_last_seqid(txn, partition, seqid)
-                        await txn.commit()
-
-                        if created:
-                            await self.commit_slug(resource)
-
-                        await self.notify_commit(
-                            partition=partition,
-                            seqid=seqid,
-                            message=message,
-                            write_type=(
-                                writer_pb2.Notification.WriteType.CREATED
-                                if created
-                                else writer_pb2.Notification.WriteType.MODIFIED
-                            ),
-                        )
-                    elif resource and resource.modified is False:
-                        await txn.abort()
-                        await self.notify_abort(
-                            partition=partition,
-                            seqid=seqid,
-                            kbid=kbid,
-                            rid=uuid,
-                            source=message.source,
-                        )
-                        logger.info("This message did not modify the resource")
-                except (
-                    asyncio.TimeoutError,
-                    asyncio.CancelledError,
-                    aiohttp.client_exceptions.ClientError,
-                    ConflictError,
-                    MaindbServerError,
-                    nats.errors.NoRespondersError,
-                    nats.js.errors.NoStreamResponseError,
-                ):  # pragma: no cover
-                    # Unhandled exceptions here that should bubble and hard fail
-                    # XXX We swallow too many exceptions here!
-                    await self.notify_abort(
-                        partition=partition,
-                        seqid=seqid,
-                        kbid=kbid,
-                        rid=uuid,
-                        source=message.source,
-                    )
-                    raise
-                except Exception as exc:
-                    # As we are in the middle of a transaction, we cannot let the exception raise directly
-                    # as we need to do some cleanup. The exception will be reraised at the end of the function
-                    # and then handled by the top caller, so errors can be handled in the same place.
-                    await self.deadletter(message, partition, seqid)
-                    await self.notify_abort(
-                        partition=partition,
-                        seqid=seqid,
-                        kbid=kbid,
-                        rid=uuid,
-                        source=message.source,
-                    )
-                    handled_exception = exc
-                finally:
-                    if resource is not None:
-                        resource.clean()
-                    # txn should be already commited or aborted, but in the event of an exception
-                    # it could be left open. Make sure to close it if it's still open
-                    if txn.open:
-                        await txn.abort()
-
-                if handled_exception is not None:
-                    if seqid == -1:
-                        raise handled_exception
+                if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
+                    resource = await kb.get(uuid)
+                    if resource is None:
+                        # It's a new resource
+                        resource = await kb.add_resource(uuid, message.slug, message.basic)
+                        created = True
                     else:
-                        if resource is not None:
-                            await self._mark_resource_error(kb, resource, partition, seqid)
-                        raise DeadletteredError() from handled_exception
+                        # It's an update from writer for an existing resource
+                        ...
+
+                elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+                    resource = await kb.get(uuid)
+                    if resource is None:
+                        logger.info(
+                            f"Processor message for resource received but the resource does not exist, ignoring.",
+                            extra={
+                                "kbid": kbid,
+                                "rid": uuid,
+                                "seqid": seqid,
+                            },
+                        )
+                        return None
+                    else:
+                        # It's an update from processor for an existing resource
+                        ...
+
+                    generated_fields = await get_generated_fields(message, resource)
+                    if generated_fields.is_not_empty():
+                        await send_generated_fields_to_process(kbid, resource, generated_fields, message)
+                        # TODO: remove this when processor sends the field set
+                        for generated_text in generated_fields.texts:
+                            message.texts[generated_text].generated_by.data_augmentation.SetInParent()
+
+                else:  # pragma: no cover
+                    raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
+
+                # apply changes from the broker message to the resource
+                await self.apply_resource(message, resource, update=(not created))
+
+                # index message
+                if resource and resource.modified:
+                    index_message = await self.generate_index_message(resource, message, created)
+                    try:
+                        warnings = await self.index_resource(
+                            index_message=index_message,
+                            txn=txn,
+                            uuid=uuid,
+                            kbid=kbid,
+                            seqid=seqid,
+                            partition=partition,
+                            kb=kb,
+                            source=to_index_message_source(message),
+                        )
+                        # Save indexing warnings
+                        for field_id, warning in warnings:
+                            await resource.add_field_error(
+                                field_id, warning, writer_pb2.Error.Severity.WARNING
+                            )
+                    except ResourceNotIndexable as e:
+                        await resource.add_field_error(
+                            e.field_id, e.message, writer_pb2.Error.Severity.ERROR
+                        )
+                        # Catalog takes status from index message labels, override it to error
+                        current_status = [x for x in index_message.labels if x.startswith("/n/s/")]
+                        if current_status:
+                            index_message.labels.remove(current_status[0])
+                            index_message.labels.append("/n/s/ERROR")
+
+                    await catalog_update(txn, kbid, resource, index_message)
+                    if transaction_check:
+                        await sequence_manager.set_last_seqid(txn, partition, seqid)
+                    await txn.commit()
+
+                    if created:
+                        await self.commit_slug(resource)
+
+                    await self.notify_commit(
+                        partition=partition,
+                        seqid=seqid,
+                        message=message,
+                        write_type=(
+                            writer_pb2.Notification.WriteType.CREATED
+                            if created
+                            else writer_pb2.Notification.WriteType.MODIFIED
+                        ),
+                    )
+                elif resource and resource.modified is False:
+                    await txn.abort()
+                    await self.notify_abort(
+                        partition=partition,
+                        seqid=seqid,
+                        kbid=kbid,
+                        rid=uuid,
+                        source=message.source,
+                    )
+                    logger.info("This message did not modify the resource")
+            except (
+                asyncio.TimeoutError,
+                asyncio.CancelledError,
+                aiohttp.client_exceptions.ClientError,
+                ConflictError,
+                MaindbServerError,
+                nats.errors.NoRespondersError,
+                nats.js.errors.NoStreamResponseError,
+            ):  # pragma: no cover
+                # Unhandled exceptions here that should bubble and hard fail
+                # XXX We swallow too many exceptions here!
+                await self.notify_abort(
+                    partition=partition,
+                    seqid=seqid,
+                    kbid=kbid,
+                    rid=uuid,
+                    source=message.source,
+                )
+                raise
+            except Exception as exc:
+                # As we are in the middle of a transaction, we cannot let the exception raise directly
+                # as we need to do some cleanup. The exception will be reraised at the end of the function
+                # and then handled by the top caller, so errors can be handled in the same place.
+                await self.deadletter(message, partition, seqid)
+                await self.notify_abort(
+                    partition=partition,
+                    seqid=seqid,
+                    kbid=kbid,
+                    rid=uuid,
+                    source=message.source,
+                )
+                handled_exception = exc
+            finally:
+                if resource is not None:
+                    resource.clean()
+                # txn should be already commited or aborted, but in the event of an exception
+                # it could be left open. Make sure to close it if it's still open
+                if txn.open:
+                    await txn.abort()
+
+            if handled_exception is not None:
+                if seqid == -1:
+                    raise handled_exception
+                else:
+                    if resource is not None:
+                        await self._mark_resource_error(kb, resource, partition, seqid)
+                    raise DeadletteredError() from handled_exception
 
             return None
 
