@@ -580,19 +580,22 @@ class Processor:
         if update:
             await self.maybe_update_resource_basic(resource, message)
 
+        tasks = []
         if message.HasField("origin"):
-            await resource.set_origin(message.origin)
+            tasks.append(resource.set_origin(message.origin))
 
         if message.HasField("extra"):
-            await resource.set_extra(message.extra)
+            tasks.append(resource.set_extra(message.extra))
 
         if message.HasField("security"):
-            await resource.set_security(message.security)
+            tasks.append(resource.set_security(message.security))
 
         if message.HasField("user_relations"):
-            await resource.set_user_relations(message.user_relations)
+            tasks.append(resource.set_user_relations(message.user_relations))
 
-        await resource.apply_fields(message)
+        tasks.append(resource.apply_fields(message))
+        await asyncio.gather(*tasks)
+
         await resource.apply_extracted(message)
 
     async def maybe_update_resource_basic(
