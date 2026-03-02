@@ -38,6 +38,7 @@ RESOURCE_LOCK = "resource-{kbid}-{resource_id}"
 RESOURCE_CREATION_SLUG_LOCK = "resource-creation-{kbid}-{resource_slug}"
 KB_SHARDS_LOCK = "shards-kb-{kbid}"
 MIGRATIONS_LOCK = "migration"
+KB_MIGRATIONS_LOCK = "migration-{kbid}"
 
 
 # Metrics
@@ -108,15 +109,17 @@ lock_held_duration_histogram = Histogram(
 def _get_lock_type(key: str) -> str:
     """Extract the lock type from the lock key for metrics labeling."""
     if key.startswith("new-shard-"):
-        return "new-shard"
+        return NEW_SHARD_LOCK
     elif key.startswith("resource-creation-"):
-        return "resource-creation"
+        return RESOURCE_CREATION_SLUG_LOCK
     elif key.startswith("resource-"):
-        return "resource"
+        return RESOURCE_LOCK
     elif key.startswith("shards-kb-"):
-        return "shards-kb"
+        return KB_SHARDS_LOCK
+    elif key.startswith("migration-"):
+        return KB_MIGRATIONS_LOCK
     elif key == "migration":
-        return "migration"
+        return MIGRATIONS_LOCK
     else:
         return "other"
 
