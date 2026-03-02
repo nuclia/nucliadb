@@ -26,6 +26,7 @@ from dataclasses import dataclass
 import orjson
 
 from nucliadb.common.maindb.exceptions import ConflictError
+from nucliadb_telemetry.metrics import Counter, Gauge, Histogram
 
 from .maindb.driver import Transaction
 from .maindb.utils import get_driver
@@ -37,6 +38,87 @@ RESOURCE_LOCK = "resource-{kbid}-{resource_id}"
 RESOURCE_CREATION_SLUG_LOCK = "resource-creation-{kbid}-{resource_slug}"
 KB_SHARDS_LOCK = "shards-kb-{kbid}"
 MIGRATIONS_LOCK = "migration"
+
+
+# Metrics
+lock_acquired_counter = Counter(
+    "nucliadb_lock_acquired_total",
+    labels={"lock_type": ""},
+)
+
+lock_miss_counter = Counter(
+    "nucliadb_lock_miss_total",
+    labels={"lock_type": ""},
+)
+
+lock_timeout_counter = Counter(
+    "nucliadb_lock_timeout_total",
+    labels={"lock_type": ""},
+)
+
+locks_active_gauge = Gauge(
+    "nucliadb_locks_active",
+    labels={"lock_type": ""},
+)
+
+lock_wait_duration_histogram = Histogram(
+    "nucliadb_lock_wait_duration_seconds",
+    labels={"lock_type": ""},
+    buckets=[
+        0.001,  # 1ms
+        0.005,  # 5ms
+        0.010,  # 10ms
+        0.025,  # 25ms
+        0.050,  # 50ms
+        0.100,  # 100ms
+        0.250,  # 250ms
+        0.500,  # 500ms
+        1.0,  # 1s
+        2.5,  # 2.5s
+        5.0,  # 5s
+        10.0,  # 10s
+        30.0,  # 30s
+        60.0,  # 60s
+        float("inf"),
+    ],
+)
+
+lock_held_duration_histogram = Histogram(
+    "nucliadb_lock_held_duration_seconds",
+    labels={"lock_type": ""},
+    buckets=[
+        0.010,  # 10ms
+        0.050,  # 50ms
+        0.100,  # 100ms
+        0.250,  # 250ms
+        0.500,  # 500ms
+        1.0,  # 1s
+        2.5,  # 2.5s
+        5.0,  # 5s
+        10.0,  # 10s
+        30.0,  # 30s
+        60.0,  # 60s
+        120.0,  # 2min
+        300.0,  # 5min
+        float("inf"),
+    ],
+)
+
+
+def _get_lock_type(key: str) -> str:
+    """Extract the lock type from the lock key for metrics labeling."""
+    if key.startswith("new-shard-"):
+        return "new-shard"
+    elif key.startswith("resource-creation-"):
+        return "resource-creation"
+    elif key.startswith("resource-"):
+        return "resource"
+    elif key.startswith("shards-kb-"):
+        return "shards-kb"
+    elif key == "migration":
+        return "migration"
+    else:
+        return "other"
 
 
 class ResourceLocked(Exception):
@@ -69,9 +151,12 @@ class _Lock:
         self.refresh_timeout = refresh_timeout
         self.value = uuid.uuid4().hex
         self.driver = get_driver()
+        self.lock_type = _get_lock_type(key)
+        self.acquired_at: float | None = None
 
     async def __aenter__(self) -> "_Lock":
         start = time.time()
+        lock_acquired_immediately = True
         while True:
             try:
                 async with self.driver.rw_transaction() as txn:
@@ -81,6 +166,9 @@ class _Lock:
                         await txn.commit()
                         break
                     else:
+                        lock_acquired_immediately = False
+                        lock_miss_counter.inc(labels={"lock_type": self.lock_type})
+
                         if time.time() > lock_data.expires_at:
                             # if current time is greater than when it expires, take it over
                             await self._update_lock_value(txn)
@@ -90,11 +178,24 @@ class _Lock:
                         if time.time() > start + self.lock_timeout:
                             # if current time > start time + lock timeout
                             # we've waited too long, raise exception that, we can't get the lock
+                            lock_timeout_counter.inc(labels={"lock_type": self.lock_type})
                             raise ResourceLocked(key=self.user_key)
             except ConflictError:
                 # if we get a conflict error, retry
+                lock_acquired_immediately = False
                 pass
             await asyncio.sleep(0.1)  # sleep before trying again
+
+        # Record metrics after successful acquisition
+        if not lock_acquired_immediately:
+            wait_duration = time.time() - start
+        else:
+            wait_duration = 0.0
+        lock_wait_duration_histogram.observe(wait_duration, labels={"lock_type": self.lock_type})
+        lock_acquired_counter.inc(labels={"lock_type": self.lock_type})
+        locks_active_gauge.inc(1, labels={"type": self.lock_type})
+        self.acquired_at = time.time()
+
         self.task = asyncio.create_task(self._refresh_task())
         return self
 
@@ -137,6 +238,14 @@ class _Lock:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         self.task.cancel()
+
+        # Record how long the lock was held
+        if self.acquired_at is not None:
+            held_duration = time.time() - self.acquired_at
+            lock_held_duration_histogram.observe(held_duration, labels={"lock_type": self.lock_type})
+
+        locks_active_gauge.dec(1, labels={"lock_type": self.lock_type})
+
         async with self.driver.rw_transaction() as txn:
             await txn.delete(self.key)
             await txn.commit()
