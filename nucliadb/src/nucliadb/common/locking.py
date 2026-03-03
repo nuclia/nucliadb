@@ -43,27 +43,27 @@ KB_MIGRATIONS_LOCK = "migration-{kbid}"
 
 # Metrics
 lock_acquired_counter = Counter(
-    "lock_acquired_total",
+    "nucliadb_lock_acquired_total",
     labels={"lock_type": ""},
 )
 
 lock_miss_counter = Counter(
-    "lock_miss_total",
+    "nucliadb_lock_miss_total",
     labels={"lock_type": ""},
 )
 
 lock_timeout_counter = Counter(
-    "lock_timeout_total",
+    "nucliadb_lock_timeout_total",
     labels={"lock_type": ""},
 )
 
 locks_active_gauge = Gauge(
-    "locks_active",
+    "nucliadb_locks_active",
     labels={"lock_type": ""},
 )
 
 lock_wait_duration_histogram = Histogram(
-    "lock_wait_duration_seconds",
+    "nucliadb_lock_wait_duration_seconds",
     labels={"lock_type": ""},
     buckets=[
         0.001,  # 1ms
@@ -85,7 +85,7 @@ lock_wait_duration_histogram = Histogram(
 )
 
 lock_held_duration_histogram = Histogram(
-    "lock_held_duration_seconds",
+    "nucliadb_lock_held_duration_seconds",
     labels={"lock_type": ""},
     buckets=[
         0.010,  # 10ms
