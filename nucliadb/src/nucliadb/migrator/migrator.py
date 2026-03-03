@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 async def run_kb_migrations(context: ExecutionContext, kbid: str, target_version: int) -> None:
-    async with locking.distributed_lock(f"migration-{kbid}"):
+    async with locking.distributed_lock(locking.KB_MIGRATIONS_LOCK.format(kbid=kbid)):
         kb_info = await context.data_manager.get_kb_info(kbid)
         if kb_info is None:
             logger.warning("KB not found", extra={"kbid": kbid})
