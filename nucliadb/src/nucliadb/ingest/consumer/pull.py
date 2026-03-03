@@ -151,7 +151,9 @@ class PullV2Worker:
                     start_time = time.monotonic()
 
                     # The code is only really prepared to pull 1 message at a time. If changing this, review MessageProgressUpdate usage
-                    pull = await processing_http_client.pull_v2(ack_tokens=ack_tokens, limit=1)
+                    pull = await processing_http_client.pull_v2(
+                        ack_tokens=ack_tokens, limit=1, timeout=1
+                    )
                     ack_tokens.clear()
                     if pull is None:
                         processing_pending_messages.set(0)
