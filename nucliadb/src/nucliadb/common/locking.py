@@ -170,7 +170,7 @@ class _Lock:
                     else:
                         lock_miss_counter.inc(labels={"lock_type": self.lock_type})
 
-                        if time.monotonic() > lock_data.expires_at:
+                        if time.time() > lock_data.expires_at:
                             # if current time is greater than when it expires, take it over
                             await self._update_lock_value(txn)
                             await txn.commit()
@@ -209,7 +209,7 @@ class _Lock:
         """
         await txn.set(
             self.key,
-            orjson.dumps(LockValue(self.value, time.monotonic() + self.expire_timeout)),
+            orjson.dumps(LockValue(self.value, time.time() + self.expire_timeout)),
         )
 
     async def _set_lock_value(self, txn: Transaction) -> None:
@@ -218,7 +218,7 @@ class _Lock:
         """
         await txn.insert(
             self.key,
-            orjson.dumps(LockValue(self.value, time.monotonic() + self.expire_timeout)),
+            orjson.dumps(LockValue(self.value, time.time() + self.expire_timeout)),
         )
 
     async def _refresh_task(self) -> None:
@@ -250,7 +250,7 @@ class _Lock:
     async def is_locked(self) -> bool:
         async with get_driver().ro_transaction() as txn:
             lock_data = await self.get_lock_data(txn)
-        return lock_data is not None and time.monotonic() < lock_data.expires_at
+        return lock_data is not None and time.time() < lock_data.expires_at
 
 
 def distributed_lock(
