@@ -159,7 +159,6 @@ class _Lock:
 
     async def __aenter__(self) -> "_Lock":
         start = time.time()
-        lock_acquired_immediately = True
         while True:
             try:
                 async with self.driver.rw_transaction() as txn:
@@ -169,7 +168,6 @@ class _Lock:
                         await txn.commit()
                         break
                     else:
-                        lock_acquired_immediately = False
                         lock_miss_counter.inc(labels={"lock_type": self.lock_type})
 
                         if time.time() > lock_data.expires_at:
@@ -185,19 +183,15 @@ class _Lock:
                             raise ResourceLocked(key=self.user_key)
             except ConflictError:
                 # if we get a conflict error, retry
-                lock_acquired_immediately = False
                 pass
             await asyncio.sleep(0.1)  # sleep before trying again
 
         # Record metrics after successful acquisition
-        if not lock_acquired_immediately:
-            wait_duration = time.time() - start
-        else:
-            wait_duration = 0.0
+        self.acquired_at = time.monotonic()
+        wait_duration = self.acquired_at - start
         lock_wait_duration_histogram.observe(wait_duration, labels={"lock_type": self.lock_type})
         lock_acquired_counter.inc(labels={"lock_type": self.lock_type})
         locks_active_gauge.inc(1, labels={"lock_type": self.lock_type})
-        self.acquired_at = time.time()
 
         self.task = asyncio.create_task(self._refresh_task())
         return self
@@ -244,7 +238,7 @@ class _Lock:
 
         # Record how long the lock was held
         if self.acquired_at is not None:
-            held_duration = time.time() - self.acquired_at
+            held_duration = time.monotonic() - self.acquired_at
             lock_held_duration_histogram.observe(held_duration, labels={"lock_type": self.lock_type})
 
         locks_active_gauge.dec(1, labels={"lock_type": self.lock_type})
