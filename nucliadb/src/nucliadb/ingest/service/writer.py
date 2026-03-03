@@ -22,14 +22,13 @@ from collections.abc import AsyncIterator
 
 from nucliadb.backups import tasks as backup_tasks
 from nucliadb.backups import utils as backup_utils
-from nucliadb.common import datamanagers
+from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
-from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.index_message import get_resource_index_message
@@ -63,10 +62,8 @@ from nucliadb_protos.writer_pb2 import (
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.utilities import (
-    get_partitioning,
     get_pubsub,
     get_storage,
-    get_transaction_utility,
 )
 
 
@@ -319,31 +316,24 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             return response
 
-    async def Index(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
-        async with self.driver.ro_transaction() as txn:
-            resobj = ResourceORM(txn, self.storage, request.kbid, request.rid)
-            bm = await generate_broker_message(resobj)
-            transaction = get_transaction_utility()
-            partitioning = get_partitioning()
-            partition = partitioning.generate_partition(request.kbid, request.rid)
-            await transaction.commit(bm, partition)
-
-            response = IndexStatus()
-            return response
-
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
         try:
-            async with self.driver.rw_transaction() as txn:
-                kbobj = KnowledgeBoxORM(txn, self.storage, request.kbid)
-                resobj = ResourceORM(txn, self.storage, request.kbid, request.rid)
+            kbid = request.kbid
+            rid = request.rid
+            async with (
+                locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=rid)),
+                self.driver.rw_transaction() as txn,
+            ):
+                kbobj = KnowledgeBoxORM(txn, self.storage, kbid)
+                resobj = ResourceORM(txn, self.storage, kbid, rid)
                 resobj.disable_vectors = not request.reindex_vectors
                 index_message = await get_resource_index_message(resobj, reindex=True)
-                shard = await self.proc.get_or_assign_resource_shard(txn, kbobj, request.rid)
-                external_index_manager = await get_external_index_manager(kbid=request.kbid)
+                shard = await self.proc.get_or_assign_resource_shard(txn, kbobj, rid)
+                external_index_manager = await get_external_index_manager(kbid=kbid)
                 if external_index_manager is not None:
                     await self.proc.external_index_add_resource(
-                        request.kbid,
-                        request.rid,
+                        kbid,
+                        rid,
                         index_message,
                     )
                 else:
@@ -352,7 +342,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                         index_message,
                         0,
                         partition=self.partitions[0],
-                        kb=request.kbid,
+                        kb=kbid,
                         reindex_id=uuid.uuid4().hex,
                     )
                 response = IndexStatus()

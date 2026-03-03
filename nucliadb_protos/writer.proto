@@ -382,7 +382,6 @@ service Writer {
 
     rpc Status(WriterStatusRequest) returns (WriterStatusResponse) {}
 
-    rpc Index(IndexResource) returns (IndexStatus) {}
     rpc ReIndex(IndexResource) returns (IndexStatus) {}
 
     rpc CreateBackup(backups.CreateBackupRequest) returns (backups.CreateBackupResponse) {}
