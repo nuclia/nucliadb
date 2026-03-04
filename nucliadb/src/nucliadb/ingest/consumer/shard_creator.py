@@ -17,12 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
 import logging
 import uuid
 from functools import partial
 from typing import Any
 
+from grpc import StatusCode
+from grpc.aio import AioRpcError
 from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers, locking
@@ -104,11 +105,21 @@ class ShardCreatorHandler:
         async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
             # remember, a lock will do at least 1+ reads and 1 write.
             # with heavy writes, this adds some simple k/v pressure
-            shard: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
-                nodereader_pb2.GetShardRequest(
-                    shard_id=noderesources_pb2.ShardId(id=current_shard.nidx_shard_id)
-                )  # type: ignore
-            )
+            try:
+                shard: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
+                    nodereader_pb2.GetShardRequest(
+                        shard_id=noderesources_pb2.ShardId(id=current_shard.nidx_shard_id)
+                    )  # type: ignore
+                )
+            except AioRpcError as exc:  # pragma: no cover
+                if exc.code() == StatusCode.NOT_FOUND:
+                    # KB and its shards may have been deleted
+                    logger.warning(
+                        f"Shard not found in nidx",
+                        extra={"kbid": kbid, "nidx_shard_id": current_shard.nidx_shard_id},
+                    )
+                    return
+                raise
 
             if not should_create_new_shard(shard.paragraphs):
                 return
