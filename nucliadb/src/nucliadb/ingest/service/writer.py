@@ -203,6 +203,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             # learning configuration is automatically removed in nuclia backend for
             # hosted users, we don't need to do it
             await KnowledgeBoxORM.delete(self.driver, kbid=kbid)
+            logger.info("KB deleted successfully", extra={"kbid": kbid})
         except KnowledgeBoxNotFound:
             logger.warning(f"KB not found: kbid={request.uuid}, slug={request.slug}")
         except Exception:
