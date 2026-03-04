@@ -24,6 +24,8 @@ import uuid
 from functools import partial
 from typing import Any
 
+from grpc import StatusCode
+from grpc.aio import AioRpcError
 from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers
@@ -115,11 +117,21 @@ class IndexAuditHandler:
         total_paragraphs = 0
 
         for shard_obj in shard_groups:
-            shard: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
-                nodereader_pb2.GetShardRequest(
-                    shard_id=noderesources_pb2.ShardId(id=shard_obj.nidx_shard_id)
+            try:
+                shard: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
+                    nodereader_pb2.GetShardRequest(
+                        shard_id=noderesources_pb2.ShardId(id=shard_obj.nidx_shard_id)
+                    )
                 )
-            )
+            except AioRpcError as exc:  # pragma: no cover
+                if exc.code() == StatusCode.NOT_FOUND:
+                    # KB and its shards may have been deleted
+                    logger.warning(
+                        f"Shard not found in nidx",
+                        extra={"kbid": kbid, "nidx_shard_id": shard_obj.nidx_shard_id},
+                    )
+                    continue
+                raise
 
             total_fields += shard.fields
             total_paragraphs += shard.paragraphs
