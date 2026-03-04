@@ -586,8 +586,11 @@ class Resource:
         for field_id in message.delete_question_answers:
             await self._delete_question_answers(field_id)
 
+        tasks = []
         for extracted_text in message.extracted_text:
-            await self._apply_extracted_text(extracted_text)
+            tasks.append(self._apply_extracted_text(extracted_text))
+        await asyncio.gather(*tasks)
+        tasks.clear()
 
         # Update field and resource status depending on processing results
         await self.apply_fields_status(message, self._modified_extracted_text)
@@ -610,20 +613,27 @@ class Resource:
 
         # Metadata should go first
         for field_metadata in message.field_metadata:
-            await self._apply_field_computed_metadata(field_metadata)
+            tasks.append(self._apply_field_computed_metadata(field_metadata))
             extracted_languages.extend(extract_field_metadata_languages(field_metadata))
 
         update_basic_languages(self.basic, extracted_languages)
 
         # Upload to binary storage
         if self.disable_vectors is False:
-            await self._apply_extracted_vectors(message.field_vectors)
-            await self._apply_semantic_graph_node_vectors(message.field_semantic_graph_node_vectors)
-            await self._apply_semantic_graph_edge_vectors(message.field_semantic_graph_edge_vectors)
+            tasks.append(self._apply_extracted_vectors(message.field_vectors))
+            tasks.append(
+                self._apply_semantic_graph_node_vectors(message.field_semantic_graph_node_vectors)
+            )
+            tasks.append(
+                self._apply_semantic_graph_edge_vectors(message.field_semantic_graph_edge_vectors)
+            )
 
         # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
-            await self._apply_field_large_metadata(field_large_metadata)
+            tasks.append(self._apply_field_large_metadata(field_large_metadata))
+
+        await asyncio.gather(*tasks)
+        tasks.clear()
 
         # Basic proto may have been modified in some apply functions but we only
         # want to set it once
