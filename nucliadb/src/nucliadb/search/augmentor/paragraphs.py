@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import bisect
 from collections.abc import Sequence
 from typing import cast
 
@@ -261,6 +262,27 @@ async def get_field_paragraphs(field: Field) -> Sequence[resources_pb2.Paragraph
     return field_paragraphs
 
 
+def _find_paragraph(
+    field_paragraphs: Sequence[resources_pb2.Paragraph], paragraph_id: ParagraphId
+) -> int | None:
+    # use a bisection algorithm to find the position in the list where
+    # list.insert() would maintain sort order. This will be the position of the
+    # paragraph we are looking for or a different one if it doesn't exist
+    idx = bisect.bisect_left(
+        field_paragraphs,
+        (paragraph_id.paragraph_start, paragraph_id.paragraph_end),
+        key=lambda p: (p.start, p.end),
+    )
+    if idx == len(field_paragraphs) or not (
+        field_paragraphs[idx].start == paragraph_id.paragraph_start
+        and field_paragraphs[idx].end == paragraph_id.paragraph_end
+    ):
+        # we haven't found the paragraph, we can't provide a position
+        return None
+
+    return idx
+
+
 @augmentor_observer.wrap({"type": "paragraph_text"})
 async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | None:
     text = await get_paragraph_from_full_text(
@@ -280,14 +302,11 @@ async def get_paragraph_position(field: Field, paragraph_id: ParagraphId) -> Tex
     if field_paragraphs is None:
         return None
 
-    idx: int | None
-    for idx, paragraph in enumerate(field_paragraphs):
-        field_paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end)
-        if field_paragraph_id == paragraph_id:
-            break
-    else:
+    idx = _find_paragraph(field_paragraphs, paragraph_id)
+    if idx is None:
         # we haven't found the paragraph, we can't provide a position
         return None
+    paragraph = field_paragraphs[idx]
 
     return TextPosition(
         index=idx,
@@ -309,14 +328,11 @@ async def related_paragraphs(
     if field_paragraphs is None:
         return None
 
-    idx: int | None
-    for idx, paragraph in enumerate(field_paragraphs):
-        field_paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end)
-        if field_paragraph_id == paragraph_id:
-            break
-    else:
+    idx = _find_paragraph(field_paragraphs, paragraph_id)
+    if idx is None:
         # we haven't found the paragraph, we won't find any related either
         return None
+    paragraph = field_paragraphs[idx]
 
     before = []
     for idx_before in range(max(idx - neighbours_before, 0), idx):
