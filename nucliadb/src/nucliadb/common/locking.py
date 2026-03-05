@@ -196,7 +196,7 @@ class _BaseLock(abc.ABC):
                 await self._cleanup_expired_locks()
             except Exception:
                 # If cleanup fails, log but don't block lock acquisition
-                logger.debug("Failed to cleanup expired locks", exc_info=True)
+                logger.warning("Failed to cleanup expired locks", exc_info=True)
 
     async def __aenter__(self) -> "_BaseLock":
         await self._maybe_cleanup_expired_locks()
