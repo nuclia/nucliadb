@@ -239,13 +239,11 @@ async def db_paragraph_metadata(field: Field, paragraph_id: ParagraphId) -> Meta
         # We don't have paragraph metadata for this field, we can't do anything
         return None
 
-    for paragraph in field_paragraphs:
-        field_paragraph_id = field.field_id.paragraph_id(paragraph.start, paragraph.end)
-        if field_paragraph_id == paragraph_id:
-            metadata = Metadata.from_db_paragraph(paragraph)
-            return metadata
-    else:
+    idx = _find_paragraph(field_paragraphs, paragraph_id)
+    if idx is None:
         return None
+
+    return Metadata.from_db_paragraph(field_paragraphs[idx])
 
 
 async def get_field_paragraphs(field: Field) -> Sequence[resources_pb2.Paragraph] | None:
