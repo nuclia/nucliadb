@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import abc
 import asyncio
 import contextlib
 import logging
@@ -139,8 +138,8 @@ class LockValue:
     expires_at: float
 
 
-class _BaseLock(abc.ABC):
-    """Base class for distributed lock implementations."""
+class _Lock:
+    """PostgreSQL table-based distributed lock implementation."""
 
     task: asyncio.Task
 
@@ -159,31 +158,23 @@ class _BaseLock(abc.ABC):
         self.value = uuid.uuid4().hex
         self.lock_type = _get_lock_type(self.user_key)
         self.acquired_at: float | None = None
+        self.driver = cast(PGDriver, get_driver())
 
-    @abc.abstractmethod
-    async def _get_lock_data(self) -> LockValue | None:
-        """Get the current lock data. Must acquire FOR UPDATE lock."""
-        ...
+    @contextlib.asynccontextmanager
+    async def transaction(self) -> AsyncGenerator[PGTransaction, None]:
+        async with self.driver._transaction(read_only=False) as txn:
+            txn = cast(PGTransaction, txn)
+            yield txn
 
-    @abc.abstractmethod
-    async def _set_lock_value(self) -> None:
-        """Set a new lock value. Should raise ConflictError if lock already exists."""
-        ...
-
-    @abc.abstractmethod
-    async def _update_lock_value(self) -> None:
-        """Update the lock value and expiration time."""
-        ...
-
-    @abc.abstractmethod
-    async def _delete_lock(self) -> None:
-        """Delete the lock."""
-        ...
-
-    @abc.abstractmethod
     async def _cleanup_expired_locks(self) -> None:
-        """Cleanup expired locks."""
-        ...
+        """Clean up expired locks older than 1 day."""
+        async with self.transaction() as txn:
+            async with txn.connection.cursor() as cur:
+                await cur.execute(
+                    "DELETE FROM distributed_locks "
+                    "WHERE expires_at < EXTRACT(EPOCH FROM NOW() - INTERVAL '1 day')::DOUBLE PRECISION"
+                )
+            await txn.commit()
 
     async def _maybe_cleanup_expired_locks(self) -> None:
         # Probabilistically run cleanup (1% chance) to distribute cleanup load
@@ -195,7 +186,50 @@ class _BaseLock(abc.ABC):
                 # If cleanup fails, log but don't block lock acquisition
                 logger.warning("Failed to cleanup expired locks", exc_info=True)
 
-    async def __aenter__(self) -> "_BaseLock":
+    async def _get_lock_data(self) -> LockValue | None:
+        async with self.transaction() as txn:
+            async with txn.connection.cursor() as cur:
+                await cur.execute(
+                    "SELECT lock_value, expires_at FROM distributed_locks WHERE lock_key = %s FOR UPDATE",
+                    (self.user_key,),
+                )
+                row = await cur.fetchone()
+                if row is None:
+                    return None
+                else:
+                    return LockValue(value=row[0], expires_at=row[1])
+
+    async def _set_lock_value(self) -> None:
+        async with self.transaction() as txn:
+            async with txn.connection.cursor() as cur:
+                try:
+                    await cur.execute(
+                        "INSERT INTO distributed_locks (lock_key, lock_value, expires_at) VALUES (%s, %s, %s)",
+                        (self.user_key, self.value, time.time() + self.expire_timeout),
+                    )
+                except Exception as e:
+                    # If there's a unique constraint violation, it means the lock already exists
+                    if "duplicate key value" in str(e).lower() or "unique constraint" in str(e).lower():
+                        raise ConflictError() from e
+                    raise
+            await txn.commit()
+
+    async def _update_lock_value(self) -> None:
+        async with self.transaction() as txn:
+            async with txn.connection.cursor() as cur:
+                await cur.execute(
+                    "UPDATE distributed_locks SET lock_value = %s, expires_at = %s WHERE lock_key = %s",
+                    (self.value, time.time() + self.expire_timeout, self.user_key),
+                )
+            await txn.commit()
+
+    async def _delete_lock(self) -> None:
+        async with self.transaction() as txn:
+            async with txn.connection.cursor() as cur:
+                await cur.execute("DELETE FROM distributed_locks WHERE lock_key = %s", (self.user_key,))
+            await txn.commit()
+
+    async def __aenter__(self) -> "_Lock":
         await self._maybe_cleanup_expired_locks()
 
         start = time.monotonic()
@@ -255,90 +289,6 @@ class _BaseLock(abc.ABC):
 
         await self._delete_lock()
 
-    @abc.abstractmethod
-    async def is_locked(self) -> bool:
-        """Check if the lock is currently held."""
-        ...
-
-
-class _PGLock(_BaseLock):
-    """PostgreSQL table-based distributed lock implementation."""
-
-    def __init__(
-        self,
-        key: str,
-        *,
-        lock_timeout: float,
-        expire_timeout: float,
-        refresh_timeout: float,
-    ):
-        super().__init__(
-            key,
-            lock_timeout=lock_timeout,
-            expire_timeout=expire_timeout,
-            refresh_timeout=refresh_timeout,
-        )
-        self.driver = cast(PGDriver, get_driver())
-
-    @contextlib.asynccontextmanager
-    async def transaction(self) -> AsyncGenerator[PGTransaction, None]:
-        async with self.driver._transaction(read_only=False) as txn:
-            txn = cast(PGTransaction, txn)
-            yield txn
-
-    async def _cleanup_expired_locks(self) -> None:
-        """Clean up expired locks older than 1 day."""
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    "DELETE FROM distributed_locks "
-                    "WHERE expires_at < EXTRACT(EPOCH FROM NOW() - INTERVAL '1 day')::DOUBLE PRECISION"
-                )
-            await txn.commit()
-
-    async def _get_lock_data(self) -> LockValue | None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    "SELECT lock_value, expires_at FROM distributed_locks WHERE lock_key = %s FOR UPDATE",
-                    (self.user_key,),
-                )
-                row = await cur.fetchone()
-                if row is None:
-                    return None
-                else:
-                    return LockValue(value=row[0], expires_at=row[1])
-
-    async def _set_lock_value(self) -> None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                try:
-                    await cur.execute(
-                        "INSERT INTO distributed_locks (lock_key, lock_value, expires_at) VALUES (%s, %s, %s)",
-                        (self.user_key, self.value, time.time() + self.expire_timeout),
-                    )
-                except Exception as e:
-                    # If there's a unique constraint violation, it means the lock already exists
-                    if "duplicate key value" in str(e).lower() or "unique constraint" in str(e).lower():
-                        raise ConflictError() from e
-                    raise
-            await txn.commit()
-
-    async def _update_lock_value(self) -> None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    "UPDATE distributed_locks SET lock_value = %s, expires_at = %s WHERE lock_key = %s",
-                    (self.value, time.time() + self.expire_timeout, self.user_key),
-                )
-            await txn.commit()
-
-    async def _delete_lock(self) -> None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute("DELETE FROM distributed_locks WHERE lock_key = %s", (self.user_key,))
-            await txn.commit()
-
     async def is_locked(self) -> bool:
         async with self.transaction() as txn:
             async with txn.connection.cursor() as cur:
@@ -354,7 +304,7 @@ def distributed_lock(
     lock_timeout: float = 60.0,
     expire_timeout: float = 30.0,
     refresh_timeout: float = 10.0,
-) -> _BaseLock:
+) -> _Lock:
     """
     Context manager to get a distributed lock on a key.
 
@@ -364,7 +314,7 @@ def distributed_lock(
     - expire_timeout: how long by default the lock will be held without a refresh
     - refresh_timeout: how often to refresh the lock
     """
-    return _PGLock(
+    return _Lock(
         key,
         lock_timeout=lock_timeout,
         expire_timeout=expire_timeout,
