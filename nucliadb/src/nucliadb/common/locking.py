@@ -28,12 +28,9 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from typing import cast
 
-import orjson
-
 from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb_telemetry.metrics import Counter, Gauge, Histogram
 
-from .maindb.driver import Driver
 from .maindb.pg import PGDriver, PGTransaction
 from .maindb.utils import get_driver
 
@@ -264,73 +261,6 @@ class _BaseLock(abc.ABC):
         ...
 
 
-class _Lock(_BaseLock):
-    """
-    Key-value store based distributed lock implementation.
-    We need to keep this implementation because we are still supporting the local maindb driver,
-    which is key-value based.
-    """
-
-    def __init__(
-        self,
-        key: str,
-        *,
-        lock_timeout: float,
-        expire_timeout: float,
-        refresh_timeout: float,
-        driver: Driver,
-    ):
-        super().__init__(
-            key,
-            lock_timeout=lock_timeout,
-            expire_timeout=expire_timeout,
-            refresh_timeout=refresh_timeout,
-        )
-        self.key = "/distributed/locks/" + self.user_key
-        self.driver = driver
-
-    async def _get_lock_data(self) -> LockValue | None:
-        async with self.driver.rw_transaction() as txn:
-            existing_data = await txn.get(self.key, for_update=True)
-            if existing_data is None:
-                return None
-            else:
-                return LockValue(**orjson.loads(existing_data))
-
-    async def _set_lock_value(self) -> None:
-        async with self.driver.rw_transaction() as txn:
-            await txn.insert(
-                self.key,
-                orjson.dumps(LockValue(self.value, time.time() + self.expire_timeout)),
-            )
-            await txn.commit()
-
-    async def _update_lock_value(self) -> None:
-        async with self.driver.rw_transaction() as txn:
-            await txn.set(
-                self.key,
-                orjson.dumps(LockValue(self.value, time.time() + self.expire_timeout)),
-            )
-            await txn.commit()
-
-    async def _delete_lock(self) -> None:
-        async with self.driver.rw_transaction() as txn:
-            await txn.delete(self.key)
-            await txn.commit()
-
-    async def is_locked(self) -> bool:
-        async with self.driver.ro_transaction() as txn:
-            existing_data = await txn.get(self.key, for_update=True)
-            lock_data = None
-            if existing_data is not None:
-                lock_data = LockValue(**orjson.loads(existing_data))
-        return lock_data is not None and time.time() < lock_data.expires_at
-
-    async def _cleanup_expired_locks(self) -> None:
-        # No need to cleanup for the key-value store implementation since it is only used for testing purposes.
-        pass
-
-
 class _PGLock(_BaseLock):
     """PostgreSQL table-based distributed lock implementation."""
 
@@ -341,7 +271,6 @@ class _PGLock(_BaseLock):
         lock_timeout: float,
         expire_timeout: float,
         refresh_timeout: float,
-        driver: PGDriver,
     ):
         super().__init__(
             key,
@@ -349,7 +278,7 @@ class _PGLock(_BaseLock):
             expire_timeout=expire_timeout,
             refresh_timeout=refresh_timeout,
         )
-        self.driver = driver
+        self.driver = cast(PGDriver, get_driver())
 
     @contextlib.asynccontextmanager
     async def transaction(self) -> AsyncGenerator[PGTransaction, None]:
@@ -358,11 +287,13 @@ class _PGLock(_BaseLock):
             yield txn
 
     async def _cleanup_expired_locks(self) -> None:
-        """Clean up expired locks older than 2 days."""
-        two_days_ago = time.time() - (2 * 24 * 60 * 60)  # 2 days in seconds
+        """Clean up expired locks older than 1 day."""
         async with self.transaction() as txn:
             async with txn.connection.cursor() as cur:
-                await cur.execute("DELETE FROM distributed_locks WHERE expires_at < %s", (two_days_ago,))
+                await cur.execute(
+                    "DELETE FROM distributed_locks "
+                    "WHERE expires_at < EXTRACT(EPOCH FROM NOW() - INTERVAL '1 day')::DOUBLE PRECISION"
+                )
             await txn.commit()
 
     async def _get_lock_data(self) -> LockValue | None:
@@ -433,24 +364,12 @@ def distributed_lock(
     - expire_timeout: how long by default the lock will be held without a refresh
     - refresh_timeout: how often to refresh the lock
     """
-    driver = get_driver()
-
-    if isinstance(driver, PGDriver):
-        return _PGLock(
-            key,
-            lock_timeout=lock_timeout,
-            expire_timeout=expire_timeout,
-            refresh_timeout=refresh_timeout,
-            driver=driver,
-        )
-    else:
-        return _Lock(
-            key,
-            lock_timeout=lock_timeout,
-            expire_timeout=expire_timeout,
-            refresh_timeout=refresh_timeout,
-            driver=driver,
-        )
+    return _PGLock(
+        key,
+        lock_timeout=lock_timeout,
+        expire_timeout=expire_timeout,
+        refresh_timeout=refresh_timeout,
+    )
 
 
 async def is_locked(key: str) -> bool:
