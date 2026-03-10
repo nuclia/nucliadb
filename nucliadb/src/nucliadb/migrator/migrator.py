@@ -208,7 +208,6 @@ async def run_rollovers(context: ExecutionContext) -> None:
 async def run_pg_schema_migrations(driver: PGDriver):
     migrations = get_pg_migrations()
 
-    logger.info(f"Running PG schema migrations.")
     # The migration uses two transactions. The former is only used to get a lock (pg_advisory_lock)
     # without having to worry about correctly unlocking it (postgres unlocks it when the transaction ends)
     async with driver.rw_transaction() as tx_lock, tx_lock.connection.cursor() as cur_lock:  # type: ignore[attr-defined]
