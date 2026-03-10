@@ -31,6 +31,7 @@ from nucliadb.search.search.query_parser.models import (
     Filters,
     GraphQuery,
     KeywordQuery,
+    ParsedQuery,
     Query,
     RankFusion,
     ReciprocalRankFusion,
@@ -46,7 +47,7 @@ from nucliadb_models.search import MAX_RANK_FUSION_WINDOW
 
 
 @query_parser_observer.wrap({"type": "parse_retrieve"})
-async def parse_retrieve(kbid: str, item: RetrievalRequest) -> UnitRetrieval:
+async def parse_retrieve(kbid: str, item: RetrievalRequest) -> ParsedQuery:
     if isinstance(item.query, nucliadb_models.retrieval.RawQuery):
         query = ""
         if item.query.keyword is not None:
@@ -100,7 +101,12 @@ async def parse_retrieve(kbid: str, item: RetrievalRequest) -> UnitRetrieval:
     )
     parser = _RetrievalParser(kbid, item, fetcher)
     retrieval = await parser.parse()
-    return retrieval
+
+    return ParsedQuery(
+        fetcher=fetcher,
+        retrieval=retrieval,
+        generation=None,
+    )
 
 
 class _RetrievalParser:
