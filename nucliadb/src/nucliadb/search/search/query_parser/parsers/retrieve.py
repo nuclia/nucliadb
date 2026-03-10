@@ -19,7 +19,9 @@
 #
 from nidx_protos import nodereader_pb2
 from pydantic import ValidationError
+from typing_extensions import assert_never
 
+import nucliadb_models.retrieval
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.filter_expression import parse_expression
 from nucliadb.search.search.metrics import query_parser_observer
@@ -45,16 +47,55 @@ from nucliadb_models.search import MAX_RANK_FUSION_WINDOW
 
 @query_parser_observer.wrap({"type": "parse_retrieve"})
 async def parse_retrieve(kbid: str, item: RetrievalRequest) -> UnitRetrieval:
+    if isinstance(item.query, nucliadb_models.retrieval.RawQuery):
+        query = ""
+        if item.query.keyword is not None:
+            query = item.query.keyword.query
+
+        user_vector = None
+        vectorset = None
+        if item.query.semantic is not None:
+            user_vector = item.query.semantic.query
+            vectorset = item.query.semantic.vectorset
+
+        # Low-level queries don't support images (for now)
+        query_image = None
+
+        # nor rephrasing
+        rephrase = False
+        rephrase_prompt = None
+
+    elif isinstance(item.query, nucliadb_models.retrieval.Query):
+        query = item.query.query or ""
+
+        user_vector = None
+        vectorset = None
+        if isinstance(item.query.override.semantic, nucliadb_models.retrieval.SemanticOverrides):
+            if item.query.override.semantic.vector is not None:
+                user_vector = item.query.override.semantic.vector
+            if item.query.override.semantic.vectorset is not None:
+                vectorset = item.query.override.semantic.vectorset
+
+        query_image = item.query.image
+
+        rephrase = False
+        rephrase_prompt = None
+        if item.query.rephrase:
+            rephrase = True
+            if isinstance(item.query.rephrase, nucliadb_models.retrieval.Rephrase):
+                rephrase_prompt = item.query.rephrase.prompt
+
+    else:
+        assert_never(item.query)
+
     fetcher = Fetcher(
         kbid=kbid,
-        query=item.query.keyword.query if item.query.keyword else "",
-        user_vector=item.query.semantic.query if item.query.semantic else None,
-        vectorset=item.query.semantic.vectorset if item.query.semantic else None,
-        # Retrieve doesn't use images for now
-        query_image=None,
-        # Retrieve doesn't do rephrasing
-        rephrase=False,
-        rephrase_prompt=None,
+        query=query,
+        user_vector=user_vector,
+        vectorset=vectorset,
+        query_image=query_image,
+        rephrase=rephrase,
+        rephrase_prompt=rephrase_prompt,
         generative_model=None,
     )
     parser = _RetrievalParser(kbid, item, fetcher)
@@ -94,35 +135,123 @@ class _RetrievalParser:
 
     @query_parser_observer.wrap({"type": "retrieve_parse_query"})
     async def _parse_query(self) -> Query:
+        if isinstance(self.item.query, nucliadb_models.retrieval.RawQuery):
+            query = self.item.query
+        elif isinstance(self.item.query, nucliadb_models.retrieval.Query):
+            query = await self._into_raw_query(self.item.query)
+        else:
+            assert_never(self.item.query)
+
         keyword = None
-        if self.item.query.keyword is not None:
-            keyword_query, is_synonyms_query = await self._parse_keyword_query()
+        if query.keyword is not None:
+            keyword_query, is_synonyms_query = await self._parse_keyword_query(query.keyword)
             keyword = KeywordQuery(
                 query=keyword_query,
                 is_synonyms_query=is_synonyms_query,
-                min_score=self.item.query.keyword.min_score,
+                min_score=query.keyword.min_score,
             )
 
         semantic = None
-        if self.item.query.semantic is not None:
-            vectorset, query_vector = await self._parse_semantic_query()
+        if query.semantic is not None:
+            vectorset, query_vector = await self._parse_semantic_query(query.semantic)
             semantic = SemanticQuery(
                 query=query_vector,
                 vectorset=vectorset,
-                min_score=self.item.query.semantic.min_score,
+                min_score=query.semantic.min_score,
             )
 
         graph = None
-        if self.item.query.graph is not None:
-            graph = GraphQuery(query=self.item.query.graph.query)
+        if query.graph is not None:
+            graph = GraphQuery(query=query.graph.query)
 
         return Query(keyword=keyword, semantic=semantic, graph=graph)
 
-    async def _parse_keyword_query(self) -> tuple[str, bool]:
-        assert self.item.query.keyword is not None
-        keyword_query = self.item.query.keyword.query
+    async def _into_raw_query(
+        self, query: nucliadb_models.retrieval.Query
+    ) -> nucliadb_models.retrieval.RawQuery:
+        if query.override.keyword == "disabled":
+            keyword = None
+        else:
+            keyword = nucliadb_models.retrieval.KeywordQuery(
+                query=query.query,
+            )
+            if query.override.keyword is None:
+                # nothing to override
+                pass
+            elif isinstance(query.override.keyword, nucliadb_models.retrieval.KeywordOverrides):
+                if query.override.keyword.min_score is not None:
+                    keyword.min_score = query.override.keyword.min_score
+                if query.override.keyword.with_synonyms:
+                    keyword.min_score = query.override.keyword.with_synonyms
+            else:
+                assert_never(query.override.keyword)
+
+        if query.override.semantic == "disabled":
+            semantic = None
+        else:
+            vector = None
+            vectorset = None
+            user_semantic_min_score = None
+
+            if query.override.semantic is None:
+                # nothing to override
+                pass
+
+            elif isinstance(query.override.semantic, nucliadb_models.retrieval.SemanticOverrides):
+                if query.override.semantic.vector is not None:
+                    vector = query.override.semantic.vector
+                if query.override.semantic.vectorset is not None:
+                    vectorset = query.override.semantic.vectorset
+                if query.override.semantic.min_score is not None:
+                    user_semantic_min_score = query.override.semantic.min_score
+
+            else:
+                assert_never(query.override.semantic)
+
+            if vectorset is None:
+                vectorset = await self.fetcher.get_vectorset()
+            if vector is None:
+                vector = await self.fetcher.get_query_vector()
+
+            if vector is None:
+                # can't semantic search, user didn't provide a vector and we
+                # didn't manage to obtain it from Predict API either. We skip
+                # semantic search in order to, at least, return some results
+                pass
+            else:
+                semantic = nucliadb_models.retrieval.SemanticQuery(
+                    query=vector,
+                    vectorset=vectorset,
+                )
+
+                if user_semantic_min_score is not None:
+                    semantic.min_score = user_semantic_min_score
+
+        if query.override.graph == "disabled":
+            graph = None
+        elif query.override.graph is None:
+            # we haven't implemented yet an automatic graph query from user input
+            graph = None
+        elif isinstance(query.override.graph, nucliadb_models.retrieval.GraphOverrides):
+            if query.override.graph.query is None:
+                graph = None
+            else:
+                graph = nucliadb_models.retrieval.GraphQuery(query=query.override.graph.query)
+        else:
+            assert_never(query.override.graph)
+
+        return nucliadb_models.retrieval.RawQuery(
+            keyword=keyword,
+            semantic=semantic,
+            graph=graph,
+        )
+
+    async def _parse_keyword_query(
+        self, keyword: nucliadb_models.retrieval.KeywordQuery
+    ) -> tuple[str, bool]:
+        keyword_query = keyword.query
         is_synonyms_query = False
-        if self.item.query.keyword.with_synonyms:
+        if keyword.with_synonyms:
             synonyms_query = await query_with_synonyms(keyword_query, fetcher=self.fetcher)
             if synonyms_query is not None:
                 keyword_query = synonyms_query
@@ -133,14 +262,15 @@ class _RetrievalParser:
         keyword_query = validate_query_syntax(keyword_query)
         return keyword_query, is_synonyms_query
 
-    async def _parse_semantic_query(self) -> tuple[str, list[float]]:
-        assert self.item.query.semantic is not None
+    async def _parse_semantic_query(
+        self, semantic: nucliadb_models.retrieval.SemanticQuery
+    ) -> tuple[str, list[float]]:
         # Make sure the vectorset exists in the KB and is valid
         vectorset = await self.fetcher.get_user_vectorset()
         assert vectorset is not None, "retrieve always enforces a vectorset on semantic search"
 
         # Calculate the matryoshka dimension if applicable
-        user_vector = self.item.query.semantic.query
+        user_vector = semantic.query
         matryoshka_dimension = await self.fetcher.get_matryoshka_dimension()
         if matryoshka_dimension is not None:
             if len(user_vector) < matryoshka_dimension:
@@ -157,8 +287,6 @@ class _RetrievalParser:
     @query_parser_observer.wrap({"type": "retrieve_parse_filters"})
     async def _parse_filters(self) -> Filters:
         filters = Filters()
-        if self.item.filters is None:
-            return filters
 
         if self.item.filters.filter_expression is not None:
             if self.item.filters.filter_expression.field is not None:
