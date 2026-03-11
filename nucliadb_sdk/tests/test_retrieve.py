@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import pytest
+
 import nucliadb_sdk
 from nucliadb_models.retrieval import KeywordQuery, Query, RetrievalRequest, RetrievalResponse
+from nucliadb_sdk.v2.exceptions import UnprocessableEntity
 
 
 def test_retrieve(docs_dataset: str, sdk: nucliadb_sdk.NucliaDB):
@@ -21,3 +24,10 @@ def test_retrieve(docs_dataset: str, sdk: nucliadb_sdk.NucliaDB):
         kbid=docs_dataset, content=RetrievalRequest(query=Query(keyword=KeywordQuery(query="love")))
     )
     assert len(results.matches) > 0
+
+    # /retrieve handles 422
+    with pytest.raises(UnprocessableEntity):
+        sdk.retrieve(
+            kbid=docs_dataset,
+            content=RetrievalRequest.model_construct(param=["invalid", "value"]),
+        )

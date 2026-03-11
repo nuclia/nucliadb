@@ -144,7 +144,7 @@ def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.ask_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
     sdk.ask_on_resource_by_slug(kbid=kb.uuid, slug="resource", query="foo")
     sdk.feedback(kbid=kb.uuid, ident="bar", good=True, feedback="baz", task="CHAT")
-    with pytest.raises(nucliadb_sdk.v2.exceptions.UnknownError) as err:
+    with pytest.raises(nucliadb_sdk.v2.exceptions.PreconditionFailed) as err:
         sdk.summarize(kbid=kb.uuid, resources=["foobar"])
     assert "Could not summarize" in str(err.value)
 

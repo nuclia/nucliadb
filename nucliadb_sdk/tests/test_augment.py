@@ -11,9 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import nucliadb_sdk
 from nucliadb_models.augment import AugmentRequest
 
 
 def test_retrieve(docs_dataset: str, sdk: nucliadb_sdk.NucliaDB):
     _ = sdk.augment(kbid=docs_dataset, content=AugmentRequest())
+
+    _ = sdk.augment(
+        kbid=docs_dataset,
+        content=AugmentRequest.model_construct(param=["invalid", "value"]),
+    )
