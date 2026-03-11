@@ -85,7 +85,7 @@ async def test_search_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.feedback(
         kbid=kb.uuid, ident="bar", good=True, feedback="baz", task=FeedbackTasks.CHAT
     )
-    with pytest.raises(nucliadb_sdk.v2.exceptions.UnknownError) as err:
+    with pytest.raises(nucliadb_sdk.v2.exceptions.PreconditionFailed) as err:
         await sdk_async.summarize(kbid=kb.uuid, resources=["foobar"])
     assert "Could not summarize" in str(err.value)
 
