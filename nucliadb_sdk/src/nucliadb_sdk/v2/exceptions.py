@@ -43,10 +43,16 @@ class UnknownError(ClientError):
     pass
 
 
+class PreconditionFailed(ClientError):
+    def __init__(self, message: str):
+        super().__init__(str(message))
+        self.message = message
+
+
 class UnprocessableEntity(ClientError):
-    def __init__(self, validation_error: dict):
-        super().__init__(str(validation_error))
-        self.validation_error = validation_error
+    def __init__(self, message: str):
+        super().__init__(str(message))
+        self.message = message
 
 
 class AskResponseError(ClientError):
