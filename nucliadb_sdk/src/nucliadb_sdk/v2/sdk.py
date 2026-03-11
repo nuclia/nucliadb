@@ -1009,6 +1009,9 @@ class _NucliaDBBase:
             raise exceptions.ConflictError(response.text)
         elif response.status_code == 404:
             raise exceptions.NotFoundError(f"Resource not found at url {response.url}: {response.text}")
+        elif response.status_code == 422:
+            # FastAPI validation errors (client error)
+            raise exceptions.UnprocessableEntity(validation_error=response.json())
         else:
             raise exceptions.UnknownError(
                 f"Unknown error connecting to API: {response.status_code}: {response.text}"

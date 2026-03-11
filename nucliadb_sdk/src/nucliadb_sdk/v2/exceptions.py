@@ -43,5 +43,11 @@ class UnknownError(ClientError):
     pass
 
 
+class UnprocessableEntity(ClientError):
+    def __init__(self, validation_error: dict):
+        super().__init__(str(validation_error))
+        self.validation_error = validation_error
+
+
 class AskResponseError(ClientError):
     pass
