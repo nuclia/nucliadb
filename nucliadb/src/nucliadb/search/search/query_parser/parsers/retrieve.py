@@ -33,17 +33,15 @@ from nucliadb.search.search.query_parser.models import (
     KeywordQuery,
     ParsedQuery,
     Query,
-    RankFusion,
-    ReciprocalRankFusion,
     SemanticQuery,
     UnitRetrieval,
 )
 from nucliadb.search.search.query_parser.parsers.common import query_with_synonyms, validate_query_syntax
 from nucliadb.search.search.utils import filter_hidden_resources
-from nucliadb_models import search as search_models
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.retrieval import RetrievalRequest
-from nucliadb_models.search import MAX_RANK_FUSION_WINDOW
+
+from .common import parse_rank_fusion
 
 
 @query_parser_observer.wrap({"type": "parse_retrieve"})
@@ -120,7 +118,7 @@ class _RetrievalParser:
         query = await self._parse_query()
         filters = await self._parse_filters()
         try:
-            rank_fusion = self._parse_rank_fusion()
+            rank_fusion = parse_rank_fusion(self.item.rank_fusion, self.item.top_k)
         except ValidationError as exc:
             raise InternalParserError(f"Parsing error in rank fusion: {exc!s}") from exc
 
@@ -316,28 +314,3 @@ class _RetrievalParser:
         filters.with_duplicates = self.item.filters.with_duplicates
 
         return filters
-
-    def _parse_rank_fusion(self) -> RankFusion:
-        rank_fusion: RankFusion
-
-        top_k = self.item.top_k
-        window = min(top_k, MAX_RANK_FUSION_WINDOW)
-
-        if isinstance(self.item.rank_fusion, search_models.RankFusionName):
-            if self.item.rank_fusion == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
-                rank_fusion = ReciprocalRankFusion(window=window)
-            else:
-                raise InternalParserError(f"Unknown rank fusion algorithm: {self.item.rank_fusion}")
-
-        elif isinstance(self.item.rank_fusion, search_models.ReciprocalRankFusion):
-            user_window = self.item.rank_fusion.window
-            rank_fusion = ReciprocalRankFusion(
-                k=self.item.rank_fusion.k,
-                boosting=self.item.rank_fusion.boosting,
-                window=min(max(user_window or 0, top_k), 500),
-            )
-
-        else:
-            raise InternalParserError(f"Unknown rank fusion {self.item.rank_fusion}")
-
-        return rank_fusion
