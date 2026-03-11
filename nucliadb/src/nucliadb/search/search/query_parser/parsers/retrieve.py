@@ -32,6 +32,7 @@ from nucliadb.search.search.query_parser.models import (
     GraphQuery,
     KeywordQuery,
     ParsedQuery,
+    PredictReranker,
     Query,
     SemanticQuery,
     UnitRetrieval,
@@ -41,7 +42,7 @@ from nucliadb.search.search.utils import filter_hidden_resources
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.retrieval import RetrievalRequest
 
-from .common import parse_rank_fusion
+from .common import parse_rank_fusion, parse_reranker
 
 
 @query_parser_observer.wrap({"type": "parse_retrieve"})
@@ -122,18 +123,32 @@ class _RetrievalParser:
         except ValidationError as exc:
             raise InternalParserError(f"Parsing error in rank fusion: {exc!s}") from exc
 
+        reranker = None
+        if self.item.reranker is not None:
+            try:
+                reranker = parse_reranker(self.item.reranker, self.item.top_k)
+            except ValidationError as exc:
+                raise InternalParserError(f"Parsing error in reranker: {exc!s}") from exc
+
         # ensure top_k and rank_fusion are coherent
         if top_k > rank_fusion.window:
             raise InvalidQueryError(
                 "rank_fusion.window", "Rank fusion window must be greater or equal to top_k"
             )
 
+        # Adjust retrieval windows. Our current implementation assume:
+        # `top_k <= reranker.window <= rank_fusion.window`
+        # and as rank fusion is done before reranking, we must ensure rank
+        # fusion window is at least, the reranker window
+        if isinstance(reranker, PredictReranker):
+            rank_fusion.window = max(rank_fusion.window, reranker.window)
+
         retrieval = UnitRetrieval(
             query=query,
             top_k=top_k,
             filters=filters,
             rank_fusion=rank_fusion,
-            reranker=None,
+            reranker=reranker,
         )
         return retrieval
 

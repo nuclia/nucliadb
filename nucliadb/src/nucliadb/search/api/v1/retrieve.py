@@ -29,7 +29,7 @@ from nucliadb.common.models_utils import to_proto
 from nucliadb.models.internal.augment import Paragraph, ParagraphText
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.augmentor.paragraphs import augment_paragraphs
-from nucliadb.search.search import rerankers
+from nucliadb.search.search import cache, rerankers
 from nucliadb.search.search.query_parser.parsers.retrieve import parse_retrieve
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import get_rephrased_query
 from nucliadb.search.search.rerankers import RerankableItem, Reranker, RerankingOptions, get_reranker
@@ -111,9 +111,10 @@ async def retrieve_endpoint(
             # use the rephrased query if available; we assume it'll be better for the reranker model
             reranker_query = get_rephrased_query(parsed) or parsed.retrieval.query.keyword.query
 
-            reranked = await rerank(
-                kbid, text_blocks, reranker, RerankingOptions(kbid=kbid, query=reranker_query)
-            )
+            with cache.request_caches():
+                reranked = await rerank(
+                    kbid, text_blocks, reranker, RerankingOptions(kbid=kbid, query=reranker_query)
+                )
             text_blocks = reranked
 
     # cut the top K, we may have more due to extra results used for rank fusion or reranking
@@ -185,7 +186,7 @@ async def rerank(
         text_block.order = order
         reranked_text_blocks.append(text_block)
 
-    return text_blocks
+    return reranked_text_blocks
 
 
 def text_block_match_to_retrieval_match(item: TextBlockMatch) -> RetrievalMatch:
