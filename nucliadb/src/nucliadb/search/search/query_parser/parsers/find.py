@@ -31,14 +31,10 @@ from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
     Filters,
     GraphQuery,
-    NoopReranker,
     ParsedQuery,
     PredictReranker,
     Query,
-    RankFusion,
-    ReciprocalRankFusion,
     RelationQuery,
-    Reranker,
     UnitRetrieval,
 )
 from nucliadb.search.search.query_parser.old_filters import OldFilterParams, parse_old_filters
@@ -52,6 +48,8 @@ from nucliadb_protos import utils_pb2
 
 from .common import (
     parse_keyword_query,
+    parse_rank_fusion,
+    parse_reranker,
     parse_semantic_query,
     parse_top_k,
     should_disable_vector_search,
@@ -118,11 +116,11 @@ class _FindParser:
         filters = await self._parse_filters()
 
         try:
-            rank_fusion = self._parse_rank_fusion()
+            rank_fusion = parse_rank_fusion(self.item.rank_fusion, self.item.top_k)
         except ValidationError as exc:
             raise InternalParserError(f"Parsing error in rank fusion: {exc!s}") from exc
         try:
-            reranker = self._parse_reranker()
+            reranker = parse_reranker(self.item.reranker, self.item.top_k)
         except ValidationError as exc:
             raise InternalParserError(f"Parsing error in reranker: {exc!s}") from exc
 
@@ -252,54 +250,3 @@ class _FindParser:
             hidden=hidden,
             with_duplicates=self.item.with_duplicates,
         )
-
-    def _parse_rank_fusion(self) -> RankFusion:
-        rank_fusion: RankFusion
-
-        top_k = parse_top_k(self.item)
-        window = min(top_k, 500)
-
-        if isinstance(self.item.rank_fusion, search_models.RankFusionName):
-            if self.item.rank_fusion == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
-                rank_fusion = ReciprocalRankFusion(window=window)
-            else:
-                raise InternalParserError(f"Unknown rank fusion algorithm: {self.item.rank_fusion}")
-
-        elif isinstance(self.item.rank_fusion, search_models.ReciprocalRankFusion):
-            user_window = self.item.rank_fusion.window
-            rank_fusion = ReciprocalRankFusion(
-                k=self.item.rank_fusion.k,
-                boosting=self.item.rank_fusion.boosting,
-                window=min(max(user_window or 0, top_k), 500),
-            )
-
-        else:
-            raise InternalParserError(f"Unknown rank fusion {self.item.rank_fusion}")
-
-        return rank_fusion
-
-    def _parse_reranker(self) -> Reranker:
-        reranking: Reranker
-
-        top_k = parse_top_k(self.item)
-
-        if isinstance(self.item.reranker, search_models.RerankerName):
-            if self.item.reranker == search_models.RerankerName.NOOP:
-                reranking = NoopReranker()
-
-            elif self.item.reranker == search_models.RerankerName.PREDICT_RERANKER:
-                # for predict rearnker, by default, we want a x2 factor with a
-                # top of 200 results
-                reranking = PredictReranker(window=min(top_k * 2, 200))
-
-            else:
-                raise InternalParserError(f"Unknown reranker algorithm: {self.item.reranker}")
-
-        elif isinstance(self.item.reranker, search_models.PredictReranker):
-            user_window = self.item.reranker.window
-            reranking = PredictReranker(window=min(max(user_window or 0, top_k), 200))
-
-        else:
-            raise InternalParserError(f"Unknown reranker {self.item.reranker}")
-
-        return reranking
