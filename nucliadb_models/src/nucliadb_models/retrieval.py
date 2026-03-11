@@ -15,7 +15,8 @@
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+from typing_extensions import Self
 
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.graph.requests import GraphPathQuery
@@ -104,6 +105,13 @@ class QueryOverrides(BaseModel):
         description="Override graph search parameters. Using false disables graph search",
     )
 
+    @model_validator(mode="after")
+    def cant_disable_all(self) -> Self:
+        if self.keyword == self.semantic == self.graph == "disabled":
+            raise ValueError("disabling all searches is not allowed as it'd never return any result")
+
+        return self
+
 
 class Query(BaseModel):
     """A high-level query to retrieve what you want with overridable low-level details."""
@@ -132,7 +140,7 @@ class Filters(BaseModel):
     with_duplicates: bool = False
 
 
-class RetrievalRequest(BaseModel):
+class RetrievalRequest(BaseModel, extra="forbid"):
     query: Query | RawQuery
     top_k: int = Field(default=20, gt=0, le=500)
     filters: Filters = Field(default_factory=Filters)
