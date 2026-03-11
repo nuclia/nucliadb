@@ -186,7 +186,7 @@ class _RetrievalParser:
                 if query.override.keyword.min_score is not None:
                     keyword.min_score = query.override.keyword.min_score
                 if query.override.keyword.with_synonyms:
-                    keyword.min_score = query.override.keyword.with_synonyms
+                    keyword.with_synonyms = query.override.keyword.with_synonyms
             else:
                 assert_never(query.override.keyword)
 
