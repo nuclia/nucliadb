@@ -85,7 +85,7 @@ async def parse_retrieve(kbid: str, item: RetrievalRequest) -> ParsedQuery:
             if isinstance(item.query.rephrase, nucliadb_models.retrieval.Rephrase):
                 rephrase_prompt = item.query.rephrase.prompt
 
-    else:
+    else:  # pragma: no cover
         assert_never(item.query)
 
     fetcher = Fetcher(
@@ -158,7 +158,7 @@ class _RetrievalParser:
             query = self.item.query
         elif isinstance(self.item.query, nucliadb_models.retrieval.Query):
             query = await self._into_raw_query(self.item.query)
-        else:
+        else:  # pragma: no cover
             assert_never(self.item.query)
 
         keyword = None
@@ -202,7 +202,7 @@ class _RetrievalParser:
                     keyword.min_score = query.override.keyword.min_score
                 if query.override.keyword.with_synonyms:
                     keyword.with_synonyms = query.override.keyword.with_synonyms
-            else:
+            else:  # pragma: no cover
                 assert_never(query.override.keyword)
 
         if query.override.semantic == "disabled":
@@ -224,7 +224,7 @@ class _RetrievalParser:
                 if query.override.semantic.min_score is not None:
                     user_semantic_min_score = query.override.semantic.min_score
 
-            else:
+            else:  # pragma: no cover
                 assert_never(query.override.semantic)
 
             if vectorset is None:
@@ -256,7 +256,7 @@ class _RetrievalParser:
                 graph = None
             else:
                 graph = nucliadb_models.retrieval.GraphQuery(query=query.override.graph.query)
-        else:
+        else:  # pragma: no cover
             assert_never(query.override.graph)
 
         return nucliadb_models.retrieval.RawQuery(
