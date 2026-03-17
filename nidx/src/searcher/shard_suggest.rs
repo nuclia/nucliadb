@@ -98,10 +98,9 @@ fn blocking_suggest(
     if suggest_paragraphs {
         if let Some(expr) = &request.field_filter {
             let prefilter = PreFilterRequest {
-                security: None,
+                security: request.security.clone(),
                 filter_expression: Some(expr.clone()),
             };
-
             prefiltered = text_searcher.prefilter(&prefilter)?;
         }
         paragraph_request = Some(ParagraphSuggestRequest {

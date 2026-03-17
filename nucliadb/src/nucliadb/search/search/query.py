@@ -127,6 +127,7 @@ async def suggest_query_to_pb(
     range_modification_start: datetime | None = None,
     range_modification_end: datetime | None = None,
     hidden: bool | None = None,
+    security_groups: list[str] | None = None,
 ) -> nodereader_pb2.SuggestRequest:
     request = nodereader_pb2.SuggestRequest()
 
@@ -162,6 +163,9 @@ async def suggest_query_to_pb(
 
     if field_expr is not None:
         request.field_filter.CopyFrom(field_expr)
+
+    if security_groups is not None and len(security_groups) > 0:
+        request.security.access_groups.extend(security_groups)
 
     if filter_expression:
         if filter_expression.field:
