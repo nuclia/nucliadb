@@ -12,7 +12,7 @@ message AuditField {
     DELETED = 2;
   }
   FieldAction action = 1;
-  int32 size = 2;
+  uint64 size = 2;
   int32 size_delta = 3 [deprecated = true]; // no longer calculated
   string field_id = 4;
   resources.FieldType field_type = 5;
