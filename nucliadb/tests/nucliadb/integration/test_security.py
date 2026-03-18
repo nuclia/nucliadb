@@ -113,16 +113,26 @@ async def test_resource_security_is_updated(
     assert resource["security"]["access_groups"] == []
 
 
-@pytest.mark.parametrize("search_endpoint", ("find_get", "find_post", "search_get", "search_post"))
+@pytest.mark.parametrize(
+    "search_endpoint",
+    (
+        ("GET", "find"),
+        ("POST", "find"),
+        ("GET", "search"),
+        ("POST", "search"),
+        ("GET", "suggest"),
+    ),
+)
 @pytest.mark.deploy_modes("standalone")
 async def test_resource_security_search(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox: str,
     resource_with_security,
-    search_endpoint,
+    search_endpoint: tuple[str, str],
 ):
     kbid = standalone_knowledgebox
+    method, endpoint = search_endpoint
     resource_id = resource_with_security
     support_group = "support"
     # Add another group to the resource
@@ -138,7 +148,8 @@ async def test_resource_security_search(
 
     # Querying without security should return the resource
     await _test_search_request_with_security(
-        search_endpoint,
+        method,
+        endpoint,
         nucliadb_reader,
         kbid,
         query="resource",
@@ -157,7 +168,8 @@ async def test_resource_security_search(
         [DEVELOPERS_GROUP, "some-unknown-group"],
     ):
         await _test_search_request_with_security(
-            search_endpoint,
+            method,
+            endpoint,
             nucliadb_reader,
             kbid,
             query="resource",
@@ -167,7 +179,8 @@ async def test_resource_security_search(
 
     # Querying with an unknown security group should not return the resource
     await _test_search_request_with_security(
-        search_endpoint,
+        method,
+        endpoint,
         nucliadb_reader,
         kbid,
         query="resource",
@@ -192,7 +205,8 @@ async def test_resource_security_search(
 
     # Querying with an unknown security group should return the resource now, as it is public
     await _test_search_request_with_security(
-        search_endpoint,
+        method,
+        endpoint,
         nucliadb_reader,
         kbid,
         query="resource",
@@ -201,75 +215,9 @@ async def test_resource_security_search(
     )
 
 
-@pytest.mark.deploy_modes("standalone")
-async def test_resource_security_suggest(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    standalone_knowledgebox: str,
-    resource_with_security,
-):
-    kbid = standalone_knowledgebox
-    resource_id = resource_with_security
-
-    # Suggest without security groups should return the resource
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/suggest",
-        params={"query": "something"},
-    )
-    assert resp.status_code == 200, resp.text
-    assert len(resp.json()["paragraphs"]["results"]) > 0
-
-    # Suggest with a matching security group should return the resource
-    for access_groups in (
-        [DEVELOPERS_GROUP],
-        [PLATFORM_GROUP],
-        [PLATFORM_GROUP, DEVELOPERS_GROUP],
-        [DEVELOPERS_GROUP, "some-unknown-group"],
-    ):
-        resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/suggest",
-            params={"query": "something", "security_groups": access_groups},
-        )
-        assert resp.status_code == 200, resp.text
-        results = resp.json()["paragraphs"]["results"]
-        assert len(results) > 0, f"Expected results for groups {access_groups}"
-        assert any(r["rid"] == resource_id for r in results)
-
-    # Suggest with an unknown security group should not return the resource
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/suggest",
-        params={"query": "something", "security_groups": ["some-unknown-group"]},
-    )
-    assert resp.status_code == 200, resp.text
-    results = resp.json()["paragraphs"]["results"]
-    assert len(results) == 0, f"Expected no results but got {results}"
-
-    # Make the resource public
-    resp = await nucliadb_writer.patch(
-        f"/kb/{kbid}/resource/{resource_id}",
-        json={
-            "security": {
-                "access_groups": [],
-            },
-        },
-    )
-    assert resp.status_code == 200, resp.text
-
-    await asyncio.sleep(1)
-
-    # Suggest with an unknown group should now return the resource (it's public)
-    resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/suggest",
-        params={"query": "something", "security_groups": ["blah-blah"]},
-    )
-    assert resp.status_code == 200, resp.text
-    results = resp.json()["paragraphs"]["results"]
-    assert len(results) > 0, "Expected results for public resource"
-    assert any(r["rid"] == resource_id for r in results)
-
-
 async def _test_search_request_with_security(
-    search_endpoint: str,
+    method: str,
+    endpoint: str,
     nucliadb_reader: AsyncClient,
     kbid: str,
     query: str,
@@ -288,30 +236,44 @@ async def _test_search_request_with_security(
     if security_groups:
         params["security_groups"] = security_groups  # type: ignore
 
-    if search_endpoint == "find_post":
+    if method == "POST" and endpoint == "find":
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",
             json=payload,
         )
-    elif search_endpoint == "find_get":
+    elif method == "GET" and endpoint == "find":
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/find",
             params=params,
         )
-    elif search_endpoint == "search_post":
+    elif method == "POST" and endpoint == "search":
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/search",
             json=payload,
         )
-    elif search_endpoint == "search_get":
+    elif method == "GET" and endpoint == "search":
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/search",
+            params=params,
+        )
+    elif method == "GET" and endpoint == "suggest":
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/suggest",
             params=params,
         )
     else:
-        raise ValueError(f"Unknown search endpoint: {search_endpoint}")
+        raise ValueError(f"Unknown method and/or search endpoint: {method} {endpoint}")
 
     assert resp.status_code == 200, resp.text
-    search_response = resp.json()
-    assert len(search_response["resources"]) == len(expected_resources)
-    assert set(search_response["resources"]) == set(expected_resources)
+
+    if endpoint in ("search", "find"):
+        search_response = resp.json()
+        assert len(search_response["resources"]) == len(expected_resources)
+        assert set(search_response["resources"]) == set(expected_resources)
+    elif endpoint in ("suggest",):
+        suggest_response = resp.json()
+        resources = [paragraph["rid"] for paragraph in suggest_response["paragraphs"]["results"]]
+        assert len(resources) == len(expected_resources)
+        assert set(resources) == set(expected_resources)
+    else:
+        raise ValueError(f"Unknown method and/or search endpoint: {method} {endpoint}")
