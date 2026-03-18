@@ -96,10 +96,10 @@ fn blocking_suggest(
 
     let mut paragraph_request = None;
     if suggest_paragraphs {
-        if let Some(expr) = &request.field_filter {
+        if request.field_filter.is_some() || request.security.is_some() {
             let prefilter = PreFilterRequest {
                 security: request.security.clone(),
-                filter_expression: Some(expr.clone()),
+                filter_expression: request.field_filter.clone(),
             };
             prefiltered = text_searcher.prefilter(&prefilter)?;
         }
