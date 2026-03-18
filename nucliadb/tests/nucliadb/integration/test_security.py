@@ -22,12 +22,21 @@ import asyncio
 import pytest
 from httpx import AsyncClient
 
+from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
+from tests.utils.dirty_index import wait_for_sync
+
 PLATFORM_GROUP = "platform"
 DEVELOPERS_GROUP = "developers"
 
 
 @pytest.fixture(scope="function")
-async def resource_with_security(nucliadb_writer: AsyncClient, standalone_knowledgebox: str):
+async def resource_with_security(
+    nucliadb_writer: AsyncClient, standalone_knowledgebox: str, nucliadb_ingest_grpc: WriterStub
+):
     kbid = standalone_knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
@@ -42,7 +51,25 @@ async def resource_with_security(nucliadb_writer: AsyncClient, standalone_knowle
         },
     )
     assert resp.status_code == 201, resp.text
-    return resp.json()["uuid"]
+    rid = resp.json()["uuid"]
+
+    # Add a broker message with paragraphs via the grpc interface
+    bmb = BrokerMessageBuilder(
+        kbid=kbid,
+        rid=rid,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+    bmb.with_title("Test resource")
+    bmb.with_summary("My text discussing about something")
+
+    text_field = bmb.field_builder("text1", FieldType.TEXT)
+    text_field.add_paragraph("My text discussing about something")
+
+    bm = bmb.build()
+    await inject_message(nucliadb_ingest_grpc, bm)
+    await wait_for_sync()
+
+    return rid
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -172,6 +199,73 @@ async def test_resource_security_search(
         security_groups=["blah-blah"],
         expected_resources=[resource_id],
     )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_resource_security_suggest(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+    resource_with_security,
+):
+    kbid = standalone_knowledgebox
+    resource_id = resource_with_security
+
+    # Suggest without security groups should return the resource
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/suggest",
+        params={"query": "something"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert len(resp.json()["paragraphs"]["results"]) > 0
+
+    # Suggest with a matching security group should return the resource
+    for access_groups in (
+        [DEVELOPERS_GROUP],
+        [PLATFORM_GROUP],
+        [PLATFORM_GROUP, DEVELOPERS_GROUP],
+        [DEVELOPERS_GROUP, "some-unknown-group"],
+    ):
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/suggest",
+            params={"query": "something", "security_groups": access_groups},
+        )
+        assert resp.status_code == 200, resp.text
+        results = resp.json()["paragraphs"]["results"]
+        assert len(results) > 0, f"Expected results for groups {access_groups}"
+        assert any(r["rid"] == resource_id for r in results)
+
+    # Suggest with an unknown security group should not return the resource
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/suggest",
+        params={"query": "something", "security_groups": ["some-unknown-group"]},
+    )
+    assert resp.status_code == 200, resp.text
+    results = resp.json()["paragraphs"]["results"]
+    assert len(results) == 0, f"Expected no results but got {results}"
+
+    # Make the resource public
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{resource_id}",
+        json={
+            "security": {
+                "access_groups": [],
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    await asyncio.sleep(1)
+
+    # Suggest with an unknown group should now return the resource (it's public)
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/suggest",
+        params={"query": "something", "security_groups": ["blah-blah"]},
+    )
+    assert resp.status_code == 200, resp.text
+    results = resp.json()["paragraphs"]["results"]
+    assert len(results) > 0, "Expected results for public resource"
+    assert any(r["rid"] == resource_id for r in results)
 
 
 async def _test_search_request_with_security(
