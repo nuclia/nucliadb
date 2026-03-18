@@ -224,6 +224,7 @@ async def run_pg_schema_migrations(driver: PGDriver):
             if version in migrated:
                 continue
 
+            logger.info(f"Running PG schema migration {version}: {migration.__name__}")
             # Gets a new transaction for each migration, so if they get interrupted we at least
             # save the state of the last finished transaction
             async with driver.rw_transaction() as tx, tx.connection.cursor() as cur:  # type: ignore[attr-defined]
