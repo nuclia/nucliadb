@@ -219,7 +219,7 @@ impl RelationSearcher {
     }
 
     #[instrument(name = "relation::suggest", skip_all)]
-    pub fn suggest(&self, prefixes: Vec<String>) -> anyhow::Result<Vec<RelationNode>> {
+    pub fn suggest(&self, prefixes: Vec<String>, prefilter: &PrefilterResult) -> anyhow::Result<Vec<RelationNode>> {
         let subqueries: Vec<_> = prefixes
             .into_iter()
             .filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH)
@@ -256,7 +256,7 @@ impl RelationSearcher {
             }),
             ..Default::default()
         };
-        let response = self.graph_search(&request, &PrefilterResult::All, VectorQueryResults::default())?;
+        let response = self.graph_search(&request, prefilter, VectorQueryResults::default())?;
         Ok(response.nodes)
     }
 
