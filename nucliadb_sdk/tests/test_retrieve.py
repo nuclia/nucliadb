@@ -15,13 +15,13 @@
 import pytest
 
 import nucliadb_sdk
-from nucliadb_models.retrieval import KeywordQuery, Query, RetrievalRequest, RetrievalResponse
+from nucliadb_models.retrieval import KeywordQuery, RawQuery, RetrievalRequest, RetrievalResponse
 from nucliadb_sdk.v2.exceptions import UnprocessableEntity
 
 
 def test_retrieve(docs_dataset: str, sdk: nucliadb_sdk.NucliaDB):
     results: RetrievalResponse = sdk.retrieve(
-        kbid=docs_dataset, content=RetrievalRequest(query=Query(keyword=KeywordQuery(query="love")))
+        kbid=docs_dataset, content=RetrievalRequest(query=RawQuery(keyword=KeywordQuery(query="love")))
     )
     assert len(results.matches) > 0
 

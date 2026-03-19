@@ -192,7 +192,7 @@ async def parse_filter_expression(expr: ResourceFilterExpression, kbid: str) -> 
         cat.date = CatalogExpression.Date(field="modified_at", since=expr.since, until=expr.until)
     elif isinstance(expr, FacetFilter):
         cat.facet = facet_from_filter(expr)
-    else:
+    else:  # pragma: no cover
         assert_never(expr)
 
     return cat

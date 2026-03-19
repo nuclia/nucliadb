@@ -19,7 +19,7 @@
 #
 
 import logging
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from typing_extensions import assert_never
@@ -63,7 +63,8 @@ class RerankingOptions:
 
 
 class Reranker(ABC):
-    @abstractproperty
+    @property
+    @abstractmethod
     def window(self) -> int | None:
         """Number of elements the reranker requests. `None` means no specific
         window is enforced."""

@@ -21,12 +21,19 @@ import re
 import string
 
 from nucliadb.search import logger
+from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
     KeywordQuery,
+    NoopReranker,
+    PredictReranker,
+    RankFusion,
+    ReciprocalRankFusion,
+    Reranker,
     SemanticQuery,
 )
 from nucliadb_models import search as search_models
+from nucliadb_models.search import MAX_RANK_FUSION_WINDOW
 
 DEFAULT_GENERIC_SEMANTIC_THRESHOLD = 0.7
 
@@ -211,3 +218,59 @@ async def query_with_synonyms(
         return advanced_query
 
     return None
+
+
+def parse_rank_fusion(
+    rank_fusion: search_models.RankFusionName | search_models.RankFusion,
+    top_k: int,
+) -> RankFusion:
+    _rank_fusion: RankFusion
+
+    window = min(top_k, MAX_RANK_FUSION_WINDOW)
+
+    if isinstance(rank_fusion, search_models.RankFusionName):
+        if rank_fusion == search_models.RankFusionName.RECIPROCAL_RANK_FUSION:
+            _rank_fusion = ReciprocalRankFusion(window=window)
+        else:
+            raise InternalParserError(f"Unknown rank fusion algorithm: {rank_fusion}")
+
+    elif isinstance(rank_fusion, search_models.ReciprocalRankFusion):
+        user_window = rank_fusion.window
+        _rank_fusion = ReciprocalRankFusion(
+            k=rank_fusion.k,
+            boosting=rank_fusion.boosting,
+            window=min(max(user_window or 0, top_k), 500),
+        )
+
+    else:
+        raise InternalParserError(f"Unknown rank fusion {rank_fusion}")
+
+    return _rank_fusion
+
+
+def parse_reranker(
+    reranker: search_models.RerankerName | search_models.Reranker,
+    top_k: int,
+) -> Reranker:
+    _reranker: Reranker
+
+    if isinstance(reranker, search_models.RerankerName):
+        if reranker == search_models.RerankerName.NOOP:
+            _reranker = NoopReranker()
+
+        elif reranker == search_models.RerankerName.PREDICT_RERANKER:
+            # for predict rearnker, by default, we want a x2 factor with a
+            # top of 200 results
+            _reranker = PredictReranker(window=min(top_k * 2, 200))
+
+        else:
+            raise InternalParserError(f"Unknown reranker algorithm: {reranker}")
+
+    elif isinstance(reranker, search_models.PredictReranker):
+        user_window = reranker.window
+        _reranker = PredictReranker(window=min(max(user_window or 0, top_k), 200))
+
+    else:
+        raise InternalParserError(f"Unknown reranker {reranker}")
+
+    return _reranker
