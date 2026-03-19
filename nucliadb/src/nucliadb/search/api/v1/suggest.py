@@ -86,6 +86,7 @@ async def suggest_knowledgebox(
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
+    security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
 ) -> KnowledgeboxSuggestResults | HTTPClientError:
     try:
         expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
@@ -111,6 +112,7 @@ async def suggest_knowledgebox(
             debug,
             highlight,
             show_hidden,
+            security_groups,
         )
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
@@ -140,6 +142,7 @@ async def suggest(
     debug: bool,
     highlight: bool,
     show_hidden: bool,
+    security_groups: list[str],
 ) -> KnowledgeboxSuggestResults:
     with cache.request_caches():
         hidden = await filter_hidden_resources(kbid, show_hidden)
@@ -156,6 +159,7 @@ async def suggest(
             range_modification_start,
             range_modification_end,
             hidden,
+            security_groups,
         )
         results, queried_shards = await nidx_query(kbid, Method.SUGGEST, pb_query)
 

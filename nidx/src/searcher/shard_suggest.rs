@@ -90,21 +90,19 @@ fn blocking_suggest(
     let suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
     let suggest_entities = request.features.contains(&(SuggestFeatures::Entities as i32));
 
-    let prefixes = split_suggest_query(&request.body, MAX_SUGGEST_COMPOUND_WORDS);
+    if !suggest_paragraphs && !suggest_entities {
+        // all features disabled, we won't search
+        return Ok(SuggestResponse::default());
+    }
 
-    let mut prefiltered = PrefilterResult::All;
-
-    let mut paragraph_request = None;
-    if suggest_paragraphs {
-        if let Some(expr) = &request.field_filter {
-            let prefilter = PreFilterRequest {
-                security: None,
-                filter_expression: Some(expr.clone()),
-            };
-
-            prefiltered = text_searcher.prefilter(&prefilter)?;
-        }
-        paragraph_request = Some(ParagraphSuggestRequest {
+    let relation_request = if suggest_entities {
+        let prefixes = split_suggest_query(&request.body, MAX_SUGGEST_COMPOUND_WORDS);
+        Some(prefixes)
+    } else {
+        None
+    };
+    let paragraph_request = if suggest_paragraphs {
+        Some(ParagraphSuggestRequest {
             body: request.body,
             filtering_formula: request
                 .paragraph_filter
@@ -113,15 +111,29 @@ fn blocking_suggest(
                 .transpose()?,
             filter_or: request.filter_operator == FilterOperator::Or as i32,
         })
+    } else {
+        None
+    };
+
+    let mut prefilter = PrefilterResult::All;
+    if request.field_filter.is_some() || request.security.is_some() {
+        let request = PreFilterRequest {
+            security: request.security.clone(),
+            filter_expression: request.field_filter.clone(),
+        };
+        prefilter = text_searcher.prefilter(&request)?;
     }
 
-    if matches!(prefiltered, PrefilterResult::None) {
-        paragraph_request = None;
+    if matches!(prefilter, PrefilterResult::None) {
+        // Nothing matches the prefilter, searching won't yield any result
+        return Ok(SuggestResponse::default());
     }
 
-    let paragraph_task = paragraph_request.map(|req| move || paragraph_searcher.suggest(&req, &prefiltered));
-
-    let relation_task = suggest_entities.then_some(move || relation_searcher.suggest(prefixes));
+    let paragraph_task = {
+        let prefilter = prefilter.clone();
+        paragraph_request.map(|request| move || paragraph_searcher.suggest(&request, &prefilter))
+    };
+    let relation_task = relation_request.map(|prefixes| move || relation_searcher.suggest(prefixes, &prefilter));
 
     let mut rparagraph = None;
     let mut rrelation = None;

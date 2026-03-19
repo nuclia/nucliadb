@@ -22,12 +22,21 @@ import asyncio
 import pytest
 from httpx import AsyncClient
 
+from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
+from tests.utils.dirty_index import wait_for_sync
+
 PLATFORM_GROUP = "platform"
 DEVELOPERS_GROUP = "developers"
 
 
 @pytest.fixture(scope="function")
-async def resource_with_security(nucliadb_writer: AsyncClient, standalone_knowledgebox: str):
+async def resource_with_security(
+    nucliadb_writer: AsyncClient, standalone_knowledgebox: str, nucliadb_ingest_grpc: WriterStub
+):
     kbid = standalone_knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
@@ -42,7 +51,25 @@ async def resource_with_security(nucliadb_writer: AsyncClient, standalone_knowle
         },
     )
     assert resp.status_code == 201, resp.text
-    return resp.json()["uuid"]
+    rid = resp.json()["uuid"]
+
+    # Add a broker message with paragraphs via the grpc interface
+    bmb = BrokerMessageBuilder(
+        kbid=kbid,
+        rid=rid,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+    bmb.with_title("Test resource")
+    bmb.with_summary("My text discussing about something")
+
+    text_field = bmb.field_builder("text1", FieldType.TEXT)
+    text_field.add_paragraph("My text discussing about something")
+
+    bm = bmb.build()
+    await inject_message(nucliadb_ingest_grpc, bm)
+    await wait_for_sync()
+
+    return rid
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -86,16 +113,26 @@ async def test_resource_security_is_updated(
     assert resource["security"]["access_groups"] == []
 
 
-@pytest.mark.parametrize("search_endpoint", ("find_get", "find_post", "search_get", "search_post"))
+@pytest.mark.parametrize(
+    "search_endpoint",
+    (
+        ("GET", "find"),
+        ("POST", "find"),
+        ("GET", "search"),
+        ("POST", "search"),
+        ("GET", "suggest"),
+    ),
+)
 @pytest.mark.deploy_modes("standalone")
 async def test_resource_security_search(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox: str,
     resource_with_security,
-    search_endpoint,
+    search_endpoint: tuple[str, str],
 ):
     kbid = standalone_knowledgebox
+    method, endpoint = search_endpoint
     resource_id = resource_with_security
     support_group = "support"
     # Add another group to the resource
@@ -111,7 +148,8 @@ async def test_resource_security_search(
 
     # Querying without security should return the resource
     await _test_search_request_with_security(
-        search_endpoint,
+        method,
+        endpoint,
         nucliadb_reader,
         kbid,
         query="resource",
@@ -130,7 +168,8 @@ async def test_resource_security_search(
         [DEVELOPERS_GROUP, "some-unknown-group"],
     ):
         await _test_search_request_with_security(
-            search_endpoint,
+            method,
+            endpoint,
             nucliadb_reader,
             kbid,
             query="resource",
@@ -140,7 +179,8 @@ async def test_resource_security_search(
 
     # Querying with an unknown security group should not return the resource
     await _test_search_request_with_security(
-        search_endpoint,
+        method,
+        endpoint,
         nucliadb_reader,
         kbid,
         query="resource",
@@ -165,7 +205,8 @@ async def test_resource_security_search(
 
     # Querying with an unknown security group should return the resource now, as it is public
     await _test_search_request_with_security(
-        search_endpoint,
+        method,
+        endpoint,
         nucliadb_reader,
         kbid,
         query="resource",
@@ -175,7 +216,8 @@ async def test_resource_security_search(
 
 
 async def _test_search_request_with_security(
-    search_endpoint: str,
+    method: str,
+    endpoint: str,
     nucliadb_reader: AsyncClient,
     kbid: str,
     query: str,
@@ -194,30 +236,44 @@ async def _test_search_request_with_security(
     if security_groups:
         params["security_groups"] = security_groups  # type: ignore
 
-    if search_endpoint == "find_post":
+    if method == "POST" and endpoint == "find":
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",
             json=payload,
         )
-    elif search_endpoint == "find_get":
+    elif method == "GET" and endpoint == "find":
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/find",
             params=params,
         )
-    elif search_endpoint == "search_post":
+    elif method == "POST" and endpoint == "search":
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/search",
             json=payload,
         )
-    elif search_endpoint == "search_get":
+    elif method == "GET" and endpoint == "search":
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/search",
+            params=params,
+        )
+    elif method == "GET" and endpoint == "suggest":
+        resp = await nucliadb_reader.get(
+            f"/kb/{kbid}/suggest",
             params=params,
         )
     else:
-        raise ValueError(f"Unknown search endpoint: {search_endpoint}")
+        raise ValueError(f"Unknown method and/or search endpoint: {method} {endpoint}")
 
     assert resp.status_code == 200, resp.text
-    search_response = resp.json()
-    assert len(search_response["resources"]) == len(expected_resources)
-    assert set(search_response["resources"]) == set(expected_resources)
+
+    if endpoint in ("search", "find"):
+        search_response = resp.json()
+        assert len(search_response["resources"]) == len(expected_resources)
+        assert set(search_response["resources"]) == set(expected_resources)
+    elif endpoint in ("suggest",):
+        suggest_response = resp.json()
+        resources = [paragraph["rid"] for paragraph in suggest_response["paragraphs"]["results"]]
+        assert len(resources) == len(expected_resources)
+        assert set(resources) == set(expected_resources)
+    else:
+        raise ValueError(f"Unknown method and/or search endpoint: {method} {endpoint}")

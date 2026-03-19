@@ -385,6 +385,8 @@ message SuggestRequest {
     optional FilterExpression field_filter = 7;
     optional FilterExpression paragraph_filter = 8;
     FilterOperator filter_operator = 9;
+
+    optional utils.Security security = 10;
 }
 
 message SuggestResponse {
