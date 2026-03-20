@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class ResourceSecurity(BaseModel):
@@ -35,6 +35,7 @@ class RequestSecurity(BaseModel):
 
     groups: list[str] = Field(
         default=[],
+        validation_alias=AliasChoices("access_groups", "groups"),
         title="Groups",
         description="List of group ids to do the request with. ",
     )
