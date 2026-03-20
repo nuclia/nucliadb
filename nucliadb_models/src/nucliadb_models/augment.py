@@ -56,14 +56,14 @@ ParagraphId = Annotated[
 # Request
 
 
-class AugmentResourceFields(BaseModel):
+class AugmentResourceFields(BaseModel, extra="forbid"):
     text: bool = False
     classification_labels: bool = False
 
     filters: list[filters.Field | filters.Generated]
 
 
-class AugmentResources(BaseModel):
+class AugmentResources(BaseModel, extra="forbid"):
     given: list[ResourceId]
 
     # `show` props
@@ -158,7 +158,7 @@ class AugmentResources(BaseModel):
                     assert_never(e)
 
 
-class AugmentFields(BaseModel):
+class AugmentFields(BaseModel, extra="forbid"):
     given: list[FieldId]
 
     text: bool = False
@@ -211,7 +211,7 @@ class AugmentFields(BaseModel):
         return self
 
 
-class ParagraphMetadata(BaseModel):
+class ParagraphMetadata(BaseModel, extra="forbid"):
     is_an_image: bool
     is_a_table: bool
 
@@ -223,12 +223,12 @@ class ParagraphMetadata(BaseModel):
     in_page_with_visual: bool | None
 
 
-class AugmentParagraph(BaseModel):
+class AugmentParagraph(BaseModel, extra="forbid"):
     id: ParagraphId
     metadata: ParagraphMetadata | None = None
 
 
-class AugmentParagraphs(BaseModel):
+class AugmentParagraphs(BaseModel, extra="forbid"):
     given: list[AugmentParagraph]
 
     text: bool = True
@@ -255,7 +255,7 @@ class AugmentParagraphs(BaseModel):
         return self
 
 
-class AugmentRequest(BaseModel):
+class AugmentRequest(BaseModel, extra="forbid"):
     resources: list[AugmentResources] | None = Field(default=None, min_length=1)
     fields: list[AugmentFields] | None = Field(default=None, min_length=1)
     paragraphs: list[AugmentParagraphs] | None = Field(default=None, min_length=1)
@@ -264,7 +264,7 @@ class AugmentRequest(BaseModel):
 # Response
 
 
-class AugmentedParagraph(BaseModel):
+class AugmentedParagraph(BaseModel, extra="forbid"):
     text: str | None = None
     position: TextPosition | None = None
 
@@ -276,7 +276,7 @@ class AugmentedParagraph(BaseModel):
     page_preview_image: str | None = None
 
 
-class AugmentedField(BaseModel):
+class AugmentedField(BaseModel, extra="forbid"):
     text: str | None = None
 
     classification_labels: dict[str, list[str]] | None = None
@@ -285,7 +285,7 @@ class AugmentedField(BaseModel):
     entities: dict[str, list[str]] | None = None
 
 
-class AugmentedFileField(BaseModel):
+class AugmentedFileField(BaseModel, extra="forbid"):
     text: str | None = None
 
     classification_labels: dict[str, list[str]] | None = None
@@ -299,13 +299,13 @@ class AugmentedFileField(BaseModel):
     thumbnail_image: str | None = None
 
 
-class AugmentedConversationMessage(BaseModel):
+class AugmentedConversationMessage(BaseModel, extra="forbid"):
     ident: str
     text: str | None = None
     attachments: list[FieldId] | None = None
 
 
-class AugmentedConversationField(BaseModel):
+class AugmentedConversationField(BaseModel, extra="forbid"):
     classification_labels: dict[str, list[str]] | None = None
     # former ners
     entities: dict[str, list[str]] | None = None
@@ -344,7 +344,7 @@ class AugmentedConversationField(BaseModel):
             return None
 
 
-class AugmentedResource(Resource):
+class AugmentedResource(Resource, extra="forbid"):
     classification_labels: dict[str, list[str]] | None = None
 
     def updated_from(self, origin: Resource):
@@ -352,7 +352,7 @@ class AugmentedResource(Resource):
             self.__setattr__(key, getattr(origin, key))
 
 
-class AugmentResponse(BaseModel):
+class AugmentResponse(BaseModel, extra="forbid"):
     resources: dict[ResourceId, AugmentedResource]
     fields: dict[FieldId, AugmentedField | AugmentedFileField | AugmentedConversationField]
     paragraphs: dict[ParagraphId, AugmentedParagraph]
