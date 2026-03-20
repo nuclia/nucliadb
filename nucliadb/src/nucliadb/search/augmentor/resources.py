@@ -213,7 +213,7 @@ async def augment_resources_deep(
     return augmented
 
 
-@augmentor_observer.wrap({"type": "seialize_resource"})
+@augmentor_observer.wrap({"type": "serialize_resource"})
 async def augment_resource_deep(
     kbid: str,
     rid: str,
