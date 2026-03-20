@@ -31,23 +31,23 @@ from nucliadb_models.search import (
 from nucliadb_models.security import RequestSecurity
 
 
-class KeywordQuery(BaseModel):
+class KeywordQuery(BaseModel, extra="forbid"):
     query: str
     min_score: float = 0.0
     with_synonyms: bool = False
 
 
-class SemanticQuery(BaseModel):
+class SemanticQuery(BaseModel, extra="forbid"):
     query: list[float]
     vectorset: str
     min_score: float = -1.0
 
 
-class GraphQuery(BaseModel):
+class GraphQuery(BaseModel, extra="forbid"):
     query: GraphPathQuery
 
 
-class RawQuery(BaseModel):
+class RawQuery(BaseModel, extra="forbid"):
     """Low-level query with per-index options."""
 
     keyword: KeywordQuery | None = None
@@ -55,7 +55,7 @@ class RawQuery(BaseModel):
     graph: GraphQuery | None = None
 
 
-class Rephrase(BaseModel):
+class Rephrase(BaseModel, extra="forbid"):
     prompt: str = Field(
         description=(
             "Rephrase prompt given to the generative model responsible for rephrasing the query for a more effective retrieval step.\n"
@@ -76,22 +76,22 @@ Please return ONLY the question without any explanation.""",
     )
 
 
-class KeywordOverrides(BaseModel):
+class KeywordOverrides(BaseModel, extra="forbid"):
     min_score: float | None = None
     with_synonyms: bool = False
 
 
-class SemanticOverrides(BaseModel):
+class SemanticOverrides(BaseModel, extra="forbid"):
     vector: list[float] | None = None
     vectorset: str | None = None
     min_score: float | None = None
 
 
-class GraphOverrides(BaseModel):
+class GraphOverrides(BaseModel, extra="forbid"):
     query: GraphPathQuery | None = None
 
 
-class QueryOverrides(BaseModel):
+class QueryOverrides(BaseModel, extra="forbid"):
     keyword: KeywordOverrides | Literal["disabled"] | None = Field(
         default=None,
         description="Override keyword search parameters. Using false disables keyword search",
@@ -113,7 +113,7 @@ class QueryOverrides(BaseModel):
         return self
 
 
-class Query(BaseModel):
+class Query(BaseModel, extra="forbid"):
     """A high-level query to retrieve what you want with overridable low-level details."""
 
     query: str = Field(description="Textual query to search for")
@@ -131,7 +131,7 @@ class Query(BaseModel):
     )
 
 
-class Filters(BaseModel):
+class Filters(BaseModel, extra="forbid"):
     filter_expression: FilterExpression | None = (
         SearchParamDefaults.filter_expression.to_pydantic_field()
     )
@@ -166,37 +166,37 @@ class ScoreType(str, Enum):
     RERANKER = "reranker"
 
 
-class KeywordScore(BaseModel):
+class KeywordScore(BaseModel, extra="forbid"):
     score: float
     source: Literal[ScoreSource.INDEX] = ScoreSource.INDEX
     type: Literal[ScoreType.KEYWORD] = ScoreType.KEYWORD
 
 
-class SemanticScore(BaseModel):
+class SemanticScore(BaseModel, extra="forbid"):
     score: float
     source: Literal[ScoreSource.INDEX] = ScoreSource.INDEX
     type: Literal[ScoreType.SEMANTIC] = ScoreType.SEMANTIC
 
 
-class GraphScore(BaseModel):
+class GraphScore(BaseModel, extra="forbid"):
     score: float
     source: Literal[ScoreSource.INDEX] = ScoreSource.INDEX
     type: Literal[ScoreType.GRAPH] = ScoreType.GRAPH
 
 
-class RrfScore(BaseModel):
+class RrfScore(BaseModel, extra="forbid"):
     score: float
     source: Literal[ScoreSource.RANK_FUSION] = ScoreSource.RANK_FUSION
     type: Literal[ScoreType.RRF] = ScoreType.RRF
 
 
-class WeightedCombSumScore(BaseModel):
+class WeightedCombSumScore(BaseModel, extra="forbid"):
     score: float
     source: Literal[ScoreSource.RANK_FUSION] = ScoreSource.RANK_FUSION
     type: Literal[ScoreType.WCOMB_SUM] = ScoreType.WCOMB_SUM
 
 
-class RerankerScore(BaseModel):
+class RerankerScore(BaseModel, extra="forbid"):
     score: float
     source: Literal[ScoreSource.RERANKER] = ScoreSource.RERANKER
     type: Literal[ScoreType.RERANKER] = ScoreType.RERANKER
@@ -205,14 +205,14 @@ class RerankerScore(BaseModel):
 Score = KeywordScore | SemanticScore | GraphScore | RrfScore | WeightedCombSumScore | RerankerScore
 
 
-class Scores(BaseModel):
+class Scores(BaseModel, extra="forbid"):
     value: float
     source: ScoreSource
     type: ScoreType
     history: list[Score]
 
 
-class Metadata(BaseModel):
+class Metadata(BaseModel, extra="forbid"):
     field_labels: list[str]
     paragraph_labels: list[str]
 
@@ -227,11 +227,11 @@ class Metadata(BaseModel):
     in_page_with_visual: bool | None
 
 
-class RetrievalMatch(BaseModel):
+class RetrievalMatch(BaseModel, extra="forbid"):
     id: str
     score: Scores
     metadata: Metadata
 
 
-class RetrievalResponse(BaseModel):
+class RetrievalResponse(BaseModel, extra="forbid"):
     matches: list[RetrievalMatch]
