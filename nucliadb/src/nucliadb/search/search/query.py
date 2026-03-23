@@ -121,7 +121,6 @@ async def suggest_query_to_pb(
     filter_expression: FilterExpression | None,
     fields: list[str],
     filters: list[str],
-    faceted: list[str],
     range_creation_start: datetime | None = None,
     range_creation_end: datetime | None = None,
     range_modification_start: datetime | None = None,

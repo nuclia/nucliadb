@@ -68,9 +68,12 @@ async def suggest_knowledgebox(
     ),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
-    faceted: list[str] = fastapi_query(SearchParamDefaults.faceted),
     range_creation_start: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_start),
     range_creation_end: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_end),
+    faceted: list[str] = fastapi_query(
+        SearchParamDefaults.faceted,
+        deprecated="Facets are not supported",
+    ),
     range_modification_start: DateTime | None = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
@@ -98,7 +101,6 @@ async def suggest_knowledgebox(
             expr,
             fields,
             filters,
-            faceted,
             range_creation_start,
             range_creation_end,
             range_modification_start,
@@ -128,7 +130,6 @@ async def suggest(
     filter_expression: FilterExpression | None,
     fields: list[str],
     filters: list[str],
-    faceted: list[str],
     range_creation_start: datetime | None,
     range_creation_end: datetime | None,
     range_modification_start: datetime | None,
@@ -153,7 +154,6 @@ async def suggest(
             filter_expression,
             fields,
             filters,
-            faceted,
             range_creation_start,
             range_creation_end,
             range_modification_start,
