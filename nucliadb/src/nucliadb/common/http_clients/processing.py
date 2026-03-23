@@ -212,7 +212,7 @@ class ProcessingHTTPClient:
             check_status(resp, resp_text)
 
     async def pull_v2(
-        self, ack_tokens: list[str], limit: int = 1, timeout: float = 5
+        self, ack_tokens: list[str], limit: int = 1, timeout: float = 3.0
     ) -> PullResponseV2 | None:
         url = self.base_url_v2 + "/pull"
         request = PullRequestV2(limit=limit, timeout=timeout, ack=ack_tokens)
