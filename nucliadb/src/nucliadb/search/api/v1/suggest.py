@@ -20,7 +20,7 @@
 import json
 from datetime import datetime
 
-from fastapi import Header, Request, Response
+from fastapi import Request, Response
 from fastapi_versioning import version
 from pydantic import ValidationError
 
@@ -33,13 +33,10 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query import suggest_query_to_pb
 from nucliadb.search.search.utils import filter_hidden_resources
-from nucliadb_models.common import FieldTypeName
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     KnowledgeboxSuggestResults,
-    NucliaDBClientType,
-    ResourceProperties,
     SearchParamDefaults,
     SuggestOptions,
 )
@@ -70,22 +67,11 @@ async def suggest_knowledgebox(
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
     range_creation_start: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_start),
     range_creation_end: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_end),
-    faceted: list[str] = fastapi_query(
-        SearchParamDefaults.faceted,
-        deprecated="Facets are not supported",
-    ),
     range_modification_start: DateTime | None = fastapi_query(
         SearchParamDefaults.range_modification_start
     ),
     range_modification_end: DateTime | None = fastapi_query(SearchParamDefaults.range_modification_end),
     features: list[SuggestOptions] = fastapi_query(SearchParamDefaults.suggest_features),
-    show: list[ResourceProperties] = fastapi_query(SearchParamDefaults.show),
-    field_type_filter: list[FieldTypeName] = fastapi_query(
-        SearchParamDefaults.field_type_filter, alias="field_type"
-    ),
-    x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
-    x_nucliadb_user: str = Header(""),
-    x_forwarded_for: str = Header(""),
     debug: bool = fastapi_query(SearchParamDefaults.debug),
     highlight: bool = fastapi_query(SearchParamDefaults.highlight),
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
@@ -106,8 +92,6 @@ async def suggest_knowledgebox(
             range_modification_start,
             range_modification_end,
             features,
-            show,
-            field_type_filter,
             debug,
             highlight,
             show_hidden,
@@ -132,8 +116,6 @@ async def suggest(
     range_modification_start: datetime | None,
     range_modification_end: datetime | None,
     features: list[SuggestOptions],
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
     debug: bool,
     highlight: bool,
     show_hidden: bool,
