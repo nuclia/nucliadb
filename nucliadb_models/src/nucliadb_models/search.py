@@ -17,6 +17,7 @@ from enum import Enum
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
+from nuclia_models.common.consumption import Consumption
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.aliases import AliasChoices
 from pydantic.json_schema import SkipJsonSchema
@@ -24,14 +25,14 @@ from typing_extensions import Self
 
 from nucliadb_models import RelationMetadata
 from nucliadb_models.common import FieldTypeName, ParamDefault
+from nucliadb_models.filters import CatalogFilterExpression, FilterExpression
 from nucliadb_models.graph.requests import GraphPathQuery
-
-# Bw/c import to avoid breaking users
 from nucliadb_models.metadata import RelationNodeType, RelationType, ResourceProcessingStatus
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.security import RequestSecurity
 from nucliadb_models.utils import DateTime
 
+# Bw/c import to avoid breaking users
 from nucliadb_models.internal.shards import (  # noqa isort: skip
     DocumentServiceEnum,
     ParagraphServiceEnum,
@@ -42,9 +43,7 @@ from nucliadb_models.internal.shards import (  # noqa isort: skip
     ShardReplica,
     KnowledgeboxShards,
 )
-from nuclia_models.common.consumption import Consumption
 
-from nucliadb_models.filters import CatalogFilterExpression, FilterExpression
 
 ANSWER_JSON_SCHEMA_EXAMPLE = {
     "name": "structred_response",
@@ -459,10 +458,7 @@ class SearchParamDefaults:
         description="The query to search for",
         max_items=20_000,
     )
-    suggest_query = ParamDefault(
-        default=..., title="Query", description="The query to get suggestions for"
-    )
-    fields = ParamDefault(
+    fields: ParamDefault = ParamDefault(
         default=[],
         title="Fields",
         description=(
@@ -470,7 +466,7 @@ class SearchParamDefaults:
             "For more details on filtering by field, see: https://docs.nuclia.dev/docs/rag/advanced/search/#search-in-a-specific-field. "
         ),
     )
-    filters = ParamDefault(
+    filters: ParamDefault = ParamDefault(
         default=[],
         title="Search Filters",
         description="The list of filters to apply. Filtering examples can be found here: https://docs.nuclia.dev/docs/rag/advanced/search-filters",
@@ -480,7 +476,7 @@ class SearchParamDefaults:
         title="Resources filter",
         description="List of resource ids to filter search results for. Only paragraphs from the specified resources will be returned.",
     )
-    faceted = ParamDefault(
+    faceted: ParamDefault = ParamDefault(
         default=[],
         title="Faceted",
         description="The list of facets to calculate. The facets follow the same syntax as filters: https://docs.nuclia.dev/docs/rag/advanced/search-filters",
@@ -517,7 +513,7 @@ class SearchParamDefaults:
         title="Results offset",
         description="The number of results to skip, starting from the beginning in sort order. Used for pagination. It can only be used with the keyword and fulltext indexes.",
     )
-    highlight = ParamDefault(
+    highlight: ParamDefault = ParamDefault(
         default=False,
         title="Highlight",
         description="If set to true, the query terms will be highlighted in the results between <mark>...</mark> tags",
@@ -567,7 +563,7 @@ class SearchParamDefaults:
         title="Reranker",
         description="Reranker let you specify which method you want to use to rerank your results at the end of retrieval",
     )
-    debug = ParamDefault(
+    debug: ParamDefault = ParamDefault(
         default=False,
         title="Debug mode",
         description="If set, the response will include some extra metadata for debugging purposes, like the list of queried nodes.",
@@ -588,22 +584,22 @@ class SearchParamDefaults:
         title="Field type filter",
         description="Define which field types are serialized on resources of search results",
     )
-    range_creation_start = ParamDefault(
+    range_creation_start: ParamDefault = ParamDefault(
         default=None,
         title="Resource creation range start",
         description="Resources created before this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",
     )
-    range_creation_end = ParamDefault(
+    range_creation_end: ParamDefault = ParamDefault(
         default=None,
         title="Resource creation range end",
         description="Resources created after this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",
     )
-    range_modification_start = ParamDefault(
+    range_modification_start: ParamDefault = ParamDefault(
         default=None,
         title="Resource modification range start",
         description="Resources modified before this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",
     )
-    range_modification_end = ParamDefault(
+    range_modification_end: ParamDefault = ParamDefault(
         default=None,
         title="Resource modification range end",
         description="Resources modified after this date will be filtered out of search results. Datetime are represented as a str in ISO 8601 format, like: 2008-09-15T15:53:00+05:00.",
@@ -634,20 +630,12 @@ class SearchParamDefaults:
         title="Chat features",
         description="Features enabled for the chat endpoint. Semantic search is done if `semantic` is included. If `keyword` is included, the results will include matching paragraphs from the bm25 index. If `relations` is included, a graph of entities related to the answer is returned. `paragraphs` and `vectors` are deprecated, please use `keyword` and `semantic` instead",
     )
-    suggest_features = ParamDefault(
-        default=[
-            SuggestOptions.PARAGRAPH,
-            SuggestOptions.ENTITIES,
-        ],
-        title="Suggest features",
-        description="Features enabled for the suggest endpoint.",
-    )
-    security = ParamDefault(
+    security: ParamDefault = ParamDefault(
         default=None,
         title="Security",
         description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",
     )
-    security_groups = ParamDefault(
+    security_groups: ParamDefault = ParamDefault(
         default=[],
         title="Security groups",
         description="List of security groups to filter search results for. Only resources matching the query and containing the specified security groups will be returned. If empty, all resources will be considered for the search.",
@@ -662,7 +650,7 @@ class SearchParamDefaults:
         title="Prefer markdown",
         description="If set to true, the response will be in markdown format",
     )
-    show_hidden = ParamDefault(
+    show_hidden: ParamDefault = ParamDefault(
         default=False,
         title="Show hidden resources",
         description="If set to false (default), excludes hidden resources from search",
@@ -672,7 +660,7 @@ class SearchParamDefaults:
         title="Filter resources by hidden",
         description="Set to filter only hidden or only non-hidden resources. Default is to return everything",
     )
-    filter_expression = ParamDefault(
+    filter_expression: ParamDefault = ParamDefault(
         default=None,
         title="Filter resource by an expression",
         description=(

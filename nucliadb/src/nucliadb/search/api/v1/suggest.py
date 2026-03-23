@@ -31,15 +31,12 @@ from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.merge import merge_suggest_results
-from nucliadb.search.search.query import suggest_query_to_pb
-from nucliadb.search.search.utils import filter_hidden_resources
+from nucliadb.search.search.query_parser.parsers import parse_suggest
+from nucliadb_models import SuggestRequest
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_models.search import (
-    KnowledgeboxSuggestResults,
-    SearchParamDefaults,
-    SuggestOptions,
-)
+from nucliadb_models.search import KnowledgeboxSuggestResults
+from nucliadb_models.suggest import SuggestOptions, SuggestParamDefaults
 from nucliadb_models.utils import DateTime
 from nucliadb_utils.authentication import requires
 
@@ -59,23 +56,23 @@ async def suggest_knowledgebox(
     request: Request,
     response: Response,
     kbid: str,
-    query: str = fastapi_query(SearchParamDefaults.suggest_query),
+    query: str = fastapi_query(SuggestParamDefaults.suggest_query),
     filter_expression: str | None = fastapi_query(
-        SearchParamDefaults.filter_expression, include_in_schema=False
+        SuggestParamDefaults.filter_expression, include_in_schema=False
     ),
-    fields: list[str] = fastapi_query(SearchParamDefaults.fields),
-    filters: list[str] = fastapi_query(SearchParamDefaults.filters),
-    range_creation_start: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_start),
-    range_creation_end: DateTime | None = fastapi_query(SearchParamDefaults.range_creation_end),
+    fields: list[str] = fastapi_query(SuggestParamDefaults.fields),
+    filters: list[str] = fastapi_query(SuggestParamDefaults.filters),
+    range_creation_start: DateTime | None = fastapi_query(SuggestParamDefaults.range_creation_start),
+    range_creation_end: DateTime | None = fastapi_query(SuggestParamDefaults.range_creation_end),
     range_modification_start: DateTime | None = fastapi_query(
-        SearchParamDefaults.range_modification_start
+        SuggestParamDefaults.range_modification_start
     ),
-    range_modification_end: DateTime | None = fastapi_query(SearchParamDefaults.range_modification_end),
-    features: list[SuggestOptions] = fastapi_query(SearchParamDefaults.suggest_features),
-    debug: bool = fastapi_query(SearchParamDefaults.debug),
-    highlight: bool = fastapi_query(SearchParamDefaults.highlight),
-    show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
-    security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
+    range_modification_end: DateTime | None = fastapi_query(SuggestParamDefaults.range_modification_end),
+    features: list[SuggestOptions] = fastapi_query(SuggestParamDefaults.suggest_features),
+    debug: bool = fastapi_query(SuggestParamDefaults.debug),
+    highlight: bool = fastapi_query(SuggestParamDefaults.highlight),
+    show_hidden: bool = fastapi_query(SuggestParamDefaults.show_hidden),
+    security_groups: list[str] = fastapi_query(SuggestParamDefaults.security_groups),
 ) -> KnowledgeboxSuggestResults | HTTPClientError:
     try:
         expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
@@ -104,6 +101,48 @@ async def suggest_knowledgebox(
         return HTTPClientError(status_code=422, detail=detail)
 
 
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/suggest",
+    status_code=200,
+    summary="Suggest on a knowledge box",
+    description="Suggestions on a knowledge box",
+    response_model=KnowledgeboxSuggestResults,
+    response_model_exclude_unset=True,
+    tags=["Search"],
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def suggest_post_knowledgebox(
+    request: Request,
+    response: Response,
+    kbid: str,
+    item: SuggestRequest,
+) -> KnowledgeboxSuggestResults | HTTPClientError:
+    try:
+        return await suggest(
+            response,
+            kbid,
+            query=item.query,
+            filter_expression=item.filter_expression,
+            fields=[],
+            filters=[],
+            range_creation_start=None,
+            range_creation_end=None,
+            range_modification_start=None,
+            range_modification_end=None,
+            features=item.features,
+            debug=item.debug,
+            highlight=item.highlight,
+            show_hidden=item.show_hidden,
+            security_groups=item.security.groups if item.security else [],
+        )
+    except InvalidQueryError as exc:
+        return HTTPClientError(status_code=412, detail=str(exc))
+    except ValidationError as exc:
+        detail = json.loads(exc.json())
+        return HTTPClientError(status_code=422, detail=detail)
+
+
 async def suggest(
     response,
     kbid: str,
@@ -122,19 +161,18 @@ async def suggest(
     security_groups: list[str],
 ) -> KnowledgeboxSuggestResults:
     with cache.request_caches():
-        hidden = await filter_hidden_resources(kbid, show_hidden)
-        pb_query = await suggest_query_to_pb(
+        pb_query = await parse_suggest(
             kbid,
-            features,
             query,
+            features,
             filter_expression,
             fields,
             filters,
+            show_hidden,
             range_creation_start,
             range_creation_end,
             range_modification_start,
             range_modification_end,
-            hidden,
             security_groups,
         )
         results, queried_shards = await nidx_query(kbid, Method.SUGGEST, pb_query)
