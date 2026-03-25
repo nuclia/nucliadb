@@ -53,7 +53,7 @@ spec:
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/suggest'
           method:
-            regex: "GET|OPTIONS"
+            regex: "GET|POST|OPTIONS"
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/graph'
           method:

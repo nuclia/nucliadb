@@ -24,6 +24,7 @@ from .metadata import *  # noqa
 from .notifications import *  # noqa
 from .processing import *  # noqa
 from .security import *  # noqa
+from .suggest import *  # noqa
 from .text import *  # noqa
 from .writer import *  # noqa
 

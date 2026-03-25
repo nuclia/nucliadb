@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 from nidx_protos import nodereader_pb2
 from pydantic import ValidationError
 
