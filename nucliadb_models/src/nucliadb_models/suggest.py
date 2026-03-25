@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
 from pydantic import BaseModel
 from pydantic.json_schema import SkipJsonSchema
 
