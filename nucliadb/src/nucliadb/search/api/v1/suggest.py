@@ -123,18 +123,20 @@ async def suggest_post_knowledgebox(
             response,
             kbid,
             query=item.query,
+            features=item.features,
+            debug=item.debug,
+            highlight=item.highlight,
+            show_hidden=item.show_hidden,
+            security_groups=item.security.groups if item.security else [],
             filter_expression=item.filter_expression,
+            # all these fields are superseeded by filter expression. In the POST
+            # endpoint we don't support any of these fields
             fields=[],
             filters=[],
             range_creation_start=None,
             range_creation_end=None,
             range_modification_start=None,
             range_modification_end=None,
-            features=item.features,
-            debug=item.debug,
-            highlight=item.highlight,
-            show_hidden=item.show_hidden,
-            security_groups=item.security.groups if item.security else [],
         )
     except InvalidQueryError as exc:
         return HTTPClientError(status_code=412, detail=str(exc))
