@@ -160,6 +160,7 @@ class _RetrievalParser:
             query = await self._into_raw_query(self.item.query)
         else:  # pragma: no cover
             assert_never(self.item.query)
+            assert False, "SAST tools don't trust this yet"
 
         keyword = None
         if query.keyword is not None:
