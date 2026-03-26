@@ -199,7 +199,7 @@ jobs:
           SQLX_OFFLINE: true
         run: cd nidx && cargo llvm-cov --codecov --output-path codecov.json nextest --workspace --all-features
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           file: ./nidx/codecov.json
           flags: nidx
@@ -296,7 +296,7 @@ jobs:
         run: source .venv/bin/activate && make -C nucliadb test-cov-search
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb-search
@@ -351,7 +351,7 @@ jobs:
           make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb
@@ -393,7 +393,7 @@ jobs:
         run: source .venv/bin/activate && make -C nucliadb test-cov-${{ matrix.component }}
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb-${{ matrix.component }}
@@ -435,7 +435,7 @@ jobs:
         run: source .venv/bin/activate && make -C ${{ matrix.package }} test-cov
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           file: ./${{ matrix.package }}/coverage.xml
           flags: ${{ matrix.package }}
