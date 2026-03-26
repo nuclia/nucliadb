@@ -111,7 +111,7 @@ async def parse_retrieve(kbid: str, item: RetrievalRequest) -> ParsedQuery:
 class _RetrievalParser:
     def __init__(self, kbid: str, item: RetrievalRequest, fetcher: Fetcher):
         self.kbid = kbid
-        self.item = item
+        self.item: RetrievalRequest = item
         self.fetcher = fetcher
 
     async def parse(self) -> UnitRetrieval:
@@ -205,9 +205,8 @@ class _RetrievalParser:
             else:  # pragma: no cover
                 assert_never(query.override.keyword)
 
-        if query.override.semantic == "disabled":
-            semantic = None
-        else:
+        semantic = None
+        if query.override.semantic != "disabled":
             vector = None
             vectorset = None
             user_semantic_min_score = None
@@ -291,6 +290,8 @@ class _RetrievalParser:
         # Calculate the matryoshka dimension if applicable
         user_vector = semantic.query
         matryoshka_dimension = await self.fetcher.get_matryoshka_dimension()
+
+        query_vector = user_vector
         if matryoshka_dimension is not None:
             if len(user_vector) < matryoshka_dimension:
                 raise InvalidQueryError(
@@ -301,6 +302,7 @@ class _RetrievalParser:
             # KB using a matryoshka embeddings model, cut the query vector
             # accordingly
             query_vector = user_vector[:matryoshka_dimension]
+
         return vectorset, query_vector
 
     @query_parser_observer.wrap({"type": "retrieve_parse_filters"})
