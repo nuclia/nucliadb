@@ -14,7 +14,7 @@ jobs:
       contents: read
       pull-requests: write
       checks: write
-    
+
     steps:
       - uses: actions/checkout@v5
         with:
@@ -27,7 +27,7 @@ jobs:
             polaris_server_url: 'https://polaris.blackduck.com'
             polaris_access_token: ${{ secrets.POLARIS_ACCESS_TOKEN }}
             polaris_application_name: Nuclia
-            polaris_project_name: ${{ github.event.repository.name }}
+            polaris_project_name: nuclia-${{ github.event.repository.name }}
             polaris_assessment_types: "SAST"
             polaris_test_sast_type: ${{ github.event_name == 'pull_request' && 'SAST_RAPID' || 'SAST_FULL' }}
             polaris_assessment_mode: CI
