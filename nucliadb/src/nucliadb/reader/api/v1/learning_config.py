@@ -138,13 +138,16 @@ async def get_schema_for_configuration_updates(
 @requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_models_group_by_providers(
-    request: Request, kbid: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
+    request: Request,
+    kbid: str,
+    x_nucliadb_account: str = Header(default="", include_in_schema=False),
+    x_nucliadb_account_type: str = Header(default="", include_in_schema=False),
 ):
     return await learning_config_proxy(
         request,
         "GET",
         f"/generative_providers/{kbid}",
-        headers={"account-id": x_nucliadb_account},
+        headers={"account-id": x_nucliadb_account, "account-type": x_nucliadb_account_type},
     )
 
 
