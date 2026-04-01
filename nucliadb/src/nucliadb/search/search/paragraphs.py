@@ -21,11 +21,16 @@ import logging
 import re
 import string
 
+from nidx_protos.nidx_pb2 import ExtractedTextsRequest
+
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search.search import cache
 from nucliadb_telemetry import errors, metrics
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 logger = logging.getLogger(__name__)
 PRE_WORD = string.punctuation + " "
@@ -65,23 +70,43 @@ async def get_paragraph_from_full_text(
 
     This requires downloading the full text and then slicing it.
     """
-    extracted_text = await cache.get_field_extracted_text(field)
-    if extracted_text is None:
-        if log_on_missing_field:
-            logger.warning(
-                "Extracted_text for field does not exist on DB. This should not happen.",
-                extra={
-                    "field_id": field.resource_unique_id,
-                    "kbid": field.kbid,
-                },
+    if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}):
+        nidx_searcher = get_nidx_searcher_client()
+        extracted_texts = await nidx_searcher.ExtractedTexts(
+            ExtractedTextsRequest(
+                shard_id="7f265f9e-5428-42b4-817b-be578f0ca3f9",
+                paragraph_ids=[
+                    ExtractedTextsRequest.ParagraphId(
+                        rid=field.field_id.rid,
+                        field_type=field.field_id.type,
+                        field_name=field.field_id.key,
+                        split=field.field_id.subfield_id,
+                        paragraph_start=start,
+                        paragraph_end=end,
+                    )
+                ],
             )
-        return ""
-
-    if split not in (None, ""):
-        text = extracted_text.split_text[split]  # type: ignore
-        return text[start:end]
+        )
+        text = extracted_texts.paragraphs[field.field_id.paragraph_id(start, end).full()]
+        return text
     else:
-        return extracted_text.text[start:end]
+        extracted_text = await cache.get_field_extracted_text(field)
+        if extracted_text is None:
+            if log_on_missing_field:
+                logger.warning(
+                    "Extracted_text for field does not exist on DB. This should not happen.",
+                    extra={
+                        "field_id": field.resource_unique_id,
+                        "kbid": field.kbid,
+                    },
+                )
+            return ""
+
+        if split not in (None, ""):
+            text = extracted_text.split_text[split]  # type: ignore
+            return text[start:end]
+        else:
+            return extracted_text.text[start:end]
 
 
 async def get_paragraph_text(
