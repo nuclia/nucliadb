@@ -87,6 +87,6 @@ pub async fn extracted_texts(
         }
     }
 
-    println!("Extracted texts took {:?}ms", start.elapsed().as_millis());
+    tracing::info!("Extracted texts took {:?}ms", start.elapsed().as_millis());
     Ok(extracted_texts)
 }

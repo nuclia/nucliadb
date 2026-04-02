@@ -22,6 +22,7 @@ from typing import Any
 
 import mrflagly
 import pydantic_settings
+from pydantic import Field
 
 from nucliadb_utils import const
 from nucliadb_utils.settings import nuclia_settings, running_settings
@@ -29,6 +30,8 @@ from nucliadb_utils.settings import nuclia_settings, running_settings
 
 class Settings(pydantic_settings.BaseSettings):
     flag_settings_url: str | None = None
+
+    flipt_token: str | None = Field(default=None, description="Flipt feature flag server auth token")
 
 
 DEFAULT_FLAG_DATA: dict[str, Any] = {
@@ -77,4 +80,22 @@ class FlagService:
             context = {}
         context["environment"] = running_settings.running_environment
         context["zone"] = nuclia_settings.nuclia_zone
+        return self.flag_service.enabled(flag_key, default=default, context=context)
+
+
+class FliptService:
+    def __init__(self):
+        settings = Settings()
+        # TODO
+        if settings.flag_settings_url is None:
+            self.flag_service = mrflagly.FlagService(data=json.dumps(DEFAULT_FLAG_DATA))
+        else:
+            self.flag_service = mrflagly.FlagService(url=settings.flag_settings_url)
+
+    def enabled(self, flag_key: str, default: bool = False, context: dict | None = None) -> bool:
+        if context is None:
+            context = {}
+        context["environment"] = running_settings.running_environment
+        context["zone"] = nuclia_settings.nuclia_zone
+        # TODO: check flipt
         return self.flag_service.enabled(flag_key, default=default, context=context)

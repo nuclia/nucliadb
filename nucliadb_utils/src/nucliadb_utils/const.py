@@ -44,3 +44,7 @@ class Features:
     SEMANTIC_GRAPH = "nucliadb_semantic_graph"
     AUDIT_RETRIEVE_AND_AUGMENT = "nucliadb_audit_retrieve_and_augment"
     NIDX_AS_EXTRACTED_TEXT_STORAGE = "nucliadb_nidx_as_extracted_text_storage"
+
+
+class FliptFeatures:
+    NIDX_AS_EXTRACTED_TEXT_STORAGE = "nucliadb_nidx_as_extracted_text_storage"

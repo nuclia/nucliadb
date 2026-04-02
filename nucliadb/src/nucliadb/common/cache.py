@@ -20,6 +20,7 @@
 
 import contextlib
 import logging
+import time
 from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -40,7 +41,7 @@ from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_telemetry.metrics import Counter, Gauge
 from nucliadb_utils import const
-from nucliadb_utils.utilities import get_storage, has_feature
+from nucliadb_utils.utilities import get_storage, has_flipt_feature
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +120,10 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
         @alru_cache(maxsize=cache_size)
         @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
         async def _get_extracted_text(kbid: str, field_id: FieldId) -> ExtractedText | None:
-            if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": kbid}):
+            _start_time = time.monotonic()
+            if has_flipt_feature(
+                const.FliptFeatures.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": kbid}
+            ):
                 nidx_searcher = get_nidx_searcher_client()
                 extracted_texts = await nidx_searcher.ExtractedTexts(
                     ExtractedTextsRequest(
@@ -135,6 +139,9 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
                     )
                 )
                 text = extracted_texts.fields[field_id.full_without_subfield()]
+                print(
+                    f"et-cache Using nidx as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}",
+                )
                 return ExtractedText(text=text)
 
             else:
@@ -143,7 +150,11 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
                     sf = storage.file_extracted(
                         kbid, field_id.rid, field_id.type, field_id.key, FieldTypes.FIELD_TEXT.value
                     )
-                    return await storage.download_pb(sf, ExtractedText)
+                    pb = await storage.download_pb(sf, ExtractedText)
+                    print(
+                        f"et-cache Using nidx as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}",
+                    )
+                    return pb
                 except Exception:
                     logger.warning(
                         "Error getting extracted text for field. Retrying",

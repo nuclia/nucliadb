@@ -78,6 +78,7 @@ class Utility(str, Enum):
     TRAIN = "train"
     TRAIN_SERVER = "train_server"
     FEATURE_FLAGS = "feature_flags"
+    FLIPT_FEATURE_FLAGS = "flipt_feature_flags"
     NATS_MANAGER = "nats_manager"
     LOCAL_STORAGE = "local_storage"
     NUCLIA_STORAGE = "nuclia_storage"
@@ -402,6 +403,14 @@ def get_feature_flags() -> featureflagging.FlagService:
     return val
 
 
+def get_flipt_feature_flags() -> featureflagging.FliptService:
+    val = get_utility(Utility.FLIPT_FEATURE_FLAGS)
+    if val is None:
+        val = featureflagging.FliptService()
+        set_utility(Utility.FLIPT_FEATURE_FLAGS, val)
+    return val
+
+
 X_USER_HEADER = "X-NUCLIADB-USER"
 X_ACCOUNT_HEADER = "X-NUCLIADB-ACCOUNT"
 X_ACCOUNT_TYPE_HEADER = "X-NUCLIADB-ACCOUNT-TYPE"
@@ -425,6 +434,26 @@ def has_feature(
         if X_ACCOUNT_TYPE_HEADER in headers:
             context["account_type"] = headers[X_ACCOUNT_TYPE_HEADER]
     return get_feature_flags().enabled(name, default=default, context=context)
+
+
+def has_flipt_feature(
+    name: str,
+    default: bool = False,
+    context: dict[str, str] | None = None,
+    headers: dict[str, str] | None = None,
+) -> bool:
+    if context is None:
+        context = {}
+    if headers is not None:
+        if X_USER_HEADER in headers:
+            context["user_id_sha256"] = hashlib.sha256(
+                headers[X_USER_HEADER].encode("utf-8")
+            ).hexdigest()
+        if X_ACCOUNT_HEADER in headers:
+            context["account_id_sha256"] = hashlib.sha256(headers[X_ACCOUNT_HEADER].encode()).hexdigest()
+        if X_ACCOUNT_TYPE_HEADER in headers:
+            context["account_type"] = headers[X_ACCOUNT_TYPE_HEADER]
+    return get_flipt_feature_flags().enabled(name, default=default, context=context)
 
 
 def get_endecryptor() -> EndecryptorUtility:
