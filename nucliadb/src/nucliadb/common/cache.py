@@ -41,7 +41,7 @@ from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_telemetry.metrics import Counter, Gauge
 from nucliadb_utils import const
-from nucliadb_utils.utilities import get_storage, has_flipt_feature
+from nucliadb_utils.utilities import get_storage, has_feature
 
 logger = logging.getLogger(__name__)
 
@@ -121,9 +121,7 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
         @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
         async def _get_extracted_text(kbid: str, field_id: FieldId) -> ExtractedText | None:
             _start_time = time.monotonic()
-            if has_flipt_feature(
-                const.FliptFeatures.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": kbid}
-            ):
+            if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": kbid}):
                 nidx_searcher = get_nidx_searcher_client()
                 extracted_texts = await nidx_searcher.ExtractedTexts(
                     ExtractedTextsRequest(

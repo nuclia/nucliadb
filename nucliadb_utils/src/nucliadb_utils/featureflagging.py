@@ -18,10 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import json
+import uuid
 from typing import Any
 
 import mrflagly
 import pydantic_settings
+from flipt_client import FliptClient  # type: ignore[import-untyped]
+from flipt_client.models import (  # type: ignore[import-untyped]
+    ClientOptions,
+    ClientTokenAuthentication,
+    FetchMode,
+)
 from pydantic import Field
 
 from nucliadb_utils import const
@@ -31,6 +38,7 @@ from nucliadb_utils.settings import nuclia_settings, running_settings
 class Settings(pydantic_settings.BaseSettings):
     flag_settings_url: str | None = None
 
+    flipt_server_url: str | None = Field(default=None, description="Flipt feature flag server URL")
     flipt_token: str | None = Field(default=None, description="Flipt feature flag server auth token")
 
 
@@ -70,32 +78,36 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
 class FlagService:
     def __init__(self):
         settings = Settings()
+
         if settings.flag_settings_url is None:
             self.flag_service = mrflagly.FlagService(data=json.dumps(DEFAULT_FLAG_DATA))
         else:
             self.flag_service = mrflagly.FlagService(url=settings.flag_settings_url)
+
+        # We are transitioning from mr. flaggly to Flipt. Meanwhile, we'll have
+        # both clients and check both places
+        self.client: FliptClient = FliptClient(
+            opts=ClientOptions(
+                url=settings.flipt_server_url,
+                authentication=ClientTokenAuthentication(client_token=settings.flipt_token),
+                environment=running_settings.running_environment,
+                namespace="nucliadb",
+                fetch_mode=FetchMode.STREAMING,
+            )
+        )
+        self.entity_id = str(uuid.uuid4())
 
     def enabled(self, flag_key: str, default: bool = False, context: dict | None = None) -> bool:
         if context is None:
             context = {}
         context["environment"] = running_settings.running_environment
         context["zone"] = nuclia_settings.nuclia_zone
-        return self.flag_service.enabled(flag_key, default=default, context=context)
 
-
-class FliptService:
-    def __init__(self):
-        settings = Settings()
-        # TODO
-        if settings.flag_settings_url is None:
-            self.flag_service = mrflagly.FlagService(data=json.dumps(DEFAULT_FLAG_DATA))
-        else:
-            self.flag_service = mrflagly.FlagService(url=settings.flag_settings_url)
-
-    def enabled(self, flag_key: str, default: bool = False, context: dict | None = None) -> bool:
-        if context is None:
-            context = {}
-        context["environment"] = running_settings.running_environment
-        context["zone"] = nuclia_settings.nuclia_zone
-        # TODO: check flipt
-        return self.flag_service.enabled(flag_key, default=default, context=context)
+        evaluation = self.client.evaluate_boolean(
+            flag_key="nidx-as-extracted-text-storage",
+            entity_id=self.entity_id,
+            context=context,
+        )
+        return evaluation.enabled or self.flag_service.enabled(
+            flag_key, default=default, context=context
+        )

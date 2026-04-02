@@ -31,7 +31,7 @@ from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search.search import cache
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils import const
-from nucliadb_utils.utilities import has_flipt_feature
+from nucliadb_utils.utilities import has_feature
 
 logger = logging.getLogger(__name__)
 PRE_WORD = string.punctuation + " "
@@ -72,9 +72,7 @@ async def get_paragraph_from_full_text(
     This requires downloading the full text and then slicing it.
     """
     _start_time = time.monotonic()
-    if has_flipt_feature(
-        const.FliptFeatures.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}
-    ):
+    if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}):
         nidx_searcher = get_nidx_searcher_client()
         extracted_texts = await nidx_searcher.ExtractedTexts(
             ExtractedTextsRequest(
