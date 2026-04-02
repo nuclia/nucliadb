@@ -150,7 +150,7 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
                     )
                     pb = await storage.download_pb(sf, ExtractedText)
                     print(
-                        f"et-cache Using nidx as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}",
+                        f"et-cache Using blob as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}",
                     )
                     return pb
                 except Exception:

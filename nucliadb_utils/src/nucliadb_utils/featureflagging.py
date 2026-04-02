@@ -64,38 +64,41 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
-    const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
-        "kbid": [
-            "2f654e84-3fe1-4b5d-8193-781a421b2f5e",  # local
-            "7ea4e2a2-4d16-4359-b989-439e71c2b6df",  # dev
-        ],
-    },
+    # const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE: {
+    #     "rollout": 0,
+    #     "variants": {"environment": ["local"]},
+    #     "kbid": [
+    #         "2f654e84-3fe1-4b5d-8193-781a421b2f5e",  # local
+    #         "7ea4e2a2-4d16-4359-b989-439e71c2b6df",  # dev
+    #     ],
+    # },
 }
 
 
 class FlagService:
-    def __init__(self):
+    def __init__(self) -> None:
         settings = Settings()
 
         if settings.flag_settings_url is None:
-            self.flag_service = mrflagly.FlagService(data=json.dumps(DEFAULT_FLAG_DATA))
+            self.flag_service = mrflagly.FlagService(data=json.dumps(DEFAULT_FLAG_DATA))  # type: ignore[attr-defined]
         else:
-            self.flag_service = mrflagly.FlagService(url=settings.flag_settings_url)
+            self.flag_service = mrflagly.FlagService(url=settings.flag_settings_url)  # type: ignore[attr-defined]
 
         # We are transitioning from mr. flaggly to Flipt. Meanwhile, we'll have
         # both clients and check both places
-        self.client: FliptClient = FliptClient(
-            opts=ClientOptions(
-                url=settings.flipt_server_url,
-                authentication=ClientTokenAuthentication(client_token=settings.flipt_token),
-                environment=running_settings.running_environment,
-                namespace="nucliadb",
-                fetch_mode=FetchMode.STREAMING,
+        self.flipt_enabled = settings.flipt_token is not None
+        print("FLIPT ENABLED", self.flipt_enabled)
+        if settings.flipt_token:
+            self.client: FliptClient = FliptClient(
+                opts=ClientOptions(
+                    url=settings.flipt_server_url,
+                    authentication=ClientTokenAuthentication(client_token=settings.flipt_token),
+                    environment=running_settings.running_environment,
+                    namespace="nucliadb",
+                    fetch_mode=FetchMode.STREAMING,
+                )
             )
-        )
-        self.entity_id = str(uuid.uuid4())
+            self.entity_id = str(uuid.uuid4())
 
     def enabled(self, flag_key: str, default: bool = False, context: dict | None = None) -> bool:
         if context is None:
@@ -103,11 +106,14 @@ class FlagService:
         context["environment"] = running_settings.running_environment
         context["zone"] = nuclia_settings.nuclia_zone
 
-        evaluation = self.client.evaluate_boolean(
-            flag_key="nidx-as-extracted-text-storage",
-            entity_id=self.entity_id,
-            context=context,
-        )
-        return evaluation.enabled or self.flag_service.enabled(
-            flag_key, default=default, context=context
-        )
+        enabled = False
+        if self.flipt_enabled:
+            evaluation = self.client.evaluate_boolean(
+                flag_key="nidx-as-extracted-text-storage",
+                entity_id=self.entity_id,
+                context=context,
+            )
+            print(f"[flipt:debug] Flipt evaluation for {context} was {evaluation}")
+            enabled = evaluation.enabled
+
+        return enabled or self.flag_service.enabled(flag_key, default=default, context=context)
