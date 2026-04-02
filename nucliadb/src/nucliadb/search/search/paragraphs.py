@@ -24,6 +24,7 @@ import time
 
 from nidx_protos.nidx_pb2 import ExtractedTextsRequest
 
+from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.fields.base import Field
@@ -74,23 +75,30 @@ async def get_paragraph_from_full_text(
     _start_time = time.monotonic()
     if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}):
         nidx_searcher = get_nidx_searcher_client()
-        extracted_texts = await nidx_searcher.ExtractedTexts(
-            ExtractedTextsRequest(
-                shard_id="7f265f9e-5428-42b4-817b-be578f0ca3f9",
-                paragraph_ids=[
-                    ExtractedTextsRequest.ParagraphId(
-                        rid=field.field_id.rid,
-                        field_type=field.field_id.type,
-                        field_name=field.field_id.key,
-                        split=field.field_id.subfield_id,
-                        paragraph_start=start,
-                        paragraph_end=end,
-                    )
-                ],
+        shard_manager = get_shard_manager()
+        shard_groups = await shard_manager.get_shards_by_kbid(field.kbid)
+        for shard_obj in shard_groups:
+            shard_id = shard_obj.nidx_shard_id
+            extracted_texts = await nidx_searcher.ExtractedTexts(
+                ExtractedTextsRequest(
+                    shard_id=shard_id,
+                    paragraph_ids=[
+                        ExtractedTextsRequest.ParagraphId(
+                            rid=field.field_id.rid,
+                            field_type=field.field_id.type,
+                            field_name=field.field_id.key,
+                            split=field.field_id.subfield_id,
+                            paragraph_start=start,
+                            paragraph_end=end,
+                        )
+                    ],
+                )
             )
-        )
-        text = extracted_texts.paragraphs[field.field_id.paragraph_id(start, end).full()]
-        print(
+            text = extracted_texts.paragraphs.get(field.field_id.paragraph_id(start, end).full(), "")
+            if text:
+                break
+
+        logger.info(
             f"get_paragraph_from_full_text Using nidx as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}ms",
         )
         return text
@@ -109,12 +117,12 @@ async def get_paragraph_from_full_text(
 
         if split not in (None, ""):
             text = extracted_text.split_text[split]  # type: ignore
-            print(
+            logger.info(
                 f"get_paragraph_from_full_text Using blob as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}",
             )
             return text[start:end]
         else:
-            print(
+            logger.info(
                 f"get_paragraph_from_full_text Using blob as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}",
             )
             return extracted_text.text[start:end]
