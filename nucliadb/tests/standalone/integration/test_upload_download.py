@@ -568,3 +568,43 @@ def test_guess_content_type(filename, content_type):
         assert content_types.guess(filename) in content_type
     else:
         assert content_types.guess(filename) == content_type
+
+
+def test_guess():
+    # Regular types
+    assert content_types.guess("example.jpg") in ("image/jpeg", "image/pjpeg")
+    assert content_types.guess("example.pdf") == "application/pdf"
+
+    # Types with special extensions (case handling via OS)
+    # Different OS/Python versions might return differing cases, but it should be standard
+    res_xlsm = content_types.guess("test.xlsm")
+    assert res_xlsm is not None and res_xlsm.lower() == "application/vnd.ms-excel.sheet.macroenabled.12"
+
+    # No extension or unknown extension
+    assert content_types.guess("example") is None
+    assert content_types.guess("test.madeup") is None
+
+
+def test_valid():
+    # Standard valid MIME types
+    assert content_types.valid("image/jpeg") is True
+    assert content_types.valid("application/json") is True
+    assert content_types.valid("text/html") is True
+
+    # Case-insensitivity support for the Python bug fallback and extra types
+    assert content_types.valid("application/vnd.ms-excel.sheet.macroEnabled.12") is True
+    assert content_types.valid("application/vnd.ms-excel.sheet.macroenabled.12") is True
+    assert content_types.valid("application/VND.MS-EXCEL.SHEET.MACROENABLED.12") is True
+
+    # Custom EXTRA types
+    assert content_types.valid("video/YouTube") is True
+    assert content_types.valid("video/youtube") is True
+
+    # Unknown suffixes but known base
+    # (e.g. valid checks endswith features directly like +aitable)
+    assert content_types.valid("application/pdf+aitable") is True
+    assert content_types.valid("text/plain+blankline") is True
+
+    # Invalid MIME types
+    assert content_types.valid("invalid") is False
+    assert content_types.valid("some/made-up-type") is False

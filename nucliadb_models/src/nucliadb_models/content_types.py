@@ -30,9 +30,9 @@ EXTRA_VALID_CONTENT_TYPES = {
     "application/rtf",
     "application/toml",
     "application/vnd.jgraph.mxfile",
-    "application/vnd.ms-excel.sheet.macroenabled.12",
+    "application/vnd.ms-excel.sheet.macroEnabled.12",
     "application/vnd.ms-outlook",
-    "application/vnd.ms-word.document.macroenabled.12",
+    "application/vnd.ms-word.document.macroEnabled.12",
     "application/vnd.rar",
     "application/x-aportisdoc",
     "application/x-archive",
@@ -78,6 +78,8 @@ EXTRA_VALID_CONTENT_TYPES = {
     "video/YouTube",
 } | NUCLIA_CUSTOM_CONTENT_TYPES
 
+EXTRA_VALID_CONTENT_TYPES_LOWER = {ct.lower() for ct in EXTRA_VALID_CONTENT_TYPES}
+
 
 def guess(filename: str) -> str | None:
     """
@@ -116,4 +118,4 @@ def valid(content_type: str) -> bool:
             content_type = content_type.split(feature_suffix)[0]
             break
     in_standard = mimetypes.guess_extension(content_type, strict=False) is not None
-    return in_standard or content_type in EXTRA_VALID_CONTENT_TYPES
+    return in_standard or content_type.lower() in EXTRA_VALID_CONTENT_TYPES_LOWER
