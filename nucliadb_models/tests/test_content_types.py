@@ -19,12 +19,12 @@ def test_guess():
     # Regular types
     assert guess("example.jpg") in ("image/jpeg", "image/pjpeg")
     assert guess("example.pdf") == "application/pdf"
-    
+
     # Types with special extensions (case handling via OS)
     # Different OS/Python versions might return differing cases, but it should be standard
     res_xlsm = guess("test.xlsm")
     assert res_xlsm is not None and res_xlsm.lower() == "application/vnd.ms-excel.sheet.macroenabled.12"
-    
+
     # No extension or unknown extension
     assert guess("example") is None
     assert guess("test.madeup") is None
@@ -35,7 +35,7 @@ def test_valid():
     assert valid("image/jpeg") is True
     assert valid("application/json") is True
     assert valid("text/html") is True
-    
+
     # Case-insensitivity support for the Python bug fallback and extra types
     assert valid("application/vnd.ms-excel.sheet.macroEnabled.12") is True
     assert valid("application/vnd.ms-excel.sheet.macroenabled.12") is True
