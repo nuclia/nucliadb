@@ -226,6 +226,7 @@ class TestWriterServicer:
         assert knowledgebox_class.update.call_args.kwargs["hidden_resources_enabled"] is False
         assert knowledgebox_class.update.call_args.kwargs["hidden_resources_hide_on_creation"] is False
         assert knowledgebox_class.update.call_args.kwargs["prewarm_enabled"] is False
+        assert knowledgebox_class.update.call_args.kwargs["enforce_security"] is False
 
     async def test_UpdateKnowledgeBox_not_found(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")

@@ -29,7 +29,7 @@ from nucliadb.common.filter_expression import add_and_expression, parse_expressi
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationTypeMap
 from nucliadb.search.predict_models import QueryModel
 from nucliadb.search.search.query_parser.models import GraphRetrieval
-from nucliadb.search.search.utils import filter_hidden_resources
+from nucliadb.search.search.utils import filter_hidden_resources, kb_security_enforced
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
 from nucliadb_models.graph import requests as graph_requests
@@ -91,7 +91,7 @@ async def _parse_common(kbid: str, item: AnyGraphRequest) -> nodereader_pb2.Grap
     if filter_expr is not None:
         pb.field_filter.CopyFrom(filter_expr)
 
-    security = _parse_security(kbid, item)
+    security = await _parse_security(kbid, item)
     if security is not None:
         pb.security.CopyFrom(security)
 
@@ -127,10 +127,11 @@ async def _parse_filters(kbid: str, item: AnyGraphRequest) -> nodereader_pb2.Fil
         return None
 
 
-def _parse_security(kbid: str, item: AnyGraphRequest) -> utils_pb2.Security | None:
-    if item.security is not None and len(item.security.groups) > 0:
+async def _parse_security(kbid: str, item: AnyGraphRequest) -> utils_pb2.Security | None:
+    security = await kb_security_enforced(kbid, item.security)
+    if security is not None:
         security_pb = utils_pb2.Security()
-        for group_id in item.security.groups:
+        for group_id in security.groups:
             if group_id not in security_pb.access_groups:
                 security_pb.access_groups.append(group_id)
         return security_pb

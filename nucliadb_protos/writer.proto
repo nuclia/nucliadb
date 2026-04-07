@@ -358,6 +358,9 @@ message NewKnowledgeBoxV2Request {
 
     repeated VectorSet graph_node_vectorsets = 10;
     repeated VectorSet graph_edge_vectorsets = 11;
+
+    // Whether the security is enforced on all requests by default
+    bool enforce_security = 12;
 }
 
 message NewKnowledgeBoxV2Response {

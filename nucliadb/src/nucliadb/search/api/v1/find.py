@@ -165,6 +165,7 @@ async def find_knowledgebox(
             show_hidden=show_hidden,
             rank_fusion=rank_fusion,
             reranker=reranker,
+            search_configuration=search_configuration,
         )
     except ValidationError as exc:
         detail = json.loads(exc.json())

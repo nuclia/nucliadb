@@ -26,12 +26,13 @@ from nucliadb.common.filter_expression import add_and_expression, parse_expressi
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.old_filters import OldFilterParams, parse_old_filters
-from nucliadb.search.search.utils import filter_hidden_resources
+from nucliadb.search.search.utils import filter_hidden_resources, kb_security_enforced
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.labels import LABEL_HIDDEN
 from nucliadb_models.search import (
     SuggestOptions,
 )
+from nucliadb_models.security import RequestSecurity
 
 
 @query_parser_observer.wrap({"type": "parse_suggest"})
@@ -84,8 +85,11 @@ async def parse_suggest(
     if field_expr is not None:
         request.field_filter.CopyFrom(field_expr)
 
-    if security_groups is not None and len(security_groups) > 0:
-        request.security.access_groups.extend(security_groups)
+    security = await kb_security_enforced(
+        kbid, RequestSecurity(groups=security_groups) if security_groups is not None else None
+    )
+    if security is not None:
+        request.security.access_groups.extend(security.groups)
 
     if filter_expression:
         if filter_expression.field:

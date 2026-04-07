@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from nucliadb.common.datamanagers.atomic import kb
 from nucliadb.search.search.metrics import query_parse_dependency_observer
 from nucliadb_models.search import MinScore
+from nucliadb_models.security import RequestSecurity
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
@@ -38,6 +39,24 @@ async def filter_hidden_resources(kbid: str, show_hidden: bool) -> bool | None:
         return False
     else:
         return None  # None = No filtering, show all resources
+
+
+@query_parse_dependency_observer.wrap({"type": "security_enforced"})
+async def kb_security_enforced(
+    kbid: str, request_security: RequestSecurity | None
+) -> RequestSecurity | None:
+    kb_config = await kb.get_config(kbid=kbid)
+    kb_enforced_security = kb_config and kb_config.enforce_security
+    if kb_enforced_security:
+        if request_security is None:
+            # If the request does not have security groups set and kb enforces security groups,
+            # this makes the system return only public resources.
+            return RequestSecurity(groups=[])
+        else:
+            return request_security
+    else:
+        # No enforcement, return whatever the request has, even if it's None.
+        return request_security
 
 
 def min_score_from_query_params(
