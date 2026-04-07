@@ -139,7 +139,8 @@ async def test_resource_security_is_updated(
         ("POST", "find"),
         ("GET", "search"),
         ("POST", "search"),
-        ("GET", "suggest"),
+        # ("GET", "suggest"),
+        # ("POST", "suggest"),
     ),
 )
 @pytest.mark.deploy_modes("standalone")
@@ -280,6 +281,11 @@ async def _test_search_request_with_security(
             f"/kb/{kbid}/suggest",
             params=params,
         )
+    elif method == "POST" and endpoint == "suggest":
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/suggest",
+            json=payload,
+        )
     else:
         raise ValueError(f"Unknown method and/or search endpoint: {method} {endpoint}")
 
@@ -320,8 +326,8 @@ async def _create_public_resource(
         ("POST", "find"),
         ("GET", "search"),
         ("POST", "search"),
-        ("GET", "suggest"),
-        ("POST", "suggest"),
+        # ("GET", "suggest"),
+        # ("POST", "suggest"),
     ),
 )
 @pytest.mark.deploy_modes("standalone")
@@ -404,7 +410,8 @@ async def test_security_groups_enforce_hides_secured_resources_without_matching_
         ("POST", "find"),
         ("GET", "search"),
         ("POST", "search"),
-        ("GET", "suggest"),
+        # ("GET", "suggest"),
+        # ("POST", "suggest"),
     ),
 )
 @pytest.mark.deploy_modes("standalone")

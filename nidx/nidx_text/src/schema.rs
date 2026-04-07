@@ -43,7 +43,7 @@ pub struct TextSchema {
     pub facets: Field,
 
     // Security
-    pub groups_public: Field,
+    pub groups_public: Field, // This is set to 1 if the resource is public, 0 otherwise. Allows quick filtering of public resources.
     pub groups_with_access: Field,
 
     pub encoded_field_id: Field,

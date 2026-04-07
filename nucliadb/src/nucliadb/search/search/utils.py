@@ -41,7 +41,7 @@ async def filter_hidden_resources(kbid: str, show_hidden: bool) -> bool | None:
         return None  # None = No filtering, show all resources
 
 
-@query_parse_dependency_observer.wrap({"type": "security_enforced"})
+@query_parse_dependency_observer.wrap({"type": "kb_security_enforced"})
 async def kb_security_enforced(
     kbid: str, request_security: RequestSecurity | None
 ) -> RequestSecurity | None:

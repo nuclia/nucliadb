@@ -156,6 +156,13 @@ impl TextReaderService {
         let mut access_groups_queries: Vec<Box<dyn Query>> = Vec::new();
 
         if let Some(security) = request.security.as_ref() {
+            // First off, add query for public fields so that resources that are public are not filtered out by the access groups query
+            let public_fields_query = Box::new(TermQuery::new(
+                Term::from_field_u64(self.schema.groups_public, 1_u64),
+                IndexRecordOption::Basic,
+            ));
+            access_groups_queries.push(public_fields_query);
+
             for group_id in security.access_groups.iter() {
                 let mut group_id_key = group_id.clone();
                 if !group_id.starts_with('/') {
@@ -171,11 +178,6 @@ impl TextReaderService {
 
         let mut subqueries = vec![];
         if !access_groups_queries.is_empty() {
-            let public_fields_query = Box::new(TermQuery::new(
-                Term::from_field_u64(self.schema.groups_public, 1_u64),
-                IndexRecordOption::Basic,
-            ));
-            access_groups_queries.push(public_fields_query);
             let access_groups_query: Box<dyn Query> = Box::new(BooleanQuery::union(access_groups_queries));
             subqueries.push(access_groups_query);
         }

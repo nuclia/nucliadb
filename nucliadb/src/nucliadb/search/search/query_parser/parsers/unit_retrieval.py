@@ -197,10 +197,7 @@ class _Converter:
             [translate_label(facet) for facet in self.retrieval.filters.facets]
         )
 
-        if (
-            self.retrieval.filters.security is not None
-            and len(self.retrieval.filters.security.groups) > 0
-        ):
+        if self.retrieval.filters.security is not None:
             security_pb = utils_pb2.Security()
             for group_id in self.retrieval.filters.security.groups:
                 if group_id not in security_pb.access_groups:
