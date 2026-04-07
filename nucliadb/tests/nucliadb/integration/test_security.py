@@ -33,43 +33,62 @@ PLATFORM_GROUP = "platform"
 DEVELOPERS_GROUP = "developers"
 
 
-@pytest.fixture(scope="function")
-async def resource_with_security(
-    nucliadb_writer: AsyncClient, standalone_knowledgebox: str, nucliadb_ingest_grpc: WriterStub
-):
-    kbid = standalone_knowledgebox
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
-        json={
-            "title": "Test resource",
-            "texts": {
-                "text1": {"body": "My text discussing about something"},
-            },
-            "security": {
-                "access_groups": [PLATFORM_GROUP, DEVELOPERS_GROUP],
-            },
-        },
-    )
+async def _create_resource(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    kbid: str,
+    title: str,
+    texts: dict[str, str],
+    security_groups: list[str] | None = None,
+) -> str:
+    """Create a resource via the writer API and index it via the grpc interface.
+    Returns:
+        The resource UUID.
+    """
+    payload: dict = {
+        "title": title,
+        "texts": {field_id: {"body": body} for field_id, body in texts.items()},
+    }
+    if security_groups is not None:
+        payload["security"] = {"access_groups": security_groups}
+
+    resp = await nucliadb_writer.post(f"/kb/{kbid}/resources", json=payload)
     assert resp.status_code == 201, resp.text
     rid = resp.json()["uuid"]
 
-    # Add a broker message with paragraphs via the grpc interface
     bmb = BrokerMessageBuilder(
         kbid=kbid,
         rid=rid,
         source=BrokerMessage.MessageSource.PROCESSOR,
     )
-    bmb.with_title("Test resource")
-    bmb.with_summary("My text discussing about something")
+    bmb.with_title(title)
+    # Use the first text field body as the summary
+    first_body = next(iter(texts.values()))
+    bmb.with_summary(first_body)
 
-    text_field = bmb.field_builder("text1", FieldType.TEXT)
-    text_field.add_paragraph("My text discussing about something")
+    for field_id, body in texts.items():
+        text_field = bmb.field_builder(field_id, FieldType.TEXT)
+        text_field.add_paragraph(body)
 
     bm = bmb.build()
     await inject_message(nucliadb_ingest_grpc, bm)
     await wait_for_sync()
 
     return rid
+
+
+@pytest.fixture(scope="function")
+async def resource_with_security(
+    nucliadb_writer: AsyncClient, standalone_knowledgebox: str, nucliadb_ingest_grpc: WriterStub
+):
+    return await _create_resource(
+        nucliadb_writer,
+        nucliadb_ingest_grpc,
+        kbid=standalone_knowledgebox,
+        title="Test resource",
+        texts={"text1": "My text discussing about something"},
+        security_groups=[PLATFORM_GROUP, DEVELOPERS_GROUP],
+    )
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -277,3 +296,267 @@ async def _test_search_request_with_security(
         assert set(resources) == set(expected_resources)
     else:
         raise ValueError(f"Unknown method and/or search endpoint: {method} {endpoint}")
+
+
+async def _create_public_resource(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    kbid: str,
+) -> str:
+    """Helper to create a public resource (no security groups) with indexed paragraphs."""
+    return await _create_resource(
+        nucliadb_writer,
+        nucliadb_ingest_grpc,
+        kbid=kbid,
+        title="Public resource",
+        texts={"text1": "This is a public document about something"},
+    )
+
+
+@pytest.mark.parametrize(
+    "search_endpoint",
+    (
+        ("GET", "find"),
+        ("POST", "find"),
+        ("GET", "search"),
+        ("POST", "search"),
+        ("GET", "suggest"),
+        ("POST", "suggest"),
+    ),
+)
+@pytest.mark.deploy_modes("standalone")
+async def test_security_groups_enforce_hides_secured_resources_without_matching_groups(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+    resource_with_security,
+    search_endpoint: tuple[str, str],
+):
+    """When security_groups_enforce is enabled at the KB level, resources with
+    security groups should only be returned when the request provides matching
+    security groups. Resources without security groups (public) should always be returned.
+
+    Without security param: only public resource returned.
+    With matching security groups: both resources returned.
+    With non-matching security groups: only public resource returned.
+    """
+    kbid = standalone_knowledgebox
+    secured_rid = resource_with_security
+    method, endpoint = search_endpoint
+
+    # Enable enforce security groups at KB level
+    resp = await nucliadb_writer_manager.patch(
+        f"/kb/{kbid}",
+        json={
+            "enforce_security": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Create a public resource (no security groups)
+    public_rid = await _create_public_resource(nucliadb_writer, nucliadb_ingest_grpc, kbid)
+
+    # Querying without security should only return the public resource
+    await _test_search_request_with_security(
+        method,
+        endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[public_rid],
+    )
+
+    # Querying with matching security groups should return both resources
+    for access_groups in (
+        [PLATFORM_GROUP],
+        [DEVELOPERS_GROUP],
+        [PLATFORM_GROUP, DEVELOPERS_GROUP],
+    ):
+        await _test_search_request_with_security(
+            method,
+            endpoint,
+            nucliadb_reader,
+            kbid,
+            query="resource",
+            security_groups=access_groups,
+            expected_resources=[secured_rid, public_rid],
+        )
+
+    # Querying with non-matching security groups should only return the public resource
+    await _test_search_request_with_security(
+        method,
+        endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=["unknown-group"],
+        expected_resources=[public_rid],
+    )
+
+
+@pytest.mark.parametrize(
+    "search_endpoint",
+    (
+        ("GET", "find"),
+        ("POST", "find"),
+        ("GET", "search"),
+        ("POST", "search"),
+        ("GET", "suggest"),
+    ),
+)
+@pytest.mark.deploy_modes("standalone")
+async def test_security_groups_enforce_disabled_returns_all_resources(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    resource_with_security,
+    search_endpoint: tuple[str, str],
+):
+    """When security_groups_enforce is NOT enabled (default), requests without
+    security groups should return all resources, including those with security groups.
+    This is the current/legacy behavior.
+    """
+    kbid = standalone_knowledgebox
+    secured_rid = resource_with_security
+    method, endpoint = search_endpoint
+
+    # Without security_groups_enforce, querying without security should return the resource
+    await _test_search_request_with_security(
+        method,
+        endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[secured_rid],
+    )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_security_groups_enforce_toggle(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
+    standalone_knowledgebox: str,
+    resource_with_security,
+):
+    """Test that toggling security_groups_enforce on and off changes the behavior."""
+    kbid = standalone_knowledgebox
+    secured_rid = resource_with_security
+
+    # By default, enforce is off: querying without security returns everything
+    await _test_search_request_with_security(
+        "POST",
+        "find",
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[secured_rid],
+    )
+
+    # Enable enforce
+    resp = await nucliadb_writer_manager.patch(
+        f"/kb/{kbid}",
+        json={"enforce_security": True},
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Now querying without security should NOT return the secured resource
+    await _test_search_request_with_security(
+        "POST",
+        "find",
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[],
+    )
+
+    # Querying with matching security groups should return it
+    await _test_search_request_with_security(
+        "POST",
+        "find",
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=[PLATFORM_GROUP],
+        expected_resources=[secured_rid],
+    )
+
+    # Disable enforce
+    resp = await nucliadb_writer_manager.patch(
+        f"/kb/{kbid}",
+        json={"enforce_security": False},
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Back to default behavior: querying without security returns everything again
+    await _test_search_request_with_security(
+        "POST",
+        "find",
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[secured_rid],
+    )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_security_groups_enforce_making_resource_public(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
+    standalone_knowledgebox: str,
+    resource_with_security,
+):
+    """When security_groups_enforce is enabled, removing all security groups from a
+    resource (making it public) should make it visible to all requests again.
+    """
+    kbid = standalone_knowledgebox
+    rid = resource_with_security
+
+    # Enable enforce
+    resp = await nucliadb_writer_manager.patch(
+        f"/kb/{kbid}",
+        json={"enforce_security": True},
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Querying without security should NOT return the resource
+    await _test_search_request_with_security(
+        "POST",
+        "find",
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[],
+    )
+
+    # Make the resource public by removing security groups
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={
+            "security": {
+                "access_groups": [],
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Wait for the tantivy index to be updated
+    await asyncio.sleep(1)
+
+    # Now querying without security should return the resource
+    await _test_search_request_with_security(
+        "POST",
+        "find",
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[rid],
+    )
