@@ -130,6 +130,7 @@ class KnowledgeBox:
         prewarm_enabled: bool = False,
         semantic_graph_node_models: dict[str, SemanticModelMetadata] = dict(),
         semantic_graph_edge_models: dict[str, SemanticModelMetadata] = dict(),
+        enforce_security: bool | None = None,
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
 
@@ -228,6 +229,7 @@ class KnowledgeBox:
                     migration_version=get_latest_version(),
                     hidden_resources_enabled=hidden_resources_enabled,
                     hidden_resources_hide_on_creation=hidden_resources_hide_on_creation,
+                    enforce_security=enforce_security if enforce_security is not None else False,
                     prewarm_enabled=prewarm_enabled,
                 )
                 config.external_index_provider.CopyFrom(stored_external_index_provider)
@@ -289,6 +291,7 @@ class KnowledgeBox:
         hidden_resources_enabled: bool | None = None,
         hidden_resources_hide_on_creation: bool | None = None,
         prewarm_enabled: bool | None = None,
+        enforce_security: bool | None = None,
     ) -> str:
         async with driver.rw_transaction() as txn:
             stored = await datamanagers.kb.get_config(txn, kbid=kbid, for_update=True)
@@ -329,6 +332,9 @@ class KnowledgeBox:
                 raise KnowledgeBoxCreationError(
                     "Cannot hide new resources if the hidden resources feature is disabled"
                 )
+
+            if enforce_security is not None:
+                stored.enforce_security = enforce_security
 
             await datamanagers.kb.set_config(txn, kbid=kbid, config=stored)
 

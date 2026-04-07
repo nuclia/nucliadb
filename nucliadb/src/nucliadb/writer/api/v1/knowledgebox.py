@@ -126,6 +126,7 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
             external_index_provider=external_index_provider,
             hidden_resources_enabled=item.hidden_resources_enabled,
             hidden_resources_hide_on_creation=item.hidden_resources_hide_on_creation,
+            enforce_security=item.enforce_security,
         )
 
     except Exception as exc:
@@ -154,6 +155,7 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
         or item.description
         or item.hidden_resources_enabled
         or item.hidden_resources_hide_on_creation
+        or item.enforce_security is not None
     ):
         try:
             driver = get_driver()
@@ -165,6 +167,7 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
                 description=item.description,
                 hidden_resources_enabled=item.hidden_resources_enabled,
                 hidden_resources_hide_on_creation=item.hidden_resources_hide_on_creation,
+                enforce_security=item.enforce_security,
             )
         except datamanagers.exceptions.KnowledgeBoxNotFound:
             raise HTTPException(status_code=404, detail="Knowledge box does not exist")
