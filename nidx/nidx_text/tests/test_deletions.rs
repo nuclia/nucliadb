@@ -23,6 +23,7 @@ use common::TestOpener;
 use nidx_protos::TextInformation;
 use nidx_tests::minimal_resource;
 use nidx_text::{DocumentSearchRequest, TextConfig, TextIndexer, TextSearcher};
+use nidx_types::prefilter::PrefilterResult;
 use tempfile::tempdir;
 
 #[test]
@@ -54,10 +55,13 @@ fn test_texts_deletions() -> anyhow::Result<()> {
         TextConfig::default(),
         TestOpener::new(vec![(meta1.clone(), 1i64.into())], vec![]),
     )?;
-    let result = searcher.search(&DocumentSearchRequest {
-        result_per_page: 20,
-        ..Default::default()
-    })?;
+    let result = searcher.search(
+        &DocumentSearchRequest {
+            result_per_page: 20,
+            ..Default::default()
+        },
+        &PrefilterResult::All,
+    )?;
     assert_eq!(result.results.len(), 2);
 
     // Search with resource deletion
@@ -65,10 +69,13 @@ fn test_texts_deletions() -> anyhow::Result<()> {
         TextConfig::default(),
         TestOpener::new(vec![(meta1.clone(), 1i64.into())], vec![(rid.clone(), 2i64.into())]),
     )?;
-    let result = searcher.search(&DocumentSearchRequest {
-        result_per_page: 20,
-        ..Default::default()
-    })?;
+    let result = searcher.search(
+        &DocumentSearchRequest {
+            result_per_page: 20,
+            ..Default::default()
+        },
+        &PrefilterResult::All,
+    )?;
     assert_eq!(result.results.len(), 0);
 
     // Search with field deletion
@@ -79,10 +86,13 @@ fn test_texts_deletions() -> anyhow::Result<()> {
             vec![(format!("{rid}/a/title"), 2i64.into())],
         ),
     )?;
-    let result = searcher.search(&DocumentSearchRequest {
-        result_per_page: 20,
-        ..Default::default()
-    })?;
+    let result = searcher.search(
+        &DocumentSearchRequest {
+            result_per_page: 20,
+            ..Default::default()
+        },
+        &PrefilterResult::All,
+    )?;
     assert_eq!(result.results.len(), 1);
 
     Ok(())
