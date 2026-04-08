@@ -471,6 +471,8 @@ impl TextReaderService {
     pub fn get_fields_text(&self, field_uids: Vec<FieldUid>) -> anyhow::Result<HashMap<FieldUid, Option<String>>> {
         let limit = field_uids.len();
 
+        // due to implementation details, we use here a BooleanQuery as it's
+        // around 2 orders of magnitude faster than a TermSetQuery
         let subqueries: Vec<Box<dyn Query>> = field_uids
             .into_iter()
             .map(|uid| {
