@@ -23,6 +23,7 @@ use std::time::Instant;
 
 use nidx_protos::{ExtractedTextsRequest, ExtractedTextsResponse};
 use nidx_text::{FieldUid, ParagraphUid, TextSearcher};
+use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::index_cache::IndexCache;
@@ -52,41 +53,37 @@ pub async fn extracted_texts(
     let mut extracted_texts = ExtractedTextsResponse::default();
 
     if !request.field_ids.is_empty() {
-        let fields_text = searcher.get_fields_text(
-            request
-                .field_ids
-                .iter()
-                .map(|id| FieldUid {
-                    rid: &id.rid,
-                    field_type: &id.field_type,
-                    field_name: &id.field_name,
-                })
-                .collect(),
-        )?;
+        let mut field_ids = vec![];
+        for id in request.field_ids {
+            field_ids.push(FieldUid {
+                rid: Uuid::parse_str(&id.rid).map_err(NidxError::InvalidUuid)?,
+                field_type: id.field_type,
+                field_name: id.field_name,
+            });
+        }
+        let fields_text = searcher.get_fields_text(field_ids)?;
         for (k, v) in fields_text {
-            extracted_texts.fields.insert(k, v.unwrap_or_default());
+            extracted_texts.fields.insert(k.to_string(), v.unwrap_or_default());
         }
     }
 
     if !request.paragraph_ids.is_empty() {
-        let paragraphs_text = searcher.get_paragraphs_text(
-            request
-                .paragraph_ids
-                .iter()
-                .map(|id| ParagraphUid {
-                    rid: &id.rid,
-                    field_type: &id.field_type,
-                    field_name: &id.field_name,
-                    paragraph_start: id.paragraph_start,
-                    paragraph_end: id.paragraph_end,
-                })
-                .collect(),
-        )?;
+        let mut paragraph_ids = vec![];
+        for id in request.paragraph_ids {
+            paragraph_ids.push(ParagraphUid {
+                rid: Uuid::parse_str(&id.rid).map_err(NidxError::InvalidUuid)?,
+                field_type: id.field_type,
+                field_name: id.field_name,
+                paragraph_start: id.paragraph_start,
+                paragraph_end: id.paragraph_end,
+            });
+        }
+        let paragraphs_text = searcher.get_paragraphs_text(paragraph_ids)?;
         for (k, v) in paragraphs_text {
-            extracted_texts.paragraphs.insert(k, v.unwrap_or_default());
+            extracted_texts.paragraphs.insert(k.to_string(), v.unwrap_or_default());
         }
     }
 
-    tracing::info!("Extracted texts took {:?}ms", start.elapsed().as_millis());
+    tracing::info!("Extracted texts took {:?}µs", start.elapsed().as_micros());
     Ok(extracted_texts)
 }

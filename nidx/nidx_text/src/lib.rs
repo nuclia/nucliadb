@@ -77,19 +77,19 @@ fn default_version() -> u64 {
 
 // Unique id for a field, equivalent to {rid}/{field_type}/{field_id}
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct FieldUid<'a> {
-    pub rid: &'a str,
-    pub field_type: &'a str,
-    pub field_name: &'a str,
+pub struct FieldUid {
+    pub rid: Uuid,
+    pub field_type: String,
+    pub field_name: String,
     // TODO: split
 }
 
 // Unique id for a field, equivalent to {rid}/{field_type}/{field_id}[/{split}]/{paragraph_start}-{paragraph_end}
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct ParagraphUid<'a> {
-    pub rid: &'a str,
-    pub field_type: &'a str,
-    pub field_name: &'a str,
+pub struct ParagraphUid {
+    pub rid: Uuid,
+    pub field_type: String,
+    pub field_name: String,
     // TODO: split
     pub paragraph_start: u32,
     pub paragraph_end: u32,
@@ -216,20 +216,20 @@ impl TextSearcher {
         self.reader.prefilter(request)
     }
 
-    pub fn get_fields_text(&self, field_uids: Vec<FieldUid>) -> anyhow::Result<HashMap<String, Option<String>>> {
+    pub fn get_fields_text(&self, field_uids: Vec<FieldUid>) -> anyhow::Result<HashMap<FieldUid, Option<String>>> {
         self.reader.get_fields_text(field_uids)
     }
 
     pub fn get_paragraphs_text(
         &self,
         paragraph_uids: Vec<ParagraphUid>,
-    ) -> anyhow::Result<HashMap<String, Option<String>>> {
+    ) -> anyhow::Result<HashMap<ParagraphUid, Option<String>>> {
         let mut paragraph_fields = HashMap::new();
         for paragraph_id in paragraph_uids {
             let field_id = FieldUid::from(paragraph_id.clone());
             paragraph_fields
                 .entry(field_id)
-                .and_modify(|v: &mut Vec<ParagraphUid<'_>>| v.push(paragraph_id.clone()))
+                .and_modify(|v: &mut Vec<ParagraphUid>| v.push(paragraph_id.clone()))
                 .or_insert(vec![paragraph_id]);
         }
 
@@ -239,15 +239,8 @@ impl TextSearcher {
 
         let mut paragraphs_text = HashMap::new();
 
-        for (field_id_str, field_text) in fields_text {
-            let parts: Vec<_> = field_id_str.split('/').collect();
-            let field_id = FieldUid {
-                rid: parts[0],
-                field_type: parts[1],
-                field_name: parts[2],
-            };
-
-            if let Some(paragraphs) = paragraph_fields.get(&field_id) {
+        for (field_id, field_text) in fields_text {
+            if let Some(paragraphs) = paragraph_fields.remove(&field_id) {
                 for paragraph_id in paragraphs {
                     let paragraph_text = field_text.as_ref().map(|field_text| {
                         field_text
@@ -256,7 +249,7 @@ impl TextSearcher {
                             .take((paragraph_id.paragraph_end - paragraph_id.paragraph_start) as usize)
                             .collect()
                     });
-                    paragraphs_text.insert(paragraph_id.to_string(), paragraph_text);
+                    paragraphs_text.insert(paragraph_id, paragraph_text);
                 }
             }
         }
@@ -278,8 +271,14 @@ impl TextSearcher {
     }
 }
 
-impl<'a> From<ParagraphUid<'a>> for FieldUid<'a> {
-    fn from(value: ParagraphUid<'a>) -> Self {
+impl Display for FieldUid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}/{}/{}", self.rid, self.field_type, self.field_name))
+    }
+}
+
+impl From<ParagraphUid> for FieldUid {
+    fn from(value: ParagraphUid) -> Self {
         Self {
             rid: value.rid,
             field_type: value.field_type,
@@ -289,7 +288,7 @@ impl<'a> From<ParagraphUid<'a>> for FieldUid<'a> {
     }
 }
 
-impl Display for ParagraphUid<'_> {
+impl Display for ParagraphUid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "{}/{}/{}/{}-{}",
