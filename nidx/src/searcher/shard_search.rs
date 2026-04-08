@@ -153,13 +153,13 @@ fn blocking_search(
         let prefiltered = text_searcher.unwrap().prefilter(&prefilter)?;
         index_queries.apply_prefilter(prefiltered);
     }
+    let prefilter = &index_queries.prefilter_results;
 
     // Run the rest of the plan
     let text_task = index_queries
         .texts_request
-        .map(|request| move || text_searcher.unwrap().search(&request));
+        .map(|request| move || text_searcher.unwrap().search(&request, prefilter));
 
-    let prefilter = &index_queries.prefilter_results;
     let paragraph_task = index_queries
         .paragraphs_request
         .map(|request| move || paragraph_searcher.unwrap().search(&request, prefilter));

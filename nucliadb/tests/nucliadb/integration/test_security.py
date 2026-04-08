@@ -139,8 +139,8 @@ async def test_resource_security_is_updated(
         ("POST", "find"),
         ("GET", "search"),
         ("POST", "search"),
-        # ("GET", "suggest"),
-        # ("POST", "suggest"),
+        ("GET", "suggest"),
+        ("POST", "suggest"),
     ),
 )
 @pytest.mark.deploy_modes("standalone")
@@ -326,8 +326,8 @@ async def _create_public_resource(
         ("POST", "find"),
         ("GET", "search"),
         ("POST", "search"),
-        # ("GET", "suggest"),
-        # ("POST", "suggest"),
+        ("GET", "suggest"),
+        ("POST", "suggest"),
     ),
 )
 @pytest.mark.deploy_modes("standalone")
@@ -410,8 +410,8 @@ async def test_security_groups_enforce_hides_secured_resources_without_matching_
         ("POST", "find"),
         ("GET", "search"),
         ("POST", "search"),
-        # ("GET", "suggest"),
-        # ("POST", "suggest"),
+        ("GET", "suggest"),
+        ("POST", "suggest"),
     ),
 )
 @pytest.mark.deploy_modes("standalone")

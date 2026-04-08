@@ -636,7 +636,7 @@ class SearchParamDefaults:
         description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",
     )
     security_groups: ParamDefault = ParamDefault(
-        default=[],
+        default=None,
         title="Security groups",
         description="List of security groups to filter search results for. Only resources matching the query and containing the specified security groups will be returned. If empty, all resources will be considered for the search.",
     )
