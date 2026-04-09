@@ -118,6 +118,11 @@ class KnowledgeBoxConfig(BaseModel):
         description="Hide newly created resources",
     )
 
+    enforce_security: bool | None = Field(
+        default=None,
+        description="Whether to enforce security groups by default on all requests. If set to None, the value will not be updated. If set to a boolean value, it will update the setting for the Knowledge Box accordingly.",
+    )
+
     @field_validator("slug")
     @classmethod
     def id_check(cls, v: str | None) -> str | None:

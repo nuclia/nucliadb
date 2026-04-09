@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use nidx_protos::FilterExpression;
+use nidx_protos::{FilterExpression, Security};
 
 #[derive(Clone, Default)]
 pub struct DocumentSearchRequest {
@@ -30,4 +30,5 @@ pub struct DocumentSearchRequest {
     pub advanced_query: Option<String>,
     pub min_score: f32,
     pub filter_expression: Option<FilterExpression>,
+    pub security: Option<Security>,
 }

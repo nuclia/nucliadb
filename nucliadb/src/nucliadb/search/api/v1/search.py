@@ -147,7 +147,7 @@ async def search_knowledgebox(
     extracted: list[ExtractedDataTypeName] = fastapi_query(SearchParamDefaults.extracted),
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
-    security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
+    security_groups: list[str] | None = fastapi_query(SearchParamDefaults.security_groups),
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
@@ -157,7 +157,7 @@ async def search_knowledgebox(
         expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
 
         security = None
-        if len(security_groups) > 0:
+        if security_groups is not None:
             security = RequestSecurity(groups=security_groups)
         item = SearchRequest(
             query=query,

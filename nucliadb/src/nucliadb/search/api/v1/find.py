@@ -123,7 +123,7 @@ async def find_knowledgebox(
     extracted: list[ExtractedDataTypeName] = fastapi_query(SearchParamDefaults.extracted),
     with_duplicates: bool = fastapi_query(SearchParamDefaults.with_duplicates),
     with_synonyms: bool = fastapi_query(SearchParamDefaults.with_synonyms),
-    security_groups: list[str] = fastapi_query(SearchParamDefaults.security_groups),
+    security_groups: list[str] | None = fastapi_query(SearchParamDefaults.security_groups),
     show_hidden: bool = fastapi_query(SearchParamDefaults.show_hidden),
     rank_fusion: RankFusionName = fastapi_query(SearchParamDefaults.rank_fusion),
     reranker: RerankerName = fastapi_query(SearchParamDefaults.reranker),
@@ -139,7 +139,7 @@ async def find_knowledgebox(
         expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
 
         security = None
-        if len(security_groups) > 0:
+        if security_groups is not None:
             security = RequestSecurity(groups=security_groups)
         item = FindRequest(
             query=query,
@@ -165,6 +165,7 @@ async def find_knowledgebox(
             show_hidden=show_hidden,
             rank_fusion=rank_fusion,
             reranker=reranker,
+            search_configuration=search_configuration,
         )
     except ValidationError as exc:
         detail = json.loads(exc.json())

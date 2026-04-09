@@ -633,12 +633,12 @@ class SearchParamDefaults:
     security: ParamDefault = ParamDefault(
         default=None,
         title="Security",
-        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",
+        description="Security metadata for the request. Please refer to the documentation for more details on how security works: https://docs.rag.progress.cloud/docs/management/how-to/restrict-access",
     )
     security_groups: ParamDefault = ParamDefault(
-        default=[],
+        default=None,
         title="Security groups",
-        description="List of security groups to filter search results for. Only resources matching the query and containing the specified security groups will be returned. If empty, all resources will be considered for the search.",
+        description="List of security groups to filter search results for. Only resources matching the query and containing the specified security groups will be returned. Please refer to the documentation for more details on how security groups work: https://docs.rag.progress.cloud/docs/management/how-to/restrict-access",
     )
     rephrase = ParamDefault(
         default=False,

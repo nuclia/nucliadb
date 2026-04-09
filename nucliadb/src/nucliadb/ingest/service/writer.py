@@ -130,6 +130,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 hidden_resources_enabled=request.hidden_resources_enabled,
                 hidden_resources_hide_on_creation=request.hidden_resources_hide_on_creation,
                 prewarm_enabled=request.prewarm_enabled,
+                enforce_security=request.enforce_security,
             )
 
         except KnowledgeBoxConflict:
@@ -181,6 +182,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 hidden_resources_enabled=request.config.hidden_resources_enabled,
                 hidden_resources_hide_on_creation=request.config.hidden_resources_hide_on_creation,
                 prewarm_enabled=request.config.prewarm_enabled,
+                enforce_security=request.config.enforce_security,
             )
         except KnowledgeBoxNotFound:
             return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.NOTFOUND)

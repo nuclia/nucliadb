@@ -38,7 +38,7 @@ use nidx_tantivy::utils::decode_facet;
 use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::Column;
-use tantivy::query::{AllQuery, BooleanQuery, Query, QueryParser, TermQuery};
+use tantivy::query::{AllQuery, BooleanQuery, Query, QueryParser};
 use tantivy::schema::Value;
 use tantivy::{DateTime, DocAddress, Index, IndexReader, Searcher};
 use tantivy::{Order, schema::*};
@@ -153,31 +153,10 @@ impl Collector for FieldUuidCollector {
 impl TextReaderService {
     pub fn prefilter(&self, request: &PreFilterRequest) -> anyhow::Result<PrefilterResult> {
         let schema = &self.schema;
-        let mut access_groups_queries: Vec<Box<dyn Query>> = Vec::new();
+        let mut subqueries = vec![];
 
         if let Some(security) = request.security.as_ref() {
-            for group_id in security.access_groups.iter() {
-                let mut group_id_key = group_id.clone();
-                if !group_id.starts_with('/') {
-                    // Slash needs to be added to be compatible with tantivy facet fields
-                    group_id_key = "/".to_string() + group_id;
-                }
-                let facet = Facet::from_text(&group_id_key).unwrap();
-                let term = Term::from_facet(self.schema.groups_with_access, &facet);
-                let term_query = TermQuery::new(term, IndexRecordOption::Basic);
-                access_groups_queries.push(Box::new(term_query));
-            }
-        }
-
-        let mut subqueries = vec![];
-        if !access_groups_queries.is_empty() {
-            let public_fields_query = Box::new(TermQuery::new(
-                Term::from_field_u64(self.schema.groups_public, 1_u64),
-                IndexRecordOption::Basic,
-            ));
-            access_groups_queries.push(public_fields_query);
-            let access_groups_query: Box<dyn Query> = Box::new(BooleanQuery::union(access_groups_queries));
-            subqueries.push(access_groups_query);
+            subqueries.push(crate::search_query::security_query(schema, security));
         }
 
         if let Some(expr) = &request.filter_expression {

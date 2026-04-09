@@ -72,7 +72,7 @@ async def suggest_knowledgebox(
     debug: bool = fastapi_query(SuggestParamDefaults.debug),
     highlight: bool = fastapi_query(SuggestParamDefaults.highlight),
     show_hidden: bool = fastapi_query(SuggestParamDefaults.show_hidden),
-    security_groups: list[str] = fastapi_query(SuggestParamDefaults.security_groups),
+    security_groups: list[str] | None = fastapi_query(SuggestParamDefaults.security_groups),
 ) -> KnowledgeboxSuggestResults | HTTPClientError:
     try:
         expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
@@ -127,7 +127,7 @@ async def suggest_post_knowledgebox(
             debug=item.debug,
             highlight=item.highlight,
             show_hidden=item.show_hidden,
-            security_groups=item.security.groups if item.security else [],
+            security_groups=item.security.groups if item.security else None,
             filter_expression=item.filter_expression,
             # all these fields are superseeded by filter expression. In the POST
             # endpoint we don't support any of these fields
@@ -160,7 +160,7 @@ async def suggest(
     debug: bool,
     highlight: bool,
     show_hidden: bool,
-    security_groups: list[str],
+    security_groups: list[str] | None,
 ) -> KnowledgeboxSuggestResults:
     with cache.request_caches():
         pb_query = await parse_suggest(

@@ -38,7 +38,7 @@ from nucliadb.search.search.query_parser.models import (
     UnitRetrieval,
 )
 from nucliadb.search.search.query_parser.parsers.common import query_with_synonyms, validate_query_syntax
-from nucliadb.search.search.utils import filter_hidden_resources
+from nucliadb.search.search.utils import filter_hidden_resources, kb_security_enforced
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.retrieval import RetrievalRequest
 
@@ -328,7 +328,7 @@ class _RetrievalParser:
             filters.filter_expression_operator = filter_operator
 
         filters.hidden = await filter_hidden_resources(self.kbid, self.item.filters.show_hidden)
-        filters.security = self.item.filters.security
+        filters.security = await kb_security_enforced(self.kbid, self.item.filters.security)
         filters.with_duplicates = self.item.filters.with_duplicates
 
         return filters

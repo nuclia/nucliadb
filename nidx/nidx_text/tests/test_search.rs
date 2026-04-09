@@ -42,7 +42,6 @@ fn test_search_queries() {
             result_per_page: 20,
             ..Default::default()
         };
-
         let response = reader.search(&request).unwrap();
         assert_eq!(response.total, expected, "Failed query: '{}'", query);
 

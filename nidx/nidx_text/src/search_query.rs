@@ -24,7 +24,7 @@ use nidx_protos::filter_expression::FieldFilter;
 use nidx_protos::filter_expression::date_range_filter::DateField;
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
 use nidx_protos::stream_filter::Conjunction;
-use nidx_protos::{FilterExpression, StreamFilter, StreamRequest};
+use nidx_protos::{FilterExpression, Security, StreamFilter, StreamRequest};
 use std::ops::Bound;
 use tantivy::Term;
 use tantivy::query::*;
@@ -65,6 +65,35 @@ pub fn create_streaming_query(schema: &TextSchema, request: &StreamRequest) -> B
     Box::new(BooleanQuery::new(queries))
 }
 
+/// Builds a tantivy query that filters documents by security groups.
+/// The query matches documents that are either public (groups_public == 1)
+/// or have at least one of the specified access groups.
+pub fn security_query(schema: &TextSchema, security: &Security) -> Box<dyn Query> {
+    let mut access_groups_queries: Vec<Box<dyn Query>> = Vec::new();
+
+    // Match public resources (those without security groups)
+    let public_fields_query = Box::new(TermQuery::new(
+        Term::from_field_u64(schema.groups_public, 1_u64),
+        IndexRecordOption::Basic,
+    ));
+    access_groups_queries.push(public_fields_query);
+
+    // Match resources that have any of the specified access groups
+    for group_id in security.access_groups.iter() {
+        let mut group_id_key = group_id.clone();
+        if !group_id.starts_with('/') {
+            // Slash needs to be added to be compatible with tantivy facet fields
+            group_id_key = "/".to_string() + group_id;
+        }
+        let facet = Facet::from_text(&group_id_key).unwrap();
+        let term = Term::from_facet(schema.groups_with_access, &facet);
+        let term_query = TermQuery::new(term, IndexRecordOption::Basic);
+        access_groups_queries.push(Box::new(term_query));
+    }
+
+    Box::new(BooleanQuery::union(access_groups_queries))
+}
+
 pub fn create_query(
     parser: &QueryParser,
     search: &DocumentSearchRequest,
@@ -82,6 +111,11 @@ pub fn create_query(
 
     if let Some(filter_expression) = &search.filter_expression {
         queries.push((Occur::Must, filter_to_query(schema, filter_expression)));
+    }
+
+    // Security filter
+    if let Some(security) = &search.security {
+        queries.push((Occur::Must, security_query(schema, security)));
     }
 
     // Advance query

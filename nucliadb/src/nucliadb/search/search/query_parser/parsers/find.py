@@ -37,7 +37,7 @@ from nucliadb.search.search.query_parser.models import (
     UnitRetrieval,
 )
 from nucliadb.search.search.query_parser.old_filters import OldFilterParams, parse_old_filters
-from nucliadb.search.search.utils import filter_hidden_resources
+from nucliadb.search.search.utils import filter_hidden_resources, kb_security_enforced
 from nucliadb_models import search as search_models
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.search import (
@@ -239,13 +239,14 @@ class _FindParser:
                 filter_operator = nodereader_pb2.FilterOperator.AND
 
         hidden = await filter_hidden_resources(self.kbid, self.item.show_hidden)
+        security = await kb_security_enforced(self.kbid, self.item.security)
 
         return Filters(
             facets=[],
             field_expression=field_expr,
             paragraph_expression=paragraph_expr,
             filter_expression_operator=filter_operator,
-            security=self.item.security,
+            security=security,
             hidden=hidden,
             with_duplicates=self.item.with_duplicates,
         )

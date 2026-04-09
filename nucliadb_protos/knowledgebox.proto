@@ -94,6 +94,9 @@ message KnowledgeBoxConfig {
     // this flag allow faster searches (with less cold start) but it is
     // expensive on the infrastructure
     bool prewarm_enabled = 12;
+
+    // Whether to enforce security groups by default on all requests
+    bool enforce_security = 13;
 }
 
 // UPDATE

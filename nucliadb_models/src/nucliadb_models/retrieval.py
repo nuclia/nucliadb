@@ -136,7 +136,7 @@ class Filters(BaseModel, extra="forbid"):
         SearchParamDefaults.filter_expression.to_pydantic_field()
     )
     show_hidden: bool = SearchParamDefaults.show_hidden.to_pydantic_field()
-    security: RequestSecurity | None = None
+    security: RequestSecurity | None = SearchParamDefaults.security.to_pydantic_field()
     with_duplicates: bool = False
 
 
