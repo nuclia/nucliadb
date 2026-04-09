@@ -39,7 +39,7 @@ async fn create_dummy_resources(total: u8, fixture: &mut NidxFixture, shard_id: 
     for i in 0..total {
         println!("Creating dummy resource {}/{}", i, total);
         let rid = Uuid::new_v4();
-        let field = format!("dummy-{i:0>3}");
+        let field = format!("f/dummy-{i:0>3}");
 
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
         let timestamp = Timestamp {
@@ -50,7 +50,7 @@ async fn create_dummy_resources(total: u8, fixture: &mut NidxFixture, shard_id: 
         let labels = vec![format!("/dummy{i:0>3}")];
         let mut texts = HashMap::new();
         texts.insert(
-            field,
+            field.clone(),
             nidx_protos::TextInformation {
                 text: format!("Dummy text {i:0>3}"),
                 labels: vec![],
@@ -79,7 +79,7 @@ async fn create_dummy_resources(total: u8, fixture: &mut NidxFixture, shard_id: 
                     texts,
                     security: Some(security),
                     field_relations: HashMap::from([(
-                        "f/file".to_string(),
+                        field,
                         IndexRelations {
                             relations: vec![IndexRelation {
                                 relation: Some(Relation {
@@ -129,11 +129,13 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let shard_id = &new_shard_response.get_ref().id;
 
     let group_engineering = "engineering".to_string();
+    let group_other = "other".to_string();
 
     create_dummy_resources(1, &mut fixture, shard_id.clone(), vec![group_engineering.clone()]).await;
+    create_dummy_resources(1, &mut fixture, shard_id.clone(), vec![group_other.clone()]).await;
     fixture.wait_sync().await;
 
-    // Searching with no security should return 1 results
+    // Searching with no security should return 2 results
     let response = fixture
         .searcher_client
         .search(SearchRequest {
@@ -141,12 +143,12 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
             shard: shard_id.clone(),
             document: true,
             vectorset: "english".to_string(),
-            security: Some(Security { access_groups: vec![] }),
+            security: None,
             ..Default::default()
         })
         .await
         .unwrap();
-    assert_eq!(response.get_ref().document.as_ref().unwrap().total, 1);
+    assert_eq!(response.get_ref().document.as_ref().unwrap().total, 2);
 
     let response = fixture
         .searcher_client
@@ -156,12 +158,12 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
                 path: Some(Default::default()),
             }),
             top_k: 100,
-            security: Some(Security { access_groups: vec![] }),
+            security: None,
             ..Default::default()
         })
         .await
         .unwrap();
-    assert_eq!(response.get_ref().relations.len(), 1);
+    assert_eq!(response.get_ref().relations.len(), 2);
 
     // Searching with an unknown group should return no results
     let response = fixture
@@ -190,6 +192,35 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
             security: Some(Security {
                 access_groups: vec!["unknown".to_string()],
             }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(response.get_ref().relations.len(), 0);
+
+    // Searching with no security groups should return no results
+    let response = fixture
+        .searcher_client
+        .search(SearchRequest {
+            shard: shard_id.clone(),
+            document: true,
+            vectorset: "english".to_string(),
+            security: Some(Security { access_groups: vec![] }),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(response.get_ref().document.as_ref(), None);
+
+    let response = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard: shard_id.clone(),
+            query: Some(nidx_protos::GraphQuery {
+                path: Some(Default::default()),
+            }),
+            top_k: 100,
+            security: Some(Security { access_groups: vec![] }),
             ..Default::default()
         })
         .await
