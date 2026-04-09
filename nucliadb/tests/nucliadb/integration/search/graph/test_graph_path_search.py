@@ -932,6 +932,114 @@ async def test_graph_search_facets(
     assert len(paths) == 0
 
 
+@pytest.mark.deploy_modes("standalone")
+async def test_graph_search__enforce_security(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
+    kb_with_entity_graph: str,
+):
+    """When enforce_security is enabled at the KB level, graph search requests
+    without security groups should only return paths from public resources.
+    Requests with matching groups should return paths from secured resources,
+    and requests with non-matching groups should not.
+    """
+    kbid = kb_with_entity_graph
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resources",
+    )
+    assert resp.status_code == 200
+    rid = resp.json()["resources"][0]["id"]
+
+    # Set security groups on the resource
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={
+            "security": {
+                "access_groups": ["secret"],
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Enable enforce_security at KB level
+    resp = await nucliadb_writer_manager.patch(
+        f"/kb/{kbid}",
+        json={"enforce_security": True},
+    )
+    assert resp.status_code == 200, resp.text
+
+    graph_query = {
+        "query": {
+            "prop": "path",
+            "source": {
+                "value": "Anna",
+            },
+            "relation": {
+                "label": "IS_FRIEND",
+            },
+            "undirected": True,
+        },
+        "top_k": 100,
+    }
+
+    # Without security groups and enforce_security enabled,
+    # should NOT return paths from secured resources
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json=graph_query,
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+    # With empty security groups, should also NOT return paths from secured resources
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={**graph_query, "security": {"groups": []}},
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+    # With matching security groups, should return the paths
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={**graph_query, "security": {"groups": ["secret"]}},
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert ("Anastasia", "IS_FRIEND", "Anna") in paths
+
+    # With non-matching security groups, should NOT return the paths
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={**graph_query, "security": {"groups": ["other-group"]}},
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+    # Disable enforce_security at KB level
+    resp = await nucliadb_writer_manager.patch(
+        f"/kb/{kbid}",
+        json={"enforce_security": False},
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Without enforce_security, should return paths again (legacy behavior)
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json=graph_query,
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert ("Anastasia", "IS_FRIEND", "Anna") in paths
+
+
 def simple_paths(paths: list[graph_responses.GraphPath]) -> list[tuple[str, str, str]]:
     simple_paths = []
     for path in paths:

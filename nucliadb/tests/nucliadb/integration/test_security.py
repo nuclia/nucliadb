@@ -79,7 +79,9 @@ async def _create_resource(
 
 @pytest.fixture(scope="function")
 async def resource_with_security(
-    nucliadb_writer: AsyncClient, standalone_knowledgebox: str, nucliadb_ingest_grpc: WriterStub
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+    nucliadb_ingest_grpc: WriterStub,
 ):
     return await _create_resource(
         nucliadb_writer,
