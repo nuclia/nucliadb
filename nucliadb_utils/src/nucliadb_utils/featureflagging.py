@@ -64,14 +64,6 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
-    # const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE: {
-    #     "rollout": 0,
-    #     "variants": {"environment": ["local"]},
-    #     "kbid": [
-    #         "2f654e84-3fe1-4b5d-8193-781a421b2f5e",  # local
-    #         "7ea4e2a2-4d16-4359-b989-439e71c2b6df",  # dev
-    #     ],
-    # },
 }
 
 
