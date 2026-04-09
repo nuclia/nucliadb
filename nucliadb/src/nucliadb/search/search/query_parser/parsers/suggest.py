@@ -85,9 +85,10 @@ async def parse_suggest(
     if field_expr is not None:
         request.field_filter.CopyFrom(field_expr)
 
-    security = await kb_security_enforced(
-        kbid, RequestSecurity(groups=security_groups) if security_groups is not None else None
-    )
+    request_security = None
+    if security_groups is not None:
+        request_security = RequestSecurity(groups=security_groups)
+    security = await kb_security_enforced(kbid, request_security)
     if security is not None:
         request.security.access_groups.extend(security.groups)
 

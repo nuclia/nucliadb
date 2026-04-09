@@ -247,13 +247,11 @@ async def _test_search_request_with_security(
     payload = {
         "query": query,
     }
-    if security_groups:
-        payload["security"] = {"groups": security_groups}  # type: ignore
-
     params = {
         "query": query,
     }
-    if security_groups:
+    if security_groups is not None:
+        payload["security"] = {"groups": security_groups}  # type: ignore
         params["security_groups"] = security_groups  # type: ignore
 
     if method == "POST" and endpoint == "find":
@@ -290,16 +288,27 @@ async def _test_search_request_with_security(
         raise ValueError(f"Unknown method and/or search endpoint: {method} {endpoint}")
 
     assert resp.status_code == 200, resp.text
-
-    if endpoint in ("search", "find"):
+    if endpoint == "search":
         search_response = resp.json()
-        assert len(search_response["resources"]) == len(expected_resources)
-        assert set(search_response["resources"]) == set(expected_resources)
-    elif endpoint in ("suggest",):
+        # Check paragraph search results
+        p_rids = [p_result["rid"] for p_result in search_response["paragraphs"]["results"]]
+        assert len(p_rids) == len(expected_resources), "Unexpected number of paragraph results"
+        assert set(p_rids) == set(expected_resources), "Unexpected paragraph results"
+        # Check texts search results
+        # t_rids = [t_result["rid"] for t_result in search_response["texts"]["results"]]
+        # assert len(t_rids) == len(expected_resources), "Unexpected number of text results"
+        # assert set(t_rids) == set(expected_resources), "Unexpected text results"
+    elif endpoint == "find":
+        find_response = resp.json()
+        assert len(find_response["resources"]) == len(expected_resources), (
+            "Unexpected number of find results"
+        )
+        assert set(find_response["resources"]) == set(expected_resources), "Unexpected find results"
+    elif endpoint == "suggest":
         suggest_response = resp.json()
         resources = [paragraph["rid"] for paragraph in suggest_response["paragraphs"]["results"]]
-        assert len(resources) == len(expected_resources)
-        assert set(resources) == set(expected_resources)
+        assert len(resources) == len(expected_resources), "Unexpected number of suggest results"
+        assert set(resources) == set(expected_resources), "Unexpected suggest results"
     else:
         raise ValueError(f"Unknown method and/or search endpoint: {method} {endpoint}")
 

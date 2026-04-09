@@ -57,13 +57,10 @@ fn test_index_merge_search() -> anyhow::Result<()> {
         TextConfig::default(),
         TestOpener::new(vec![(meta1.clone(), 1i64.into())], vec![]),
     )?;
-    let result = searcher.search(
-        &DocumentSearchRequest {
-            result_per_page: 20,
-            ..Default::default()
-        },
-        &PrefilterResult::All,
-    )?;
+    let result = searcher.search(&DocumentSearchRequest {
+        result_per_page: 20,
+        ..Default::default()
+    })?;
     assert_eq!(result.results.len(), 2);
 
     // Search on both resources
@@ -71,13 +68,10 @@ fn test_index_merge_search() -> anyhow::Result<()> {
         TextConfig::default(),
         TestOpener::new(vec![(meta1, 1i64.into()), (meta2, 2i64.into())], vec![]),
     )?;
-    let result = searcher.search(
-        &DocumentSearchRequest {
-            result_per_page: 20,
-            ..Default::default()
-        },
-        &PrefilterResult::All,
-    )?;
+    let result = searcher.search(&DocumentSearchRequest {
+        result_per_page: 20,
+        ..Default::default()
+    })?;
     assert_eq!(result.results.len(), 4);
 
     // Search on merged resources
@@ -85,13 +79,10 @@ fn test_index_merge_search() -> anyhow::Result<()> {
         TextConfig::default(),
         TestOpener::new(vec![(merged_meta, 1i64.into())], vec![]),
     )?;
-    let result = searcher.search(
-        &DocumentSearchRequest {
-            result_per_page: 20,
-            ..Default::default()
-        },
-        &PrefilterResult::All,
-    )?;
+    let result = searcher.search(&DocumentSearchRequest {
+        result_per_page: 20,
+        ..Default::default()
+    })?;
     assert_eq!(result.results.len(), 2);
 
     Ok(())

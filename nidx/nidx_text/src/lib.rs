@@ -185,12 +185,8 @@ impl TextSearcher {
     }
 
     #[instrument(name = "text::search", skip_all)]
-    pub fn search(
-        &self,
-        request: &DocumentSearchRequest,
-        prefilter: &PrefilterResult,
-    ) -> anyhow::Result<DocumentSearchResponse> {
-        self.reader.search(request, prefilter)
+    pub fn search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
+        self.reader.search(request)
     }
 
     #[instrument(name = "text::prefilter", skip_all)]

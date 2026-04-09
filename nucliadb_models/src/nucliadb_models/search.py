@@ -638,7 +638,7 @@ class SearchParamDefaults:
     security_groups: ParamDefault = ParamDefault(
         default=None,
         title="Security groups",
-        description="List of security groups to filter search results for. Only resources matching the query and containing the specified security groups will be returned. If empty, all resources will be considered for the search.",
+        description="List of security groups to filter search results for. Only resources matching the query and containing the specified security groups will be returned. Please refer to the documentation for more details on how security groups work: https://docs.rag.progress.cloud/docs/management/how-to/restrict-access",
     )
     rephrase = ParamDefault(
         default=False,

@@ -158,7 +158,7 @@ fn blocking_search(
     // Run the rest of the plan
     let text_task = index_queries
         .texts_request
-        .map(|request| move || text_searcher.unwrap().search(&request, prefilter));
+        .map(|request| move || text_searcher.unwrap().search(&request));
 
     let paragraph_task = index_queries
         .paragraphs_request

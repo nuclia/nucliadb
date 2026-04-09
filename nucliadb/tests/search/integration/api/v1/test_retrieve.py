@@ -288,6 +288,10 @@ async def test_retrieve_query_parsing() -> None:
             "nucliadb.search.search.query_parser.parsers.retrieve.filter_hidden_resources",
             return_value=False,
         ),
+        patch(
+            "nucliadb.search.search.query_parser.parsers.retrieve.kb_security_enforced",
+            return_value=None,
+        ),
     ):
         # TEST: textual query
 

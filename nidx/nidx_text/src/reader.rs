@@ -231,12 +231,8 @@ impl TextReaderService {
         Ok(count)
     }
 
-    pub fn search(
-        &self,
-        request: &DocumentSearchRequest,
-        prefilter: &PrefilterResult,
-    ) -> anyhow::Result<DocumentSearchResponse> {
-        self.do_search(request, prefilter)
+    pub fn search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
+        self.do_search(request)
     }
 }
 
@@ -396,12 +392,8 @@ impl TextReaderService {
         }
     }
 
-    fn do_search(
-        &self,
-        request: &DocumentSearchRequest,
-        prefilter: &PrefilterResult,
-    ) -> anyhow::Result<DocumentSearchResponse> {
-        use crate::search_query::{create_query, prefilter_query};
+    fn do_search(&self, request: &DocumentSearchRequest) -> anyhow::Result<DocumentSearchResponse> {
+        use crate::search_query::create_query;
         let time = Instant::now();
 
         let v = time.elapsed().as_millis();
@@ -418,12 +410,7 @@ impl TextReaderService {
             .as_ref()
             .map(|query| query_parser.parse_query(query))
             .transpose()?;
-        let mut query = create_query(&query_parser, request, &self.schema, &text, advanced_query)?;
-
-        // Apply prefilter to restrict results to allowed fields
-        if let Some(pf_query) = prefilter_query(&self.schema, prefilter) {
-            query = Box::new(BooleanQuery::intersection(vec![query, pf_query]));
-        }
+        let query = create_query(&query_parser, request, &self.schema, &text, advanced_query)?;
 
         // Offset to search from
         let results = request.result_per_page as usize;

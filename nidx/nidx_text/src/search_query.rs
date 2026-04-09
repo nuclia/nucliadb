@@ -20,13 +20,11 @@
 
 use crate::DocumentSearchRequest;
 use crate::query_io::translate_keyword_to_text_query;
-use crate::schema::encode_field_id_bytes;
 use nidx_protos::filter_expression::FieldFilter;
 use nidx_protos::filter_expression::date_range_filter::DateField;
 use nidx_protos::prost_types::Timestamp as ProstTimestamp;
 use nidx_protos::stream_filter::Conjunction;
 use nidx_protos::{FilterExpression, StreamFilter, StreamRequest};
-use nidx_types::prefilter::PrefilterResult;
 use std::ops::Bound;
 use tantivy::Term;
 use tantivy::query::*;
@@ -65,23 +63,6 @@ pub fn create_streaming_query(schema: &TextSchema, request: &StreamRequest) -> B
         queries.push((Occur::Must, filter_to_query(schema, filter_expression)))
     }
     Box::new(BooleanQuery::new(queries))
-}
-
-pub fn prefilter_query(schema: &TextSchema, prefilter: &PrefilterResult) -> Option<Box<dyn Query>> {
-    if let PrefilterResult::Some(field_keys) = prefilter {
-        let terms: Vec<Term> = field_keys
-            .iter()
-            .map(|field_id| {
-                Term::from_field_bytes(
-                    schema.encoded_field_id_bytes,
-                    &encode_field_id_bytes(field_id.resource_id, &field_id.field_id),
-                )
-            })
-            .collect();
-        Some(Box::new(TermSetQuery::new(terms)))
-    } else {
-        None
-    }
 }
 
 pub fn create_query(
