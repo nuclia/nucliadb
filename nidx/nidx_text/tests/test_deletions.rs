@@ -23,7 +23,6 @@ use common::TestOpener;
 use nidx_protos::TextInformation;
 use nidx_tests::minimal_resource;
 use nidx_text::{DocumentSearchRequest, TextConfig, TextIndexer, TextSearcher};
-use nidx_types::prefilter::PrefilterResult;
 use tempfile::tempdir;
 
 #[test]

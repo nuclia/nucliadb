@@ -22,7 +22,6 @@ mod common;
 use common::TestOpener;
 use nidx_tests::little_prince;
 use nidx_text::{DocumentSearchRequest, TextConfig, TextIndexer, TextSearcher};
-use nidx_types::prefilter::PrefilterResult;
 use tempfile::tempdir;
 
 #[test]
