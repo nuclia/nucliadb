@@ -32,7 +32,7 @@ from async_lru import _LRUCacheWrapper, alru_cache
 from nidx_protos.nidx_pb2 import ExtractedTextsRequest
 from typing_extensions import ParamSpec
 
-from nucliadb.common.cluster.utils import get_shard_manager
+from nucliadb.common import datamanagers
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_searcher_client
@@ -123,28 +123,42 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
         async def _get_extracted_text(kbid: str, field_id: FieldId) -> ExtractedText | None:
             _start_time = time.monotonic()
             if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": kbid}):
-                nidx_searcher = get_nidx_searcher_client()
+                async with datamanagers.with_ro_transaction() as txn:
+                    kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+                    if kb_shards is None:
+                        return None
 
-                shard_manager = get_shard_manager()
-                shard_groups = await shard_manager.get_shards_by_kbid(kbid)
-                for shard_obj in shard_groups:
-                    shard_id = shard_obj.nidx_shard_id
-                    extracted_texts = await nidx_searcher.ExtractedTexts(
-                        ExtractedTextsRequest(
-                            shard_id=shard_id,
-                            field_ids=[
-                                ExtractedTextsRequest.FieldId(
-                                    rid=field_id.rid,
-                                    field_type=field_id.type,
-                                    field_name=field_id.key,
-                                    split=field_id.subfield_id,
-                                )
-                            ],
-                        )
+                    resource_shard_id = await datamanagers.resources.get_resource_shard_id(
+                        txn,
+                        kbid=kbid,
+                        rid=field_id.rid,
                     )
-                    text = extracted_texts.fields.get(field_id.full_without_subfield(), "")
-                    if text:
-                        break
+                    if resource_shard_id is None:
+                        return None
+
+                    nidx_shard_id = None
+                    for shard in kb_shards.shards:
+                        if shard.shard == resource_shard_id:
+                            nidx_shard_id = shard.nidx_shard_id
+                            break
+                    else:
+                        return None
+
+                nidx_searcher = get_nidx_searcher_client()
+                extracted_texts = await nidx_searcher.ExtractedTexts(
+                    ExtractedTextsRequest(
+                        shard_id=nidx_shard_id,
+                        field_ids=[
+                            ExtractedTextsRequest.FieldId(
+                                rid=field_id.rid,
+                                field_type=field_id.type,
+                                field_name=field_id.key,
+                                split=field_id.subfield_id,
+                            )
+                        ],
+                    )
+                )
+                text = extracted_texts.fields.get(field_id.full_without_subfield(), "")
 
                 logger.info(
                     f"et-cache Using nidx as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}",
