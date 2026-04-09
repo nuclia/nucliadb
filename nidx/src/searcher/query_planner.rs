@@ -233,6 +233,7 @@ fn compute_texts_request(search_request: &SearchRequest) -> Option<DocumentSearc
         advanced_query: search_request.advanced_query.clone(),
         min_score: search_request.min_score_bm25,
         filter_expression: search_request.field_filter.clone(),
+        security: search_request.security.clone(),
     })
 }
 

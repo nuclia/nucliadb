@@ -295,9 +295,9 @@ async def _test_search_request_with_security(
         assert len(p_rids) == len(expected_resources), "Unexpected number of paragraph results"
         assert set(p_rids) == set(expected_resources), "Unexpected paragraph results"
         # Check texts search results
-        # t_rids = [t_result["rid"] for t_result in search_response["texts"]["results"]]
-        # assert len(t_rids) == len(expected_resources), "Unexpected number of text results"
-        # assert set(t_rids) == set(expected_resources), "Unexpected text results"
+        t_rids = [t_result["rid"] for t_result in search_response["fulltext"]["results"]]
+        assert len(t_rids) == len(expected_resources), "Unexpected number of text results"
+        assert set(t_rids) == set(expected_resources), "Unexpected text results"
     elif endpoint == "find":
         find_response = resp.json()
         assert len(find_response["resources"]) == len(expected_resources), (
