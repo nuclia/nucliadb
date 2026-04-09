@@ -38,7 +38,7 @@ use nidx_tantivy::utils::decode_facet;
 use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::Column;
-use tantivy::query::{AllQuery, BooleanQuery, Query, QueryParser};
+use tantivy::query::{AllQuery, BooleanQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::Value;
 use tantivy::{DateTime, DocAddress, Index, IndexReader, Searcher};
 use tantivy::{Order, schema::*};
