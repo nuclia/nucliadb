@@ -138,10 +138,12 @@ pub fn encode_field_id(rid: uuid::Uuid, fid: &str) -> Vec<u64> {
 /// Decodes a resource and field id from a series of u64
 /// This is retrieved from the fast field `encoded_field_id`
 /// and used for faster loading in the prefilter Collector
-pub fn decode_field_id(data: &[u64]) -> (uuid::Uuid, String) {
-    let rid = uuid::Uuid::from_u64_pair(data[0], data[1]);
-    let mut ubytes = Vec::with_capacity((data.len() - 2) * 8);
-    for word in &data[2..] {
+pub fn decode_field_id(mut data: impl Iterator<Item = u64>) -> (uuid::Uuid, String) {
+    let w0 = data.next().expect("encoded_field_id missing first word");
+    let w1 = data.next().expect("encoded_field_id missing second word");
+    let rid = uuid::Uuid::from_u64_pair(w0, w1);
+    let mut ubytes = Vec::new();
+    for word in data {
         let wb = word.to_le_bytes();
         let mut i = 7;
         while wb[i] == 0 {
@@ -191,7 +193,7 @@ mod tests {
         for t in testcases {
             let rid = uuid::Uuid::parse_str(t.0).unwrap();
             let data = encode_field_id(rid, t.1);
-            let (decoded_rid, decoded_fid) = decode_field_id(&data);
+            let (decoded_rid, decoded_fid) = decode_field_id(data.into_iter());
             assert_eq!(decoded_rid.simple().to_string().as_str(), t.0);
             assert_eq!(decoded_fid, t.1);
         }

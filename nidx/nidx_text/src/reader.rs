@@ -98,9 +98,7 @@ impl SegmentCollector for FieldUuidSegmentCollectorV2 {
     type Fruit = Vec<FieldId>;
 
     fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
-        let mut data = Vec::new();
-        self.encoded_field_id_reader.fill_vals(doc, &mut data);
-        let (rid, fid) = decode_field_id(&data);
+        let (rid, fid) = decode_field_id(self.encoded_field_id_reader.values_for_doc(doc));
 
         self.results.push(FieldId {
             resource_id: rid,
@@ -239,7 +237,7 @@ impl TextReaderService {
         &self,
         order: OrderBy,
         limit: usize,
-    ) -> impl Collector<Fruit = Vec<(DateTime, DocAddress)>> {
+    ) -> impl Collector<Fruit = Vec<(Option<DateTime>, DocAddress)>> {
         let order_field = match order.sort_by() {
             OrderField::Created => "created",
             OrderField::Modified => "modified",
@@ -251,7 +249,11 @@ impl TextReaderService {
         TopDocs::with_limit(limit).order_by_fast_field(order_field, order_direction)
     }
 
-    fn convert_int_order(&self, response: SearchResponse<DateTime>, searcher: &Searcher) -> DocumentSearchResponse {
+    fn convert_int_order(
+        &self,
+        response: SearchResponse<Option<DateTime>>,
+        searcher: &Searcher,
+    ) -> DocumentSearchResponse {
         let total = response.total as i32;
         let retrieved_results = response.results_per_page;
         let next_page = total > retrieved_results;
@@ -285,7 +287,7 @@ impl TextReaderService {
                         .filter(|x| x.starts_with("/l/"))
                         .collect_vec();
 
-                    let sort_value = Some(SortValue::Date(datetime_utc_to_timestamp(&score)));
+                    let sort_value = score.as_ref().map(|s| SortValue::Date(datetime_utc_to_timestamp(s)));
 
                     let result = DocumentResult {
                         uuid,
@@ -462,7 +464,7 @@ impl TextReaderService {
                 Ok(result)
             }
             None => {
-                let topdocs_collector = TopDocs::with_limit(extra_result);
+                let topdocs_collector = TopDocs::with_limit(extra_result).order_by_score();
                 let multicollector = &(facet_collector, topdocs_collector, Count);
                 let (facets_count, top_docs, total) = searcher.search(&query, multicollector)?;
                 let result = self.convert_bm25_order(
@@ -508,7 +510,9 @@ impl Iterator for BatchProducer {
             return None;
         }
         debug!("Producing a new batch with offset: {}", self.offset);
-        let top_docs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
+        let top_docs = TopDocs::with_limit(Self::BATCH)
+            .and_offset(self.offset)
+            .order_by_score();
         let top_docs = self.searcher.search(&self.query, &top_docs).unwrap();
         let mut items = vec![];
         for doc in top_docs

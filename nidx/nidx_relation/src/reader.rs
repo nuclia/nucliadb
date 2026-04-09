@@ -131,7 +131,7 @@ impl RelationsReaderService {
         let index_query = parser.parse_bool(query);
         let index_query = self.apply_prefilter(index_query, prefilter);
 
-        let collector = TopDocs::with_limit(top_k);
+        let collector = TopDocs::with_limit(top_k).order_by_score();
         let searcher = self.reader.searcher();
         let matching_docs = searcher.search(&index_query, &collector)?;
 

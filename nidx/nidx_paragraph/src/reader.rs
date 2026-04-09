@@ -69,11 +69,11 @@ impl ParagraphReaderService {
         let (keyword, term_collector, fuzzy) = suggest_query(request, prefilter, &self.schema);
 
         let searcher = self.reader.searcher();
-        let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
+        let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST).order_by_score();
         let mut results = searcher.search(&keyword, &topdocs)?;
 
         if results.is_empty() {
-            let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST);
+            let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST).order_by_score();
             match searcher.search(&fuzzy, &topdocs) {
                 Ok(mut fuzzy) => results.append(&mut fuzzy),
                 Err(err) => error!("{err:?} during suggest"),
@@ -195,7 +195,9 @@ impl Iterator for BatchProducer {
         }
         debug!("Producing a new batch with offset: {}", self.offset);
 
-        let topdocs = TopDocs::with_limit(Self::BATCH).and_offset(self.offset);
+        let topdocs = TopDocs::with_limit(Self::BATCH)
+            .and_offset(self.offset)
+            .order_by_score();
         let Ok(top_docs) = self.searcher.search(&self.query, &topdocs) else {
             error!("Something went wrong");
             return None;
@@ -235,7 +237,7 @@ impl Searcher<'_> {
         &self,
         order: OrderBy,
         limit: usize,
-    ) -> impl Collector<Fruit = Vec<(DateTime, DocAddress)>> {
+    ) -> impl Collector<Fruit = Vec<(Option<DateTime>, DocAddress)>> {
         let order_field = match order.sort_by() {
             OrderField::Created => "created",
             OrderField::Modified => "modified",
@@ -292,7 +294,7 @@ impl Searcher<'_> {
                     }))
                 }
                 None => {
-                    let topdocs_collector = TopDocs::with_limit(extra_result);
+                    let topdocs_collector = TopDocs::with_limit(extra_result).order_by_score();
                     let collector = &(Count, topdocs_collector);
                     let (total, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchBm25Response {
@@ -332,7 +334,7 @@ impl Searcher<'_> {
                     }))
                 }
                 None => {
-                    let topdocs_collector = TopDocs::with_limit(extra_result);
+                    let topdocs_collector = TopDocs::with_limit(extra_result).order_by_score();
                     let collector = &(Count, facet_collector, topdocs_collector);
                     let (total, facets_count, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchBm25Response {
