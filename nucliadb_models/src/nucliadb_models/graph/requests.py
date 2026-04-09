@@ -159,7 +159,7 @@ class BaseGraphSearchRequest(BaseModel):
     security: RequestSecurity | None = Field(
         default=None,
         title="Security",
-        description="Security metadata for the request. If not provided, the search request is done without the security lookup phase.",
+        description="Security metadata for the request. Please refer to the documentation for more details on how security works: https://docs.rag.progress.cloud/docs/management/how-to/restrict-access",
     )
     show_hidden: bool = Field(
         default=False,
