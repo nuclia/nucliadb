@@ -8,7 +8,7 @@ license = "AGPL-3.0-or-later"
 tempfile = "3"
 itertools = "0.14"
 
-tantivy = "0.24"
+tantivy = "0.26"
 nidx_types = { version = "0.1.0", path = "../nidx_types" }
 nidx_protos = { version = "0.1.0", path = "../nidx_protos" }
 nidx_tantivy = { version = "0.1.0", path = "../nidx_tantivy" }
