@@ -19,6 +19,7 @@
 //
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::str::FromStr;
 use std::time::*;
 
 use crate::schema::{datetime_utc_to_timestamp, decode_field_id, encode_field_id_bytes};
@@ -479,7 +480,7 @@ impl TextReaderService {
                 Box::new(TermQuery::new(
                     Term::from_field_bytes(
                         self.schema.encoded_field_id_bytes,
-                        &encode_field_id_bytes(uid.rid, &format!("/{}/{}", uid.field_type, uid.field_name)),
+                        &encode_field_id_bytes(uid.rid, &format!("{}/{}", uid.field_type, uid.field_name)),
                     ),
                     IndexRecordOption::Basic,
                 )) as Box<dyn Query>
@@ -495,14 +496,16 @@ impl TextReaderService {
             let doc = searcher.doc::<TantivyDocument>(doc_id)?;
             let doc_value = doc.get_first(self.schema.text);
 
-            let rid = Uuid::from_bytes(
-                *doc.get_first(self.schema.uuid)
-                    .expect("document doesn't appear to have uuid.")
-                    .as_bytes()
-                    .unwrap()
-                    .as_array::<16>()
-                    .unwrap(),
-            );
+            let rid = Uuid::from_str(
+                str::from_utf8(
+                    doc.get_first(self.schema.uuid)
+                        .expect("document doesn't appear to have uuid.")
+                        .as_bytes()
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
             let field = decode_facet(
                 doc.get_first(self.schema.field)
                     .expect("document doesn't appear to have field.")
@@ -510,11 +513,11 @@ impl TextReaderService {
                     .unwrap(),
             )
             .to_path_string();
-            let parts: Vec<_> = field.split('/').collect();
+            let parts: Vec<_> = field.split('/').collect(); // e.g. /a/title
             let field_uid = FieldUid {
                 rid,
-                field_type: parts[0].to_string(),
-                field_name: parts[1].to_string(),
+                field_type: parts[1].to_string(),
+                field_name: parts[2].to_string(),
             };
 
             let text = doc_value.map(|value| String::from(value.as_str().unwrap()));
