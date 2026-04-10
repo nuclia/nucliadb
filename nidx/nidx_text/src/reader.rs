@@ -487,7 +487,7 @@ impl TextReaderService {
             })
             .collect();
         let query: Box<dyn Query> = Box::new(BooleanQuery::union(subqueries));
-        let collector = TopDocs::with_limit(limit);
+        let collector = TopDocs::with_limit(limit).order_by_score();
         let searcher = self.reader.searcher();
 
         let mut texts = HashMap::new();
