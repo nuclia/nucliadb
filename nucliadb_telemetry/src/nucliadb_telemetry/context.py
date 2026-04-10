@@ -66,7 +66,7 @@ def set_info_on_span(
         (str | bool | int | float | Sequence[str] | Sequence[bool] | Sequence[int] | Sequence[float]),
     ],
 ):
-    if telemetry_settings.jaeger_enabled:
+    if telemetry_settings.tracing_enabled():
         span = get_current_span()
         if span is not INVALID_SPAN:
             span.set_attributes(headers)
