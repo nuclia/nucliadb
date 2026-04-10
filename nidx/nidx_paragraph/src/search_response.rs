@@ -100,7 +100,7 @@ pub struct SearchIntResponse<'a> {
     pub query: &'a str,
     pub facets_count: Option<FacetCounts>,
     pub facets: &'a [Facet],
-    pub top_docs: Vec<(DateTime, DocAddress)>,
+    pub top_docs: Vec<(Option<DateTime>, DocAddress)>,
     pub results_per_page: i32,
     pub termc: TermCollector,
     pub searcher: tantivy::Searcher,
@@ -179,7 +179,7 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
                         .unwrap()
                         .to_string();
 
-                    let sort_value = Some(SortValue::Date(datetime_utc_to_timestamp(&score)));
+                    let sort_value = score.as_ref().map(|s| SortValue::Date(datetime_utc_to_timestamp(s)));
 
                     let index = doc.get_first(schema.index).unwrap().as_u64().unwrap();
                     let mut terms: Vec<_> = response.termc.get_fterms(doc_address.doc_id).into_iter().collect();
