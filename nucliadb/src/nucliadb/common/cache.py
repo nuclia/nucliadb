@@ -153,7 +153,7 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
                                 rid=field_id.rid,
                                 field_type=field_id.type,
                                 field_name=field_id.key,
-                                split=field_id.subfield_id,
+                                # split=field_id.subfield_id,
                             )
                         ],
                     )

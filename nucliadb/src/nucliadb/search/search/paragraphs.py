@@ -104,7 +104,7 @@ async def get_paragraph_from_full_text(
                         rid=rid,
                         field_type=field.field_id.type,
                         field_name=field.field_id.key,
-                        split=field.field_id.subfield_id,
+                        # split=field.field_id.subfield_id,
                         paragraph_start=start,
                         paragraph_end=end,
                     )
