@@ -24,6 +24,7 @@ from typing import Any
 import mrflagly
 import pydantic_settings
 from flipt_client import FliptClient  # type: ignore[import-untyped]
+from flipt_client.errors import EvaluationError  # type: ignore[import-untyped]
 from flipt_client.models import (  # type: ignore[import-untyped]
     ClientOptions,
     ClientTokenAuthentication,
@@ -102,12 +103,16 @@ class FlagService:
 
         enabled = False
         if self.flipt_enabled:
-            evaluation = self.client.evaluate_boolean(
-                flag_key=flag_key,
-                entity_id=self.entity_id,
-                context=context,
-            )
-            print(f"[flipt:debug] Flipt evaluation for {context} was {evaluation}")
+            try:
+                evaluation = self.client.evaluate_boolean(
+                    flag_key=flag_key,
+                    entity_id=self.entity_id,
+                    context=context,
+                )
+            except EvaluationError as exc:
+                logger.exception("Flipt FF evaluation failed", exc_info=exc)
+
+            logger.info(f"Flipt evaluation of {flag_key} for {context} was {evaluation}")
             enabled = evaluation.enabled
 
         return enabled or self.flag_service.enabled(flag_key, default=default, context=context)
