@@ -7,12 +7,14 @@ on:
     paths:
       - "nidx/**"
       - "nucliadb_protos/**"
+      - .github/workflows/nidx_binding_release.yml
   push:
     branches:
       - main
     paths:
       - "nidx/**"
       - "nucliadb_protos/**"
+      - .github/workflows/nidx_binding_release.yml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -67,7 +69,7 @@ jobs:
           before-script-linux: scripts/install-protoc.sh
           target: ${{ matrix.target }}
           manylinux: 2_34
-          args: -m nidx/nidx_binding/Cargo.toml --release --out dist
+          args: -m nidx/nidx_binding/Cargo.toml --release --out dist -i python3.10
 
       - run: ${{ matrix.ls || 'ls -lh' }} dist/
 
