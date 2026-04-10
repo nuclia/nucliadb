@@ -26,6 +26,11 @@ pub fn normalize_vector(vector: &[f32]) -> Vec<f32> {
     vector.iter().map(|x| *x / magnitude).collect()
 }
 
+/// Returns a wincode configuration matching `bincode::config::standard()` (bincode 2.x)
+pub(crate) fn wincode_config() -> impl wincode::config::Config + Copy {
+    wincode::config::Configuration::default().with_varint_encoding()
+}
+
 /// Represents a field id as encoded in the indexes:
 ///   Resource ID (UUID): encoded in binary
 ///   Field type (string): e.g: t, a
@@ -51,18 +56,28 @@ impl<'a> Hash for FieldKey<'a> {
     }
 }
 
-impl<'a> bincode::Encode for FieldKey<'a> {
-    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
-        self.bytes().encode(encoder)
+unsafe impl<'a, C: wincode::config::Config> wincode::SchemaWrite<C> for FieldKey<'a> {
+    type Src = FieldKey<'a>;
+
+    fn size_of(src: &Self::Src) -> wincode::error::WriteResult<usize> {
+        <[u8] as wincode::SchemaWrite<C>>::size_of(src.bytes())
+    }
+
+    fn write(writer: impl wincode::io::Writer, src: &Self::Src) -> wincode::error::WriteResult<()> {
+        <[u8] as wincode::SchemaWrite<C>>::write(writer, src.bytes())
     }
 }
 
-impl<'a, 'de: 'a, Context> bincode::BorrowDecode<'de, Context> for FieldKey<'a> {
-    fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = Context>>(
-        decoder: &mut D,
-    ) -> Result<Self, bincode::error::DecodeError> {
-        let bytes = <&[u8]>::borrow_decode(decoder)?;
-        Ok(Self::Borrowed(bytes))
+unsafe impl<'de, C: wincode::config::Config> wincode::SchemaRead<'de, C> for FieldKey<'de> {
+    type Dst = FieldKey<'de>;
+
+    fn read(
+        reader: impl wincode::io::Reader<'de>,
+        dst: &mut std::mem::MaybeUninit<Self::Dst>,
+    ) -> wincode::error::ReadResult<()> {
+        let bytes = <&[u8] as wincode::SchemaRead<'de, C>>::get(reader)?;
+        dst.write(FieldKey::Borrowed(bytes));
+        Ok(())
     }
 }
 
