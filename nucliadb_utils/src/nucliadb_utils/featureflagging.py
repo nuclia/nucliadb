@@ -31,7 +31,7 @@ from flipt_client.models import (  # type: ignore[import-untyped]
 )
 from pydantic import Field
 
-from nucliadb_utils import const
+from nucliadb_utils import const, logger
 from nucliadb_utils.settings import nuclia_settings, running_settings
 
 
@@ -78,9 +78,11 @@ class FlagService:
 
         # We are transitioning from mr. flaggly to Flipt. Meanwhile, we'll have
         # both clients and check both places
-        self.flipt_enabled = settings.flipt_token is not None
-        print("FLIPT ENABLED", self.flipt_enabled)
-        if settings.flipt_token:
+        self.flipt_enabled = (settings.flipt_server_url is not None) and (
+            settings.flipt_token is not None
+        )
+        logger.info(f"Flipt enabled? {self.flipt_enabled}")
+        if self.flipt_enabled:
             self.client: FliptClient = FliptClient(
                 opts=ClientOptions(
                     url=settings.flipt_server_url,
