@@ -101,7 +101,7 @@ class FlagService:
         enabled = False
         if self.flipt_enabled:
             evaluation = self.client.evaluate_boolean(
-                flag_key="nidx-as-extracted-text-storage",
+                flag_key=flag_key,
                 entity_id=self.entity_id,
                 context=context,
             )
