@@ -347,6 +347,10 @@ impl IndexConfig {
         Self::Text(TextConfig::default())
     }
 
+    pub fn new_text_with(version: u64) -> Self {
+        Self::Text(TextConfig { version })
+    }
+
     pub fn new_paragraph() -> Self {
         Self::Paragraph(())
     }

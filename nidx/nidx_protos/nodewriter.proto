@@ -62,6 +62,12 @@ message NewShardRequest {
     bool prewarm_enabled = 7;
     map<string, VectorIndexConfig> relation_node_vectorsets_configs = 8;
     map<string, VectorIndexConfig> relation_edge_vectorsets_configs = 9;
+
+    // list of feature flags we want to enable for the shard being created. We
+    // use this as a way to FF nidx shards without introducing a FF library
+    // there. If at some point we integrate a better FF solution in nidx, this
+    // should be replaced.
+    repeated string features = 10;
 }
 
 message NewVectorSetRequest {

@@ -122,7 +122,8 @@ impl NidxApi for ApiServer {
             ));
         }
 
-        let shard = shards::create_shard(&self.meta, kbid, vector_configs).await?;
+        let features = request.features.iter().map(|x| x.as_str()).collect();
+        let shard = shards::create_shard(&self.meta, kbid, vector_configs, features).await?;
 
         Ok(Response::new(ShardCreated {
             id: shard.id.to_string(),

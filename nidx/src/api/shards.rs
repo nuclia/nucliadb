@@ -18,7 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use nidx_vector::config::VectorConfig;
 use uuid::Uuid;
@@ -31,14 +31,20 @@ pub async fn create_shard(
     meta: &NidxMetadata,
     kbid: Uuid,
     vector_configs: Vec<(String, VectorConfig)>,
+    features: HashSet<&str>,
 ) -> NidxResult<Shard> {
     if vector_configs.is_empty() {
         return Err(NidxError::invalid("Can't create shard without a vector index"));
     }
 
+    let text_version = if features.contains("nidx-as-extracted-text-storage") {
+        5
+    } else {
+        4
+    };
     let mut tx = meta.transaction().await?;
     let shard = Shard::create(&mut *tx, kbid).await?;
-    Index::create(&mut *tx, shard.id, "text", IndexConfig::new_text()).await?;
+    Index::create(&mut *tx, shard.id, "text", IndexConfig::new_text_with(text_version)).await?;
     Index::create(&mut *tx, shard.id, "paragraph", IndexConfig::new_paragraph()).await?;
     Index::create(&mut *tx, shard.id, "relation", IndexConfig::new_relation()).await?;
     for (vectorset_id, config) in vector_configs.into_iter() {
