@@ -27,7 +27,7 @@ from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME
-from nucliadb.search.predict import start_predict_engine
+from nucliadb.search.predict import start_predict_engine, stop_predict_engine
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
 from nucliadb_utils.utilities import (
     Utility,
@@ -58,11 +58,8 @@ async def lifespan(app: FastAPI):
     await stop_ingest()
     if get_utility(Utility.PARTITION):
         clean_utility(Utility.PARTITION)
-    predict = get_utility(Utility.PREDICT)
-    if predict:
-        await predict.finalize()
-        clean_utility(Utility.PREDICT)
 
+    await stop_predict_engine()
     await stop_nidx_utility()
 
     await finalize_utilities()

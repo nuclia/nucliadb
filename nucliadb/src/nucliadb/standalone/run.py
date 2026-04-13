@@ -85,7 +85,7 @@ def run():
     settings = setup()
     run_migrations()
     app, server = get_server(settings)
-    instrument_app(app, excluded_urls=["/"], metrics=True)
+    instrument_app(app, excluded_urls=["/", "/health/alive", "/health/ready"], metrics=True)
 
     if settings.fork:  # pragma: no cover
         pid = os.fork()

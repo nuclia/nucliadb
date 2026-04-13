@@ -22,4 +22,7 @@ from nucliadb_utils.utilities import Utility, get_utility
 
 
 def get_predict() -> PredictEngine:
-    return get_utility(Utility.PREDICT)  # type: ignore
+    existing = get_utility(Utility.PREDICT)
+    if existing is None:
+        raise ValueError("Predict engine is not initialized")
+    return existing
