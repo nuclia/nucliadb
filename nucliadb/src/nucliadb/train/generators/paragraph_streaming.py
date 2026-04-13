@@ -63,7 +63,7 @@ async def generate_paragraph_streaming_payloads(
 
         orm_resource = await get_resource_from_cache_or_db(kbid, rid)
         if orm_resource is None:
-            logger.error(f"{rid} does not exist on DB")
+            logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
             continue
 
         field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
@@ -72,7 +72,10 @@ async def generate_paragraph_streaming_payloads(
         extracted_text = await field_obj.get_extracted_text()
         field_metadata = await field_obj.get_field_metadata()
         if field_metadata is None:
-            logger.error(f"{field_id} does not have field metadata on DB")
+            logger.warning(
+                "Field metadata not found on DB",
+                extra={"kbid": kbid, "rid": rid, "field": field, "field_type": field_type},
+            )
             continue
 
         for paragraph in field_metadata.metadata.paragraphs:

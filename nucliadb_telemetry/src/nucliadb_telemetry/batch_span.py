@@ -169,7 +169,7 @@ class BatchSpanProcessor(SpanProcessor):
             try:
                 await asyncio.wait_for(self._export(flush_request), timeout)
             except asyncio.TimeoutError:
-                logger.exception("Took to much time to export, network problem ahead")
+                logger.warning("Took to much time to export, network problem ahead")
             end = time.perf_counter_ns()
             duration = (end - start) / 1e9
             timeout = self.schedule_delay_millis / 1e3 - duration

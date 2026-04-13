@@ -109,6 +109,12 @@ class BackPressureMaterializer:
             try:
                 with back_pressure_observer({"type": "get_processing_pending"}):
                     pending = await self._get_processing_pending(kbid)
+            except TimeoutError:  # pragma: no cover
+                logger.warning(
+                    "Timeout getting pending messages to process. Back pressure on proccessing for KB can't be applied.",
+                    extra={"kbid": kbid},
+                )
+                return 0
             except Exception:  # pragma: no cover
                 # Do not cache if there was an error
                 logger.exception(
