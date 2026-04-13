@@ -111,8 +111,9 @@ class FlagService:
                 )
             except EvaluationError as exc:
                 logger.exception("Flipt FF evaluation failed", exc_info=exc)
-
-            logger.info(f"Flipt evaluation of {flag_key} for {context} was {evaluation}")
-            enabled = evaluation.enabled
+                enabled = False
+            else:
+                logger.info(f"Flipt evaluation of {flag_key} for {context} was {evaluation}")
+                enabled = evaluation.enabled
 
         return enabled or self.flag_service.enabled(flag_key, default=default, context=context)
