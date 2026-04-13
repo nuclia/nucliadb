@@ -58,7 +58,9 @@ async def lifespan(app: FastAPI):
     await stop_ingest()
     if get_utility(Utility.PARTITION):
         clean_utility(Utility.PARTITION)
-    if get_utility(Utility.PREDICT):
+    predict = get_utility(Utility.PREDICT)
+    if predict:
+        await predict.finalize()
         clean_utility(Utility.PREDICT)
 
     await stop_nidx_utility()

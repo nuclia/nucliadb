@@ -62,7 +62,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
-from nucliadb_utils.utilities import Utility, set_utility
+from nucliadb_utils.utilities import Utility, get_utility, set_utility
 
 
 class SendToPredictError(Exception):
@@ -148,6 +148,10 @@ class RephraseResponse:
 
 
 async def start_predict_engine():
+    existing = get_utility(Utility.PREDICT)
+    if existing is not None:
+        return
+
     if nuclia_settings.dummy_predict:
         predict_util = DummyPredictEngine()
     else:
