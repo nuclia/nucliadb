@@ -97,7 +97,7 @@ async def get_labels_resource(result: DocumentResult, kbid: str) -> list[str]:
     orm_resource = await cache.get_resource(kbid, result.uuid)
 
     if orm_resource is None:
-        logger.error(f"{result.uuid} does not exist on DB")
+        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": result.uuid})
         return []
 
     labels: list[str] = []
@@ -113,7 +113,7 @@ async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> list[str]:
     orm_resource = await cache.get_resource(kbid, result.uuid)
 
     if orm_resource is None:
-        logger.error(f"{result.uuid} does not exist on DB")
+        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": result.uuid})
         return []
 
     labels: list[str] = []
@@ -147,7 +147,7 @@ async def get_seconds_paragraph(
     orm_resource = await cache.get_resource(kbid, result.uuid)
 
     if orm_resource is None:
-        logger.error(f"{result.uuid} does not exist on DB")
+        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": result.uuid})
         return None
 
     paragraph = await get_paragraph_from_resource(orm_resource=orm_resource, result=result)

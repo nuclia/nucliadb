@@ -146,7 +146,7 @@ async def get_text_sentence(
     orm_resource = await cache.get_resource(kbid, rid)
 
     if orm_resource is None:
-        logger.warning(f"{rid} does not exist on DB")
+        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return ""
 
     field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
