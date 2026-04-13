@@ -93,7 +93,7 @@ data:
 {{- end }}
 
 {{- if .Values.flipt_server_url }}
-  FLIPT_URL: "{{ .Values.flipt_server_url }}"
+  FLIPT_SERVER_URL: "{{ .Values.flipt_server_url }}"
 {{- end }}
 
 {{- if .Values.flag_settings_url }}
