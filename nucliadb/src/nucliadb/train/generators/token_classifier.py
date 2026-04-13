@@ -93,7 +93,7 @@ async def get_field_text(
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
-        logger.error(f"{rid} does not exist on DB")
+        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return {}, {}, {}
 
     field_type_int = FIELD_TYPE_STR_TO_PB[field_type]

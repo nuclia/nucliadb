@@ -16,7 +16,7 @@
 import asyncio
 import math
 import socket
-from asyncio import Future
+from asyncio import CancelledError, Future
 from functools import partial
 
 from opentelemetry.exporter.jaeger.thrift import JaegerExporter
@@ -163,6 +163,8 @@ class AgentClientUDPAsync:
         loop.add_writer(self._sock.fileno(), send_to)
         try:
             await on_con_lost
+        except CancelledError:
+            logger.warning("Emission to Jaeger was cancelled")
         except Exception:
             logger.exception("Exception on sending to jaeger", stack_info=True)
         finally:
