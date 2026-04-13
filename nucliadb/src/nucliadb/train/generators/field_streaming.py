@@ -196,7 +196,7 @@ async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> Ex
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
-        logger.error("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
+        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return None
 
     field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
@@ -212,7 +212,7 @@ async def get_field_metadata(
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
-        logger.error("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
+        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return None
 
     field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
@@ -226,7 +226,7 @@ async def get_field_basic(kbid: str, rid: str, field: str, field_type: str) -> B
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
-        logger.error("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
+        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return None
 
     basic = await orm_resource.get_basic()
