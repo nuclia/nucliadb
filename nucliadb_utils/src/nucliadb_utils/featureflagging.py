@@ -103,17 +103,17 @@ class FlagService:
 
         enabled = False
         if self.flipt_enabled:
-            try:
-                evaluation = self.client.evaluate_boolean(
-                    flag_key=flag_key,
-                    entity_id=self.entity_id,
-                    context=context,
-                )
-            except EvaluationError as exc:
-                logger.exception("Flipt FF evaluation failed", exc_info=exc)
-                enabled = False
-            else:
-                logger.info(f"Flipt evaluation of {flag_key} for {context} was {evaluation}")
-                enabled = evaluation.enabled
+            if flag_key in const._FliptFeatures:
+                try:
+                    evaluation = self.client.evaluate_boolean(
+                        flag_key=flag_key,
+                        entity_id=self.entity_id,
+                        context=context,
+                    )
+                except EvaluationError as exc:
+                    logger.exception("Flipt FF evaluation failed", exc_info=exc)
+                else:
+                    logger.info(f"Flipt evaluation of {flag_key} for {context} was {evaluation}")
+                    enabled = evaluation.enabled
 
         return enabled or self.flag_service.enabled(flag_key, default=default, context=context)

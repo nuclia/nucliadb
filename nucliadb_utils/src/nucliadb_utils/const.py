@@ -45,3 +45,6 @@ class Features:
     AUDIT_RETRIEVE_AND_AUGMENT = "nucliadb_audit_retrieve_and_augment"
     # Flipt features
     NIDX_AS_EXTRACTED_TEXT_STORAGE = "nidx-as-extracted-text-storage"
+
+
+_FliptFeatures = set([Features.NIDX_AS_EXTRACTED_TEXT_STORAGE])
