@@ -81,7 +81,7 @@ pub struct FieldUid {
     pub rid: Uuid,
     pub field_type: String,
     pub field_name: String,
-    // TODO: split
+    pub split: Option<String>,
 }
 
 // Unique id for a field, equivalent to {rid}/{field_type}/{field_id}[/{split}]/{paragraph_start}-{paragraph_end}
@@ -90,7 +90,7 @@ pub struct ParagraphUid {
     pub rid: Uuid,
     pub field_type: String,
     pub field_name: String,
-    // TODO: split
+    pub split: Option<String>,
     pub paragraph_start: u32,
     pub paragraph_end: u32,
 }
@@ -283,16 +283,23 @@ impl From<ParagraphUid> for FieldUid {
             rid: value.rid,
             field_type: value.field_type,
             field_name: value.field_name,
-            // TODO: split
+            split: value.split,
         }
     }
 }
 
 impl Display for ParagraphUid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!(
-            "{}/{}/{}/{}-{}",
-            self.rid, self.field_type, self.field_name, self.paragraph_start, self.paragraph_end
-        ))
+        if let Some(ref split) = self.split {
+            f.write_fmt(format_args!(
+                "{}/{}/{}/{}/{}-{}",
+                self.rid, self.field_type, self.field_name, split, self.paragraph_start, self.paragraph_end
+            ))
+        } else {
+            f.write_fmt(format_args!(
+                "{}/{}/{}/{}-{}",
+                self.rid, self.field_type, self.field_name, self.paragraph_start, self.paragraph_end
+            ))
+        }
     }
 }

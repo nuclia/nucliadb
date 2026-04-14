@@ -518,6 +518,7 @@ impl TextReaderService {
                 rid,
                 field_type: parts[1].to_string(),
                 field_name: parts[2].to_string(),
+                split: parts.get(3).map(|x| x.to_string()),
             };
 
             let text = doc_value.map(|value| String::from(value.as_str().unwrap()));

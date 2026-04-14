@@ -59,6 +59,7 @@ pub async fn extracted_texts(
                 rid: Uuid::parse_str(&id.rid).map_err(NidxError::InvalidUuid)?,
                 field_type: id.field_type,
                 field_name: id.field_name,
+                split: id.split,
             });
         }
         let fields_text = searcher.get_fields_text(field_ids)?;
@@ -74,6 +75,7 @@ pub async fn extracted_texts(
                 rid: Uuid::parse_str(&id.rid).map_err(NidxError::InvalidUuid)?,
                 field_type: id.field_type,
                 field_name: id.field_name,
+                split: id.split,
                 paragraph_start: id.paragraph_start,
                 paragraph_end: id.paragraph_end,
             });
