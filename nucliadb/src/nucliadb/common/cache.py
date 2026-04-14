@@ -20,7 +20,6 @@
 
 import contextlib
 import logging
-import time
 from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -121,7 +120,6 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
         @alru_cache(maxsize=cache_size)
         @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
         async def _get_extracted_text(kbid: str, field_id: FieldId) -> ExtractedText | None:
-            _start_time = time.monotonic()
             if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": kbid}):
                 async with datamanagers.with_ro_transaction() as txn:
                     kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
@@ -159,10 +157,6 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
                     )
                 )
                 text = extracted_texts.fields.get(field_id.full_without_subfield(), "")
-
-                logger.info(
-                    f"et-cache Using nidx as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}",
-                )
                 return ExtractedText(text=text)
 
             else:
@@ -171,11 +165,7 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
                     sf = storage.file_extracted(
                         kbid, field_id.rid, field_id.type, field_id.key, FieldTypes.FIELD_TEXT.value
                     )
-                    pb = await storage.download_pb(sf, ExtractedText)
-                    logger.info(
-                        f"et-cache Using blob as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}",
-                    )
-                    return pb
+                    return await storage.download_pb(sf, ExtractedText)
                 except Exception:
                     logger.warning(
                         "Error getting extracted text for field. Retrying",

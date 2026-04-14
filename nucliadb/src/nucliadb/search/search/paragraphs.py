@@ -20,7 +20,6 @@
 import logging
 import re
 import string
-import time
 
 from nidx_protos.nidx_pb2 import ExtractedTextsRequest
 
@@ -72,7 +71,6 @@ async def get_paragraph_from_full_text(
 
     This requires downloading the full text and then slicing it.
     """
-    _start_time = time.monotonic()
     if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}):
         kbid = field.kbid
         rid = field.uuid
@@ -112,10 +110,6 @@ async def get_paragraph_from_full_text(
             )
         )
         text = extracted_texts.paragraphs.get(field.field_id.paragraph_id(start, end).full(), "")
-
-        logger.info(
-            f"get_paragraph_from_full_text Using nidx as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}ms",
-        )
         return text
     else:
         extracted_text = await cache.get_field_extracted_text(field)
@@ -132,14 +126,8 @@ async def get_paragraph_from_full_text(
 
         if split not in (None, ""):
             text = extracted_text.split_text[split]  # type: ignore
-            logger.info(
-                f"get_paragraph_from_full_text Using blob as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}",
-            )
             return text[start:end]
         else:
-            logger.info(
-                f"get_paragraph_from_full_text Using blob as extracted text storage took {(time.monotonic() - _start_time) * 1000:.1f}",
-            )
             return extracted_text.text[start:end]
 
 
