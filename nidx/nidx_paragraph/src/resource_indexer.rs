@@ -30,7 +30,9 @@ use tantivy::doc;
 use tantivy::schema::Facet;
 
 lazy_static::lazy_static! {
-    static ref REGEX: Regex = Regex::new(r"\\[a-zA-Z0-9]").unwrap();
+    // matches escape chars explicitly written in the text with 2 characters,
+    // e.g., \n as a \ and an n
+    static ref EXPLICIT_ESCAPE_CHAR: Regex = Regex::new(r"\\[a-zA-Z0-9]").unwrap();
 }
 
 pub fn index_paragraphs(
@@ -65,7 +67,19 @@ pub fn index_paragraphs(
         .map_err(|e| tantivy::TantivyError::InvalidArgument(e.to_string()))?;
 
     for (field, text_info) in &resource.texts {
-        let chars: Vec<char> = REGEX.replace_all(&text_info.text, " ").chars().collect();
+        // Some texts, usually about programming, can use control characters
+        // explicitly written with 2 characters. As those are not considered
+        // blanks by tantivy (nor anyone), we find and replace them in order to
+        // this regex allows to find them and remove them.
+        //
+        // For example, the text: `printf("hello\nworld")` will be splitted
+        // properly in 3 words (printf, hello and world).
+        //
+        // Note how we are replacing 2 chars for 2 whitespace
+        let chars: Vec<char> = EXPLICIT_ESCAPE_CHAR
+            .replace_all(&text_info.text, "  ")
+            .chars()
+            .collect();
         let field_labels = text_info
             .labels
             .iter()
