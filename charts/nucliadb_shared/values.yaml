@@ -98,6 +98,7 @@ telemetry:
   enabled: True
 
 flag_settings_url: null
+flipt_server_url: null
 
 encryption:
   secret_key: XX

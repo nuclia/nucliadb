@@ -62,7 +62,7 @@ pub fn datetime_utc_to_timestamp(tantivy: &DateTime) -> nidx_protos::prost_types
 }
 
 impl TextSchema {
-    pub fn new(_version: u64) -> Self {
+    pub fn new(version: u64) -> Self {
         let mut sb = Schema::builder();
         let num_options: NumericOptions = NumericOptions::default().set_indexed().set_fast();
 
@@ -73,7 +73,11 @@ impl TextSchema {
         let uuid = sb.add_bytes_field("uuid", STORED | FAST | INDEXED);
         let field = sb.add_facet_field("field", facet_options.clone());
 
-        let text = sb.add_text_field("text", TEXT);
+        let text = if version <= 4 {
+            sb.add_text_field("text", TEXT)
+        } else {
+            sb.add_text_field("text", TEXT | STORED)
+        };
 
         // Date fields needs to be searched in order, order_by_u64_field seems to work in TopDocs.
         let created = sb.add_date_field("created", date_options.clone());

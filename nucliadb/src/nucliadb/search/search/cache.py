@@ -75,7 +75,7 @@ async def get_field_extracted_text(field: Field) -> ExtractedText | None:
         logger.warning("Extracted text cache not set")
         return await field.get_extracted_text()
 
-    extracted_text = await cache.get(field.kbid, FieldId(field.uuid, field.type, field.id))
+    extracted_text = await cache.get(field.kbid, field.field_id)
     field.extracted_text = extracted_text
     return extracted_text
 

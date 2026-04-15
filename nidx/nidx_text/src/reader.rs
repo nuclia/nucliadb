@@ -19,11 +19,12 @@
 //
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::str::FromStr;
 use std::time::*;
 
-use crate::schema::{datetime_utc_to_timestamp, decode_field_id};
+use crate::schema::{datetime_utc_to_timestamp, decode_field_id, encode_field_id_bytes};
 use crate::search_query::filter_to_query;
-use crate::{DocumentSearchRequest, prefilter::*};
+use crate::{DocumentSearchRequest, FieldUid, prefilter::*};
 
 use super::schema::TextSchema;
 use super::search_query;
@@ -38,11 +39,12 @@ use nidx_tantivy::utils::decode_facet;
 use nidx_types::prefilter::{FieldId, PrefilterResult};
 use tantivy::collector::{Collector, Count, FacetCollector, FacetCounts, SegmentCollector, TopDocs};
 use tantivy::columnar::Column;
-use tantivy::query::{AllQuery, BooleanQuery, Query, QueryParser};
+use tantivy::query::{AllQuery, BooleanQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::Value;
 use tantivy::{DateTime, DocAddress, Index, IndexReader, Searcher};
 use tantivy::{Order, schema::*};
 use tracing::*;
+use uuid::Uuid;
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
     facets_count
@@ -465,6 +467,65 @@ impl TextReaderService {
 
     fn is_valid_facet(maybe_facet: &str) -> bool {
         Facet::from_text(maybe_facet).is_ok()
+    }
+
+    pub fn get_fields_text(&self, field_uids: Vec<FieldUid>) -> anyhow::Result<HashMap<FieldUid, Option<String>>> {
+        let limit = field_uids.len();
+
+        // due to implementation details, we use here a BooleanQuery as it's
+        // around 2 orders of magnitude faster than a TermSetQuery
+        let subqueries: Vec<Box<dyn Query>> = field_uids
+            .into_iter()
+            .map(|uid| {
+                Box::new(TermQuery::new(
+                    Term::from_field_bytes(
+                        self.schema.encoded_field_id_bytes,
+                        &encode_field_id_bytes(uid.rid, &format!("{}/{}", uid.field_type, uid.field_name)),
+                    ),
+                    IndexRecordOption::Basic,
+                )) as Box<dyn Query>
+            })
+            .collect();
+        let query: Box<dyn Query> = Box::new(BooleanQuery::union(subqueries));
+        let collector = TopDocs::with_limit(limit).order_by_score();
+        let searcher = self.reader.searcher();
+
+        let mut texts = HashMap::new();
+        let results = searcher.search(&query, &collector)?;
+        for (_score, doc_id) in results {
+            let doc = searcher.doc::<TantivyDocument>(doc_id)?;
+            let doc_value = doc.get_first(self.schema.text);
+
+            let rid = Uuid::from_str(
+                str::from_utf8(
+                    doc.get_first(self.schema.uuid)
+                        .expect("document doesn't appear to have uuid.")
+                        .as_bytes()
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            let field = decode_facet(
+                doc.get_first(self.schema.field)
+                    .expect("document doesn't appear to have field.")
+                    .as_facet()
+                    .unwrap(),
+            )
+            .to_path_string();
+            let parts: Vec<_> = field.split('/').collect(); // e.g. /a/title
+            let field_uid = FieldUid {
+                rid,
+                field_type: parts[1].to_string(),
+                field_name: parts[2].to_string(),
+                split: parts.get(3).map(|x| x.to_string()),
+            };
+
+            let text = doc_value.map(|value| String::from(value.as_str().unwrap()));
+            texts.insert(field_uid, text);
+        }
+
+        Ok(texts)
     }
 }
 

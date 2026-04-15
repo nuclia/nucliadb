@@ -842,6 +842,19 @@ wheels = [
 ]
 
 [[package]]
+name = "flipt-client"
+version = "1.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4f/6d/8e4a1e2e3e26c1a49a57dfde455abf12f7862e156df28a6d84c9f14ccd13/flipt_client-1.4.1.tar.gz", hash = "sha256:5f0ddfec458b5efb51b1e553e1ff7782449220802a286f11df50f229b5bbccc1", size = 22777757, upload-time = "2025-12-08T13:33:48.958Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e5/5a/154b83fc74311657be786ab854b9650558e025ad0016e2a95a01968c0749/flipt_client-1.4.1-py3-none-any.whl", hash = "sha256:34651b849a8d3dc36ea35ed9b2bb2d599e8a2b6862c415995d84b82a2a7b2e51", size = 22909345, upload-time = "2025-12-08T13:33:46.202Z" },
+]
+
+[[package]]
 name = "frozenlist"
 version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2223,6 +2236,7 @@ version = "6.12.1"
 source = { editable = "nucliadb_utils" }
 dependencies = [
     { name = "aiohttp" },
+    { name = "flipt-client" },
     { name = "httpx" },
     { name = "mmh3" },
     { name = "mrflagly" },
@@ -2277,6 +2291,7 @@ requires-dist = [
     { name = "azure-storage-blob", marker = "extra == 'storages'", specifier = "==12.20.0" },
     { name = "backoff", marker = "extra == 'storages'", specifier = ">=1.11.1" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.95.2" },
+    { name = "flipt-client", specifier = ">=1.4.1" },
     { name = "google-api-python-client", marker = "extra == 'storages'", specifier = ">=2.37.0" },
     { name = "google-auth", marker = "extra == 'storages'", specifier = ">=2.4.1" },
     { name = "httpx", specifier = ">=0.27.0" },
