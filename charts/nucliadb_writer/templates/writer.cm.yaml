@@ -12,7 +12,11 @@ data:
   DM_REDIS_HOST: {{ .Values.config.dm_redis_host }}
   DM_REDIS_PORT: {{ .Values.config.dm_redis_port | quote }}
 {{- if .Values.tracing.enabled }}
-  JAEGER_ENABLED: "True"
+  {{- if .Values.tracing.otlp_collector_endpoint }}
+  OTLP_COLLECTOR_ENDPOINT: {{ .Values.tracing.otlp_collector_endpoint | quote }}
+  {{- else }}
+  JAEGER_ENABLED: "true"
+  {{- end }}
 {{- end }}
   SERVING_PORT: {{ .Values.serving.port | quote }}
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}

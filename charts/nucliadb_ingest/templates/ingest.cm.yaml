@@ -18,4 +18,10 @@ data:
   INDEX_JETSTREAM_SERVERS: {{ toJson .Values.indexing.index_jetstream_servers | quote }}
   INDEX_JETSTREAM_AUTH:  {{ .Values.indexing.index_jetstream_auth }}
   TOTAL_REPLICAS: {{ .Values.replicaCount | quote }}
-  JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
+{{- if .Values.tracing.enabled }}
+  {{- if .Values.tracing.otlp_collector_endpoint }}
+  OTLP_COLLECTOR_ENDPOINT: {{ .Values.tracing.otlp_collector_endpoint | quote }}
+  {{- else }}
+  JAEGER_ENABLED: "true"
+  {{- end }}
+{{- end }}
