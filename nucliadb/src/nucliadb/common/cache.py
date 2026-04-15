@@ -120,7 +120,11 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
         @alru_cache(maxsize=cache_size)
         @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
         async def _get_extracted_text(kbid: str, field_id: FieldId) -> ExtractedText | None:
-            if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": kbid}):
+            # we store all splits unordered inside nidx_text, so nidx can't
+            # support yet conversation fields
+            if field_id.type != "c" and has_feature(
+                const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": kbid}
+            ):
                 async with datamanagers.with_ro_transaction() as txn:
                     kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
                     if kb_shards is None:
@@ -151,12 +155,14 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
                                 rid=field_id.rid,
                                 field_type=field_id.type,
                                 field_name=field_id.key,
-                                # split=field_id.subfield_id,
+                                split=field_id.subfield_id,
                             )
                         ],
                     )
                 )
-                text = extracted_texts.fields.get(field_id.full_without_subfield(), "")
+                text = extracted_texts.fields.get(field_id.full_without_subfield(), None)
+                if text is None:
+                    return None
                 return ExtractedText(text=text)
 
             else:

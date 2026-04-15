@@ -97,6 +97,7 @@ async def stream_audit(nats_server: str, mocker: MockerFixture) -> AsyncIterator
 # Feature flags
 
 
+# Overwrite this fixture to disable this behavior
 @pytest.fixture(scope="function", autouse=True)
 def flipt_features_enabled():
     evaluation = Mock()

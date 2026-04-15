@@ -71,16 +71,22 @@ async def get_paragraph_from_full_text(
 
     This requires downloading the full text and then slicing it.
     """
-    if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}):
+    # we store all splits unordered inside nidx_text, so nidx can't support yet
+    # conversation fields
+    if split is None and has_feature(
+        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}
+    ):
         kbid = field.kbid
-        rid = field.uuid
+        field_id = field.field_id
+        field_id.subfield_id = split
+
         async with datamanagers.with_ro_transaction() as txn:
             kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
             if kb_shards is None:
                 return ""
 
             resource_shard_id = await datamanagers.resources.get_resource_shard_id(
-                txn, kbid=field.kbid, rid=field.uuid
+                txn, kbid=field.kbid, rid=field_id.rid
             )
             if resource_shard_id is None:
                 return ""
@@ -99,17 +105,17 @@ async def get_paragraph_from_full_text(
                 shard_id=nidx_shard_id,
                 paragraph_ids=[
                     ExtractedTextsRequest.ParagraphId(
-                        rid=rid,
-                        field_type=field.field_id.type,
-                        field_name=field.field_id.key,
-                        # split=field.field_id.subfield_id,
+                        rid=field_id.rid,
+                        field_type=field_id.type,
+                        field_name=field_id.key,
+                        split=field_id.subfield_id,
                         paragraph_start=start,
                         paragraph_end=end,
                     )
                 ],
             )
         )
-        text = extracted_texts.paragraphs.get(field.field_id.paragraph_id(start, end).full(), "")
+        text = extracted_texts.paragraphs.get(field_id.paragraph_id(start, end).full(), "")
         return text
     else:
         extracted_text = await cache.get_field_extracted_text(field)
