@@ -22,7 +22,7 @@ rustc-hash = "2.1"
 stream-vbyte = "0.4.1"
 fst = "0.4.7"
 bit-vec = "0.8.0"
-bincode = "2.0.1"
+wincode = { version = "0.5.1", features = ["derive"] }
 rayon = "1.10.0"
 simsimd = "6.5.12"
 

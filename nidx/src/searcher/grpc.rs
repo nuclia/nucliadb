@@ -36,7 +36,7 @@ use crate::searcher::shard_selector::SearcherNode;
 
 use super::shard_selector::ShardSelector;
 use super::streams;
-use super::{index_cache::IndexCache, shard_search, shard_suggest};
+use super::{index_cache::IndexCache, shard_search, shard_suggest, shard_text};
 use tracing::*;
 
 /// When this header is set, we only try to serve the request from the local node
@@ -191,6 +191,22 @@ impl NidxSearcher for SearchServer {
             shard_id,
             LOCAL => shard_search::graph_search(Arc::clone(&self.index_cache), message.clone()).await,
             REMOTE => graph_search
+        }
+    }
+
+    async fn extracted_texts(
+        &self,
+        request: Request<ExtractedTextsRequest>,
+    ) -> Result<Response<ExtractedTextsResponse>> {
+        let message = request.get_ref();
+        let shard_id = uuid::Uuid::parse_str(&message.shard_id).map_err(NidxError::from)?;
+        shard_request! {
+            "extracted_texts",
+            self,
+            request,
+            shard_id,
+            LOCAL => shard_text::extracted_texts(Arc::clone(&self.index_cache), message.clone()).await,
+            REMOTE => extracted_texts
         }
     }
 

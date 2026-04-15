@@ -255,7 +255,7 @@ def get_nidx() -> NidxUtility:
     return nidx
 
 
-def get_nidx_api_client() -> "NidxApiStub":
+def get_nidx_api_client() -> NidxApiStub:
     nidx = get_nidx()
     if nidx.api_client:
         return nidx.api_client
@@ -263,7 +263,7 @@ def get_nidx_api_client() -> "NidxApiStub":
         raise Exception("nidx not initialized")
 
 
-def get_nidx_searcher_client() -> "NidxSearcherStub":
+def get_nidx_searcher_client() -> NidxSearcherStub:
     nidx = get_nidx()
     if nidx.searcher_client:
         return nidx.searcher_client

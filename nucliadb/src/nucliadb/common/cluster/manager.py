@@ -143,6 +143,9 @@ class KBShardManager:
                     nucliadb_index_config_to_nidx(model.vectorset_index_config)
                 )
 
+        if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": kbid}):
+            req.features.append(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE)
+
         shard_uuid = uuid.uuid4().hex
 
         shard = writer_pb2.ShardObject(shard=shard_uuid, read_only=False)

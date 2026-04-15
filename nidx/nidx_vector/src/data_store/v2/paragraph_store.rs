@@ -30,12 +30,13 @@ use crate::{
     data_store::{OpenReason, ParagraphAddr, ParagraphRef},
     data_types::usize_utils::U32_LEN,
     segment::Elem,
+    utils::wincode_config,
 };
 
 const FILENAME_DATA: &str = "paragraphs.bin";
 const FILENAME_POS: &str = "paragraphs.pos";
 
-#[derive(bincode::Encode, bincode::BorrowDecode, Clone)]
+#[derive(wincode::SchemaWrite, wincode::SchemaRead, Clone)]
 pub struct StoredParagraph<'a> {
     key: &'a str,
     labels: Vec<&'a str>,
@@ -101,8 +102,8 @@ impl ParagraphStore {
     pub fn get_paragraph(&self, ParagraphAddr(addr): ParagraphAddr) -> ParagraphRef<'_> {
         let start_bytes = &self.pos[addr as usize * U32_LEN..addr as usize * U32_LEN + U32_LEN];
         let start = u32::from_le_bytes(start_bytes.try_into().unwrap()) as usize;
-        let (paragraph, _) =
-            bincode::borrow_decode_from_slice(&self.data[start..], bincode::config::standard()).unwrap();
+        let paragraph: StoredParagraph<'_> =
+            wincode::config::deserialize(&self.data[start..], wincode_config()).unwrap();
         ParagraphRef::V2(paragraph)
     }
 
@@ -133,7 +134,12 @@ impl ParagraphStoreWriter {
     }
 
     pub fn write(&mut self, paragraph: StoredParagraph) -> VectorR<u32> {
-        let written = bincode::encode_into_std_write(paragraph, &mut self.data, bincode::config::standard())?;
+        let written = wincode::config::serialized_size(&paragraph, wincode_config())?;
+        wincode::config::serialize_into(
+            wincode::io::std_write::WriteAdapter::new(&mut self.data),
+            &paragraph,
+            wincode_config(),
+        )?;
         self.pos.write_all(&self.data_pos.to_le_bytes())?;
         self.data_pos += written as u32;
         self.addr += 1;
@@ -156,7 +162,12 @@ impl ParagraphStoreWriter {
             first_vector,
             num_vectors,
         };
-        let written = bincode::encode_into_std_write(paragraph, &mut self.data, bincode::config::standard())?;
+        let written = wincode::config::serialized_size(&paragraph, wincode_config())?;
+        wincode::config::serialize_into(
+            wincode::io::std_write::WriteAdapter::new(&mut self.data),
+            &paragraph,
+            wincode_config(),
+        )?;
         self.pos.write_all(&self.data_pos.to_le_bytes())?;
         self.data_pos += written as u32;
         self.addr += 1;

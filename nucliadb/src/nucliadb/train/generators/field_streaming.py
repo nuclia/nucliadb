@@ -187,7 +187,7 @@ async def _fetch_field_metadata(kbid: str, fsd: FieldSplitData):
 
 
 async def _fetch_basic(kbid: str, fsd: FieldSplitData):
-    basic = await get_field_basic(kbid, fsd.rid, fsd.field, fsd.field_type)
+    basic = await get_resource_basic(kbid, fsd.rid)
     if basic is not None:
         fsd.basic.CopyFrom(basic)
 
@@ -196,7 +196,7 @@ async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> Ex
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
-        logger.error(f"{rid} does not exist on DB")
+        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return None
 
     field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
@@ -212,7 +212,7 @@ async def get_field_metadata(
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
-        logger.error(f"{rid} does not exist on DB")
+        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return None
 
     field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
@@ -222,11 +222,11 @@ async def get_field_metadata(
     return field_metadata
 
 
-async def get_field_basic(kbid: str, rid: str, field: str, field_type: str) -> Basic | None:
+async def get_resource_basic(kbid: str, rid: str) -> Basic | None:
     orm_resource = await get_resource_from_cache_or_db(kbid, rid)
 
     if orm_resource is None:
-        logger.error(f"{rid} does not exist on DB")
+        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return None
 
     basic = await orm_resource.get_basic()

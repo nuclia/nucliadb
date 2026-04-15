@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashSet;
+
 use nidx_protos::graph_query::{Node, Path};
 use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::relation::RelationType;
@@ -129,7 +131,7 @@ async fn shard_with_resource(pool: sqlx::PgPool) -> anyhow::Result<(NidxFixture,
     ];
 
     // TODO: Skipping the fixture because it cannot create relation node indexes yet
-    let shard = shards::create_shard(&meta, kbid, vector_configs).await?;
+    let shard = shards::create_shard(&meta, kbid, vector_configs, HashSet::new()).await?;
 
     let mut fixture = NidxFixture::new(pool).await?;
 

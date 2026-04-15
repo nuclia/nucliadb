@@ -239,8 +239,8 @@ pub enum VectorErr {
     InvalidConfiguration(&'static str),
     #[error("FST error: {0}")]
     FstError(#[from] fst::Error),
-    #[error("bincode error: {0}")]
-    SerializationError(#[from] bincode::error::EncodeError),
+    #[error("serialization error: {0}")]
+    SerializationError(#[from] wincode::error::WriteError),
 }
 
 pub type VectorR<O> = Result<O, VectorErr>;

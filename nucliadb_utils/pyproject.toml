@@ -31,6 +31,7 @@ dependencies = [
     "PyNaCl",
     "pyjwt>=2.4.0",
     "mrflagly>=0.2.14",
+    "flipt-client>=1.4.1",
 
     # automatically bumped during release"
     "nidx-protos",

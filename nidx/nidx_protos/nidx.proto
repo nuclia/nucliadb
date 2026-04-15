@@ -22,6 +22,8 @@ service NidxSearcher {
   rpc GraphSearch(nodereader.GraphSearchRequest) returns (nodereader.GraphSearchResponse) {}
   rpc Suggest(nodereader.SuggestRequest) returns (nodereader.SuggestResponse) {}
 
+  rpc ExtractedTexts(ExtractedTextsRequest) returns (ExtractedTextsResponse) {}
+
   // Streams
   rpc Paragraphs(nodereader.StreamRequest) returns (stream nodereader.ParagraphItem) {}
   rpc Documents(nodereader.StreamRequest) returns (stream nodereader.DocumentItem) {}
@@ -56,4 +58,37 @@ message ShardConfig {
     // disk data in memory to avoid IO latency, at expenses of RAM usage. Use
     // with care.
     bool prewarm_enabled = 2;
+}
+
+message ExtractedTextsRequest {
+    // equivalent to {rid}/{field_type}/{field_id}[/{split}]
+    message FieldId {
+        string rid = 1;
+        string field_type = 2;
+        string field_name = 3;
+        optional string split = 4;
+    }
+
+    // equivalent to {rid}/{field_type}/{field_id}[/{split}]/{paragraph_start}-{paragraph_end}
+    message ParagraphId {
+        string rid = 1;
+        string field_type = 2;
+        string field_name = 3;
+        optional string split = 4;
+        uint32 paragraph_start = 5;
+        uint32 paragraph_end = 6;
+    }
+
+    string shard_id = 1;
+    repeated FieldId field_ids = 2;
+    repeated ParagraphId paragraph_ids = 3;
+}
+
+message ExtractedTextsResponse {
+    // extracted texts for whole fields (generic, text, file, link)
+    map<string, string> fields = 1;
+    // extracted texts for split fields (conversation messages)
+    map<string, string> splits = 2;
+    // extracted paragraph text
+    map<string, string> paragraphs = 3;
 }

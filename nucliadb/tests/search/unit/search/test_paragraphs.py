@@ -40,6 +40,7 @@ def extracted_text():
 @pytest.fixture()
 def field(extracted_text):
     mock = MagicMock()
+    mock.kbid = "kbid"
     mock.extracted_text = None
     mock.get_extracted_text = AsyncMock(return_value=extracted_text)
     yield mock

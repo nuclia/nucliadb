@@ -26,6 +26,8 @@ mod resource_indexer;
 mod schema;
 mod search_query;
 
+use std::collections::HashMap;
+use std::fmt::Display;
 use std::path::Path;
 
 use nidx_protos::{DocumentItem, DocumentSearchResponse, StreamRequest};
@@ -71,6 +73,26 @@ impl Default for TextConfig {
 // This should always be 1
 fn default_version() -> u64 {
     1
+}
+
+// Unique id for a field, equivalent to {rid}/{field_type}/{field_id}
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct FieldUid {
+    pub rid: Uuid,
+    pub field_type: String,
+    pub field_name: String,
+    pub split: Option<String>,
+}
+
+// Unique id for a field, equivalent to {rid}/{field_type}/{field_id}[/{split}]/{paragraph_start}-{paragraph_end}
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct ParagraphUid {
+    pub rid: Uuid,
+    pub field_type: String,
+    pub field_name: String,
+    pub split: Option<String>,
+    pub paragraph_start: u32,
+    pub paragraph_end: u32,
 }
 
 pub struct TextIndexer;
@@ -194,6 +216,47 @@ impl TextSearcher {
         self.reader.prefilter(request)
     }
 
+    pub fn get_fields_text(&self, field_uids: Vec<FieldUid>) -> anyhow::Result<HashMap<FieldUid, Option<String>>> {
+        self.reader.get_fields_text(field_uids)
+    }
+
+    pub fn get_paragraphs_text(
+        &self,
+        paragraph_uids: Vec<ParagraphUid>,
+    ) -> anyhow::Result<HashMap<ParagraphUid, Option<String>>> {
+        let mut paragraph_fields = HashMap::new();
+        for paragraph_id in paragraph_uids {
+            let field_id = FieldUid::from(paragraph_id.clone());
+            paragraph_fields
+                .entry(field_id)
+                .and_modify(|v: &mut Vec<ParagraphUid>| v.push(paragraph_id.clone()))
+                .or_insert(vec![paragraph_id]);
+        }
+
+        let fields_text = self
+            .reader
+            .get_fields_text(paragraph_fields.keys().cloned().collect())?;
+
+        let mut paragraphs_text = HashMap::new();
+
+        for (field_id, field_text) in fields_text {
+            if let Some(paragraphs) = paragraph_fields.remove(&field_id) {
+                for paragraph_id in paragraphs {
+                    let paragraph_text = field_text.as_ref().map(|field_text| {
+                        field_text
+                            .chars()
+                            .skip(paragraph_id.paragraph_start as usize)
+                            .take((paragraph_id.paragraph_end - paragraph_id.paragraph_start) as usize)
+                            .collect()
+                    });
+                    paragraphs_text.insert(paragraph_id, paragraph_text);
+                }
+            }
+        }
+
+        Ok(paragraphs_text)
+    }
+
     pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = DocumentItem> + use<>> {
         self.reader.iterator(request)
     }
@@ -204,6 +267,39 @@ impl TextSearcher {
             usage.total().get_bytes() as usize
         } else {
             0
+        }
+    }
+}
+
+impl Display for FieldUid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}/{}/{}", self.rid, self.field_type, self.field_name))
+    }
+}
+
+impl From<ParagraphUid> for FieldUid {
+    fn from(value: ParagraphUid) -> Self {
+        Self {
+            rid: value.rid,
+            field_type: value.field_type,
+            field_name: value.field_name,
+            split: value.split,
+        }
+    }
+}
+
+impl Display for ParagraphUid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(ref split) = self.split {
+            f.write_fmt(format_args!(
+                "{}/{}/{}/{}/{}-{}",
+                self.rid, self.field_type, self.field_name, split, self.paragraph_start, self.paragraph_end
+            ))
+        } else {
+            f.write_fmt(format_args!(
+                "{}/{}/{}/{}-{}",
+                self.rid, self.field_type, self.field_name, self.paragraph_start, self.paragraph_end
+            ))
         }
     }
 }
