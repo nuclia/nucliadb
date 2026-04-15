@@ -101,19 +101,18 @@ class FlagService:
         context["environment"] = running_settings.running_environment
         context["zone"] = nuclia_settings.nuclia_zone
 
-        enabled = False
-        if self.flipt_enabled:
-            if flag_key in const._FliptFeatures:
-                try:
-                    evaluation = self.client.evaluate_boolean(
-                        flag_key=flag_key,
-                        entity_id=self.entity_id,
-                        context=context,
-                    )
-                except EvaluationError as exc:
-                    logger.exception("Flipt FF evaluation failed", exc_info=exc)
-                else:
-                    logger.info(f"Flipt evaluation of {flag_key} for {context} was {evaluation}")
-                    enabled = evaluation.enabled
-
-        return enabled or self.flag_service.enabled(flag_key, default=default, context=context)
+        if self.flipt_enabled and flag_key in const._FliptFeatures:
+            try:
+                evaluation = self.client.evaluate_boolean(
+                    flag_key=flag_key,
+                    entity_id=self.entity_id,
+                    context=context,
+                )
+            except EvaluationError as exc:
+                logger.exception("Flipt FF evaluation failed", exc_info=exc)
+                return False
+            else:
+                logger.debug(f"Flipt evaluation of {flag_key} for {context} was {evaluation}")
+                return evaluation.enabled
+        else:
+            return self.flag_service.enabled(flag_key, default=default, context=context)
