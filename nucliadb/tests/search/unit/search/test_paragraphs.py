@@ -46,6 +46,12 @@ def field(extracted_text):
     yield mock
 
 
+# disable flipt features by overriding the enable fixture
+@pytest.fixture(scope="function")
+def flipt_features_enabled():
+    yield
+
+
 async def test_get_paragraph_from_full_text(field, extracted_text: ExtractedText):
     assert (
         await paragraphs.get_paragraph_from_full_text(field=field, start=0, end=12, split=None)

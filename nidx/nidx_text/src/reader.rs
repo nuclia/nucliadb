@@ -19,7 +19,6 @@
 //
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::str::FromStr;
 use std::time::*;
 
 use crate::schema::{datetime_utc_to_timestamp, decode_field_id, encode_field_id_bytes};
@@ -474,18 +473,19 @@ impl TextReaderService {
 
         // due to implementation details, we use here a BooleanQuery as it's
         // around 2 orders of magnitude faster than a TermSetQuery
-        let subqueries: Vec<Box<dyn Query>> = field_uids
-            .into_iter()
-            .map(|uid| {
-                Box::new(TermQuery::new(
-                    Term::from_field_bytes(
-                        self.schema.encoded_field_id_bytes,
-                        &encode_field_id_bytes(uid.rid, &format!("{}/{}", uid.field_type, uid.field_name)),
+        let mut subqueries: Vec<Box<dyn Query>> = vec![];
+        for uid in field_uids {
+            subqueries.push(Box::new(TermQuery::new(
+                Term::from_field_bytes(
+                    self.schema.encoded_field_id_bytes,
+                    &encode_field_id_bytes(
+                        Uuid::parse_str(&uid.rid)?,
+                        &format!("{}/{}", uid.field_type, uid.field_name),
                     ),
-                    IndexRecordOption::Basic,
-                )) as Box<dyn Query>
-            })
-            .collect();
+                ),
+                IndexRecordOption::Basic,
+            )));
+        }
         let query: Box<dyn Query> = Box::new(BooleanQuery::union(subqueries));
         let collector = TopDocs::with_limit(limit).order_by_score();
         let searcher = self.reader.searcher();
@@ -496,14 +496,12 @@ impl TextReaderService {
             let doc = searcher.doc::<TantivyDocument>(doc_id)?;
             let doc_value = doc.get_first(self.schema.text);
 
-            let rid = Uuid::from_str(
-                str::from_utf8(
-                    doc.get_first(self.schema.uuid)
-                        .expect("document doesn't appear to have uuid.")
-                        .as_bytes()
-                        .unwrap(),
-                )
-                .unwrap(),
+            let rid = String::from_utf8(
+                doc.get_first(self.schema.uuid)
+                    .expect("document doesn't appear to have uuid.")
+                    .as_bytes()
+                    .unwrap()
+                    .to_vec(),
             )
             .unwrap();
             let field = decode_facet(

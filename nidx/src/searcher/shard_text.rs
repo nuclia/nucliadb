@@ -23,7 +23,6 @@ use std::time::Instant;
 
 use nidx_protos::{ExtractedTextsRequest, ExtractedTextsResponse};
 use nidx_text::{FieldUid, ParagraphUid, TextSearcher};
-use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::index_cache::IndexCache;
@@ -56,7 +55,7 @@ pub async fn extracted_texts(
         let mut field_ids = vec![];
         for id in request.field_ids {
             field_ids.push(FieldUid {
-                rid: Uuid::parse_str(&id.rid).map_err(NidxError::InvalidUuid)?,
+                rid: id.rid,
                 field_type: id.field_type,
                 field_name: id.field_name,
                 split: id.split,
@@ -72,7 +71,7 @@ pub async fn extracted_texts(
         let mut paragraph_ids = vec![];
         for id in request.paragraph_ids {
             paragraph_ids.push(ParagraphUid {
-                rid: Uuid::parse_str(&id.rid).map_err(NidxError::InvalidUuid)?,
+                rid: id.rid,
                 field_type: id.field_type,
                 field_name: id.field_name,
                 split: id.split,

@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import os
 from collections.abc import AsyncIterable, AsyncIterator, Iterator
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -91,6 +92,28 @@ async def stream_audit(nats_server: str, mocker: MockerFixture) -> AsyncIterator
             yield audit
 
         await audit.finalize()
+
+
+# Feature flags
+
+
+# Overwrite this fixture to disable this behavior
+@pytest.fixture(scope="function", autouse=True)
+def flipt_features_enabled():
+    evaluation = Mock()
+    evaluation.enabled = True
+    with (
+        patch.dict(
+            os.environ,
+            {
+                "FLIPT_TOKEN": "token",
+                "FLIPT_SERVER_URL": "every-flag-is-true",
+            },
+            clear=False,
+        ),
+        patch("nucliadb_utils.featureflagging.FliptClient.evaluate_boolean", return_value=evaluation),
+    ):
+        yield
 
 
 # Local files
