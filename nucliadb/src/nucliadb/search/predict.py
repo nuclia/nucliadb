@@ -25,6 +25,7 @@ import random
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from enum import Enum
+from typing import cast
 from unittest.mock import AsyncMock, Mock
 
 import aiohttp
@@ -62,7 +63,7 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
-from nucliadb_utils.utilities import Utility, set_utility
+from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 
 
 class SendToPredictError(Exception):
@@ -147,9 +148,15 @@ class RephraseResponse:
     use_chat_history: bool | None
 
 
-async def start_predict_engine():
+async def start_predict_engine() -> None:
+    existing = get_utility(Utility.PREDICT)
+    if existing is not None:
+        return
+
     if nuclia_settings.dummy_predict:
-        predict_util = DummyPredictEngine()
+        dummy = DummyPredictEngine()
+        await dummy.initialize()
+        set_utility(Utility.PREDICT, dummy)
     else:
         predict_util = PredictEngine(
             nuclia_settings.nuclia_inner_predict_url,
@@ -160,8 +167,16 @@ async def start_predict_engine():
             nuclia_settings.local_predict,
             nuclia_settings.local_predict_headers,
         )
-    await predict_util.initialize()
-    set_utility(Utility.PREDICT, predict_util)
+        await predict_util.initialize()
+        set_utility(Utility.PREDICT, predict_util)
+
+
+async def stop_predict_engine() -> None:
+    predict = get_utility(Utility.PREDICT)
+    if predict is not None:
+        predict = cast(PredictEngine, predict)
+        await predict.finalize()
+        clean_utility(Utility.PREDICT)
 
 
 def convert_relations(data: dict[str, list[dict[str, str]]]) -> list[RelationNode]:

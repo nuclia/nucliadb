@@ -32,7 +32,7 @@ def run():
     instrument_app(
         application,
         tracer_provider=get_telemetry(SERVICE_NAME),
-        excluded_urls=["/"],
+        excluded_urls=["/", "/health/alive", "/health/ready"],
         metrics=True,
         trace_id_on_responses=True,
     )
