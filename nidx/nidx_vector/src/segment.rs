@@ -28,7 +28,7 @@ use crate::formula::Formula;
 use crate::hnsw::{self, *};
 use crate::inverted_index::{self, InvertedIndexes};
 use crate::inverted_index::{FilterBitSet, build_indexes};
-use crate::utils::FieldKey;
+use crate::utils::{FieldKey, wincode_config};
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use core::f32;
@@ -155,7 +155,7 @@ pub fn merge(
             Some(
                 per_paragraph_alive_fields
                     .into_iter()
-                    .map(|(k, v)| (k, bincode::encode_to_vec(v, bincode::config::standard()).unwrap()))
+                    .map(|(k, v)| (k, wincode::config::serialize(&v, wincode_config()).unwrap()))
                     .collect(),
             )
         } else {

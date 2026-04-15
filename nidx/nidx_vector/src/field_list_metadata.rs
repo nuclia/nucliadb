@@ -20,15 +20,17 @@
 
 use std::collections::HashSet;
 
-use crate::{data_store::ParagraphRef, utils::FieldKey};
+use crate::{
+    data_store::ParagraphRef,
+    utils::{FieldKey, wincode_config},
+};
 
 pub fn encode_field_list_metadata(encoded_fields: &[FieldKey]) -> Vec<u8> {
-    bincode::encode_to_vec(encoded_fields, bincode::config::standard()).unwrap()
+    wincode::config::serialize(encoded_fields, wincode_config()).unwrap()
 }
 
 pub fn decode_field_list_metadata(data: &[u8]) -> Vec<FieldKey<'_>> {
-    let (fields, _) = bincode::borrow_decode_from_slice(data, bincode::config::standard()).unwrap();
-    fields
+    wincode::config::deserialize(data, wincode_config()).unwrap()
 }
 
 pub fn paragraph_alive_fields<'a>(
