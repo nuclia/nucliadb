@@ -49,7 +49,7 @@ from nucliadb_telemetry.utils import (
 
 images.settings["jaeger"] = {
     "image": "jaegertracing/all-in-one",
-    "version": "1.33",
+    "version": "1.62.0",
     "options": {"ports": {"6831/udp": None, "16686": None}},
 }
 
@@ -62,7 +62,7 @@ class Jaeger(BaseImage):
         if os.environ.get("TESTING", "") == "jenkins" or "TRAVIS" in os.environ:
             return port if port else self.port
         network = self.container_obj.attrs["NetworkSettings"]
-        service_port = f"{port if port else self.port}/udp"
+        service_port = port or f"{self.port}/udp"
         for netport in network["Ports"].keys():
             if netport == service_port:
                 return network["Ports"][service_port][0]["HostPort"]
@@ -91,10 +91,19 @@ async def jaeger_server():
 
 @pytest.fixture(scope="function")
 async def set_telemetry_settings(jaeger_server: Jaeger):
-    telemetry_settings.jaeger_enabled = True
-    telemetry_settings.jaeger_agent_host = "127.0.0.1"
-    telemetry_settings.jaeger_agent_port = jaeger_server.get_port()
-    telemetry_settings.jaeger_query_port = jaeger_server.get_http_port()
+    if os.environ.get("TEST_JAEGER"):
+        telemetry_settings.jaeger_enabled = True
+        telemetry_settings.jaeger_agent_host = "127.0.0.1"
+        telemetry_settings.jaeger_agent_port = jaeger_server.get_port()
+        telemetry_settings.jaeger_query_port = jaeger_server.get_http_port()
+        print("Testing telemetry with Jaeger protocol (deprecated)")
+    else:
+        otlp_port = jaeger_server.get_port("4317/tcp")
+        telemetry_settings.otlp_collector_endpoint = f"127.0.0.1:{otlp_port}"
+
+        telemetry_settings.jaeger_agent_host = "127.0.0.1"
+        telemetry_settings.jaeger_query_port = jaeger_server.get_http_port()
+        print("Testing telemetry with OTLP protocol")
 
 
 @pytest.fixture(scope="function")

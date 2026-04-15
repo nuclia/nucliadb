@@ -73,6 +73,7 @@ serviceMonitor:
 
 tracing:
   enabled: false
+  otlp_collector_endpoint:  # host:port of the OTLP collector, e.g. "otlp-collector-collector.observability.svc.cluster.local:4317". If blank, Jaeger is used instead.
 
 vs:
   gateway:

@@ -12,6 +12,12 @@ metadata:
 data:
   GRPC_PORT: {{ .Values.serving.grpc_port | quote }}
   SERVING_PORT: {{ .Values.serving.port | quote }}
-  JAEGER_ENABLED: {{ .Values.tracing.enabled | quote }}
+{{- if .Values.tracing.enabled }}
+  {{- if .Values.tracing.otlp_collector_endpoint }}
+  OTLP_COLLECTOR_ENDPOINT: {{ .Values.tracing.otlp_collector_endpoint | quote }}
+  {{- else }}
+  JAEGER_ENABLED: "true"
+  {{- end }}
+{{- end }}
   METRICS_PORT: {{ .Values.serving.metricsPort | quote }}
 
