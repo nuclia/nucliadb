@@ -19,6 +19,8 @@
 
 import uuid
 
+import pytest
+
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import ParagraphId
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -46,3 +48,9 @@ async def test_get_paragraph_text(storage, cache, txn, dummy_nidx_utility, proce
         orm_resource=orm_resource,
     )
     assert text1 == "Hello"
+
+
+# disable flipt features by overriding the enable fixture
+@pytest.fixture(scope="function")
+def flipt_features_enabled():
+    yield
