@@ -78,7 +78,7 @@ fn default_version() -> u64 {
 // Unique id for a field, equivalent to {rid}/{field_type}/{field_id}
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct FieldUid {
-    pub rid: Uuid,
+    pub rid: String,
     pub field_type: String,
     pub field_name: String,
     pub split: Option<String>,
@@ -87,7 +87,7 @@ pub struct FieldUid {
 // Unique id for a field, equivalent to {rid}/{field_type}/{field_id}[/{split}]/{paragraph_start}-{paragraph_end}
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct ParagraphUid {
-    pub rid: Uuid,
+    pub rid: String,
     pub field_type: String,
     pub field_name: String,
     pub split: Option<String>,
