@@ -85,7 +85,7 @@ pub struct FieldUid {
 }
 
 // Unique id for a field, equivalent to {rid}/{field_type}/{field_id}[/{split}]/{paragraph_start}-{paragraph_end}
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ParagraphUid {
     pub rid: String,
     pub field_type: String,
@@ -271,57 +271,5 @@ impl Display for ParagraphUid {
                 self.rid, self.field_type, self.field_name, self.paragraph_start, self.paragraph_end
             ))
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_paragraph_uid_sorting() {
-        let mut paragraphs = [
-            ParagraphUid {
-                rid: "rid".to_string(),
-                field_type: "a".to_string(),
-                field_name: "title".to_string(),
-                split: None,
-                paragraph_start: 400,
-                paragraph_end: 500,
-            },
-            ParagraphUid {
-                rid: "rid".to_string(),
-                field_type: "a".to_string(),
-                field_name: "title".to_string(),
-                split: None,
-                paragraph_start: 501,
-                paragraph_end: 555,
-            },
-            ParagraphUid {
-                rid: "arid".to_string(),
-                field_type: "a".to_string(),
-                field_name: "title".to_string(),
-                split: None,
-                paragraph_start: 1000,
-                paragraph_end: 1020,
-            },
-            ParagraphUid {
-                rid: "rid".to_string(),
-                field_type: "a".to_string(),
-                field_name: "title".to_string(),
-                split: None,
-                paragraph_start: 0,
-                paragraph_end: 20,
-            },
-        ];
-        paragraphs.sort();
-        assert_eq!(paragraphs[0].rid, "arid");
-        assert_eq!(paragraphs[0].paragraph_start, 1000);
-        assert_eq!(paragraphs[1].rid, "rid");
-        assert_eq!(paragraphs[1].paragraph_start, 0);
-        assert_eq!(paragraphs[2].rid, "rid");
-        assert_eq!(paragraphs[2].paragraph_start, 400);
-        assert_eq!(paragraphs[3].rid, "rid");
-        assert_eq!(paragraphs[3].paragraph_start, 501);
     }
 }

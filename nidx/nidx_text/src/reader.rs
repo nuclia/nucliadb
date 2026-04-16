@@ -555,17 +555,13 @@ impl TextReaderService {
                 split: parts.get(3).map(|x| x.to_string()),
             };
 
-            if let Some(paragraphs) = field_paragraph_ids.remove(&field_uid) {
+            if let Some(paragraph_ids) = field_paragraph_ids.remove(&field_uid) {
                 // iterate the text by unicode characters only once, reusing the same iterator for
                 // all paragraphs on the field. This is more useful for multiple paragraphs per
                 // field on a large text
-                let mut paragraph_chars = text.chars();
-                let mut skip = 0;
-                for paragraph_id in paragraphs.into_iter().sorted() {
-                    skip = paragraph_id.paragraph_start as usize - skip;
-                    let take = (paragraph_id.paragraph_end - paragraph_id.paragraph_start) as usize;
-                    let paragraph_text = paragraph_chars.by_ref().skip(skip).take(take).collect();
-                    paragraphs_text.insert(paragraph_id, Some(paragraph_text));
+                let mut paragraphs = Self::extract_paragraphs(paragraph_ids.into_iter(), text.chars());
+                for (k, v) in paragraphs.drain() {
+                    paragraphs_text.insert(k, v);
                 }
             }
         }
@@ -599,6 +595,25 @@ impl TextReaderService {
         let collector = TopDocs::with_limit(limit).order_by_score();
         let results = searcher.search(&query, &collector)?;
         Ok(results)
+    }
+
+    fn extract_paragraphs(
+        ids: impl Iterator<Item = ParagraphUid>,
+        mut text: std::str::Chars<'_>,
+    ) -> HashMap<ParagraphUid, Option<String>> {
+        let mut skip = 0;
+
+        let mut paragraphs = HashMap::new();
+
+        for paragraph_id in ids.sorted_by_key(|id| (id.paragraph_start, id.paragraph_end)) {
+            skip = paragraph_id.paragraph_start as usize - skip;
+            let take = (paragraph_id.paragraph_end - paragraph_id.paragraph_start) as usize;
+            let paragraph = text.by_ref().skip(skip).take(take).collect();
+            skip = paragraph_id.paragraph_end as usize;
+            paragraphs.insert(paragraph_id, Some(paragraph));
+        }
+
+        paragraphs
     }
 }
 
@@ -661,5 +676,48 @@ impl Iterator for BatchProducer {
         debug!("New batch created, took {v} ms");
 
         Some(items)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_paragraphs_using_a_single_iterator() {
+        let text = "This is my test text";
+        let word_positions = [(0, 4), (5, 7), (8, 10), (11, 15), (16, 20)];
+        let words: Vec<ParagraphUid> = word_positions
+            .into_iter()
+            .map(|(start, end)| ParagraphUid {
+                rid: "rid".to_string(),
+                field_type: "a".to_string(),
+                field_name: "title".to_string(),
+                split: None,
+                paragraph_start: start,
+                paragraph_end: end,
+            })
+            .collect();
+        let paragraphs = TextReaderService::extract_paragraphs(
+            [
+                words[3].clone(),
+                words[1].clone(),
+                words[4].clone(),
+                words[0].clone(),
+                words[2].clone(),
+            ]
+            .into_iter(),
+            text.chars(),
+        );
+        assert_eq!(
+            paragraphs,
+            HashMap::from_iter([
+                (words[0].clone(), Some("This".to_string())),
+                (words[1].clone(), Some("is".to_string())),
+                (words[2].clone(), Some("my".to_string())),
+                (words[3].clone(), Some("test".to_string())),
+                (words[4].clone(), Some("text".to_string())),
+            ])
+        );
     }
 }
