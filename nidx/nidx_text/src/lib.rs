@@ -85,7 +85,7 @@ pub struct FieldUid {
 }
 
 // Unique id for a field, equivalent to {rid}/{field_type}/{field_id}[/{split}]/{paragraph_start}-{paragraph_end}
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ParagraphUid {
     pub rid: String,
     pub field_type: String,
@@ -224,37 +224,7 @@ impl TextSearcher {
         &self,
         paragraph_uids: Vec<ParagraphUid>,
     ) -> anyhow::Result<HashMap<ParagraphUid, Option<String>>> {
-        let mut paragraph_fields = HashMap::new();
-        for paragraph_id in paragraph_uids {
-            let field_id = FieldUid::from(paragraph_id.clone());
-            paragraph_fields
-                .entry(field_id)
-                .and_modify(|v: &mut Vec<ParagraphUid>| v.push(paragraph_id.clone()))
-                .or_insert(vec![paragraph_id]);
-        }
-
-        let fields_text = self
-            .reader
-            .get_fields_text(paragraph_fields.keys().cloned().collect())?;
-
-        let mut paragraphs_text = HashMap::new();
-
-        for (field_id, field_text) in fields_text {
-            if let Some(paragraphs) = paragraph_fields.remove(&field_id) {
-                for paragraph_id in paragraphs {
-                    let paragraph_text = field_text.as_ref().map(|field_text| {
-                        field_text
-                            .chars()
-                            .skip(paragraph_id.paragraph_start as usize)
-                            .take((paragraph_id.paragraph_end - paragraph_id.paragraph_start) as usize)
-                            .collect()
-                    });
-                    paragraphs_text.insert(paragraph_id, paragraph_text);
-                }
-            }
-        }
-
-        Ok(paragraphs_text)
+        self.reader.get_paragraphs_text(paragraph_uids)
     }
 
     pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = DocumentItem> + use<>> {
@@ -301,5 +271,57 @@ impl Display for ParagraphUid {
                 self.rid, self.field_type, self.field_name, self.paragraph_start, self.paragraph_end
             ))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_paragraph_uid_sorting() {
+        let mut paragraphs = vec![
+            ParagraphUid {
+                rid: "rid".to_string(),
+                field_type: "a".to_string(),
+                field_name: "title".to_string(),
+                split: None,
+                paragraph_start: 400,
+                paragraph_end: 500,
+            },
+            ParagraphUid {
+                rid: "rid".to_string(),
+                field_type: "a".to_string(),
+                field_name: "title".to_string(),
+                split: None,
+                paragraph_start: 501,
+                paragraph_end: 555,
+            },
+            ParagraphUid {
+                rid: "arid".to_string(),
+                field_type: "a".to_string(),
+                field_name: "title".to_string(),
+                split: None,
+                paragraph_start: 1000,
+                paragraph_end: 1020,
+            },
+            ParagraphUid {
+                rid: "rid".to_string(),
+                field_type: "a".to_string(),
+                field_name: "title".to_string(),
+                split: None,
+                paragraph_start: 0,
+                paragraph_end: 20,
+            },
+        ];
+        paragraphs.sort();
+        assert_eq!(paragraphs[0].rid, "arid");
+        assert_eq!(paragraphs[0].paragraph_start, 1000);
+        assert_eq!(paragraphs[1].rid, "rid");
+        assert_eq!(paragraphs[1].paragraph_start, 0);
+        assert_eq!(paragraphs[2].rid, "rid");
+        assert_eq!(paragraphs[2].paragraph_start, 400);
+        assert_eq!(paragraphs[3].rid, "rid");
+        assert_eq!(paragraphs[3].paragraph_start, 501);
     }
 }

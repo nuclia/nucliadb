@@ -23,7 +23,7 @@ use std::time::*;
 
 use crate::schema::{datetime_utc_to_timestamp, decode_field_id, encode_field_id_bytes};
 use crate::search_query::filter_to_query;
-use crate::{DocumentSearchRequest, FieldUid, prefilter::*};
+use crate::{DocumentSearchRequest, FieldUid, ParagraphUid, prefilter::*};
 
 use super::schema::TextSchema;
 use super::search_query;
@@ -524,6 +524,92 @@ impl TextReaderService {
         }
 
         Ok(texts)
+    }
+
+    pub fn get_paragraphs_text(
+        &self,
+        paragraph_uids: Vec<ParagraphUid>,
+    ) -> anyhow::Result<HashMap<ParagraphUid, Option<String>>> {
+        let mut field_paragraph_ids = HashMap::new();
+        for paragraph_id in paragraph_uids {
+            let field_id = FieldUid::from(paragraph_id.clone());
+            field_paragraph_ids
+                .entry(field_id)
+                .and_modify(|v: &mut Vec<ParagraphUid>| v.push(paragraph_id.clone()))
+                .or_insert(vec![paragraph_id]);
+        }
+
+        // we store a doc per field, so we expect at most the number of unique fields
+        let limit = field_paragraph_ids.len();
+
+        // due to implementation details, we use here a BooleanQuery as it's
+        // around 2 orders of magnitude faster than a TermSetQuery
+        let mut subqueries: Vec<Box<dyn Query>> = vec![];
+        for field_uid in field_paragraph_ids.keys() {
+            subqueries.push(Box::new(TermQuery::new(
+                Term::from_field_bytes(
+                    self.schema.encoded_field_id_bytes,
+                    &encode_field_id_bytes(
+                        Uuid::parse_str(&field_uid.rid)?,
+                        &format!("{}/{}", field_uid.field_type, field_uid.field_name),
+                    ),
+                ),
+                IndexRecordOption::Basic,
+            )));
+        }
+        let query: Box<dyn Query> = Box::new(BooleanQuery::union(subqueries));
+        let collector = TopDocs::with_limit(limit).order_by_score();
+        let searcher = self.reader.searcher();
+        let results = searcher.search(&query, &collector)?;
+
+        let mut paragraphs_text = HashMap::new();
+        for (_score, doc_id) in results {
+            let doc = searcher.doc::<TantivyDocument>(doc_id)?;
+
+            let Some(text) = doc.get_first(self.schema.text).map(|value| value.as_str().unwrap()) else {
+                // can't do anything without extracted text
+                continue;
+            };
+            let rid = String::from_utf8(
+                doc.get_first(self.schema.uuid)
+                    .expect("document doesn't appear to have uuid.")
+                    .as_bytes()
+                    .unwrap()
+                    .to_vec(),
+            )
+            .unwrap();
+            let field = decode_facet(
+                doc.get_first(self.schema.field)
+                    .expect("document doesn't appear to have field.")
+                    .as_facet()
+                    .unwrap(),
+            )
+            .to_path_string();
+
+            let parts: Vec<_> = field.split('/').collect(); // e.g. /a/title
+            let field_uid = FieldUid {
+                rid,
+                field_type: parts[1].to_string(),
+                field_name: parts[2].to_string(),
+                split: parts.get(3).map(|x| x.to_string()),
+            };
+
+            if let Some(paragraphs) = field_paragraph_ids.remove(&field_uid) {
+                // iterate the text by unicode characters only once, reusing the same iterator for
+                // all paragraphs on the field. This is more useful for multiple paragraphs per
+                // field on a large text
+                let mut paragraph_chars = text.chars();
+                let mut skip = 0;
+                for paragraph_id in paragraphs.into_iter().sorted() {
+                    skip = paragraph_id.paragraph_start as usize - skip;
+                    let take = (paragraph_id.paragraph_end - paragraph_id.paragraph_start) as usize;
+                    let paragraph_text = paragraph_chars.by_ref().skip(skip).take(take).collect();
+                    paragraphs_text.insert(paragraph_id, Some(paragraph_text));
+                }
+            }
+        }
+
+        Ok(paragraphs_text)
     }
 }
 
