@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_paragraph_uid_sorting() {
-        let mut paragraphs = vec![
+        let mut paragraphs = [
             ParagraphUid {
                 rid: "rid".to_string(),
                 field_type: "a".to_string(),
