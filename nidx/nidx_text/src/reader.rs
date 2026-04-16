@@ -469,29 +469,10 @@ impl TextReaderService {
     }
 
     pub fn get_fields_text(&self, field_uids: Vec<FieldUid>) -> anyhow::Result<HashMap<FieldUid, Option<String>>> {
-        let limit = field_uids.len();
-
-        // due to implementation details, we use here a BooleanQuery as it's
-        // around 2 orders of magnitude faster than a TermSetQuery
-        let mut subqueries: Vec<Box<dyn Query>> = vec![];
-        for uid in field_uids {
-            subqueries.push(Box::new(TermQuery::new(
-                Term::from_field_bytes(
-                    self.schema.encoded_field_id_bytes,
-                    &encode_field_id_bytes(
-                        Uuid::parse_str(&uid.rid)?,
-                        &format!("{}/{}", uid.field_type, uid.field_name),
-                    ),
-                ),
-                IndexRecordOption::Basic,
-            )));
-        }
-        let query: Box<dyn Query> = Box::new(BooleanQuery::union(subqueries));
-        let collector = TopDocs::with_limit(limit).order_by_score();
         let searcher = self.reader.searcher();
+        let results = self.search_fields(searcher.clone(), field_uids.iter())?;
 
         let mut texts = HashMap::new();
-        let results = searcher.search(&query, &collector)?;
         for (_score, doc_id) in results {
             let doc = searcher.doc::<TantivyDocument>(doc_id)?;
             let doc_value = doc.get_first(self.schema.text);
@@ -539,28 +520,8 @@ impl TextReaderService {
                 .or_insert(vec![paragraph_id]);
         }
 
-        // we store a doc per field, so we expect at most the number of unique fields
-        let limit = field_paragraph_ids.len();
-
-        // due to implementation details, we use here a BooleanQuery as it's
-        // around 2 orders of magnitude faster than a TermSetQuery
-        let mut subqueries: Vec<Box<dyn Query>> = vec![];
-        for field_uid in field_paragraph_ids.keys() {
-            subqueries.push(Box::new(TermQuery::new(
-                Term::from_field_bytes(
-                    self.schema.encoded_field_id_bytes,
-                    &encode_field_id_bytes(
-                        Uuid::parse_str(&field_uid.rid)?,
-                        &format!("{}/{}", field_uid.field_type, field_uid.field_name),
-                    ),
-                ),
-                IndexRecordOption::Basic,
-            )));
-        }
-        let query: Box<dyn Query> = Box::new(BooleanQuery::union(subqueries));
-        let collector = TopDocs::with_limit(limit).order_by_score();
         let searcher = self.reader.searcher();
-        let results = searcher.search(&query, &collector)?;
+        let results = self.search_fields(searcher.clone(), field_paragraph_ids.keys())?;
 
         let mut paragraphs_text = HashMap::new();
         for (_score, doc_id) in results {
@@ -610,6 +571,34 @@ impl TextReaderService {
         }
 
         Ok(paragraphs_text)
+    }
+
+    fn search_fields<'a>(
+        &self,
+        searcher: Searcher,
+        field_uids: impl Iterator<Item = &'a FieldUid>,
+    ) -> anyhow::Result<Vec<(f32, DocAddress)>> {
+        // due to implementation details, we use here a BooleanQuery as it's
+        // around 2 orders of magnitude faster than a TermSetQuery
+        let mut subqueries: Vec<Box<dyn Query>> = vec![];
+        for field_uid in field_uids {
+            subqueries.push(Box::new(TermQuery::new(
+                Term::from_field_bytes(
+                    self.schema.encoded_field_id_bytes,
+                    &encode_field_id_bytes(
+                        Uuid::parse_str(&field_uid.rid)?,
+                        &format!("{}/{}", field_uid.field_type, field_uid.field_name),
+                    ),
+                ),
+                IndexRecordOption::Basic,
+            )));
+        }
+        // we store a doc per field, so we expect at most the number of unique fields
+        let limit = subqueries.len();
+        let query: Box<dyn Query> = Box::new(BooleanQuery::union(subqueries));
+        let collector = TopDocs::with_limit(limit).order_by_score();
+        let results = searcher.search(&query, &collector)?;
+        Ok(results)
     }
 }
 
