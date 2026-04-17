@@ -165,7 +165,7 @@ async def delete_custom_synonyms(request: Request, kbid: str):
     summary="Create search configuration",
     tags=["Knowledge Box Services"],
 )
-@requires(NucliaDBRoles.WRITER)
+@requires(NucliaDBRoles.OWNER)
 @version(1)
 async def create_search_configuration(
     request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
@@ -191,7 +191,7 @@ async def create_search_configuration(
     summary="Update search configuration",
     tags=["Knowledge Box Services"],
 )
-@requires(NucliaDBRoles.WRITER)
+@requires(NucliaDBRoles.OWNER)
 @version(1)
 async def update_search_configuration(
     request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
@@ -217,7 +217,7 @@ async def update_search_configuration(
     summary="Delete search configuration",
     tags=["Knowledge Box Services"],
 )
-@requires(NucliaDBRoles.WRITER)
+@requires(NucliaDBRoles.OWNER)
 @version(1)
 async def delete_search_configuration(request: Request, kbid: str, config_name: str):
     async with datamanagers.with_transaction() as txn:
