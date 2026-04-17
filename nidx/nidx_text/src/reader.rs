@@ -601,16 +601,62 @@ impl TextReaderService {
         ids: impl Iterator<Item = ParagraphUid>,
         mut text: std::str::Chars<'_>,
     ) -> HashMap<ParagraphUid, Option<String>> {
-        let mut skip = 0;
-
         let mut paragraphs = HashMap::new();
 
-        for paragraph_id in ids.sorted_by_key(|id| (id.paragraph_start, id.paragraph_end)) {
-            skip = paragraph_id.paragraph_start as usize - skip;
-            let take = (paragraph_id.paragraph_end - paragraph_id.paragraph_start) as usize;
-            let paragraph = text.by_ref().skip(skip).take(take).collect();
-            skip = paragraph_id.paragraph_end as usize;
-            paragraphs.insert(paragraph_id, Some(paragraph));
+        // sort paragraph_ids by (start, end) to avoid the need of already read chars from the text
+        let mut ids = ids.sorted_by_key(|id| (id.paragraph_start, id.paragraph_end));
+
+        let Some(first) = ids.next() else {
+            return paragraphs;
+        };
+        let mut window = std::ops::Range {
+            start: first.paragraph_start,
+            end: first.paragraph_end,
+        };
+        let mut window_paragraphs = vec![first];
+
+        let mut skip = 0;
+
+        for paragraph_id in ids {
+            if paragraph_id.paragraph_start < window.end {
+                // This paragraph overlaps with the window. We can't be sure if there will be more
+                // in the future, so we widen the window and continue
+                window.end = std::cmp::max(window.end, paragraph_id.paragraph_end);
+                window_paragraphs.push(paragraph_id);
+            } else {
+                // A non-overlapping paragraph means we won't find any other paragraph that needs
+                // the text from the window. We then read the window and extract the paragraphs
+                skip = window.start - skip;
+                let take = window.end - window.start;
+                let chunk: Vec<char> = text.by_ref().skip(skip as usize).take(take as usize).collect();
+                skip = window.end;
+
+                for id in window_paragraphs.drain(..) {
+                    let start = (id.paragraph_start - window.start) as usize;
+                    let end = (id.paragraph_end - window.start) as usize;
+                    let paragraph: String = chunk[start..end].iter().collect();
+                    paragraphs.insert(id, Some(paragraph));
+                }
+
+                // As the new paragraph could overlap with future ones, we reset the window with it
+                window = std::ops::Range {
+                    start: paragraph_id.paragraph_start,
+                    end: paragraph_id.paragraph_end,
+                };
+                window_paragraphs.push(paragraph_id);
+            }
+        }
+
+        // with no more paragraphs, we can finish with the window
+        skip = window.start - skip;
+        let take = window.end - window.start;
+        let chunk: Vec<char> = text.by_ref().skip(skip as usize).take(take as usize).collect();
+
+        for id in window_paragraphs.drain(..) {
+            let start = (id.paragraph_start - window.start) as usize;
+            let end = (id.paragraph_end - window.start) as usize;
+            let paragraph: String = chunk[start..end].iter().collect();
+            paragraphs.insert(id, Some(paragraph));
         }
 
         paragraphs
@@ -698,12 +744,39 @@ mod tests {
                 paragraph_end: end,
             })
             .collect();
+
+        // longer paragraphs overlapping with the words above
+        let overlapping_positions = [
+            (0, 7),
+            // intersects with the above but has content outside
+            (5, 15),
+            // same as above
+            (5, 15),
+            // subset of the above
+            (8, 15),
+        ];
+        let overlapping: Vec<ParagraphUid> = overlapping_positions
+            .into_iter()
+            .map(|(start, end)| ParagraphUid {
+                rid: "rid".to_string(),
+                field_type: "a".to_string(),
+                field_name: "title".to_string(),
+                split: None,
+                paragraph_start: start,
+                paragraph_end: end,
+            })
+            .collect();
+
         let paragraphs = TextReaderService::extract_paragraphs(
             [
+                overlapping[2].clone(),
                 words[3].clone(),
+                overlapping[3].clone(),
                 words[1].clone(),
+                overlapping[0].clone(),
                 words[4].clone(),
                 words[0].clone(),
+                overlapping[1].clone(),
                 words[2].clone(),
             ]
             .into_iter(),
@@ -713,8 +786,12 @@ mod tests {
             paragraphs,
             HashMap::from_iter([
                 (words[0].clone(), Some("This".to_string())),
+                (overlapping[0].clone(), Some("This is".to_string())),
                 (words[1].clone(), Some("is".to_string())),
+                (overlapping[1].clone(), Some("is my test".to_string())),
+                (overlapping[2].clone(), Some("is my test".to_string())),
                 (words[2].clone(), Some("my".to_string())),
+                (overlapping[3].clone(), Some("my test".to_string())),
                 (words[3].clone(), Some("test".to_string())),
                 (words[4].clone(), Some("text".to_string())),
             ])
