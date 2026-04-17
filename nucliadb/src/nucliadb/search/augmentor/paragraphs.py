@@ -22,10 +22,14 @@ import bisect
 from collections.abc import Sequence
 from typing import cast
 
+from nidx_protos.nidx_pb2 import ExtractedTextsRequest
 from typing_extensions import assert_never
 
+from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
     AugmentedParagraph,
@@ -40,12 +44,14 @@ from nucliadb.models.internal.augment import (
     ParagraphText,
     RelatedParagraphs,
 )
+from nucliadb.search import logger
 from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
-from nucliadb.search.search.paragraphs import get_paragraph_from_full_text
 from nucliadb_models.search import TextPosition
 from nucliadb_protos import resources_pb2
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 
 async def augment_paragraphs(
@@ -283,16 +289,103 @@ def _find_paragraph(
 
 @augmentor_observer.wrap({"type": "paragraph_text"})
 async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | None:
-    text = await get_paragraph_from_full_text(
-        field=field,
-        start=paragraph_id.paragraph_start,
-        end=paragraph_id.paragraph_end,
-        split=paragraph_id.field_id.subfield_id,
-        log_on_missing_field=True,
-    )
-    # we want to be explicit with not having the paragraph text but the function
-    # above returns an empty string if it can't find it
+    # we store all splits unordered inside nidx_text, so nidx can't support yet
+    # conversation fields
+    if field.type != Conversation.type and has_feature(
+        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}
+    ):
+        text = await get_paragraph_text_from_nidx(field, paragraph_id)
+    else:
+        text = await get_paragraph_text_from_storage(field, paragraph_id)
+
+    # we want to be explicit with not having the paragraph text but the
+    # functions above returns an empty string if it can't find it
     return text or None
+
+
+@augmentor_observer.wrap({"type": "paragraph_text:nidx"})
+async def get_paragraph_text_from_nidx(field: Field, paragraph_id: ParagraphId) -> str | None:
+    """Obtain a paragraph from the field extracted text.
+
+    This is an expensive operation that requires a gRPC request to nidx to get
+    the paragraph text. However, this is faster than getting the text from
+    object storage alternative.
+
+    """
+    kbid = field.kbid
+    field_id = paragraph_id.field_id
+
+    async with datamanagers.with_ro_transaction() as txn:
+        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        if kb_shards is None:
+            return ""
+
+        resource_shard_id = await datamanagers.resources.get_resource_shard_id(
+            txn, kbid=field.kbid, rid=field_id.rid
+        )
+        if resource_shard_id is None:
+            return ""
+
+        nidx_shard_id = None
+        for shard in kb_shards.shards:
+            if shard.shard == resource_shard_id:
+                nidx_shard_id = shard.nidx_shard_id
+                break
+        else:
+            return ""
+
+    nidx_searcher = get_nidx_searcher_client()
+    # TODO(nidx-as-extracted-text-storage): minimize the number of calls to nidx
+    # with a shared batch or something similar
+    extracted_texts = await nidx_searcher.ExtractedTexts(
+        ExtractedTextsRequest(
+            shard_id=nidx_shard_id,
+            paragraph_ids=[
+                ExtractedTextsRequest.ParagraphId(
+                    rid=field_id.rid,
+                    field_type=field_id.type,
+                    field_name=field_id.key,
+                    split=field_id.subfield_id,
+                    paragraph_start=paragraph_id.paragraph_start,
+                    paragraph_end=paragraph_id.paragraph_end,
+                )
+            ],
+        )
+    )
+    text = extracted_texts.paragraphs.get(paragraph_id.full(), "")
+    return text
+
+
+@augmentor_observer.wrap({"type": "paragraph_text:storage"})
+async def get_paragraph_text_from_storage(
+    field: Field, paragraph_id: ParagraphId, *, log_on_missing_field: bool = True
+) -> str | None:
+    """Obtain a paragraph from the field extracted text.
+
+    This is an expensive operation that requires downloading the whole field
+    extracted text from object storage and then slicing it.
+
+    """
+    extracted_text = await cache.get_field_extracted_text(field)
+    if extracted_text is None:
+        if log_on_missing_field:
+            logger.warning(
+                "Extracted text for field does not exist on DB. This should not happen.",
+                extra={
+                    "kbid": field.kbid,
+                    "field_id": field.resource_unique_id,
+                },
+            )
+        return ""
+
+    split = paragraph_id.field_id.subfield_id
+    start = paragraph_id.paragraph_start
+    end = paragraph_id.paragraph_end
+    if split not in (None, ""):
+        text = extracted_text.split_text[split]  # type: ignore
+        return text[start:end]
+    else:
+        return extracted_text.text[start:end]
 
 
 async def get_paragraph_position(field: Field, paragraph_id: ParagraphId) -> TextPosition | None:
