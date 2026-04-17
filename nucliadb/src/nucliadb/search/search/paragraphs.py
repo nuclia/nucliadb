@@ -25,33 +25,12 @@ from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search.search import cache
-from nucliadb_telemetry import errors, metrics
+from nucliadb_telemetry import errors
 
 logger = logging.getLogger(__name__)
 PRE_WORD = string.punctuation + " "
 
-GET_PARAGRAPH_LATENCY = metrics.Observer(
-    "nucliadb_get_paragraph",
-    buckets=[
-        0.001,
-        0.005,
-        0.01,
-        0.025,
-        0.05,
-        0.075,
-        0.1,
-        0.25,
-        0.5,
-        0.75,
-        1.0,
-        2.5,
-        metrics.INF,
-    ],
-    labels={"type": "full"},
-)
 
-
-@GET_PARAGRAPH_LATENCY.wrap({"type": "full"})
 async def get_paragraph_from_full_text(
     *,
     field: Field,
