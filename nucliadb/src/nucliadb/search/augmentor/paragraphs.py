@@ -357,9 +357,7 @@ async def get_paragraph_text_from_nidx(field: Field, paragraph_id: ParagraphId) 
 
 
 @augmentor_observer.wrap({"type": "paragraph_text:storage"})
-async def get_paragraph_text_from_storage(
-    field: Field, paragraph_id: ParagraphId, *, log_on_missing_field: bool = True
-) -> str | None:
+async def get_paragraph_text_from_storage(field: Field, paragraph_id: ParagraphId) -> str | None:
     """Obtain a paragraph from the field extracted text.
 
     This is an expensive operation that requires downloading the whole field
@@ -368,22 +366,32 @@ async def get_paragraph_text_from_storage(
     """
     extracted_text = await cache.get_field_extracted_text(field)
     if extracted_text is None:
-        if log_on_missing_field:
-            logger.warning(
-                "Extracted text for field does not exist on DB. This should not happen.",
-                extra={
-                    "kbid": field.kbid,
-                    "field_id": field.resource_unique_id,
-                },
-            )
-        return ""
+        # NucliaDB doesn't enforce read commited isolation with the index, i.e.
+        # we can observe dirty reads.
+        #
+        # In this case, it's possible to match a paragraph on the index that's
+        # being deleted. As the delete order is first maindb and second nidx, it
+        # can happen that we get from the index a resource that is being deleted
+        # and it's no longer in maindb.
+        #
+        # This should be a transient issue and we should only see this for
+        # deletes and searches done in a small window of time. Otherwise, it may
+        # be a persistent consistency issue.
+        logger.warning(
+            "Dirty read: extracted text for field does not exist on DB. This should be temporal.",
+            extra={
+                "kbid": field.kbid,
+                "field_id": field.resource_unique_id,
+            },
+        )
+        return None
 
     split = paragraph_id.field_id.subfield_id
     start = paragraph_id.paragraph_start
     end = paragraph_id.paragraph_end
-    if split not in (None, ""):
-        text = extracted_text.split_text[split]  # type: ignore
-        return text[start:end]
+
+    if split:
+        return extracted_text.split_text[split][start:end]
     else:
         return extracted_text.text[start:end]
 
