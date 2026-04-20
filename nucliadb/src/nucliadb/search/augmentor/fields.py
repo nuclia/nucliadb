@@ -330,7 +330,7 @@ async def db_augment_conversation_field(
                     selector = FullSelector()
 
             # gather the text from each message matching the selector
-            extracted_text_pb = await cache.get_field_extracted_text(field)
+            extracted_text_pb = await cache.get_field_extracted_text_pb(field)
             async for page, index, message in conversation_selector(field, field_id, selector):
                 augmented_message = messages.setdefault(
                     (page, index), AugmentedConversationMessage(ident=message.ident)
@@ -460,7 +460,7 @@ async def get_field_extracted_text_from_nidx(kbid: str, id: FieldId) -> str | No
 
 @augmentor_observer.wrap({"type": "field_text:storage"})
 async def get_field_extracted_text_from_storage(id: FieldId, field: Field) -> str | None:
-    extracted_text_pb = await cache.get_field_extracted_text(field)
+    extracted_text_pb = await cache.get_field_extracted_text_pb(field)
     if extracted_text_pb is None:  # pragma: no cover
         return None
 

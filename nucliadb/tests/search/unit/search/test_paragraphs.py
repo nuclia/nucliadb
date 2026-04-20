@@ -113,7 +113,7 @@ async def test_get_field_extracted_text_is_cached(field, fake_download_pb):
 
     # Run 10 times in parallel to check that the cache is working
     with extracted_text_cache(10):
-        futures = [paragraphs.cache.get_field_extracted_text(field) for _ in range(10)]
+        futures = [paragraphs.cache.get_field_extracted_text_pb(field) for _ in range(10)]
         await asyncio.gather(*futures)
 
         fake_download_pb.assert_awaited_once()
@@ -123,7 +123,7 @@ async def test_get_field_extracted_text_is_not_cached_when_none(field, fake_down
     fake_download_pb.side_effect = lambda _a, _b: None
 
     with extracted_text_cache(10):
-        await paragraphs.cache.get_field_extracted_text(field)
-        await paragraphs.cache.get_field_extracted_text(field)
+        await paragraphs.cache.get_field_extracted_text_pb(field)
+        await paragraphs.cache.get_field_extracted_text_pb(field)
 
     assert fake_download_pb.await_count == 2

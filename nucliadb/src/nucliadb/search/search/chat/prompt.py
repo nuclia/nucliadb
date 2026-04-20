@@ -1365,7 +1365,7 @@ async def hydrate_field_text(
     if field is None:  # pragma: no cover
         return None
 
-    extracted_text_pb = await cache.get_field_extracted_text(field)
+    extracted_text_pb = await cache.get_field_extracted_text_pb(field)
     if extracted_text_pb is None:  # pragma: no cover
         return None
 

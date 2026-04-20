@@ -66,7 +66,7 @@ async def get_field(kbid: str, field_id: FieldId) -> Field | None:
     return field_obj
 
 
-async def get_field_extracted_text(field: Field) -> ExtractedText | None:
+async def get_field_extracted_text_pb(field: Field) -> ExtractedText | None:
     if field.extracted_text is not None:
         return field.extracted_text
 

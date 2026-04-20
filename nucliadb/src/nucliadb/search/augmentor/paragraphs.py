@@ -348,7 +348,7 @@ async def get_paragraph_text_from_storage(field: Field, paragraph_id: ParagraphI
     extracted text from object storage and then slicing it.
 
     """
-    extracted_text = await cache.get_field_extracted_text(field)
+    extracted_text = await cache.get_field_extracted_text_pb(field)
     if extracted_text is None:
         # NucliaDB doesn't enforce read commited isolation with the index, i.e.
         # we can observe dirty reads.
