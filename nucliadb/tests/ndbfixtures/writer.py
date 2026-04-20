@@ -73,16 +73,7 @@ async def standalone_nucliadb_writer(
 async def nucliadb_writer_manager(
     nucliadb_writer: AsyncClient,
 ) -> AsyncIterator[AsyncClient]:
-    roles = [NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER]
-    nucliadb_writer.headers["X-NUCLIADB-ROLES"] = ";".join([role.value for role in roles])
-    yield nucliadb_writer
-
-
-@pytest.fixture(scope="function")
-async def nucliadb_writer_owner(
-    nucliadb_writer: AsyncClient,
-) -> AsyncIterator[AsyncClient]:
-    roles = [NucliaDBRoles.OWNER, NucliaDBRoles.WRITER]
+    roles = [NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER, NucliaDBRoles.WRITER]
     nucliadb_writer.headers["X-NUCLIADB-ROLES"] = ";".join([role.value for role in roles])
     yield nucliadb_writer
 

@@ -28,20 +28,20 @@ from httpx import AsyncClient
 @pytest.mark.deploy_modes("standalone")
 async def test_search_configuration_create(
     nucliadb_writer: AsyncClient,
-    nucliadb_writer_owner: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     standalone_knowledgebox,
 ):
     kbid = standalone_knowledgebox
 
     # Create a config works
-    resp = await nucliadb_writer_owner.post(
+    resp = await nucliadb_writer_manager.post(
         f"/kb/{kbid}/search_configurations/one_thing",
         json={"kind": "find", "config": {"top_k": 1}},
     )
     assert resp.status_code == 201
 
     # Duplicates not allowed
-    resp = await nucliadb_writer_owner.post(
+    resp = await nucliadb_writer_manager.post(
         f"/kb/{kbid}/search_configurations/one_thing",
         json={"kind": "find", "config": {"top_k": 1}},
     )
@@ -52,20 +52,20 @@ async def test_search_configuration_create(
 async def test_search_configuration_update(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_writer_owner: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     standalone_knowledgebox,
 ):
     kbid = standalone_knowledgebox
 
     # Cannot update a config that doesn't exist
-    resp = await nucliadb_writer_owner.patch(
+    resp = await nucliadb_writer_manager.patch(
         f"/kb/{kbid}/search_configurations/one_thing",
         json={"kind": "find", "config": {"top_k": 1}},
     )
     assert resp.status_code == 404
 
     # Can update an existing config
-    resp = await nucliadb_writer_owner.post(
+    resp = await nucliadb_writer_manager.post(
         f"/kb/{kbid}/search_configurations/one_thing",
         json={"kind": "find", "config": {"top_k": 1}},
     )
@@ -77,7 +77,7 @@ async def test_search_configuration_update(
     assert resp.status_code == 200
     assert resp.json() == {"kind": "find", "config": {"top_k": 1}}
 
-    resp = await nucliadb_writer_owner.patch(
+    resp = await nucliadb_writer_manager.patch(
         f"/kb/{kbid}/search_configurations/one_thing",
         json={"kind": "find", "config": {"top_k": 22}},
     )
@@ -94,25 +94,25 @@ async def test_search_configuration_update(
 async def test_search_configuration_delete(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_writer_owner: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     standalone_knowledgebox,
 ):
     kbid = standalone_knowledgebox
 
-    resp = await nucliadb_writer_owner.post(
+    resp = await nucliadb_writer_manager.post(
         f"/kb/{kbid}/search_configurations/one_thing",
         json={"kind": "find", "config": {"top_k": 1}},
     )
     assert resp.status_code == 201
 
     # Cannot delete non-existing config
-    resp = await nucliadb_writer_owner.delete(
+    resp = await nucliadb_writer_manager.delete(
         f"/kb/{kbid}/search_configurations/another_thing",
     )
     assert resp.status_code == 404
 
     # Deletes existing config
-    resp = await nucliadb_writer_owner.delete(
+    resp = await nucliadb_writer_manager.delete(
         f"/kb/{kbid}/search_configurations/one_thing",
     )
     assert resp.status_code == 204
@@ -127,18 +127,18 @@ async def test_search_configuration_delete(
 async def test_search_configuration_list(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_writer_owner: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     standalone_knowledgebox,
 ):
     kbid = standalone_knowledgebox
 
-    resp = await nucliadb_writer_owner.post(
+    resp = await nucliadb_writer_manager.post(
         f"/kb/{kbid}/search_configurations/one_thing",
         json={"kind": "find", "config": {"top_k": 1}},
     )
     assert resp.status_code == 201
 
-    resp = await nucliadb_writer_owner.post(
+    resp = await nucliadb_writer_manager.post(
         f"/kb/{kbid}/search_configurations/ask_pretty",
         json={"kind": "ask", "config": {"prompt": "This is my prompt now"}},
     )
@@ -159,18 +159,18 @@ async def test_search_configuration_list(
 async def test_search_configuration_find(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_writer_owner: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     standalone_knowledgebox,
 ):
     kbid = standalone_knowledgebox
 
-    resp = await nucliadb_writer_owner.post(
+    resp = await nucliadb_writer_manager.post(
         f"/kb/{kbid}/search_configurations/one_thing",
         json={"kind": "find", "config": {"top_k": 1, "features": ["semantic"]}},
     )
     assert resp.status_code == 201
 
-    resp = await nucliadb_writer_owner.post(
+    resp = await nucliadb_writer_manager.post(
         f"/kb/{kbid}/search_configurations/ask_config",
         json={"kind": "ask", "config": {"top_k": 1, "features": ["semantic"]}},
     )
@@ -223,12 +223,12 @@ async def test_search_configuration_find(
 async def test_search_configuration_merge(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nucliadb_writer_owner: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
     standalone_knowledgebox,
 ):
     kbid = standalone_knowledgebox
 
-    resp = await nucliadb_writer_owner.post(
+    resp = await nucliadb_writer_manager.post(
         f"/kb/{kbid}/search_configurations/one_thing",
         json={"kind": "find", "config": {"top_k": 1, "features": ["semantic"]}},
     )
