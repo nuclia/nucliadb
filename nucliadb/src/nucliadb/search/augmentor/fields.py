@@ -22,10 +22,13 @@ from collections import deque
 from collections.abc import AsyncIterator, Sequence
 from typing import Deque, cast
 
+from nidx_protos.nidx_pb2 import ExtractedTextsRequest
 from typing_extensions import assert_never
 
+from nucliadb.common.cluster.manager import get_resource_nidx_shard_id
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.models_utils import from_proto
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
@@ -66,7 +69,9 @@ from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_protos import resources_pb2
+from nucliadb_utils import const
 from nucliadb_utils.storages.storage import STORAGE_FILE_EXTRACTED
+from nucliadb_utils.utilities import has_feature
 
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
@@ -413,6 +418,48 @@ async def db_augment_generic_field(
 
 @augmentor_observer.wrap({"type": "field_text"})
 async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
+    # we store all splits unordered inside nidx_text, so nidx can't support yet
+    # conversation fields
+    if field.type != Conversation.type and has_feature(
+        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}
+    ):
+        text = await get_field_extracted_text_from_nidx(field.kbid, id)
+    else:
+        text = await get_field_extracted_text_from_storage(id, field)
+
+    return text
+
+
+@augmentor_observer.wrap({"type": "field_text:nidx"})
+async def get_field_extracted_text_from_nidx(kbid: str, id: FieldId) -> str | None:
+    assert id.type != Conversation.type, "conversation extracted text not supported in nidx"
+
+    nidx_shard_id = await get_resource_nidx_shard_id(kbid=kbid, rid=id.rid)
+    if nidx_shard_id is None:
+        return None
+
+    nidx_searcher = get_nidx_searcher_client()
+    # TODO(nidx-as-extracted-text-storage): minimize the number of calls to nidx
+    # with a shared batch or something similar
+    extracted_texts = await nidx_searcher.ExtractedTexts(
+        ExtractedTextsRequest(
+            shard_id=nidx_shard_id,
+            field_ids=[
+                ExtractedTextsRequest.FieldId(
+                    rid=id.rid,
+                    field_type=id.type,
+                    field_name=id.key,
+                    split=id.subfield_id,
+                )
+            ],
+        )
+    )
+    text = extracted_texts.fields.get(id.full_without_subfield(), None)
+    return text
+
+
+@augmentor_observer.wrap({"type": "field_text:storage"})
+async def get_field_extracted_text_from_storage(id: FieldId, field: Field) -> str | None:
     extracted_text_pb = await cache.get_field_extracted_text(field)
     if extracted_text_pb is None:  # pragma: no cover
         return None
