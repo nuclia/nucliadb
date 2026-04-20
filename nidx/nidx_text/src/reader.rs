@@ -633,7 +633,8 @@ impl TextReaderService {
 
                 for id in window_paragraphs.drain(..) {
                     let start = (id.paragraph_start - window.start) as usize;
-                    let end = (id.paragraph_end - window.start) as usize;
+                    // clamp to chunk size, we don't have more text
+                    let end = std::cmp::min((id.paragraph_end - window.start) as usize, chunk.len());
                     let paragraph: String = chunk[start..end].iter().collect();
                     paragraphs.insert(id, Some(paragraph));
                 }
@@ -654,7 +655,7 @@ impl TextReaderService {
 
         for id in window_paragraphs.drain(..) {
             let start = (id.paragraph_start - window.start) as usize;
-            let end = (id.paragraph_end - window.start) as usize;
+            let end = std::cmp::min((id.paragraph_end - window.start) as usize, chunk.len());
             let paragraph: String = chunk[start..end].iter().collect();
             paragraphs.insert(id, Some(paragraph));
         }
@@ -767,16 +768,31 @@ mod tests {
             })
             .collect();
 
+        let out_of_bounds: Vec<ParagraphUid> = [(8, 100), (16, 100), (200, 300)]
+            .into_iter()
+            .map(|(start, end)| ParagraphUid {
+                rid: "rid".to_string(),
+                field_type: "a".to_string(),
+                field_name: "title".to_string(),
+                split: None,
+                paragraph_start: start,
+                paragraph_end: end,
+            })
+            .collect();
+
         let paragraphs = TextReaderService::extract_paragraphs(
             [
                 overlapping[2].clone(),
                 words[3].clone(),
                 overlapping[3].clone(),
+                out_of_bounds[2].clone(),
                 words[1].clone(),
                 overlapping[0].clone(),
+                out_of_bounds[1].clone(),
                 words[4].clone(),
                 words[0].clone(),
                 overlapping[1].clone(),
+                out_of_bounds[0].clone(),
                 words[2].clone(),
             ]
             .into_iter(),
@@ -792,8 +808,11 @@ mod tests {
                 (overlapping[2].clone(), Some("is my test".to_string())),
                 (words[2].clone(), Some("my".to_string())),
                 (overlapping[3].clone(), Some("my test".to_string())),
+                (out_of_bounds[0].clone(), Some("my test text".to_string())),
                 (words[3].clone(), Some("test".to_string())),
                 (words[4].clone(), Some("text".to_string())),
+                (out_of_bounds[1].clone(), Some("text".to_string())),
+                (out_of_bounds[2].clone(), Some("".to_string())),
             ])
         );
     }
