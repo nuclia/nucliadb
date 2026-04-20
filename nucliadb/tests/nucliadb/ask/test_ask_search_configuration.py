@@ -30,17 +30,18 @@ from nucliadb_models.search import FullResourceStrategy
 async def test_search_configuration_ask(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
+    nucliadb_writer_owner: AsyncClient,
     standalone_knowledgebox,
 ):
     kbid = standalone_knowledgebox
 
-    resp = await nucliadb_writer.post(
+    resp = await nucliadb_writer_owner.post(
         f"/kb/{kbid}/search_configurations/find_config",
         json={"kind": "find", "config": {"top_k": 1, "features": ["semantic"]}},
     )
     assert resp.status_code == 201
 
-    resp = await nucliadb_writer.post(
+    resp = await nucliadb_writer_owner.post(
         f"/kb/{kbid}/search_configurations/ask_config",
         json={
             "kind": "ask",
