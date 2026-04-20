@@ -25,7 +25,7 @@ from typing import cast
 from nidx_protos.nidx_pb2 import ExtractedTextsRequest
 from typing_extensions import assert_never
 
-from nucliadb.common import datamanagers
+from nucliadb.common.cluster.manager import get_resource_nidx_shard_id
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.fields.base import Field
@@ -312,27 +312,11 @@ async def get_paragraph_text_from_nidx(field: Field, paragraph_id: ParagraphId) 
     object storage alternative.
 
     """
-    kbid = field.kbid
     field_id = paragraph_id.field_id
 
-    async with datamanagers.with_ro_transaction() as txn:
-        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-        if kb_shards is None:
-            return ""
-
-        resource_shard_id = await datamanagers.resources.get_resource_shard_id(
-            txn, kbid=field.kbid, rid=field_id.rid
-        )
-        if resource_shard_id is None:
-            return ""
-
-        nidx_shard_id = None
-        for shard in kb_shards.shards:
-            if shard.shard == resource_shard_id:
-                nidx_shard_id = shard.nidx_shard_id
-                break
-        else:
-            return ""
+    nidx_shard_id = await get_resource_nidx_shard_id(kbid=field.kbid, rid=field_id.rid)
+    if nidx_shard_id is None:
+        return None
 
     nidx_searcher = get_nidx_searcher_client()
     # TODO(nidx-as-extracted-text-storage): minimize the number of calls to nidx
@@ -352,7 +336,7 @@ async def get_paragraph_text_from_nidx(field: Field, paragraph_id: ParagraphId) 
             ],
         )
     )
-    text = extracted_texts.paragraphs.get(paragraph_id.full(), "")
+    text = extracted_texts.paragraphs.get(paragraph_id.full(), None)
     return text
 
 
