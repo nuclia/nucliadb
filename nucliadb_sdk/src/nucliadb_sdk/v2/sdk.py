@@ -955,7 +955,7 @@ class _NucliaDBBase:
             # By default, on prem should utilize all headers available
             # For custom auth schemes, the user will need to provide custom
             # auth headers
-            headers["X-NUCLIADB-ROLES"] = "MANAGER;WRITER;READER"
+            headers["X-NUCLIADB-ROLES"] = "MANAGER;WRITER;READER;OWNER"
         else:
             if url is None:
                 self.base_url = f"https://{self.region}.nuclia.cloud/api"
