@@ -52,7 +52,8 @@ from nucliadb_models.vectors import SemanticModelMetadata, VectorSimilarity
 
 
 class NucliaDBRoles(str, Enum):
-    MANAGER = "MANAGER"
+    MANAGER = "MANAGER"  # Root User
+    OWNER = "OWNER"  # KB Owner
     READER = "READER"
     WRITER = "WRITER"
 

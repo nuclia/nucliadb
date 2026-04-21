@@ -66,7 +66,7 @@ async def src_kb(
     kbid = await create_kb(nucliadb_writer_manager)
 
     # Create a search configuration
-    resp = await nucliadb_writer.post(
+    resp = await nucliadb_writer_manager.post(
         f"/kb/{kbid}/search_configurations/myconfig",
         json={"kind": "find", "config": {"features": ["keyword"]}},
     )

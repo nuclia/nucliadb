@@ -35,7 +35,7 @@ from nucliadb_utils.authentication import requires_one
     response_model=None,
     tags=["Knowledge Boxes"],
 )
-@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
 @version(1)
 async def set_configuration(
     request: Request,
@@ -52,7 +52,7 @@ async def set_configuration(
     response_model=None,
     tags=["Knowledge Boxes"],
 )
-@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
 @version(1)
 async def patch_configuration(
     request: Request, kbid: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
@@ -70,7 +70,7 @@ async def patch_configuration(
     response_model=str,
     tags=["Extract Strategies"],
 )
-@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
 @version(1)
 async def add_strategy(
     request: Request,
@@ -88,7 +88,7 @@ async def add_strategy(
     response_model=None,
     tags=["Extract Strategies"],
 )
-@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
 @version(1)
 async def delete_strategy(
     request: Request,
@@ -108,7 +108,7 @@ async def delete_strategy(
     response_model=str,
     tags=["Split Strategies"],
 )
-@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
 @version(1)
 async def add_split_strategy(
     request: Request,
@@ -126,7 +126,7 @@ async def add_split_strategy(
     response_model=None,
     tags=["Split Strategies"],
 )
-@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
 @version(1)
 async def delete_split_strategy(
     request: Request,

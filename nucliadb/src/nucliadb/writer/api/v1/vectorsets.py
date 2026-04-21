@@ -46,7 +46,7 @@ from nucliadb_utils.utilities import get_storage
     # TODO: remove when the feature is mature
     include_in_schema=False,
 )
-@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
 @version(1)
 async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> CreatedVectorSet:
     try:
@@ -137,7 +137,7 @@ def get_vectorset_config(
     # TODO: remove when the feature is mature
     include_in_schema=False,
 )
-@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
 @version(1)
 async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
     try:

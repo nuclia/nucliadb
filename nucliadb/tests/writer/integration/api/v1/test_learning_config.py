@@ -43,18 +43,18 @@ def learning_config_proxy_mock():
 
 @pytest.mark.deploy_modes("component")
 async def test_api(
-    nucliadb_writer: AsyncClient, knowledgebox: str, learning_config_proxy_mock: MockProxy
+    nucliadb_writer_manager: AsyncClient, knowledgebox: str, learning_config_proxy_mock: MockProxy
 ):
     kbid = knowledgebox
 
     # post configuration
-    resp = await nucliadb_writer.post(f"/kb/{kbid}/configuration", json={"some": "data"})
+    resp = await nucliadb_writer_manager.post(f"/kb/{kbid}/configuration", json={"some": "data"})
     assert resp.status_code == 204
 
     assert learning_config_proxy_mock.calls[0][1:] == ("POST", f"/config/{kbid}", {})
 
     # patch configuration
-    resp = await nucliadb_writer.patch(
+    resp = await nucliadb_writer_manager.patch(
         f"/kb/{kbid}/configuration", json={"some": "data"}, headers={"x-nucliadb-account": "account"}
     )
     assert resp.status_code == 204
