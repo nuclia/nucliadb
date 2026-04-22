@@ -47,6 +47,7 @@ pub async fn create_shard(
     Index::create(&mut *tx, shard.id, "text", IndexConfig::new_text_with(text_version)).await?;
     Index::create(&mut *tx, shard.id, "paragraph", IndexConfig::new_paragraph()).await?;
     Index::create(&mut *tx, shard.id, "relation", IndexConfig::new_relation()).await?;
+    Index::create(&mut *tx, shard.id, "json", IndexConfig::new_json()).await?;
     for (vectorset_id, config) in vector_configs.into_iter() {
         Index::create(&mut *tx, shard.id, &vectorset_id, config.into()).await?;
     }

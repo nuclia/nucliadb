@@ -108,7 +108,7 @@ impl MergeScheduler {
         for index in indexes {
             let segment_info: HashMap<_, _> = index.segments.iter().map(|(id, rec, f)| (*id, (*rec, *f))).collect();
             let merges = match index.kind {
-                IndexKind::Text | IndexKind::Paragraph | IndexKind::Relation => {
+                IndexKind::Text | IndexKind::Paragraph | IndexKind::Relation | IndexKind::Json => {
                     log_merge::plan_merges(&self.merge_settings.log, index.segments)
                 }
                 IndexKind::Vector | IndexKind::VectorRelationNode | IndexKind::VectorRelationEdge => {

@@ -20,6 +20,7 @@
 
 use std::sync::Arc;
 
+use nidx_json::JsonSearcher;
 use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{GraphSearchRequest, GraphSearchResponse, SearchRequest, SearchResponse};
 use nidx_relation::{RelationSearcher, graph_query_parser::VectorQueryResults};
@@ -62,6 +63,16 @@ pub async fn search(index_cache: Arc<IndexCache>, search_request: SearchRequest)
             return Err(NidxError::NotFound);
         };
         Some(index_cache.get(&relation_index).await?)
+    } else {
+        None
+    };
+
+    let json_search = if query_plan.index_queries.json_request.is_some() {
+        if let Some(json_index) = indexes.json_index() {
+            Some(index_cache.get(&json_index).await?)
+        } else {
+            None
+        }
     } else {
         None
     };
@@ -124,6 +135,7 @@ pub async fn search(index_cache: Arc<IndexCache>, search_request: SearchRequest)
         current.in_scope(|| {
             blocking_search(
                 query_plan,
+                json_search.as_ref().map(|v| v.as_ref().into()),
                 paragraph_search.as_ref().map(|v| v.as_ref().into()),
                 relation_search.as_ref().map(|v| v.as_ref().into()),
                 text_search.as_ref().map(|v| v.as_ref().into()),
@@ -139,6 +151,7 @@ pub async fn search(index_cache: Arc<IndexCache>, search_request: SearchRequest)
 
 fn blocking_search(
     query_plan: QueryPlan,
+    json_searcher: Option<&JsonSearcher>,
     paragraph_searcher: Option<&ParagraphSearcher>,
     relation_searcher: Option<&RelationSearcher>,
     text_searcher: Option<&TextSearcher>,
@@ -147,6 +160,19 @@ fn blocking_search(
     edge_semantic_index: Option<&VectorSearcher>,
 ) -> anyhow::Result<SearchResponse> {
     let mut index_queries = query_plan.index_queries;
+
+    // Apply JSON prefilter first (resource-level UUID set)
+    if let Some(request) = index_queries.json_request.take() {
+        if let Some(searcher) = json_searcher {
+            let uuids = searcher.search(&request)?;
+            index_queries.apply_json_prefilter(uuids, index_queries.filter_or);
+        }
+    }
+
+    // Early-exit if JSON prefilter already eliminated all results
+    if matches!(index_queries.prefilter_results, PrefilterResult::None) {
+        return Ok(SearchResponse::default());
+    }
 
     // Apply pre-filtering to the query plan
     if let Some(prefilter) = query_plan.prefilter {

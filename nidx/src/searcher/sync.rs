@@ -422,6 +422,10 @@ impl ShardIndexes {
         self.single_index_by_kind(IndexKind::Relation)
     }
 
+    pub fn json_index(&self) -> Option<IndexId> {
+        self.single_index_by_kind(IndexKind::Json)
+    }
+
     pub fn vector_index(&self, name: &str) -> Option<IndexId> {
         self.0
             .iter()

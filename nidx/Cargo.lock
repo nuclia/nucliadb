@@ -2390,6 +2390,7 @@ dependencies = [
  "kube",
  "lazy_static",
  "lru 0.18.0",
+ "nidx_json",
  "nidx_paragraph",
  "nidx_protos",
  "nidx_relation",
@@ -2438,6 +2439,21 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "nidx_json"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "nidx_protos",
+ "nidx_tantivy",
+ "nidx_tests",
+ "nidx_types",
+ "serde_json",
+ "tantivy",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

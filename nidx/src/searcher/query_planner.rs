@@ -20,10 +20,12 @@
 
 use std::collections::HashMap;
 
+use nidx_json::search::{JsonFilterExpression, JsonPathFilter, JsonPredicate, JsonSearchRequest};
 use nidx_paragraph::ParagraphSearchRequest;
 use nidx_protos::filter_expression::Expr;
 use nidx_protos::graph_query::{PathQuery, node, path_query, relation};
 use nidx_protos::graph_search_request::QueryKind;
+use nidx_protos::json_field_path_filter::Predicate;
 use nidx_protos::{FilterExpression, FilterOperator, GraphSearchRequest, SearchRequest};
 use nidx_text::DocumentSearchRequest;
 use nidx_text::prefilter::*;
@@ -131,6 +133,8 @@ impl GraphIndexQueries {
 #[derive(Default, Clone)]
 pub struct IndexQueries {
     pub prefilter_results: PrefilterResult,
+    pub filter_or: bool,
+    pub json_request: Option<JsonSearchRequest>,
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
     pub texts_request: Option<DocumentSearchRequest>,
@@ -152,6 +156,94 @@ impl IndexQueries {
 
         self.prefilter_results = prefiltered;
     }
+
+    /// Merge a JSON prefilter result (resource-level UUIDs) into the existing
+    /// prefilter, respecting `filter_or`:
+    ///
+    /// - AND (`filter_or = false`): keep only FieldId entries whose resource_id
+    ///   is in the JSON hit set (intersection).
+    /// - OR  (`filter_or = true`):  add all JSON-hit resources to the existing
+    ///   set (union).
+    ///
+    /// Downstream searchers filter by FieldId, so resource-level JSON hits are
+    /// represented as sentinel FieldIds with an empty `field_id`.
+    pub fn apply_json_prefilter(&mut self, uuids: Vec<uuid::Uuid>, filter_or: bool) {
+        use nidx_types::prefilter::FieldId;
+        use std::collections::HashSet;
+
+        let uuid_set: HashSet<uuid::Uuid> = uuids.into_iter().collect();
+
+        self.prefilter_results = match std::mem::take(&mut self.prefilter_results) {
+            PrefilterResult::None => {
+                if filter_or {
+                    // OR with no prior results: JSON hits become the result set.
+                    PrefilterResult::Some(
+                        uuid_set
+                            .into_iter()
+                            .map(|u| FieldId {
+                                resource_id: u,
+                                field_id: String::new(),
+                            })
+                            .collect(),
+                    )
+                } else {
+                    // AND with no prior results: stays empty.
+                    PrefilterResult::None
+                }
+            }
+            PrefilterResult::All => {
+                if filter_or {
+                    // OR with "all": everything still matches.
+                    PrefilterResult::All
+                } else {
+                    // AND with "all": constrain to JSON hits.
+                    PrefilterResult::Some(
+                        uuid_set
+                            .into_iter()
+                            .map(|u| FieldId {
+                                resource_id: u,
+                                field_id: String::new(),
+                            })
+                            .collect(),
+                    )
+                }
+            }
+            PrefilterResult::Some(fields) => {
+                if filter_or {
+                    // OR: union — keep existing fields and add any JSON-hit
+                    // resources not already represented.
+                    let existing_rids: HashSet<uuid::Uuid> = fields.iter().map(|f| f.resource_id).collect();
+                    let mut merged = fields;
+                    for u in uuid_set {
+                        if !existing_rids.contains(&u) {
+                            merged.push(FieldId {
+                                resource_id: u,
+                                field_id: String::new(),
+                            });
+                        }
+                    }
+                    PrefilterResult::Some(merged)
+                } else {
+                    // AND: intersect — keep only fields whose resource is in JSON hits.
+                    PrefilterResult::Some(
+                        fields
+                            .into_iter()
+                            .filter(|f| uuid_set.contains(&f.resource_id))
+                            .collect(),
+                    )
+                }
+            }
+        };
+
+        // On AND, an empty result means nothing can match — cancel all downstream queries.
+        if !filter_or && matches!(self.prefilter_results, PrefilterResult::Some(ref v) if v.is_empty()) {
+            self.prefilter_results = PrefilterResult::None;
+            self.vectors_request = None;
+            self.paragraphs_request = None;
+            self.texts_request = None;
+            self.relations_request = None;
+        }
+    }
 }
 
 /// A shard reader will use this plan to produce search results as efficiently as
@@ -166,6 +258,7 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
     let texts_request = compute_texts_request(&search_request);
     let vectors_request = compute_vectors_request(&search_request)?;
     let paragraphs_request = compute_paragraphs_request(&search_request)?;
+    let json_request = compute_json_request(&search_request)?;
 
     let prefilter = compute_prefilters(&search_request);
 
@@ -173,12 +266,74 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
         prefilter,
         index_queries: IndexQueries {
             prefilter_results: PrefilterResult::All,
+            filter_or: search_request.filter_operator == FilterOperator::Or as i32,
+            json_request,
             vectors_request,
             paragraphs_request,
             texts_request,
             relations_request: graph_request.map(GraphIndexQueries::build),
         },
     })
+}
+
+fn compute_json_request(search_request: &SearchRequest) -> anyhow::Result<Option<JsonSearchRequest>> {
+    let Some(json_filter) = &search_request.json_filter else {
+        return Ok(None);
+    };
+    Ok(Some(JsonSearchRequest {
+        filter: proto_to_json_filter(json_filter)?,
+    }))
+}
+
+fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> anyhow::Result<JsonFilterExpression> {
+    use nidx_protos::json_filter_expression::Expr as JsonExpr;
+
+    match expr
+        .expr
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("Empty JsonFilterExpression"))?
+    {
+        JsonExpr::BoolAnd(list) => {
+            let operands = list
+                .operands
+                .iter()
+                .map(proto_to_json_filter)
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(JsonFilterExpression::And(operands))
+        }
+        JsonExpr::BoolOr(list) => {
+            let operands = list
+                .operands
+                .iter()
+                .map(proto_to_json_filter)
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(JsonFilterExpression::Or(operands))
+        }
+        JsonExpr::BoolNot(inner) => Ok(JsonFilterExpression::Not(Box::new(proto_to_json_filter(inner)?))),
+        JsonExpr::Path(path_filter) => {
+            let predicate = match path_filter
+                .predicate
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Missing predicate"))?
+            {
+                Predicate::ExactMatch(s) => JsonPredicate::String(s.clone()),
+                Predicate::IntRange(r) => JsonPredicate::IntRange {
+                    lower: r.lower,
+                    upper: r.upper,
+                },
+                Predicate::FloatRange(r) => JsonPredicate::FloatRange {
+                    lower: r.lower,
+                    upper: r.upper,
+                },
+                Predicate::BoolMatch(b) => JsonPredicate::BoolMatch(*b),
+            };
+            Ok(JsonFilterExpression::Path(JsonPathFilter {
+                field_id: path_filter.field_id.clone(),
+                json_path: path_filter.json_path.clone(),
+                predicate,
+            }))
+        }
+    }
 }
 
 fn compute_prefilters(search_request: &SearchRequest) -> Option<PreFilterRequest> {
