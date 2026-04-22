@@ -21,6 +21,7 @@
 mod date_range_search;
 mod initial_sync;
 mod search_filtering;
+mod search_json_filter;
 mod search_relations;
 mod search_sorting;
 mod searcher_cluster;

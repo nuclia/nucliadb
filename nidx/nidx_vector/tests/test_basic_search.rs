@@ -370,7 +370,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
 
     let resource = |r: usize| FieldId {
         resource_id: resources[r].resource.as_ref().unwrap().uuid.parse().unwrap(),
-        field_id: "/a/title".into(),
+        field_id: Some("/a/title".to_string()),
     };
 
     // Prefilter only

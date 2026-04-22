@@ -25,7 +25,9 @@ use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub struct FieldId {
     pub resource_id: Uuid,
-    pub field_id: String,
+    /// `None` means all fields on this resource match (resource-granular).
+    /// `Some(field_id)` means a specific field matches (field-granular).
+    pub field_id: Option<String>,
 }
 
 /// Utility type to identify and allow optimizations in filtering edge cases

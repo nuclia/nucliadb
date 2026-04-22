@@ -149,6 +149,7 @@ pub async fn search(index_cache: Arc<IndexCache>, search_request: SearchRequest)
     Ok(search_results)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn blocking_search(
     query_plan: QueryPlan,
     json_searcher: Option<&JsonSearcher>,
@@ -162,11 +163,11 @@ fn blocking_search(
     let mut index_queries = query_plan.index_queries;
 
     // Apply JSON prefilter first (resource-level UUID set)
-    if let Some(request) = index_queries.json_request.take() {
-        if let Some(searcher) = json_searcher {
-            let uuids = searcher.search(&request)?;
-            index_queries.apply_json_prefilter(uuids, index_queries.filter_or);
-        }
+    if let Some(request) = index_queries.json_request.take()
+        && let Some(searcher) = json_searcher
+    {
+        let uuids = searcher.search(&request)?;
+        index_queries.apply_json_prefilter(uuids, index_queries.filter_or);
     }
 
     // Early-exit if JSON prefilter already eliminated all results

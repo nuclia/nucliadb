@@ -182,7 +182,7 @@ impl IndexQueries {
                             .into_iter()
                             .map(|u| FieldId {
                                 resource_id: u,
-                                field_id: String::new(),
+                                field_id: None,
                             })
                             .collect(),
                     )
@@ -202,7 +202,7 @@ impl IndexQueries {
                             .into_iter()
                             .map(|u| FieldId {
                                 resource_id: u,
-                                field_id: String::new(),
+                                field_id: None,
                             })
                             .collect(),
                     )
@@ -218,7 +218,7 @@ impl IndexQueries {
                         if !existing_rids.contains(&u) {
                             merged.push(FieldId {
                                 resource_id: u,
-                                field_id: String::new(),
+                                field_id: None,
                             });
                         }
                     }

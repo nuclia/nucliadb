@@ -106,13 +106,38 @@ fn filter_query(
 
     // Prefilter
     if let PrefilterResult::Some(field_keys) = prefilter {
-        let set_query = Box::new(SetQuery::new(
-            schema.field_uuid,
-            field_keys
-                .iter()
-                .map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
-        ));
-        filter_terms.push((operator, set_query));
+        // Field-granular entries match against field_uuid; resource-granular
+        // entries (field_id = None) match against the uuid field directly.
+        let field_terms: Vec<_> = field_keys
+            .iter()
+            .filter_map(|x| {
+                x.field_id
+                    .as_ref()
+                    .map(|fid| format!("{}{}", x.resource_id.simple(), fid))
+            })
+            .collect();
+        let resource_terms: Vec<_> = field_keys
+            .iter()
+            .filter(|x| x.field_id.is_none())
+            .map(|x| x.resource_id.simple().to_string())
+            .collect();
+
+        let mut prefilter_clauses: Vec<(Occur, Box<dyn Query>)> = vec![];
+        if !field_terms.is_empty() {
+            prefilter_clauses.push((
+                Occur::Should,
+                Box::new(SetQuery::new(schema.field_uuid, field_terms.into_iter())),
+            ));
+        }
+        if !resource_terms.is_empty() {
+            prefilter_clauses.push((
+                Occur::Should,
+                Box::new(SetQuery::new(schema.uuid, resource_terms.into_iter())),
+            ));
+        }
+        if !prefilter_clauses.is_empty() {
+            filter_terms.push((operator, Box::new(BooleanQuery::new(prefilter_clauses))));
+        }
     }
 
     if !filter_terms.is_empty() {
