@@ -28,7 +28,7 @@ from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.models_utils import to_proto
 from nucliadb.models.internal.augment import Paragraph, ParagraphText
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.augmentor.paragraphs import augment_paragraphs
+from nucliadb.search.augmentor import augment_paragraphs
 from nucliadb.search.search import cache, rerankers
 from nucliadb.search.search.query_parser.parsers.retrieve import parse_retrieve
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import get_rephrased_query

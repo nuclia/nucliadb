@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import bisect
 from collections.abc import Sequence
 from typing import cast
@@ -35,7 +34,6 @@ from nucliadb.models.internal.augment import (
     AugmentedParagraph,
     AugmentedRelatedParagraphs,
     Metadata,
-    Paragraph,
     ParagraphImage,
     ParagraphPage,
     ParagraphPosition,
@@ -46,39 +44,11 @@ from nucliadb.models.internal.augment import (
 )
 from nucliadb.search import logger
 from nucliadb.search.augmentor.metrics import augmentor_observer
-from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb_models.search import TextPosition
 from nucliadb_protos import resources_pb2
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
-
-
-async def augment_paragraphs(
-    kbid: str,
-    given: list[Paragraph],
-    select: list[ParagraphProp],
-    *,
-    concurrency_control: asyncio.Semaphore | None = None,
-) -> dict[ParagraphId, AugmentedParagraph | None]:
-    """Augment a list of paragraphs following an augmentation"""
-
-    ops = []
-    for paragraph in given:
-        task = asyncio.create_task(
-            limited_concurrency(
-                augment_paragraph(kbid, paragraph.id, select, paragraph.metadata),
-                max_ops=concurrency_control,
-            )
-        )
-        ops.append(task)
-    results: list[AugmentedParagraph | None] = await asyncio.gather(*ops)
-
-    augmented = {}
-    for paragraph, augmentation in zip(given, results):
-        augmented[paragraph.id] = augmentation
-
-    return augmented
 
 
 @augmentor_observer.wrap({"type": "paragraph"})

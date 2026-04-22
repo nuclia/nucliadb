@@ -40,6 +40,7 @@ from nucliadb.models.internal.augment import (
     FileAugment,
     FileProp,
     Metadata,
+    Paragraph,
     ParagraphAugment,
     ParagraphProp,
     ParagraphText,
@@ -74,6 +75,23 @@ async def augment(
     ops = AugmentorOps(kbid)
     await ops.parse(augmentations)
     return await ops.run(concurrency_control=concurrency_control)
+
+
+async def augment_paragraphs(
+    kbid: str,
+    given: list[Paragraph],
+    select: list[ParagraphProp],
+    *,
+    concurrency_control: asyncio.Semaphore | None = None,
+) -> dict[ParagraphId, AugmentedParagraph]:
+    """Augment a list of paragraphs following an augmentation. Paragraphs that
+    can't be augmented are not returned.
+
+    """
+    augmented = await augment(
+        kbid, [ParagraphAugment(given=given, select=select)], concurrency_control=concurrency_control
+    )
+    return augmented.paragraphs
 
 
 class AugmentorOps:
