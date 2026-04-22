@@ -157,7 +157,6 @@ async def create_resource(
             x_skip_store=x_skip_store,
             resource_classifications=resource_classifications,
         )
-
         set_status(writer.basic, item)
 
         writer.source = BrokerMessage.MessageSource.WRITER

@@ -20,6 +20,7 @@ from pydantic.json_schema import SkipJsonSchema
 from nucliadb_models import content_types
 from nucliadb_models.conversation import InputConversationField
 from nucliadb_models.file import FileField
+from nucliadb_models.kv_schemas import KVValue
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     Extra,
@@ -32,6 +33,22 @@ from nucliadb_models.processing import PushProcessingOptions
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdPattern, FieldIdString, SlugString
+
+
+class KeyValueField(BaseModel):
+    """A key-value field value. The field id (key in the resource's key_values dict)
+    must equal the schema name — enforcing one KV field per schema per resource."""
+
+    schema_id: str = Field(
+        ...,
+        title="Schema ID",
+        description="The name of the KV schema this field conforms to.",
+    )
+    data: dict[str, KVValue] = Field(
+        default_factory=dict,
+        title="Data",
+        description="Key-value pairs conforming to the schema.",
+    )
 
 
 class FieldDefaults:
@@ -57,6 +74,11 @@ class FieldDefaults:
         {},
         title="Links",
         description=f"Dictionary of link fields to be added to the resource. The keys correspond to the field id, and must comply with the regex: {FieldIdPattern}",
+    )
+    key_values: dict[FieldIdString, "KeyValueField"] = Field(
+        {},
+        title="Key Values",
+        description=f"Dictionary of key-value fields to be added to the resource. The key must be the schema name and must comply with the regex: {FieldIdPattern}",
     )
     texts: dict[FieldIdString, TextField] = Field(
         {},
@@ -103,6 +125,7 @@ class CreateResourcePayload(BaseModel):
     links: dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: dict[FieldIdString, TextField] = FieldDefaults.texts
     conversations: dict[FieldIdString, InputConversationField] = FieldDefaults.conversations
+    key_values: dict[FieldIdString, KeyValueField] = FieldDefaults.key_values
     processing_options: PushProcessingOptions | None = Field(
         default=PushProcessingOptions(),
         description="Options for processing the resource. If not set, the default options will be used.",
@@ -154,6 +177,7 @@ class UpdateResourcePayload(BaseModel):
     links: dict[FieldIdString, LinkField] = FieldDefaults.links
     texts: dict[FieldIdString, TextField] = FieldDefaults.texts
     conversations: dict[FieldIdString, InputConversationField] = FieldDefaults.conversations
+    key_values: dict[FieldIdString, KeyValueField] = FieldDefaults.key_values
     processing_options: PushProcessingOptions | None = Field(
         default=PushProcessingOptions(),
         description="Options for processing the resource. If not set, the default options will be used.",

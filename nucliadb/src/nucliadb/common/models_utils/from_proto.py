@@ -67,6 +67,7 @@ def field_type_name(field_type: resources_pb2.FieldType.ValueType) -> FieldTypeN
         resources_pb2.FieldType.TEXT: FieldTypeName.TEXT,
         resources_pb2.FieldType.GENERIC: FieldTypeName.GENERIC,
         resources_pb2.FieldType.CONVERSATION: FieldTypeName.CONVERSATION,
+        resources_pb2.FieldType.KEY_VALUE: FieldTypeName.KEY_VALUE,
     }[field_type]
 
 

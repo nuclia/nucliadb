@@ -44,6 +44,15 @@ enum FieldType {
     TEXT = 4;
     GENERIC = 6;  // Base title/summary fields
     CONVERSATION = 7;
+    KEY_VALUE = 8;
+}
+
+message FieldKeyValue {
+    // JSON-encoded key-value data conforming to a KV schema defined on the KnowledgeBox.
+    // The schema_id identifies which schema this field conforms to.
+    string schema_id = 1;
+    // The entire key-value payload serialized as a single JSON string.
+    string data = 2;
 }
 
 message Basic {

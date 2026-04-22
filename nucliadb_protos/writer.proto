@@ -155,6 +155,9 @@ message BrokerMessage {
     // Vectors for the relation graph nodes & edges
     repeated resources.SemanticGraphNodeVectors field_semantic_graph_node_vectors = 44;
     repeated resources.SemanticGraphEdgeVectors field_semantic_graph_edge_vectors = 45;
+
+    // Field KeyValue
+    map<string, resources.FieldKeyValue> key_value_fields = 46;
 }
 
 message BrokerMessageBlobReference {

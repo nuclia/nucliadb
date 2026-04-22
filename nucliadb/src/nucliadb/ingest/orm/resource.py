@@ -33,6 +33,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
+from nucliadb.ingest.fields.key_value import KeyValue
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain_v2 import FilePagePositions
@@ -81,6 +82,7 @@ KB_FIELDS: dict[int, type] = {
     FieldType.LINK: Link,
     FieldType.GENERIC: Generic,
     FieldType.CONVERSATION: Conversation,
+    FieldType.KEY_VALUE: KeyValue,
 }
 
 PB_TEXT_FORMAT_TO_MIMETYPE = {
@@ -438,6 +440,11 @@ class Resource:
         for field, conversation in message.conversations.items():
             fid = FieldID(field_type=FieldType.CONVERSATION, field=field)
             await self.set_field(fid.field_type, fid.field, conversation)
+            message_updated_fields.append(fid)
+
+        for field, kv in message.key_value_fields.items():
+            fid = FieldID(field_type=FieldType.KEY_VALUE, field=field)
+            await self.set_field(fid.field_type, fid.field, kv)
             message_updated_fields.append(fid)
 
         for fieldid in message.delete_fields:

@@ -34,6 +34,7 @@ FIELD_TYPE_STR_TO_PB: dict[str, FieldType.ValueType] = {
     "u": FieldType.LINK,
     "a": FieldType.GENERIC,
     "c": FieldType.CONVERSATION,
+    "k": FieldType.KEY_VALUE,
 }
 
 FIELD_TYPE_PB_TO_STR = {v: k for k, v in FIELD_TYPE_STR_TO_PB.items()}
@@ -44,6 +45,7 @@ FIELD_TYPE_NAME_TO_STR = {
     FieldTypeName.LINK: "u",
     FieldTypeName.GENERIC: "a",
     FieldTypeName.CONVERSATION: "c",
+    FieldTypeName.KEY_VALUE: "k",
 }
 
 FIELD_TYPE_STR_TO_NAME = {v: k for k, v in FIELD_TYPE_NAME_TO_STR.items()}

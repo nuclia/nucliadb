@@ -418,6 +418,14 @@ async def _get_resource_field(
                 value = await field.get_value()
                 resource_field.value = from_proto.field_link(value)
 
+            if isinstance(value, resources_pb2.FieldKeyValue):
+                import json
+
+                resource_field.value = json.loads(value.data) if value.data else {}
+
+            if field_type is FieldTypeName.KEY_VALUE and value is None:
+                raise HTTPException(status_code=404, detail="Key-value field does not exist")
+
             if isinstance(field, Conversation):
                 if page == "first":
                     page_to_fetch = 1
@@ -431,7 +439,11 @@ async def _get_resource_field(
                 if value is not None:
                     resource_field.value = from_proto.conversation(value)
 
-        if ResourceFieldProperties.EXTRACTED in show and extracted:
+        if (
+            ResourceFieldProperties.EXTRACTED in show
+            and extracted
+            and field_type in FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP
+        ):
             resource_field.extracted = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[field_type]()
             await set_resource_field_extracted_data(
                 field,
