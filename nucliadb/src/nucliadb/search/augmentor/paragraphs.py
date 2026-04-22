@@ -278,7 +278,7 @@ async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | N
     return text or None
 
 
-async def get_paragraph_text_from_nidx(paragraph_id: ParagraphId) -> str | None:
+async def get_paragraph_text_from_nidx(id: ParagraphId) -> str | None:
     """Obtain a paragraph from the field extracted text.
 
     This is an expensive operation that requires a gRPC request to nidx to get
@@ -293,7 +293,7 @@ async def get_paragraph_text_from_nidx(paragraph_id: ParagraphId) -> str | None:
 
     nidx_extracted_texts = nidx_et_cache.get()
     assert nidx_extracted_texts is not None, "this function must be called with the nidx texts cache set"
-    return nidx_extracted_texts.get_paragraph_text(paragraph_id)
+    return nidx_extracted_texts.get_paragraph_text(id)
 
 
 @augmentor_observer.wrap({"type": "paragraph_text:storage"})

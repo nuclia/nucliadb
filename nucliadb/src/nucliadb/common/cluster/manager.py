@@ -352,24 +352,3 @@ class StandaloneKBShardManager(KBShardManager):
                     await storage.delete_upload(storage_key, storage.indexing_bucket)
             except Exception:
                 pass
-
-
-async def get_resource_nidx_shard_id(kbid: str, rid: str) -> str | None:
-    async with datamanagers.with_ro_transaction() as txn:
-        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-        if kb_shards is None:
-            return None
-
-        resource_shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=rid)
-        if resource_shard_id is None:
-            return None
-
-        nidx_shard_id = None
-        for shard in kb_shards.shards:
-            if shard.shard == resource_shard_id:
-                nidx_shard_id = shard.nidx_shard_id
-                break
-        else:
-            return None
-
-    return nidx_shard_id

@@ -37,8 +37,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb_protos.utils_pb2 import ExtractedText
 from nucliadb_telemetry.metrics import Counter, Gauge
-from nucliadb_utils import const
-from nucliadb_utils.utilities import get_storage, has_feature
+from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -117,36 +116,23 @@ class ExtractedTextCache(Cache[[str, FieldId], ExtractedText]):
         @alru_cache(maxsize=cache_size)
         @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
         async def _get_extracted_text(kbid: str, field_id: FieldId) -> ExtractedText | None:
-            # we store all splits unordered inside nidx_text, so nidx can't
-            # support yet conversation fields
-            if field_id.type != "c" and has_feature(
-                const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": kbid}
-            ):
-                from nucliadb.search.augmentor.fields import get_field_extracted_text_from_nidx
-
-                text = await get_field_extracted_text_from_nidx(kbid, field_id)
-                if text is None:
-                    return None
-                return ExtractedText(text=text)
-
-            else:
-                storage = await get_storage()
-                try:
-                    sf = storage.file_extracted(
-                        kbid, field_id.rid, field_id.type, field_id.key, FieldTypes.FIELD_TEXT.value
-                    )
-                    return await storage.download_pb(sf, ExtractedText)
-                except Exception:
-                    logger.warning(
-                        "Error getting extracted text for field. Retrying",
-                        exc_info=True,
-                        extra={
-                            "kbid": kbid,
-                            "resource_id": field_id.rid,
-                            "field": f"{field_id.type}/{field_id.key}",
-                        },
-                    )
-                    raise
+            storage = await get_storage()
+            try:
+                sf = storage.file_extracted(
+                    kbid, field_id.rid, field_id.type, field_id.key, FieldTypes.FIELD_TEXT.value
+                )
+                return await storage.download_pb(sf, ExtractedText)
+            except Exception:
+                logger.warning(
+                    "Error getting extracted text for field. Retrying",
+                    exc_info=True,
+                    extra={
+                        "kbid": kbid,
+                        "resource_id": field_id.rid,
+                        "field": f"{field_id.type}/{field_id.key}",
+                    },
+                )
+                raise
 
         self.cache = _get_extracted_text
 
