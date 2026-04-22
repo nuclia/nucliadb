@@ -109,7 +109,7 @@ async def augment_fields(
 async def augment_field(
     kbid: str,
     field_id: FieldId,
-    select: Sequence[FieldProp | ConversationProp],
+    select: Sequence[FieldProp | FileProp | ConversationProp],
 ) -> AugmentedField | None:
     rid = field_id.rid
     resource = await cache.get_resource(kbid, rid)

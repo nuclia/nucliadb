@@ -31,7 +31,7 @@ MODULE = "nucliadb.search.augmentor"
 
 async def test_augment_text():
     with (
-        patch(f"{MODULE}.paragraphs.get_paragraph_from_full_text", return_value="some text"),
+        patch(f"{MODULE}.paragraphs.get_paragraph_text", return_value="some text"),
     ):
         resource = Mock()
         field = Mock()
