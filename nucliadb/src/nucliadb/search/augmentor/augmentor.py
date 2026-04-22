@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from contextvars import ContextVar
 from typing import cast
 
 from typing_extensions import assert_never
@@ -52,10 +53,15 @@ from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import Resource
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
+from .extracted_text import ExtractedTexts, extracted_texts
 from .fields import augment_field
 from .paragraphs import augment_paragraph
 from .resources import augment_resource, augment_resource_deep
+
+nidx_et_cache: ContextVar[ExtractedTexts | None] = ContextVar("nidx_et_cache", default=None)
 
 
 @augmentor_observer.wrap({"type": "augment"})
@@ -201,6 +207,7 @@ class AugmentorOps:
 
         for field_id in field_ids:
             self.field_augments.setdefault(field_id, []).extend(augmentation.select)
+            self.field_texts.add(field_id)
 
     def _parse_file_field(self, augmentation: FileAugment) -> None:
         for id in augmentation.given:
@@ -237,6 +244,27 @@ class AugmentorOps:
             self.paragraph_augments[paragraph.id] = (select, metadata)
 
     async def run(
+        self,
+        *,
+        concurrency_control: asyncio.Semaphore | None = None,
+    ) -> Augmented:
+        nidx_extracted_texts = None
+        if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": self.kbid}):
+            nidx_extracted_texts = await extracted_texts(
+                self.kbid, self.field_texts, self.paragraph_texts
+            )
+
+        # we don't care here if nidx has been available or not as the fallback
+        # is on the augmentors logic (paragraph and fields)
+        token = nidx_et_cache.set(nidx_extracted_texts)
+        try:
+            augmented = await self._run_augmentations(concurrency_control=concurrency_control)
+        finally:
+            nidx_et_cache.reset(token)
+
+        return augmented
+
+    async def _run_augmentations(
         self,
         *,
         concurrency_control: asyncio.Semaphore | None = None,

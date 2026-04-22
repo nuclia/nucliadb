@@ -21,12 +21,9 @@ import bisect
 from collections.abc import Sequence
 from typing import cast
 
-from nidx_protos.nidx_pb2 import ExtractedTextsRequest
 from typing_extensions import assert_never
 
-from nucliadb.common.cluster.manager import get_resource_nidx_shard_id
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource
@@ -259,12 +256,20 @@ def _find_paragraph(
 
 @augmentor_observer.wrap({"type": "paragraph_text"})
 async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | None:
+    from .augmentor import nidx_et_cache
+
     # we store all splits unordered inside nidx_text, so nidx can't support yet
     # conversation fields
     if field.type != Conversation.type and has_feature(
         const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}
     ):
-        text = await get_paragraph_text_from_nidx(field, paragraph_id)
+        nidx_extracted_texts = nidx_et_cache.get()
+        if nidx_extracted_texts is not None:
+            text = await get_paragraph_text_from_nidx(paragraph_id)
+        else:
+            # nidx texts not available, either we are not calling from augmentor
+            # or something went wrong. In any case, fallback to object storage
+            text = await get_paragraph_text_from_storage(field, paragraph_id)
     else:
         text = await get_paragraph_text_from_storage(field, paragraph_id)
 
@@ -273,41 +278,22 @@ async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | N
     return text or None
 
 
-@augmentor_observer.wrap({"type": "paragraph_text:nidx"})
-async def get_paragraph_text_from_nidx(field: Field, paragraph_id: ParagraphId) -> str | None:
+async def get_paragraph_text_from_nidx(paragraph_id: ParagraphId) -> str | None:
     """Obtain a paragraph from the field extracted text.
 
     This is an expensive operation that requires a gRPC request to nidx to get
     the paragraph text. However, this is faster than getting the text from
     object storage alternative.
 
+    It uses a shared cache across the augmentor to avoid too many round trips to
+    the index.
+
     """
-    field_id = paragraph_id.field_id
+    from .augmentor import nidx_et_cache
 
-    nidx_shard_id = await get_resource_nidx_shard_id(kbid=field.kbid, rid=field_id.rid)
-    if nidx_shard_id is None:
-        return None
-
-    nidx_searcher = get_nidx_searcher_client()
-    # TODO(nidx-as-extracted-text-storage): minimize the number of calls to nidx
-    # with a shared batch or something similar
-    extracted_texts = await nidx_searcher.ExtractedTexts(
-        ExtractedTextsRequest(
-            shard_id=nidx_shard_id,
-            paragraph_ids=[
-                ExtractedTextsRequest.ParagraphId(
-                    rid=field_id.rid,
-                    field_type=field_id.type,
-                    field_name=field_id.key,
-                    split=field_id.subfield_id,
-                    paragraph_start=paragraph_id.paragraph_start,
-                    paragraph_end=paragraph_id.paragraph_end,
-                )
-            ],
-        )
-    )
-    text = extracted_texts.paragraphs.get(paragraph_id.full(), None)
-    return text
+    nidx_extracted_texts = nidx_et_cache.get()
+    assert nidx_extracted_texts is not None, "this function must be called with the nidx texts cache set"
+    return nidx_extracted_texts.get_paragraph_text(paragraph_id)
 
 
 @augmentor_observer.wrap({"type": "paragraph_text:storage"})

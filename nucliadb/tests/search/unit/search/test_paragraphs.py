@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from nucliadb.common.ids import ParagraphId
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.search.search import paragraphs
 from nucliadb.search.search.cache import extracted_text_cache
 from nucliadb_protos.utils_pb2 import ExtractedText
@@ -41,6 +41,7 @@ def extracted_text():
 def field(extracted_text):
     mock = MagicMock()
     mock.kbid = "kbid"
+    mock.field_id = FieldId(rid="rid", type="f", key="myfile")
     mock.extracted_text = None
     mock.get_extracted_text = AsyncMock(return_value=extracted_text)
     yield mock
@@ -71,10 +72,7 @@ class TestGetParagraphText:
     def orm_resource(self, field):
         mock = AsyncMock()
         mock.get_field.return_value = field
-        with patch(
-            "nucliadb.search.search.paragraphs.cache.get_resource",
-            return_value=mock,
-        ):
+        with patch("nucliadb.search.search.paragraphs.cache.get_resource", return_value=mock):
             yield mock
 
     async def test_get_paragraph_text(self, orm_resource):
