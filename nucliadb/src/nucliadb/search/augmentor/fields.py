@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 from collections import deque
 from collections.abc import AsyncIterator, Sequence
 from typing import Deque, cast
@@ -65,7 +64,6 @@ from nucliadb.models.internal.augment import (
 )
 from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.resources import get_basic
-from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_protos import resources_pb2
@@ -76,33 +74,6 @@ from nucliadb_utils.utilities import has_feature
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
-
-
-async def augment_fields(
-    kbid: str,
-    given: list[FieldId],
-    select: list[FieldProp | ConversationProp],
-    *,
-    concurrency_control: asyncio.Semaphore | None = None,
-) -> dict[FieldId, AugmentedField | None]:
-    """Augment a list of fields following an augmentation"""
-
-    ops = []
-    for field_id in given:
-        task = asyncio.create_task(
-            limited_concurrency(
-                augment_field(kbid, field_id, select),
-                max_ops=concurrency_control,
-            )
-        )
-        ops.append(task)
-    results: list[AugmentedField | None] = await asyncio.gather(*ops)
-
-    augmented = {}
-    for field_id, augmentation in zip(given, results):
-        augmented[field_id] = augmentation
-
-    return augmented
 
 
 @augmentor_observer.wrap({"type": "field"})
