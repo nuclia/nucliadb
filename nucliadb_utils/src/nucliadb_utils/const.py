@@ -47,6 +47,12 @@ class Features:
     FILE_MD5_READS = "nucliadb_file_md5_reads"
     # Flipt features
     NIDX_AS_EXTRACTED_TEXT_STORAGE = "nidx-as-extracted-text-storage"
+    KEY_VALUE_FIELDS = "nucliadb_key_value_fields"
 
 
-_FliptFeatures = set([Features.NIDX_AS_EXTRACTED_TEXT_STORAGE])
+_FliptFeatures = set(
+    [
+        Features.NIDX_AS_EXTRACTED_TEXT_STORAGE,
+        Features.KEY_VALUE_FIELDS,
+    ]
+)

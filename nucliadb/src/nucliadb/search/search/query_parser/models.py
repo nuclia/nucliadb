@@ -84,6 +84,7 @@ class Filters(BaseModel):
     filter_expression_operator: nodereader_pb2.FilterOperator.ValueType = (
         nodereader_pb2.FilterOperator.AND
     )
+    json_expression: nodereader_pb2.JsonFilterExpression | None = None
 
     facets: list[str] = Field(default_factory=list)
     hidden: bool | None = None

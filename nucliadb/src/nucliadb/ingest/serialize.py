@@ -351,7 +351,12 @@ async def serialize_security(resource: ORMResource) -> ResourceSecurity:
 async def serialize_field_errors(
     field: Field,
     serialized: (
-        TextFieldData | FileFieldData | LinkFieldData | ConversationFieldData | GenericFieldData
+        TextFieldData
+        | FileFieldData
+        | LinkFieldData
+        | ConversationFieldData
+        | GenericFieldData
+        | KeyValueFieldData
     ),
 ):
     status = await field.get_status()

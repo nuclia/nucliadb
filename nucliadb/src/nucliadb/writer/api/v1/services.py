@@ -33,7 +33,9 @@ from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_protos import writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import Label as LabelPB
 from nucliadb_protos.knowledgebox_pb2 import LabelSet as LabelSetPB
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires
+from nucliadb_utils.utilities import has_feature
 
 
 @api.post(
@@ -240,10 +242,13 @@ async def delete_search_configuration(request: Request, kbid: str, config_name: 
     summary="Create KV schema",
     tags=["Knowledge Box Services"],
     response_model=KVSchema,
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def create_kv_schema(request: Request, kbid: str, item: CreateKVSchema) -> KVSchema:
+    if not has_feature(const.Features.KEY_VALUE_FIELDS, context={"kbid": kbid}, default=False):
+        raise HTTPException(status_code=404)
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -264,12 +269,15 @@ async def create_kv_schema(request: Request, kbid: str, item: CreateKVSchema) ->
     summary="Update KV schema",
     tags=["Knowledge Box Services"],
     response_model=KVSchema,
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def update_kv_schema(
     request: Request, kbid: str, schema_name: str, item: UpdateKVSchema
 ) -> KVSchema:
+    if not has_feature(const.Features.KEY_VALUE_FIELDS, context={"kbid": kbid}, default=False):
+        raise HTTPException(status_code=404)
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -294,10 +302,13 @@ async def update_kv_schema(
     status_code=204,
     summary="Delete KV schema",
     tags=["Knowledge Box Services"],
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def delete_kv_schema(request: Request, kbid: str, schema_name: str) -> Response:
+    if not has_feature(const.Features.KEY_VALUE_FIELDS, context={"kbid": kbid}, default=False):
+        raise HTTPException(status_code=404)
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")

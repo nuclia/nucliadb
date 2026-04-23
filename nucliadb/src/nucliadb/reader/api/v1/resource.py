@@ -420,8 +420,9 @@ async def _get_resource_field(
 
             if isinstance(value, resources_pb2.FieldKeyValue):
                 import json
+                from typing import Any
 
-                resource_field.value = json.loads(value.data) if value.data else {}
+                resource_field.value = cast(Any, json.loads(value.data) if value.data else {})
 
             if field_type is FieldTypeName.KEY_VALUE and value is None:
                 raise HTTPException(status_code=404, detail="Key-value field does not exist")

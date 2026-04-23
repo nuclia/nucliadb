@@ -290,7 +290,7 @@ async def parse_key_value_field(
     writer.field_statuses.append(
         FieldIDStatus(
             id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.KEY_VALUE, field=key),
-            status=FieldStatus.Status.PENDING,
+            status=FieldStatus.Status.PROCESSED,
         )
     )
 

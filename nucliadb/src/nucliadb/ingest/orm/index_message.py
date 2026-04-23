@@ -20,6 +20,7 @@
 
 
 import asyncio
+import json
 from collections.abc import Sequence
 
 from nidx_protos.noderesources_pb2 import Resource as IndexMessage
@@ -28,6 +29,7 @@ from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb.ingest.fields.file import File
+from nucliadb.ingest.fields.key_value import KeyValue
 from nucliadb.ingest.orm.brain_v2 import ResourceBrain
 from nucliadb.ingest.orm.metrics import index_message_observer as observer
 from nucliadb.ingest.orm.resource import Resource, get_file_page_positions
@@ -176,6 +178,12 @@ class IndexMessageBuilder:
                             edge_vectors,
                             vectorset_config.vectorset_id,
                         )
+
+        if isinstance(field, KeyValue):
+            field_value = await field.get_value()
+            if field_value is not None:
+                kv_dict = json.loads(field_value.data)
+                brain.generate_json(self.resource.generate_field_id(fieldid), kv_dict)
 
     def _apply_field_deletions(
         self,
@@ -332,6 +340,8 @@ def get_bm_modified_fields(message: BrokerMessage) -> list[FieldID]:
         modified.add((conv, FieldType.CONVERSATION))
     for text in message.texts:
         modified.add((text, FieldType.TEXT))
+    for kv in message.key_value_fields:
+        modified.add((kv, FieldType.KEY_VALUE))
     if message.HasField("basic"):
         # Add title and summary only if they have changed
         if message.basic.title != "":

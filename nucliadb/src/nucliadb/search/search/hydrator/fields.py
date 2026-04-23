@@ -78,6 +78,10 @@ async def hydrate_field(field: Field, field_id: FieldId, config: hydration_model
         field = cast(Generic, field)
         return await hydrate_generic_field(field, field_id, config.generic)
 
+    elif field_type == FieldTypeName.KEY_VALUE:
+        # KV fields have no hydration config
+        return
+
     else:  # pragma: no cover
         assert_never(field_type)
 

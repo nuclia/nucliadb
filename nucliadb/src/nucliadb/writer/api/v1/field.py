@@ -314,6 +314,7 @@ FIELD_PARSERS_MAP: dict[type, Callable] = {
     summary="Add resource key-value field (by slug)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
@@ -333,6 +334,7 @@ async def add_resource_field_key_value_rslug_prefix(
     summary="Add resource key-value field (by id)",
     response_model=ResourceFieldAdded,
     tags=["Resource fields"],
+    include_in_schema=False,
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)

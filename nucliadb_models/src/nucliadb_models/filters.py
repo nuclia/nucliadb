@@ -303,6 +303,75 @@ class Status(FilterProp, extra="forbid"):
     status: ResourceProcessingStatus = pydantic.Field(description="The status of the resource")
 
 
+# --- New KV filter classes (top-level key_value in FilterExpression) ---
+
+
+class KVExactMatch(BaseModel, extra="forbid"):
+    """Matches a key-value field where the given key exactly matches the given string value"""
+
+    op: Literal["exact_match"] = "exact_match"
+    field_id: str = pydantic.Field(description="The KV field/schema name, e.g. 'product'")
+    key: str = pydantic.Field(description="The key within the KV data, e.g. 'color'")
+    value: str = pydantic.Field(description="The string value to match exactly")
+
+
+class KVRange(BaseModel, extra="forbid"):
+    """Matches a key-value field where the given key falls within a numeric range"""
+
+    op: Literal["range"] = "range"
+    field_id: str = pydantic.Field(description="The KV field/schema name, e.g. 'product'")
+    key: str = pydantic.Field(description="The key within the KV data, e.g. 'price'")
+    gte: float | int | None = pydantic.Field(default=None, description="Greater than or equal to")
+    lte: float | int | None = pydantic.Field(default=None, description="Less than or equal to")
+
+    @model_validator(mode="after")
+    def check_bounds(self) -> "KVRange":
+        if self.gte is None and self.lte is None:
+            raise ValueError("KVRange requires at least one bound (gte or lte)")
+        return self
+
+
+class KVBoolMatch(BaseModel, extra="forbid"):
+    """Matches a key-value field where the given key matches the given boolean value"""
+
+    op: Literal["bool_match"] = "bool_match"
+    field_id: str = pydantic.Field(description="The KV field/schema name, e.g. 'product'")
+    key: str = pydantic.Field(description="The key within the KV data, e.g. 'in_stock'")
+    value: bool = pydantic.Field(description="The boolean value to match")
+
+
+def kv_discriminator(v: Any) -> str | None:
+    if isinstance(v, dict):
+        if "and" in v:
+            return "and"
+        elif "or" in v:
+            return "or"
+        elif "not" in v:
+            return "not"
+        else:
+            return v.get("op")
+
+    if isinstance(v, And):
+        return "and"
+    elif isinstance(v, Or):
+        return "or"
+    elif isinstance(v, Not):
+        return "not"
+    else:
+        return getattr(v, "op", None)
+
+
+KVFilterExpression = Annotated[
+    Annotated[And["KVFilterExpression"], Tag("and")]
+    | Annotated[Or["KVFilterExpression"], Tag("or")]
+    | Annotated[Not["KVFilterExpression"], Tag("not")]
+    | Annotated[KVExactMatch, Tag("exact_match")]
+    | Annotated[KVRange, Tag("range")]
+    | Annotated[KVBoolMatch, Tag("bool_match")],
+    Discriminator(kv_discriminator),
+]
+
+
 # The discriminator function is optional, everything works without it.
 # We implement it because it makes pydantic produce more user-friendly errors
 def filter_discriminator(v: Any) -> str | None:
@@ -395,6 +464,9 @@ class FilterExpression(BaseModel, extra="forbid"):
     )
     paragraph: ParagraphFilterExpression | None = pydantic.Field(
         default=None, description="Filter to apply to each text block"
+    )
+    key_value: KVFilterExpression | None = pydantic.Field(
+        default=None, description="Filter to apply to key-value fields (JSON index prefilter)"
     )
 
     operator: Operator = pydantic.Field(

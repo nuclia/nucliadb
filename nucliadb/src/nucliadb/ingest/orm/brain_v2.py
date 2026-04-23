@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 import logging
 from collections.abc import Iterator
 from copy import deepcopy
@@ -511,6 +512,13 @@ class ResourceBrain:
         self.brain.paragraphs_to_delete.append(full_field_id)
         self.brain.vectors_to_delete_in_all_vectorsets.append(full_field_id)
         self.brain.relation_fields_to_delete.append(field_key)
+        if ftype == "k":
+            self.brain.json_fields_to_delete.append(full_field_id)
+
+    def generate_json(self, field_id: str, kv_data: dict) -> None:
+        from nidx_protos.noderesources_pb2 import JsonInformation
+
+        self.brain.json_fields[field_id].CopyFrom(JsonInformation(value=json.dumps(kv_data)))
 
     @observer.wrap({"type": "generate_vectors"})
     def generate_vectors(

@@ -124,6 +124,10 @@ async def download_page_preview(field: Field, page: int) -> Image | None:
         # these fields don't have previews
         image = None
 
+    elif field_type == FieldTypeName.KEY_VALUE:
+        # KV fields have no page previews
+        image = None
+
     else:  # pragma: no cover
         assert_never(field_type)
 
