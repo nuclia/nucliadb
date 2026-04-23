@@ -223,6 +223,7 @@ class S3StorageField(StorageField):
             PartNumber=self.field.offset,
             UploadId=self.field.resumable_uri,
             Body=data,
+            ContentLength=len(data),
         )
 
     @s3_ops_observer.wrap({"type": "finish_upload"})
@@ -513,6 +514,7 @@ class S3Storage(Storage):
             Key=key,
             Body=data,
             ContentType="application/octet-stream",
+            ContentLength=len(data),
         )
 
 
