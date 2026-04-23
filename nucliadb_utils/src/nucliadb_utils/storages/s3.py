@@ -362,6 +362,7 @@ class S3Storage(Storage):
         bucket: str | None = None,
         bucket_tags: dict[str, str] | None = None,
         use_path_addressing_style: bool = False,
+        disable_checksums: bool = False,
     ):
         self.source = CloudFile.S3
         self.deadletter_bucket = deadletter_bucket
@@ -384,7 +385,17 @@ class S3Storage(Storage):
             use_ssl=use_ssl,
             region_name=region_name,
             config=aiobotocore.config.AioConfig(
-                None, max_pool_connections=max_pool_connections, s3=s3_config
+                None,
+                max_pool_connections=max_pool_connections,
+                s3=s3_config,
+                **(
+                    {
+                        "request_checksum_calculation": "when_required",
+                        "response_checksum_validation": "when_required",
+                    }
+                    if disable_checksums
+                    else {}
+                ),
             ),
         )
         self._exit_stack = AsyncExitStack()
