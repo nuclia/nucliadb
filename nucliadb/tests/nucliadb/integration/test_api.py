@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import hashlib
 import json
 from typing import cast
 from unittest.mock import AsyncMock, patch
@@ -26,6 +27,8 @@ import pydantic
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.ingest.fields.base import FieldTypes
 from nucliadb.ingest.processing import DummyProcessingEngine, PushPayload
 from nucliadb.learning_proxy import (
     LearningConfiguration,
@@ -58,6 +61,7 @@ from nucliadb_protos.train_pb2 import GetSentencesRequest, TrainParagraph
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_utils.storages.storage import Storage
 from tests.utils import broker_resource, inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
@@ -2073,3 +2077,107 @@ async def test_concurrent_patch_operations(
     # At least some classifications should be present
     assert "classifications" in data["usermetadata"]
     assert len(data["usermetadata"]["classifications"]) > 0
+
+
+@pytest.mark.parametrize(
+    "x_synchronous,should_be_deleted_from_storage",
+    [
+        (True, True),
+        (False, False),
+        (None, False),
+    ],
+    ids=["synchronous-true", "synchronous-false", "synchronous-not-set"],
+)
+@pytest.mark.deploy_modes("standalone")
+async def test_delete_resource_x_synchronous_header(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
+    maindb_driver: Driver,
+    storage: Storage,
+    hosted_nucliadb,
+    x_synchronous: str | None,
+    should_be_deleted_from_storage: bool,
+):
+    """
+    Test that the x-synchronous header on resource deletion by slug works
+    for all three conditions: true, false, and not set (None).
+    """
+    import random
+
+    kbid = standalone_knowledgebox
+
+    # Create a resource using the /upload endpoint
+    content = random.randbytes(1024)
+    md5 = hashlib.md5(content).hexdigest()
+    filename = "test_sync_delete.txt"
+    encoded_filename = base64.b64encode(filename.encode()).decode("utf-8")
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/upload",
+        headers={
+            "X-Filename": encoded_filename,
+            "X-MD5": md5,
+            "Content-Type": "text/plain",
+            "Content-Length": str(len(content)),
+        },
+        content=content,
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Set a slug on the resource so we can delete by slug
+    slug = f"sync-delete-test-{x_synchronous if x_synchronous is not None else 'none'}"
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={"slug": slug},
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Emulate processing: inject extracted text for the file field
+    extracted_text = "This is some test content for synchronous deletion testing"
+    field_id = md5
+    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR)
+    fb = bmb.field_builder(field_id, field_type=FieldType.FILE)
+    fb.with_extracted_text(extracted_text)
+    bm = bmb.build()
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    et = await _raw_storage_get_extracted_text(storage, kbid, rid, field_id, "f")
+    assert et is not None
+    assert et.text == extracted_text
+
+    # Delete the resource by slug with the appropriate header
+    headers = {}
+    if x_synchronous is not None:
+        headers["X-Synchronous"] = str(x_synchronous)
+
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/{rid}",
+        headers=headers,
+    )
+    assert resp.status_code == 204, resp.text
+
+    # Verify the resource no longer exists
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}")
+    assert resp.status_code == 404
+
+    # Check that the extracted text has been deleted from storage
+    et = await _raw_storage_get_extracted_text(storage, kbid, rid, field_id, "f")
+    if should_be_deleted_from_storage:
+        assert et is None, "Extracted text should have been deleted from storage but still exists"
+    else:
+        assert et is not None, "Extracted text should not have been deleted from storage but is missing"
+        assert et.text == extracted_text, "Extracted text content does not match expected value"
+
+
+async def _raw_storage_get_extracted_text(
+    storage: Storage,
+    kbid: str,
+    rid: str,
+    field_id: str,
+    field_type: str,
+) -> rpb.ExtractedText | None:
+    sf = storage.file_extracted(kbid, rid, field_type, field_id, FieldTypes.FIELD_TEXT.value)
+    return await storage.download_pb(sf, rpb.ExtractedText)

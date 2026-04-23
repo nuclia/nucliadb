@@ -81,7 +81,6 @@ from nucliadb_utils.utilities import (
 )
 
 X_SYNCHRONOUS_DELETE_HEADER = Header(
-    default=None,
     description="When set to true, waits for the resource to be fully deleted before returning the response. If set to false, the deletion is asynchronous and the response is returned immediately. When unset, the behavior is determined by the server configuration.",
 )
 
