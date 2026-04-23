@@ -112,12 +112,13 @@ class S3StorageField(StorageField):
             bucket = self.field.bucket_name
         downloader = await self._download(uri, bucket, range=range)
         stream = downloader["Body"]
-        data = await stream.read(CHUNK_SIZE)
-        while True:
-            if not data:
-                break
-            yield data
+        async with stream:
             data = await stream.read(CHUNK_SIZE)
+            while True:
+                if not data:
+                    break
+                yield data
+                data = await stream.read(CHUNK_SIZE)
 
     @s3_ops_observer.wrap({"type": "abort_multipart"})
     async def _abort_multipart(self):
