@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from contextvars import ContextVar
 from typing import cast
 
 from typing_extensions import assert_never
@@ -56,12 +55,10 @@ from nucliadb_models.resource import Resource
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
-from .extracted_text import ExtractedTexts, extracted_texts
+from .extracted_text import extracted_texts, nidx_et_cache
 from .fields import augment_field
 from .paragraphs import augment_paragraph
 from .resources import augment_resource, augment_resource_deep
-
-nidx_et_cache: ContextVar[ExtractedTexts | None] = ContextVar("nidx_et_cache", default=None)
 
 
 @augmentor_observer.wrap({"type": "augment"})

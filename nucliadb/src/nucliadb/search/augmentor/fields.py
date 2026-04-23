@@ -68,6 +68,8 @@ from nucliadb_utils import const
 from nucliadb_utils.storages.storage import STORAGE_FILE_EXTRACTED
 from nucliadb_utils.utilities import has_feature
 
+from .extracted_text import nidx_et_cache
+
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
@@ -386,8 +388,6 @@ async def db_augment_generic_field(
 
 @augmentor_observer.wrap({"type": "field_text"})
 async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
-    from .augmentor import nidx_et_cache
-
     # we store all splits unordered inside nidx_text, so nidx can't support yet
     # conversation fields
     if field.type != Conversation.type and has_feature(
@@ -408,8 +408,6 @@ async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
 
 
 async def get_field_extracted_text_from_nidx(kbid: str, id: FieldId) -> str | None:
-    from .augmentor import nidx_et_cache
-
     nidx_extracted_texts = nidx_et_cache.get()
     assert nidx_extracted_texts is not None, "this function must be called with the nidx texts cache set"
     return nidx_extracted_texts.get_field_text(id)

@@ -47,6 +47,8 @@ from nucliadb_protos import resources_pb2
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
+from .extracted_text import nidx_et_cache
+
 
 @augmentor_observer.wrap({"type": "paragraph"})
 async def augment_paragraph(
@@ -256,8 +258,6 @@ def _find_paragraph(
 
 @augmentor_observer.wrap({"type": "paragraph_text"})
 async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | None:
-    from .augmentor import nidx_et_cache
-
     # we store all splits unordered inside nidx_text, so nidx can't support yet
     # conversation fields
     if field.type != Conversation.type and has_feature(
@@ -289,8 +289,6 @@ async def get_paragraph_text_from_nidx(id: ParagraphId) -> str | None:
     the index.
 
     """
-    from .augmentor import nidx_et_cache
-
     nidx_extracted_texts = nidx_et_cache.get()
     assert nidx_extracted_texts is not None, "this function must be called with the nidx texts cache set"
     return nidx_extracted_texts.get_paragraph_text(id)

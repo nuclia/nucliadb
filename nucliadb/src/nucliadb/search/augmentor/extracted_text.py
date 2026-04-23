@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from contextvars import ContextVar
 
 from nidx_protos.nidx_pb2 import ExtractedTextsRequest, ExtractedTextsResponse
 from nidx_protos.nidx_pb2_grpc import NidxSearcherStub
@@ -48,6 +49,9 @@ class ExtractedTexts:
             if text:
                 break
         return text
+
+
+nidx_et_cache: ContextVar[ExtractedTexts | None] = ContextVar("nidx_et_cache", default=None)
 
 
 @augmentor_observer.wrap({"type": "nidx_extracted_texts"})
