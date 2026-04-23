@@ -412,7 +412,7 @@ class S3Storage(Storage):
         return created
 
     async def finalize(self):
-        await self._exit_stack.__aexit__(None, None, None)
+        await self._exit_stack.aclose()
 
     @s3_ops_observer.wrap({"type": "delete"})
     async def delete_upload(self, uri: str, bucket_name: str):
