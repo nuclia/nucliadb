@@ -589,6 +589,10 @@ impl TextReaderService {
                 IndexRecordOption::Basic,
             )));
         }
+        if subqueries.is_empty() {
+            // skip, as we don't have anything to search and tantivy panics with limit=0
+            return Ok(vec![]);
+        }
         // we store a doc per field, so we expect at most the number of unique fields
         let limit = subqueries.len();
         let query: Box<dyn Query> = Box::new(BooleanQuery::union(subqueries));
