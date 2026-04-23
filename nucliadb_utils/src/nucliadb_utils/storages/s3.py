@@ -360,6 +360,7 @@ class S3Storage(Storage):
         max_pool_connections: int = 30,
         bucket: str | None = None,
         bucket_tags: dict[str, str] | None = None,
+        use_path_addressing_style: bool = False,
     ):
         self.source = CloudFile.S3
         self.deadletter_bucket = deadletter_bucket
@@ -370,6 +371,10 @@ class S3Storage(Storage):
 
         self._bucket_tags = bucket_tags
 
+        s3_config = {}
+        if use_path_addressing_style:
+            s3_config["addressing_style"] = "path"
+
         self.opts = dict(
             aws_secret_access_key=self._aws_secret_key,
             aws_access_key_id=self._aws_access_key,
@@ -377,7 +382,9 @@ class S3Storage(Storage):
             verify=verify_ssl,
             use_ssl=use_ssl,
             region_name=region_name,
-            config=aiobotocore.config.AioConfig(None, max_pool_connections=max_pool_connections),
+            config=aiobotocore.config.AioConfig(
+                None, max_pool_connections=max_pool_connections, s3=s3_config
+            ),
         )
         self._exit_stack = AsyncExitStack()
         self.bucket = bucket

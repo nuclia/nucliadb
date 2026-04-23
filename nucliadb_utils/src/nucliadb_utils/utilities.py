@@ -146,6 +146,7 @@ async def _create_storage(gcs_scopes: list[str] | None = None) -> Storage:
             bucket=storage_settings.s3_bucket,
             bucket_tags=storage_settings.s3_bucket_tags,
             kms_key_id=storage_settings.s3_kms_key_id,
+            use_path_addressing_style=storage_settings.s3_path_style_addressing,
         )
         logger.info("Configuring S3 Storage")
         await s3util.initialize()
