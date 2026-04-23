@@ -80,6 +80,11 @@ from nucliadb_utils.utilities import (
     get_storage,
 )
 
+X_SYNCHRONOUS_DELETE_HEADER = Header(
+    default=None,
+    description="When set to true, waits for the resource to be fully deleted before returning the response. If set to false, the deletion is asynchronous and the response is returned immediately. When unset, the behavior is determined by the server configuration.",
+)
+
 
 @api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCES_PREFIX}",
@@ -503,12 +508,9 @@ async def delete_resource_rslug_prefix(
     rslug: str,
     background: BackgroundTasks,
     x_synchronous: Annotated[
-        bool,
-        Header(
-            default=False,
-            description="When set to true, waits for the resource to be fully deleted before returning the response.",
-        ),
-    ] = False,
+        bool | None,
+        X_SYNCHRONOUS_DELETE_HEADER,
+    ] = None,
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _delete_resource(request, kbid, rid, background, synchronous=x_synchronous)
@@ -528,18 +530,15 @@ async def delete_resource_rid_prefix(
     rid: str,
     background: BackgroundTasks,
     x_synchronous: Annotated[
-        bool,
-        Header(
-            default=False,
-            description="When set to true, waits for the resource to be fully deleted before returning the response.",
-        ),
-    ] = False,
+        bool | None,
+        X_SYNCHRONOUS_DELETE_HEADER,
+    ] = None,
 ):
     return await _delete_resource(request, kbid, rid, background, synchronous=x_synchronous)
 
 
 async def _delete_resource(
-    request: Request, kbid: str, rid: str, background: BackgroundTasks, synchronous: bool = False
+    request: Request, kbid: str, rid: str, background: BackgroundTasks, synchronous: bool | None = None
 ):
     await validate_rid_exists_or_raise_error(kbid, rid)
 
@@ -552,13 +551,23 @@ async def _delete_resource(
     writer.uuid = rid
     writer.type = BrokerMessage.MessageType.DELETE
 
-    if synchronous:
-        # If synchronous deletion is requested, make sure to delete all objects from the storage during the transaction.
+    if synchronous is None:
+        # Default server behaviour is waiting for the commit to complete, but delete from storage asynchronously (i.e. at purge time)
+        wait_for_commit = True
+        storage_deletion_synchronous = False
+    elif synchronous is True:
+        # Wait for the commit to complete and delete from storage during the transaction.
         # This way we avoid having orphaned objects which can cause issues for users that reuse ids on uploads.
-        writer.synchronous_storage_deletion = True
+        wait_for_commit = True
+        storage_deletion_synchronous = True
+    else:
+        # Do not wait for the commit to complete and delete from storage asynchronously (i.e. at purge time)
+        wait_for_commit = False
+        storage_deletion_synchronous = False
 
+    writer.synchronous_storage_deletion = storage_deletion_synchronous
     parse_audit(writer.audit, request)
-    await transaction.commit(writer, partition, wait=True)
+    await transaction.commit(writer, partition, wait=wait_for_commit)
     processing = get_processing()
     background.add_task(processing.delete_from_processing, kbid=kbid, resource_id=rid)
 
