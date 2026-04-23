@@ -615,7 +615,7 @@ impl TextReaderService {
         };
         let mut window_paragraphs = vec![first];
 
-        let mut skip = 0;
+        let mut position = 0;
 
         for paragraph_id in ids {
             if paragraph_id.paragraph_start < window.end {
@@ -626,10 +626,10 @@ impl TextReaderService {
             } else {
                 // A non-overlapping paragraph means we won't find any other paragraph that needs
                 // the text from the window. We then read the window and extract the paragraphs
-                skip = window.start - skip;
+                let skip = window.start - position;
                 let take = window.end - window.start;
                 let chunk: Vec<char> = text.by_ref().skip(skip as usize).take(take as usize).collect();
-                skip = window.end;
+                position = window.end;
 
                 for id in window_paragraphs.drain(..) {
                     let start = (id.paragraph_start - window.start) as usize;
@@ -649,9 +649,9 @@ impl TextReaderService {
         }
 
         // with no more paragraphs, we can finish with the window
-        skip = window.start - skip;
+        position = window.start - position;
         let take = window.end - window.start;
-        let chunk: Vec<char> = text.by_ref().skip(skip as usize).take(take as usize).collect();
+        let chunk: Vec<char> = text.by_ref().skip(position as usize).take(take as usize).collect();
 
         for id in window_paragraphs.drain(..) {
             let start = (id.paragraph_start - window.start) as usize;
