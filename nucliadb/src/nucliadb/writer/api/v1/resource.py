@@ -22,7 +22,7 @@ from time import time
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import BackgroundTasks, HTTPException, Query, Response
+from fastapi import BackgroundTasks, Header, HTTPException, Query, Response
 from fastapi_versioning import version
 from starlette.requests import Request
 
@@ -488,6 +488,13 @@ async def _reprocess_resource(
     return ResourceUpdated(seqid=processing_info.seqid)
 
 
+_X_SYNCHRONOUS_DESCRIPTION = """When set to true, wait until deletion has been
+completed. Otherwise, deletion will be done asynchronously. Waiting for a
+deletion can be slow but ensures the resource is fully deleted once the requests
+finishes.
+"""
+
+
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}",
     status_code=204,
@@ -497,7 +504,11 @@ async def _reprocess_resource(
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def delete_resource_rslug_prefix(
-    request: Request, kbid: str, rslug: str, background: BackgroundTasks
+    request: Request,
+    kbid: str,
+    rslug: str,
+    background: BackgroundTasks,
+    x_synchronous: bool = Header(default=False, description=_X_SYNCHRONOUS_DESCRIPTION),
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _delete_resource(request, kbid, rid, background)
@@ -511,7 +522,13 @@ async def delete_resource_rslug_prefix(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_resource_rid_prefix(request: Request, kbid: str, rid: str, background: BackgroundTasks):
+async def delete_resource_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    background: BackgroundTasks,
+    x_synchronous: bool = Header(default=False, description=_X_SYNCHRONOUS_DESCRIPTION),
+):
     return await _delete_resource(request, kbid, rid, background)
 
 
