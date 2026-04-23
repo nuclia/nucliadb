@@ -223,7 +223,7 @@ impl TextSearcher {
     pub fn get_paragraphs_text(
         &self,
         paragraph_uids: Vec<ParagraphUid>,
-    ) -> anyhow::Result<HashMap<ParagraphUid, Option<String>>> {
+    ) -> anyhow::Result<HashMap<ParagraphUid, String>> {
         self.reader.get_paragraphs_text(paragraph_uids)
     }
 

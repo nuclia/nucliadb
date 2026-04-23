@@ -510,7 +510,7 @@ impl TextReaderService {
     pub fn get_paragraphs_text(
         &self,
         paragraph_uids: Vec<ParagraphUid>,
-    ) -> anyhow::Result<HashMap<ParagraphUid, Option<String>>> {
+    ) -> anyhow::Result<HashMap<ParagraphUid, String>> {
         let mut field_paragraph_ids = HashMap::new();
         for paragraph_id in paragraph_uids {
             let field_id = FieldUid::from(paragraph_id.clone());
@@ -600,7 +600,7 @@ impl TextReaderService {
     fn extract_paragraphs(
         ids: impl Iterator<Item = ParagraphUid>,
         mut text: std::str::Chars<'_>,
-    ) -> HashMap<ParagraphUid, Option<String>> {
+    ) -> HashMap<ParagraphUid, String> {
         let mut paragraphs = HashMap::new();
 
         // sort paragraph_ids by (start, end) to avoid the need of already read chars from the text
@@ -636,7 +636,7 @@ impl TextReaderService {
                     // clamp to chunk size, we don't have more text
                     let end = std::cmp::min((id.paragraph_end - window.start) as usize, chunk.len());
                     let paragraph: String = chunk[start..end].iter().collect();
-                    paragraphs.insert(id, Some(paragraph));
+                    paragraphs.insert(id, paragraph);
                 }
 
                 // As the new paragraph could overlap with future ones, we reset the window with it
@@ -657,7 +657,7 @@ impl TextReaderService {
             let start = (id.paragraph_start - window.start) as usize;
             let end = std::cmp::min((id.paragraph_end - window.start) as usize, chunk.len());
             let paragraph: String = chunk[start..end].iter().collect();
-            paragraphs.insert(id, Some(paragraph));
+            paragraphs.insert(id, paragraph);
         }
 
         paragraphs
@@ -801,18 +801,18 @@ mod tests {
         assert_eq!(
             paragraphs,
             HashMap::from_iter([
-                (words[0].clone(), Some("This".to_string())),
-                (overlapping[0].clone(), Some("This is".to_string())),
-                (words[1].clone(), Some("is".to_string())),
-                (overlapping[1].clone(), Some("is my test".to_string())),
-                (overlapping[2].clone(), Some("is my test".to_string())),
-                (words[2].clone(), Some("my".to_string())),
-                (overlapping[3].clone(), Some("my test".to_string())),
-                (out_of_bounds[0].clone(), Some("my test text".to_string())),
-                (words[3].clone(), Some("test".to_string())),
-                (words[4].clone(), Some("text".to_string())),
-                (out_of_bounds[1].clone(), Some("text".to_string())),
-                (out_of_bounds[2].clone(), Some("".to_string())),
+                (words[0].clone(), ("This".to_string())),
+                (overlapping[0].clone(), ("This is".to_string())),
+                (words[1].clone(), ("is".to_string())),
+                (overlapping[1].clone(), ("is my test".to_string())),
+                (overlapping[2].clone(), ("is my test".to_string())),
+                (words[2].clone(), ("my".to_string())),
+                (overlapping[3].clone(), ("my test".to_string())),
+                (out_of_bounds[0].clone(), ("my test text".to_string())),
+                (words[3].clone(), ("test".to_string())),
+                (words[4].clone(), ("text".to_string())),
+                (out_of_bounds[1].clone(), ("text".to_string())),
+                (out_of_bounds[2].clone(), ("".to_string())),
             ])
         );
     }

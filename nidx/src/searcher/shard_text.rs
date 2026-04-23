@@ -98,7 +98,7 @@ fn blocking_extracted_texts(
         }
         let paragraphs_text = searcher.get_paragraphs_text(paragraph_ids)?;
         for (k, v) in paragraphs_text {
-            extracted_texts.paragraphs.insert(k.to_string(), v.unwrap_or_default());
+            extracted_texts.paragraphs.insert(k.to_string(), v);
         }
     }
 
