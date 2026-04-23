@@ -25,6 +25,7 @@ from nidx_protos.nidx_pb2_grpc import NidxSearcherStub
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.nidx import get_nidx_searcher_client
+from nucliadb.search import logger
 from nucliadb.search.augmentor.metrics import augmentor_observer
 
 
@@ -94,9 +95,15 @@ async def _build_requests(
                     txn, kbid=kbid, rid=rid
                 )
                 if resource_shard_id is None:
-                    return None
+                    # Resource not in DB, either a dirty read (reading a delete)
+                    # or a user requesting a deleted or wrong resource. Skip
+                    continue
                 nidx_shard_id = logical_to_nidx_shard.get(resource_shard_id)
                 if nidx_shard_id is None:
+                    logger.warning(
+                        "nidx shard not found for resource shard",
+                        extra={"kbid": kbid, "resource_shard_id": resource_shard_id},
+                    )
                     return None
 
                 resource_nidx_shard[rid] = nidx_shard_id
@@ -120,9 +127,15 @@ async def _build_requests(
                     txn, kbid=kbid, rid=rid
                 )
                 if resource_shard_id is None:
-                    return None
+                    # Resource not in DB, either a dirty read (reading a delete)
+                    # or a user requesting a deleted or wrong resource. Skip
+                    continue
                 nidx_shard_id = logical_to_nidx_shard.get(resource_shard_id)
                 if nidx_shard_id is None:
+                    logger.warning(
+                        "nidx shard not found for resource shard",
+                        extra={"kbid": kbid, "resource_shard_id": resource_shard_id},
+                    )
                     return None
 
                 resource_nidx_shard[rid] = nidx_shard_id
