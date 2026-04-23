@@ -24,6 +24,7 @@ import string
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
+from nucliadb.search.augmentor.paragraphs import get_paragraph_text as _augmentor_get_paragraph_text
 from nucliadb.search.search import cache
 from nucliadb_telemetry import errors
 
@@ -44,12 +45,10 @@ async def get_paragraph_from_full_text(
 
     This requires downloading the full text and then slicing it.
     """
-    from nucliadb.search.augmentor.paragraphs import get_paragraph_text
-
     field_id = field.field_id
     field_id.subfield_id = split
     paragraph_id = field_id.paragraph_id(start, end)
-    return await get_paragraph_text(field, paragraph_id) or ""
+    return await _augmentor_get_paragraph_text(field, paragraph_id) or ""
 
 
 async def get_paragraph_text(
