@@ -558,7 +558,7 @@ async def _delete_resource(
         writer.synchronous_storage_deletion = True
 
     parse_audit(writer.audit, request)
-    await transaction.commit(writer, partition, wait=synchronous)
+    await transaction.commit(writer, partition, wait=True)
     processing = get_processing()
     background.add_task(processing.delete_from_processing, kbid=kbid, resource_id=rid)
 
