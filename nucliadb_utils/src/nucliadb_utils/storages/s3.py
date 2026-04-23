@@ -598,6 +598,7 @@ def parse_status_code(error: botocore.exceptions.ClientError) -> int:
 
 def parse_object_metadata(obj: dict, key: str) -> ObjectMetadata:
     custom_metadata = obj.get("Metadata") or {}
+
     # Parse size
     custom_size = custom_metadata.get("size")
     if custom_size is None or custom_size == "0":
@@ -607,8 +608,15 @@ def parse_object_metadata(obj: dict, key: str) -> ObjectMetadata:
             size = int(content_lenght)
     else:
         size = int(custom_size)
+
     # Content type
     content_type = custom_metadata.get("content_type") or obj.get("ContentType") or ""
+    if content_type == "binary/octet-stream":
+        # some S3-compatible implementations like DELL OneFS always return
+        # binary/octet-stream as content type but, as that's not a valid IANA
+        # content type, we replace it for the correct one
+        content_type = "application/octet-stream"
+
     # Filename
     base64_filename = custom_metadata.get("base64_filename")
     if base64_filename:
