@@ -85,7 +85,7 @@ pub struct FieldUid {
 }
 
 // Unique id for a field, equivalent to {rid}/{field_type}/{field_id}[/{split}]/{paragraph_start}-{paragraph_end}
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ParagraphUid {
     pub rid: String,
     pub field_type: String,
@@ -223,38 +223,8 @@ impl TextSearcher {
     pub fn get_paragraphs_text(
         &self,
         paragraph_uids: Vec<ParagraphUid>,
-    ) -> anyhow::Result<HashMap<ParagraphUid, Option<String>>> {
-        let mut paragraph_fields = HashMap::new();
-        for paragraph_id in paragraph_uids {
-            let field_id = FieldUid::from(paragraph_id.clone());
-            paragraph_fields
-                .entry(field_id)
-                .and_modify(|v: &mut Vec<ParagraphUid>| v.push(paragraph_id.clone()))
-                .or_insert(vec![paragraph_id]);
-        }
-
-        let fields_text = self
-            .reader
-            .get_fields_text(paragraph_fields.keys().cloned().collect())?;
-
-        let mut paragraphs_text = HashMap::new();
-
-        for (field_id, field_text) in fields_text {
-            if let Some(paragraphs) = paragraph_fields.remove(&field_id) {
-                for paragraph_id in paragraphs {
-                    let paragraph_text = field_text.as_ref().map(|field_text| {
-                        field_text
-                            .chars()
-                            .skip(paragraph_id.paragraph_start as usize)
-                            .take((paragraph_id.paragraph_end - paragraph_id.paragraph_start) as usize)
-                            .collect()
-                    });
-                    paragraphs_text.insert(paragraph_id, paragraph_text);
-                }
-            }
-        }
-
-        Ok(paragraphs_text)
+    ) -> anyhow::Result<HashMap<ParagraphUid, String>> {
+        self.reader.get_paragraphs_text(paragraph_uids)
     }
 
     pub fn iterator(&self, request: &StreamRequest) -> anyhow::Result<impl Iterator<Item = DocumentItem> + use<>> {

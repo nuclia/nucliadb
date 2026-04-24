@@ -23,6 +23,7 @@ use std::time::Instant;
 
 use nidx_protos::{ExtractedTextsRequest, ExtractedTextsResponse};
 use nidx_text::{FieldUid, ParagraphUid, TextSearcher};
+use tracing::Span;
 
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::index_cache::IndexCache;
@@ -47,8 +48,24 @@ pub async fn extracted_texts(
         return Err(NidxError::NotFound);
     };
     let index = index_cache.get(&text_index_id).await?;
-    let searcher: &TextSearcher = index.as_ref().into();
 
+    let span = Span::current();
+    let extracted_texts = tokio::task::spawn_blocking(move || {
+        span.in_scope(|| {
+            let searcher: &TextSearcher = index.as_ref().into();
+            blocking_extracted_texts(searcher, request)
+        })
+    })
+    .await??;
+
+    tracing::debug!("Extracted texts took {:?}", start.elapsed());
+    Ok(extracted_texts)
+}
+
+fn blocking_extracted_texts(
+    searcher: &TextSearcher,
+    request: ExtractedTextsRequest,
+) -> NidxResult<ExtractedTextsResponse> {
     let mut extracted_texts = ExtractedTextsResponse::default();
 
     if !request.field_ids.is_empty() {
@@ -81,10 +98,9 @@ pub async fn extracted_texts(
         }
         let paragraphs_text = searcher.get_paragraphs_text(paragraph_ids)?;
         for (k, v) in paragraphs_text {
-            extracted_texts.paragraphs.insert(k.to_string(), v.unwrap_or_default());
+            extracted_texts.paragraphs.insert(k.to_string(), v);
         }
     }
 
-    tracing::info!("Extracted texts took {:?}µs", start.elapsed().as_micros());
     Ok(extracted_texts)
 }
