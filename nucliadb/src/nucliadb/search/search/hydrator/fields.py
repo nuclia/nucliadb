@@ -54,25 +54,25 @@ async def hydrate_field(field: Field, field_id: FieldId, config: hydration_model
         field = cast(Text, field)
         return await hydrate_text_field(field, field_id, config.text)
 
-    elif field_type == FieldTypeName.FILE is not None:
+    elif field_type == FieldTypeName.FILE:
         if not config.file:
             return
         field = cast(File, field)
         return await hydrate_file_field(field, field_id, config.file)
 
-    elif field_type == FieldTypeName.LINK is not None:
+    elif field_type == FieldTypeName.LINK:
         if not config.link:
             return
         field = cast(Link, field)
         return await hydrate_link_field(field, field_id, config.link)
 
-    elif field_type == FieldTypeName.CONVERSATION is not None:
+    elif field_type == FieldTypeName.CONVERSATION:
         if not config.conversation:
             return
         field = cast(Conversation, field)
         return await hydrate_conversation_field(field, field_id, config.conversation)
 
-    elif field_type == FieldTypeName.GENERIC is not None:
+    elif field_type == FieldTypeName.GENERIC:
         if not config.generic:
             return
         field = cast(Generic, field)

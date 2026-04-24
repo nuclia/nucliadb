@@ -90,7 +90,7 @@ async def retrieve_endpoint(
             detail=str(err),
         )
 
-    text_blocks, pb_query, _, _ = await text_block_search(kbid, parsed.retrieval)
+    text_blocks, _, _, _ = await text_block_search(kbid, parsed.retrieval)
 
     if (
         parsed.retrieval.reranker is not None

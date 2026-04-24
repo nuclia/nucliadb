@@ -428,7 +428,7 @@ async def test_search_relations(
     standalone_knowledgebox,
     knowledge_graph,
 ):
-    relation_nodes, relation_edges, rid = knowledge_graph
+    relation_nodes, _, rid = knowledge_graph
 
     predict_mock = Mock()
     set_utility(Utility.PREDICT, predict_mock)

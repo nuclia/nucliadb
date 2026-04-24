@@ -20,7 +20,7 @@ from typing import Any
 from urllib.parse import ParseResult
 
 import nats
-from nats.aio.client import Client
+from nats.aio.client import DEFAULT_FLUSH_TIMEOUT, Client
 from nats.aio.msg import Msg
 from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
@@ -308,7 +308,7 @@ class NatsClientTelemetry:
     async def drain(self) -> None:
         return await self.nc.drain()
 
-    async def flush(self, timeout: int = nats.aio.client.DEFAULT_FLUSH_TIMEOUT) -> None:
+    async def flush(self, timeout: int = DEFAULT_FLUSH_TIMEOUT) -> None:
         return await self.nc.flush(timeout)
 
     async def close(self) -> None:

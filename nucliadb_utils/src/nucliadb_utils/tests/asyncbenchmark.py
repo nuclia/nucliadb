@@ -182,7 +182,7 @@ class AsyncBenchmarkFixture:  # pragma: no cover
             duration, iterations, loops_range = await self._calibrate_timer(runner)
 
             # Choose how many time we must repeat the test
-            rounds = int(ceil(self._max_time / duration))
+            rounds = ceil(self._max_time / duration)
             rounds = max(rounds, self._min_rounds)
             rounds = min(rounds, sys.maxsize)
 
@@ -264,7 +264,7 @@ class AsyncBenchmarkFixture:  # pragma: no cover
 
             if duration >= min_time_estimate:
                 # coarse estimation of the number of loops
-                loops = int(ceil(min_time * loops / duration))
+                loops = ceil(min_time * loops / duration)
                 self._logger.debug("    Estimating %s iterations." % loops, green=True)
                 if loops == 1:
                     # If we got a single loop then bail early - nothing to calibrate if the the

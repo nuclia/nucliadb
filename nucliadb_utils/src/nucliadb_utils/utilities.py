@@ -102,13 +102,11 @@ def clean_utility(ident: Utility | str):
 
 
 async def get_storage(gcs_scopes: list[str] | None = None, service_name: str | None = None) -> Storage:
-    if Utility.STORAGE in MAIN:
-        return MAIN[Utility.STORAGE]
-
-    storage = await _create_storage(gcs_scopes=gcs_scopes)
-    set_utility(Utility.STORAGE, storage)
-
-    return MAIN[Utility.STORAGE]
+    storage: Storage | None = get_utility(Utility.STORAGE)
+    if storage is None:
+        storage = await _create_storage(gcs_scopes=gcs_scopes)
+        set_utility(Utility.STORAGE, storage)
+    return storage
 
 
 async def _create_storage(gcs_scopes: list[str] | None = None) -> Storage:
@@ -201,28 +199,30 @@ async def teardown_storage() -> None:
 
 
 def get_local_storage() -> LocalStorage:
-    if Utility.LOCAL_STORAGE not in MAIN:
-        from nucliadb_utils.storages.local import LocalStorage
+    from nucliadb_utils.storages.local import LocalStorage
 
-        MAIN[Utility.LOCAL_STORAGE] = LocalStorage(
-            local_testing_files=extended_storage_settings.local_testing_files
-        )
+    local_storage: LocalStorage | None = get_utility(Utility.LOCAL_STORAGE)
+    if local_storage is None:
+        local_storage = LocalStorage(local_testing_files=extended_storage_settings.local_testing_files)
+        set_utility(Utility.LOCAL_STORAGE, local_storage)
         logger.info("Configuring Local Storage")
-    return MAIN.get(Utility.LOCAL_STORAGE, None)
+    return local_storage
 
 
 async def get_nuclia_storage() -> NucliaStorage:
-    if Utility.NUCLIA_STORAGE not in MAIN:
-        from nucliadb_utils.storages.nuclia import NucliaStorage
+    from nucliadb_utils.storages.nuclia import NucliaStorage
 
-        MAIN[Utility.NUCLIA_STORAGE] = NucliaStorage(
+    nuclia_storage: NucliaStorage | None = get_utility(Utility.NUCLIA_STORAGE)
+    if nuclia_storage is None:
+        nuclia_storage = NucliaStorage(
             nuclia_public_url=nuclia_settings.nuclia_public_url,
             nuclia_zone=nuclia_settings.nuclia_zone,
             service_account=nuclia_settings.nuclia_service_account,
         )
         logger.info("Configuring Nuclia Storage")
-        await MAIN[Utility.NUCLIA_STORAGE].initialize()
-    return MAIN.get(Utility.NUCLIA_STORAGE, None)
+        await nuclia_storage.initialize()
+        set_utility(Utility.NUCLIA_STORAGE, nuclia_storage)
+    return nuclia_storage
 
 
 async def get_pubsub() -> PubSubDriver | None:
