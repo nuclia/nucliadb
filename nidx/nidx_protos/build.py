@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import os
 from importlib import resources
 
 from grpc_tools import protoc

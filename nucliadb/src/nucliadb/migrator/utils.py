@@ -27,9 +27,7 @@ from .models import Migration
 
 logger = logging.getLogger(__name__)
 
-MIGRATION_DIR = os.path.sep.join(
-    os.path.dirname(os.path.abspath(__file__)).split(os.path.sep)[:-2] + ["migrations"]
-)
+MIGRATION_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "migrations")
 
 
 def get_pg_migrations() -> list[tuple[int, types.ModuleType]]:

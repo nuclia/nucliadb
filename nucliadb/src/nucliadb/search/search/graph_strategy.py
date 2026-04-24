@@ -512,10 +512,8 @@ async def rank_relations_reranker(
     score_threshold: float = 0.02,
 ) -> tuple[Relations, dict[str, list[float]]]:
     # Store the index for keeping track after scoring
-    flat_rels: list[tuple[str, int, DirectionalRelation]] = [
-        (ent, idx, rel)
-        for (ent, rels) in relations.entities.items()
-        for (idx, rel) in enumerate(rels.related_to)
+    flat_rels: list[tuple[str, DirectionalRelation]] = [
+        (ent, rel) for (ent, rels) in relations.entities.items() for rel in rels.related_to
     ]
     # Build triplets (dict) from each relation for use in reranker
     triplets: list[dict[str, str]] = [
@@ -530,7 +528,7 @@ async def rank_relations_reranker(
             "relationship": rel.relation_label,
             "tail_entity": ent,
         }
-        for (ent, _, rel) in flat_rels
+        for (ent, rel) in flat_rels
     ]
 
     # Dedupe triplets so that they get evaluated once; map triplet -> [orig_indices]
@@ -582,10 +580,8 @@ async def rank_relations_generative(
     max_rels_to_eval: int = 100,
 ) -> tuple[Relations, dict[str, list[float]]]:
     # Store the index for keeping track after scoring
-    flat_rels: list[tuple[str, int, DirectionalRelation]] = [
-        (ent, idx, rel)
-        for (ent, rels) in relations.entities.items()
-        for (idx, rel) in enumerate(rels.related_to)
+    flat_rels: list[tuple[str, DirectionalRelation]] = [
+        (ent, rel) for (ent, rels) in relations.entities.items() for rel in rels.related_to
     ]
     triplets: list[dict[str, str]] = [
         {
@@ -599,7 +595,7 @@ async def rank_relations_generative(
             "relationship": rel.relation_label,
             "tail_entity": ent,
         }
-        for (ent, _, rel) in flat_rels
+        for (ent, rel) in flat_rels
     ]
 
     # Dedupe triplets so that they get evaluated once, we will re-associate the scores later
@@ -636,7 +632,7 @@ async def rank_relations_generative(
         generative_model=generative_model,
     )
 
-    ident, model, answer_stream = await predict.chat_query_ndjson(kbid, chat_model)
+    _ident, _model, answer_stream = await predict.chat_query_ndjson(kbid, chat_model)
     response_json = None
     status = None
     _ = None
@@ -676,7 +672,7 @@ def _scores_to_ranked_rels(
     unique_triplets: list[dict[str, str]],
     unique_indices_scores: Iterable[tuple[int, float]],
     triplet_to_orig_indices: dict[tuple[str, str, str], list[int]],
-    flat_rels: list[tuple[str, int, DirectionalRelation]],
+    flat_rels: list[tuple[str, DirectionalRelation]],
     top_k: int,
     score_threshold: float,
 ) -> tuple[Relations, dict[str, list[float]]]:
@@ -701,7 +697,7 @@ def _scores_to_ranked_rels(
         orig_indices = triplet_to_orig_indices[key]
 
         for orig_i in orig_indices:
-            ent, rel_idx, rel = flat_rels[orig_i]
+            ent, rel = flat_rels[orig_i]
             # Insert the relation into top_k_rels
             top_k_rels[ent].related_to.append(rel)
 

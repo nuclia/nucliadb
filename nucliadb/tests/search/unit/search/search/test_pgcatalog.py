@@ -142,7 +142,7 @@ async def test_prepare_query_sort():
         sort=SortOptions(field=SortField.CREATED, order=SortOrder.ASC),
     )
     parsed = await parse_catalog(kbid, request)
-    query, params = _prepare_query(parsed)
+    query, _ = _prepare_query(parsed)
     assert 'ORDER BY "created_at" ASC' in query.as_string()
 
     request = CatalogRequest(
@@ -152,7 +152,7 @@ async def test_prepare_query_sort():
         sort=SortOptions(field=SortField.MODIFIED, order=SortOrder.DESC),
     )
     parsed = await parse_catalog(kbid, request)
-    query, params = _prepare_query(parsed)
+    query, _ = _prepare_query(parsed)
     assert 'ORDER BY "modified_at" DESC' in query.as_string()
 
 
