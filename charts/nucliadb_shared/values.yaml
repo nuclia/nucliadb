@@ -43,8 +43,8 @@ storage:
   s3_bucket_tags:
   s3_deadletter_bucket: XX
   s3_indexing_bucket: XX
-  s3_path_style_addressing: False
-  s3_disable_checksums: False
+  s3_path_style_addressing: "false"
+  s3_disable_checksums: "false"
 
   azure_account_url: XX
   azure_deadletter_bucket: XX
