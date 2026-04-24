@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import bisect
 from collections.abc import Sequence
 from typing import cast
@@ -26,12 +25,12 @@ from typing_extensions import assert_never
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
+from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal.augment import (
     AugmentedParagraph,
     AugmentedRelatedParagraphs,
     Metadata,
-    Paragraph,
     ParagraphImage,
     ParagraphPage,
     ParagraphPosition,
@@ -40,39 +39,15 @@ from nucliadb.models.internal.augment import (
     ParagraphText,
     RelatedParagraphs,
 )
+from nucliadb.search import logger
 from nucliadb.search.augmentor.metrics import augmentor_observer
-from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
-from nucliadb.search.search.paragraphs import get_paragraph_from_full_text
 from nucliadb_models.search import TextPosition
 from nucliadb_protos import resources_pb2
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
-
-async def augment_paragraphs(
-    kbid: str,
-    given: list[Paragraph],
-    select: list[ParagraphProp],
-    *,
-    concurrency_control: asyncio.Semaphore | None = None,
-) -> dict[ParagraphId, AugmentedParagraph | None]:
-    """Augment a list of paragraphs following an augmentation"""
-
-    ops = []
-    for paragraph in given:
-        task = asyncio.create_task(
-            limited_concurrency(
-                augment_paragraph(kbid, paragraph.id, select, paragraph.metadata),
-                max_ops=concurrency_control,
-            )
-        )
-        ops.append(task)
-    results: list[AugmentedParagraph | None] = await asyncio.gather(*ops)
-
-    augmented = {}
-    for paragraph, augmentation in zip(given, results):
-        augmented[paragraph.id] = augmentation
-
-    return augmented
+from .extracted_text import nidx_et_cache
 
 
 @augmentor_observer.wrap({"type": "paragraph"})
@@ -283,16 +258,80 @@ def _find_paragraph(
 
 @augmentor_observer.wrap({"type": "paragraph_text"})
 async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | None:
-    text = await get_paragraph_from_full_text(
-        field=field,
-        start=paragraph_id.paragraph_start,
-        end=paragraph_id.paragraph_end,
-        split=paragraph_id.field_id.subfield_id,
-        log_on_missing_field=True,
-    )
-    # we want to be explicit with not having the paragraph text but the function
-    # above returns an empty string if it can't find it
+    # we store all splits unordered inside nidx_text, so nidx can't support yet
+    # conversation fields
+    if field.type != Conversation.type and has_feature(
+        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}
+    ):
+        nidx_extracted_texts = nidx_et_cache.get()
+        if nidx_extracted_texts is not None:
+            text = await get_paragraph_text_from_nidx(paragraph_id)
+        else:
+            # nidx texts not available, either we are not calling from augmentor
+            # or something went wrong. In any case, fallback to object storage
+            text = await get_paragraph_text_from_storage(field, paragraph_id)
+    else:
+        text = await get_paragraph_text_from_storage(field, paragraph_id)
+
+    # we want to be explicit with not having the paragraph text but the
+    # functions above returns an empty string if it can't find it
     return text or None
+
+
+async def get_paragraph_text_from_nidx(id: ParagraphId) -> str | None:
+    """Obtain a paragraph from the field extracted text.
+
+    This is an expensive operation that requires a gRPC request to nidx to get
+    the paragraph text. However, this is faster than getting the text from
+    object storage alternative.
+
+    It uses a shared cache across the augmentor to avoid too many round trips to
+    the index.
+
+    """
+    nidx_extracted_texts = nidx_et_cache.get()
+    assert nidx_extracted_texts is not None, "this function must be called with the nidx texts cache set"
+    return nidx_extracted_texts.get_paragraph_text(id)
+
+
+@augmentor_observer.wrap({"type": "paragraph_text:storage"})
+async def get_paragraph_text_from_storage(field: Field, paragraph_id: ParagraphId) -> str | None:
+    """Obtain a paragraph from the field extracted text.
+
+    This is an expensive operation that requires downloading the whole field
+    extracted text from object storage and then slicing it.
+
+    """
+    extracted_text = await cache.get_field_extracted_text_pb(field)
+    if extracted_text is None:
+        # NucliaDB doesn't enforce read commited isolation with the index, i.e.
+        # we can observe dirty reads.
+        #
+        # In this case, it's possible to match a paragraph on the index that's
+        # being deleted. As the delete order is first maindb and second nidx, it
+        # can happen that we get from the index a resource that is being deleted
+        # and it's no longer in maindb.
+        #
+        # This should be a transient issue and we should only see this for
+        # deletes and searches done in a small window of time. Otherwise, it may
+        # be a persistent consistency issue.
+        logger.warning(
+            "Dirty read: extracted text for field does not exist on DB. This should be temporal.",
+            extra={
+                "kbid": field.kbid,
+                "field_id": field.resource_unique_id,
+            },
+        )
+        return None
+
+    split = paragraph_id.field_id.subfield_id
+    start = paragraph_id.paragraph_start
+    end = paragraph_id.paragraph_end
+
+    if split:
+        return extracted_text.split_text[split][start:end]
+    else:
+        return extracted_text.text[start:end]
 
 
 async def get_paragraph_position(field: Field, paragraph_id: ParagraphId) -> TextPosition | None:

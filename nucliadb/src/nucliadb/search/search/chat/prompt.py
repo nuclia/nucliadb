@@ -36,6 +36,7 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.search import logger
+from nucliadb.search.augmentor.fields import get_field_extracted_text
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
@@ -1365,11 +1366,8 @@ async def hydrate_field_text(
     if field is None:  # pragma: no cover
         return None
 
-    extracted_text_pb = await cache.get_field_extracted_text(field)
-    if extracted_text_pb is None:  # pragma: no cover
+    text = await get_field_extracted_text(field_id, field)
+    if text is None:
         return None
 
-    if field_id.subfield_id:
-        return field_id, extracted_text_pb.split_text[field_id.subfield_id]
-    else:
-        return field_id, extracted_text_pb.text
+    return field_id, text

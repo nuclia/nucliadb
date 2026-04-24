@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 from collections import deque
 from collections.abc import AsyncIterator, Sequence
 from typing import Deque, cast
@@ -62,49 +61,25 @@ from nucliadb.models.internal.augment import (
 )
 from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.augmentor.resources import get_basic
-from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search import cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_protos import resources_pb2
+from nucliadb_utils import const
 from nucliadb_utils.storages.storage import STORAGE_FILE_EXTRACTED
+from nucliadb_utils.utilities import has_feature
+
+from .extracted_text import nidx_et_cache
 
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
 CONVERSATION_MESSAGE_CONTEXT_EXPANSION = 15
 
 
-async def augment_fields(
-    kbid: str,
-    given: list[FieldId],
-    select: list[FieldProp | ConversationProp],
-    *,
-    concurrency_control: asyncio.Semaphore | None = None,
-) -> dict[FieldId, AugmentedField | None]:
-    """Augment a list of fields following an augmentation"""
-
-    ops = []
-    for field_id in given:
-        task = asyncio.create_task(
-            limited_concurrency(
-                augment_field(kbid, field_id, select),
-                max_ops=concurrency_control,
-            )
-        )
-        ops.append(task)
-    results: list[AugmentedField | None] = await asyncio.gather(*ops)
-
-    augmented = {}
-    for field_id, augmentation in zip(given, results):
-        augmented[field_id] = augmentation
-
-    return augmented
-
-
 @augmentor_observer.wrap({"type": "field"})
 async def augment_field(
     kbid: str,
     field_id: FieldId,
-    select: Sequence[FieldProp | ConversationProp],
+    select: Sequence[FieldProp | FileProp | ConversationProp],
 ) -> AugmentedField | None:
     rid = field_id.rid
     resource = await cache.get_resource(kbid, rid)
@@ -325,7 +300,7 @@ async def db_augment_conversation_field(
                     selector = FullSelector()
 
             # gather the text from each message matching the selector
-            extracted_text_pb = await cache.get_field_extracted_text(field)
+            extracted_text_pb = await cache.get_field_extracted_text_pb(field)
             async for page, index, message in conversation_selector(field, field_id, selector):
                 augmented_message = messages.setdefault(
                     (page, index), AugmentedConversationMessage(ident=message.ident)
@@ -413,7 +388,34 @@ async def db_augment_generic_field(
 
 @augmentor_observer.wrap({"type": "field_text"})
 async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
-    extracted_text_pb = await cache.get_field_extracted_text(field)
+    # we store all splits unordered inside nidx_text, so nidx can't support yet
+    # conversation fields
+    if field.type != Conversation.type and has_feature(
+        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}
+    ):
+        nidx_extracted_texts = nidx_et_cache.get()
+        if nidx_extracted_texts is not None:
+            text = await get_field_extracted_text_from_nidx(field.kbid, id)
+        else:
+            # nidx texts not available, either we are not calling from augmentor
+            # or something went wrong. In any case, fallback to object storage
+            text = await get_field_extracted_text_from_storage(id, field)
+
+    else:
+        text = await get_field_extracted_text_from_storage(id, field)
+
+    return text
+
+
+async def get_field_extracted_text_from_nidx(kbid: str, id: FieldId) -> str | None:
+    nidx_extracted_texts = nidx_et_cache.get()
+    assert nidx_extracted_texts is not None, "this function must be called with the nidx texts cache set"
+    return nidx_extracted_texts.get_field_text(id)
+
+
+@augmentor_observer.wrap({"type": "field_text:storage"})
+async def get_field_extracted_text_from_storage(id: FieldId, field: Field) -> str | None:
+    extracted_text_pb = await cache.get_field_extracted_text_pb(field)
     if extracted_text_pb is None:  # pragma: no cover
         return None
 

@@ -182,9 +182,10 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
             side_effect=mock_augment_resources,
         ),
         patch(
-            "nucliadb.search.augmentor.paragraphs.augment_paragraph",
+            "nucliadb.search.augmentor.augmentor.augment_paragraph",
             side_effect=mock_augment_paragraph,
         ),
+        patch("nucliadb.search.augmentor.augmentor.extracted_texts"),
         patch.object(predict_mock, "rerank", AsyncMock(side_effect=fake_reranking)),
     ):
         resource_hydration_options = ResourceHydrationOptions(
