@@ -39,8 +39,8 @@ data:
   S3_BUCKET_TAGS: {{ toJson .Values.storage.s3_bucket_tags | quote }}
   S3_DEADLETTER_BUCKET: {{ .Values.storage.s3_deadletter_bucket }}
   S3_INDEXING_BUCKET: {{ .Values.storage.s3_indexing_bucket }}
-  S3_PATH_STYLE_ADDRESSING: {{ .Values.storage.s3_path_style_addressing }}
-  S3_DISABLE_CHECKSUMS: {{ .Values.storage.s3_disable_checksums }}
+  S3_PATH_STYLE_ADDRESSING: {{ .Values.storage.s3_path_style_addressing | quote }}
+  S3_DISABLE_CHECKSUMS: {{ .Values.storage.s3_disable_checksums | quote }}
 {{- with .Values.storage.s3_kms_key_id }}
   S3_KMS_KEY_ID: {{ . }}
 {{- end }}
