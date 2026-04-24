@@ -36,9 +36,9 @@ nucliadb-utils = { workspace = true }
 dev = [
     # Linting
     "mypy-protobuf>=3.6.0",
-    "mypy==1.15",
-    "pre-commit==2.20.0",
-    "ruff==0.9.9",
+    "mypy",
+    "pre-commit",
+    "ruff",
     # Testing
     "aioresponses",
     "faker>=25.1.0",
