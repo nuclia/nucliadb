@@ -224,6 +224,7 @@ class S3StorageField(StorageField):
             PartNumber=self.field.offset,
             UploadId=self.field.resumable_uri,
             Body=data,
+            ContentLength=len(data),
         )
 
     @s3_ops_observer.wrap({"type": "finish_upload"})
@@ -361,6 +362,8 @@ class S3Storage(Storage):
         max_pool_connections: int = 30,
         bucket: str | None = None,
         bucket_tags: dict[str, str] | None = None,
+        use_path_addressing_style: bool = False,
+        disable_checksums: bool = False,
     ):
         self.source = CloudFile.S3
         self.deadletter_bucket = deadletter_bucket
@@ -371,6 +374,10 @@ class S3Storage(Storage):
 
         self._bucket_tags = bucket_tags
 
+        s3_config = {}
+        if use_path_addressing_style:
+            s3_config["addressing_style"] = "path"
+
         self.opts = dict(
             aws_secret_access_key=self._aws_secret_key,
             aws_access_key_id=self._aws_access_key,
@@ -378,7 +385,19 @@ class S3Storage(Storage):
             verify=verify_ssl,
             use_ssl=use_ssl,
             region_name=region_name,
-            config=aiobotocore.config.AioConfig(None, max_pool_connections=max_pool_connections),
+            config=aiobotocore.config.AioConfig(
+                None,
+                max_pool_connections=max_pool_connections,
+                s3=s3_config,
+                **(
+                    {
+                        "request_checksum_calculation": "when_required",
+                        "response_checksum_validation": "when_required",
+                    }
+                    if disable_checksums
+                    else {}
+                ),
+            ),
         )
         self._exit_stack = AsyncExitStack()
         self.bucket = bucket
@@ -413,7 +432,7 @@ class S3Storage(Storage):
         return created
 
     async def finalize(self):
-        await self._exit_stack.__aexit__(None, None, None)
+        await self._exit_stack.aclose()
 
     @s3_ops_observer.wrap({"type": "delete"})
     async def delete_upload(self, uri: str, bucket_name: str):
@@ -507,6 +526,7 @@ class S3Storage(Storage):
             Key=key,
             Body=data,
             ContentType="application/octet-stream",
+            ContentLength=len(data),
         )
 
 
@@ -599,6 +619,7 @@ def parse_status_code(error: botocore.exceptions.ClientError) -> int:
 
 def parse_object_metadata(obj: dict, key: str) -> ObjectMetadata:
     custom_metadata = obj.get("Metadata") or {}
+
     # Parse size
     custom_size = custom_metadata.get("size")
     if custom_size is None or custom_size == "0":
@@ -608,8 +629,15 @@ def parse_object_metadata(obj: dict, key: str) -> ObjectMetadata:
             size = int(content_lenght)
     else:
         size = int(custom_size)
+
     # Content type
     content_type = custom_metadata.get("content_type") or obj.get("ContentType") or ""
+    if content_type == "binary/octet-stream":
+        # some S3-compatible implementations like DELL OneFS always return
+        # binary/octet-stream as content type but, as that's not a valid IANA
+        # content type, we replace it for the correct one
+        content_type = "application/octet-stream"
+
     # Filename
     base64_filename = custom_metadata.get("base64_filename")
     if base64_filename:

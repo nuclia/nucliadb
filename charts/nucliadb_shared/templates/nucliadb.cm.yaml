@@ -27,6 +27,9 @@ data:
   GCS_PROJECT: {{ .Values.storage.gcs_project }}
   GCS_BUCKET_LABELS: {{ toJson .Values.storage.gcs_bucket_labels | quote }}
 {{- else if eq .Values.storage.file_backend "s3" }}
+{{- if .Values.storage.s3_endpoint }}
+  S3_ENDPOINT: {{ . }}
+{{- end }}
 {{- if .Values.storage.s3_ssl }}
   S3_SSL: "True"
 {{- end }}
@@ -36,9 +39,12 @@ data:
   S3_BUCKET_TAGS: {{ toJson .Values.storage.s3_bucket_tags | quote }}
   S3_DEADLETTER_BUCKET: {{ .Values.storage.s3_deadletter_bucket }}
   S3_INDEXING_BUCKET: {{ .Values.storage.s3_indexing_bucket }}
+  S3_PATH_STYLE_ADDRESSING: {{ .Values.storage.s3_path_style_addressing }}
+  S3_DISABLE_CHECKSUMS: {{ .Values.storage.s3_disable_checksums }}
 {{- with .Values.storage.s3_kms_key_id }}
   S3_KMS_KEY_ID: {{ . }}
 {{- end }}
+
 {{- else if eq .Values.storage.file_backend "azure" }}
   AZURE_ACCOUNT_URL: {{ .Values.storage.azure_account_url }}
   AZURE_DEADLETTER_BUCKET: {{ .Values.storage.azure_deadletter_bucket }}

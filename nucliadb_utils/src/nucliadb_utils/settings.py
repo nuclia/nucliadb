@@ -100,6 +100,13 @@ class StorageSettings(BaseSettings):
     s3_endpoint: str | None = None
     s3_region_name: str | None = None
     s3_kms_key_id: str | None = None
+    s3_path_style_addressing: bool = Field(
+        default=False, description="Use S3 endpoints addressing with paths"
+    )
+    s3_disable_checksums: bool = Field(
+        default=False,
+        description="Use request checksum calculation and response validation *only* when required",
+    )
     s3_bucket: str | None = Field(default=None, description="KnowledgeBox S3 bucket name template")
     s3_bucket_tags: dict[str, str] = Field(
         default={},
