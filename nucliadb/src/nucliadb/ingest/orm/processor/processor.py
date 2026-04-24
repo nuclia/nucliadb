@@ -232,7 +232,9 @@ class Processor:
                             shard, uuid, seqid, partition, kbid
                         )
                     try:
-                        await kb.delete_resource(uuid)
+                        await kb.delete_resource(
+                            uuid, storage_synchronous=message.synchronous_storage_deletion
+                        )
                     except Exception as exc:
                         await txn.abort()
                         await self.notify_abort(
