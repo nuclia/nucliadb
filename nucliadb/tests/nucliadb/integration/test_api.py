@@ -20,6 +20,7 @@
 import base64
 import hashlib
 import json
+import random
 from typing import cast
 from unittest.mock import AsyncMock, patch
 
@@ -2104,7 +2105,6 @@ async def test_delete_resource_x_synchronous_header(
     Test that the x-synchronous header on resource deletion by slug works
     for all three conditions: true, false, and not set (None).
     """
-    import random
 
     kbid = standalone_knowledgebox
 
