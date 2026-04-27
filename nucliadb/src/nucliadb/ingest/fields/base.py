@@ -201,34 +201,42 @@ class Field(Generic[PbType]):
         self.resource.modified = True
 
     async def delete(self):
-        await datamanagers.fields.delete(
-            self.resource.txn,
-            kbid=self.kbid,
-            rid=self.uuid,
-            field_type=self.type,
-            field_id=self.id,
-        )
-        await self.delete_extracted_text()
+        tasks = [
+            datamanagers.fields.delete(
+                self.resource.txn,
+                kbid=self.kbid,
+                rid=self.uuid,
+                field_type=self.type,
+                field_id=self.id,
+            ),
+            self.delete_extracted_text(),
+            self.delete_metadata(),
+            self.delete_question_answers(),
+            self.delete_thumbnail(),
+            self.delete_large_metadata(),
+        ]
         async for vectorset_id, vs in datamanagers.vectorsets.iter(self.resource.txn, kbid=self.kbid):
-            await self.delete_vectors(vectorset_id, vs.storage_key_kind)
-
+            tasks.append(self.delete_vectors(vectorset_id, vs.storage_key_kind))
         for model in await datamanagers.graph_vectorsets.node.get_all(self.resource.txn, kbid=self.kbid):
-            await self.delete_relation_node_vectors(model.vectorset_id)
+            tasks.append(self.delete_relation_node_vectors(model.vectorset_id))
         for model in await datamanagers.graph_vectorsets.edge.get_all(self.resource.txn, kbid=self.kbid):
-            await self.delete_relation_edge_vectors(model.vectorset_id)
-
-        await self.delete_metadata()
-        await self.delete_question_answers()
+            tasks.append(self.delete_relation_edge_vectors(model.vectorset_id))
+        await asyncio.gather(*tasks)
 
     async def delete_question_answers(self) -> None:
-        sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)
-        try:
-            await self.storage.delete_upload(sf.key, sf.bucket)
-        except KeyError:
-            pass
+        await self._delete_storage_metadata_field(FieldTypes.QUESTION_ANSWERS)
 
     async def delete_extracted_text(self) -> None:
-        sf = self.get_storage_field(FieldTypes.FIELD_TEXT)
+        await self._delete_storage_metadata_field(FieldTypes.FIELD_TEXT)
+
+    async def delete_thumbnail(self) -> None:
+        await self._delete_storage_metadata_field(FieldTypes.THUMBNAIL)
+
+    async def delete_large_metadata(self) -> None:
+        await self._delete_storage_metadata_field(FieldTypes.FIELD_LARGE_METADATA)
+
+    async def _delete_storage_metadata_field(self, field_type: FieldTypes) -> None:
+        sf = self.get_storage_field(field_type)
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
@@ -271,11 +279,7 @@ class Field(Generic[PbType]):
             pass
 
     async def delete_metadata(self) -> None:
-        sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
-        try:
-            await self.storage.delete_upload(sf.key, sf.bucket)
-        except KeyError:
-            pass
+        await self._delete_storage_metadata_field(FieldTypes.FIELD_METADATA)
 
     async def get_error(self) -> Error | None:
         return await datamanagers.fields.get_error(
