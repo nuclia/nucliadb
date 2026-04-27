@@ -30,6 +30,7 @@ from unittest.mock import AsyncMock
 import botocore.exceptions
 import pytest
 
+from nucliadb_utils.settings import StorageSettings
 from nucliadb_utils.storages.s3 import S3Storage, S3StorageField
 
 
@@ -195,3 +196,40 @@ async def test_normalize_binary_content_type_does_not_change_other_types():
 
     assert meta is not None
     assert meta.content_type == "text/plain"
+
+
+# --- s3_verify_ssl: bool or cert path parsing ---
+
+
+@pytest.mark.parametrize(
+    "env_value,expected",
+    [
+        ("true", True),
+        ("True", True),
+        ("false", False),
+        ("False", False),
+        ("/etc/ssl/certs/ca-bundle.crt", "/etc/ssl/certs/ca-bundle.crt"),
+        ("/custom/path/cert.pem", "/custom/path/cert.pem"),
+    ],
+)
+def test_s3_verify_ssl_parsing(env_value, expected, monkeypatch):
+    monkeypatch.setenv("S3_VERIFY_SSL", env_value)
+    settings = StorageSettings()
+    assert settings.s3_verify_ssl == expected
+
+
+def test_s3_verify_ssl_default():
+    settings = StorageSettings()
+    assert settings.s3_verify_ssl is True
+
+
+def test_s3_storage_passes_verify_ssl_cert_path():
+    """Verify that a cert path string flows through to the aiobotocore opts."""
+    cert_path = "/etc/ssl/certs/ca-bundle.crt"
+    storage = S3Storage(verify_ssl=cert_path)
+    assert storage.opts["verify"] == cert_path
+
+
+def test_s3_storage_passes_verify_ssl_bool():
+    storage = S3Storage(verify_ssl=False)
+    assert storage.opts["verify"] is False

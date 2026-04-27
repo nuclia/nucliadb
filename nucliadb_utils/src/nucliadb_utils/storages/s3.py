@@ -355,7 +355,7 @@ class S3Storage(Storage):
         deadletter_bucket: str | None = None,
         indexing_bucket: str | None = None,
         endpoint_url: str | None = None,
-        verify_ssl: bool = True,
+        verify_ssl: bool | str = True,
         use_ssl: bool = True,
         region_name: str | None = None,
         kms_key_id: str | None = None,

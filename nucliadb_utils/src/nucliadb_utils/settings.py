@@ -18,9 +18,26 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 from enum import Enum
+from typing import Annotated
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, BeforeValidator, Field, model_validator
 from pydantic_settings import BaseSettings
+
+
+def _parse_bool_or_str(v: object) -> bool | str:
+    """Parse s3_verify_ssl: accepts a bool or a string path to a CA bundle certificate."""
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str):
+        lowered = v.lower()
+        if lowered in ("true", "false"):
+            return lowered == "true"
+        # Treat as a path to a CA bundle
+        return v
+    raise ValueError(f"Expected a bool or a string path, got {type(v)}")
+
+
+BoolOrCertPath = Annotated[bool | str, BeforeValidator(_parse_bool_or_str)]
 
 
 class RunningSettings(BaseSettings):
@@ -95,7 +112,10 @@ class StorageSettings(BaseSettings):
     s3_client_id: str | None = None
     s3_client_secret: str | None = None
     s3_ssl: bool = True
-    s3_verify_ssl: bool = True
+    s3_verify_ssl: BoolOrCertPath = Field(
+        default=True,
+        description="SSL verification: True to verify (default), False to disable, or a string path to a CA bundle certificate",
+    )
     s3_max_pool_connections: int = 30
     s3_endpoint: str | None = None
     s3_region_name: str | None = None
