@@ -948,7 +948,7 @@ class _NucliaDBBase:
         self.region: str = region
         self.api_key = api_key
         headers = headers or {}
-        if self.region == Region.ON_PREM.value:
+        if self.region == "on-prem":
             if url is None:
                 raise ValueError("url must be provided for on-prem")
             self.base_url: str = url.rstrip("/")

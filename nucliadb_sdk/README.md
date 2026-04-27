@@ -21,13 +21,13 @@ To connect to a Nuclia-hosted NucliaDB instance, just use the `NucliaDB` constru
 ```python
 from nucliadb_sdk import NucliaDB, Region
 
-ndb = NucliaDB(region=Region.EUROPE1, api_key="my-api-key")
+ndb = NucliaDB(region="europe-1", api_key="my-api-key")
 ```
 
 Alternatively, to connect to a NucliaDB local installation, use:
 
 ```python
-ndb = NucliaDB(region=Region.ON_PREM, api="http://localhost:8080/api")
+ndb = NucliaDB(region="on-prem", api="http://localhost:8080/api")
 ```
 
 Then, each method of the `NucliaDB` class maps to an HTTP endpoint of the NucliaDB API. The parameters it accepts correspond to the Pydantic models associated to the request body scheme of the endpoint.

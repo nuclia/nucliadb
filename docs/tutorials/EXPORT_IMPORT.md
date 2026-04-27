@@ -20,7 +20,7 @@ Via python
 
 from nucliadb_sdk import NucliaDB, Region
 
-sdk = NucliaDB(region=Region.ON_PREM, url="http://localhost:8080/api")
+sdk = NucliaDB(region="on-prem", url="http://localhost:8080/api")
 
 # To start the export
 export_id = sdk.start_export(kbid=kbid).export_id
@@ -52,7 +52,7 @@ Via python
 
 from nucliadb_sdk import NucliaDB, Region
 
-sdk = NucliaDB(region=Region.ON_PREM, url="http://localhost:8080/api")
+sdk = NucliaDB(region="on-prem", url="http://localhost:8080/api")
 
 # To upload the exported data and start the import
 import_id = sdk.start_import(kbid=kbid, content=open("/path/to/export/file", "rb")).import_id
