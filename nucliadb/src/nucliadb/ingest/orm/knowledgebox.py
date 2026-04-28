@@ -438,6 +438,7 @@ class KnowledgeBox:
             await txn.set(storage_to_delete, b"")
 
             await catalog_delete_kb(txn, kbid)
+            await file_md5_delete_kb(txn, kbid)
 
             # Delete KB Shards
             shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
@@ -642,3 +643,11 @@ async def catalog_delete_kb(txn: Transaction, kbid: str):
         return
     async with txn.connection.cursor() as cur:
         await cur.execute("DELETE FROM catalog where kbid = %(kbid)s", {"kbid": kbid})
+
+
+@processor_observer.wrap({"type": "file_md5_delete_kb"})
+async def file_md5_delete_kb(txn: Transaction, kbid: str):
+    if not isinstance(txn, PGTransaction):
+        return
+    async with txn.connection.cursor() as cur:
+        await cur.execute("DELETE FROM file_md5 WHERE kbid = %(kbid)s", {"kbid": kbid})

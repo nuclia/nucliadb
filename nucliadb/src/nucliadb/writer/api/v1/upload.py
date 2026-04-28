@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import logging
 import uuid
 from datetime import datetime
 from hashlib import md5
@@ -30,7 +31,7 @@ from fastapi.responses import Response
 from fastapi_versioning import version
 from starlette.requests import Request as StarletteRequest
 
-from nucliadb.common import datamanagers
+from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.models.internal.processing import PushPayload, Source
@@ -85,6 +86,8 @@ from nucliadb_utils.utilities import (
 )
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX, RSLUG_PREFIX, api
+
+logger = logging.getLogger(__name__)
 
 TUS_HEADERS = {
     "Tus-Resumable": "1.0.0",
@@ -860,12 +863,10 @@ async def validate_field_upload(
     if rid is None:
         # we are going to create a new resource and a field
         if md5 is not None:
-            exists = await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=md5)
+            exists = await file_md5.exists(kbid=kbid, md5=md5)
             if exists:
-                raise HTTPConflict("A resource with the same uploaded file already exists")
-            rid = md5
-        else:
-            rid = uuid.uuid4().hex
+                raise HTTPConflict("A file with the same MD5 hash already exists in this knowledge box")
+        rid = uuid.uuid4().hex
     else:
         # we're adding a field to a resource
         exists = await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
@@ -873,10 +874,7 @@ async def validate_field_upload(
             raise HTTPNotFound("Resource is not found or not yet available")
 
     if field is None:
-        if md5 is None:
-            field = uuid.uuid4().hex
-        else:
-            field = md5
+        field = uuid.uuid4().hex
 
     path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)
     return path, rid, field

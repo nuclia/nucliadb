@@ -26,7 +26,7 @@ from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from nucliadb.common import datamanagers
+from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.maindb.driver import Transaction
@@ -347,6 +347,7 @@ class Resource:
         if self.all_fields_keys is None:
             self.all_fields_keys = []
         self.all_fields_keys.append(field)
+
         self.modified = True
         return field_obj
 
@@ -361,7 +362,6 @@ class Resource:
         if self.all_fields_keys is not None:
             if field in self.all_fields_keys:
                 self.all_fields_keys.remove(field)
-
         await field_obj.delete()
 
     async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
@@ -434,6 +434,8 @@ class Resource:
         for field, file in message.files.items():
             fid = FieldID(field_type=FieldType.FILE, field=field)
             await self.set_field(fid.field_type, fid.field, file)
+            if file.file.md5:
+                await self.set_file_field_md5(field, file.file.md5)
             message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
@@ -443,6 +445,8 @@ class Resource:
 
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
+            if fieldid.field_type == FieldType.FILE:
+                await self.delete_file_field_md5(fieldid.field)
 
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
             await self.update_all_field_ids(
@@ -451,6 +455,18 @@ class Resource:
                 errors=message.errors,  # type: ignore
             )
             self.modified = True
+
+    async def set_file_field_md5(self, field_id: str, md5: str):
+        """
+        Record file MD5 hashes for deduplication checks.
+        """
+        await file_md5.set(self.txn, kbid=self.kbid, md5=md5, rid=self.uuid, field_id=f"f/{field_id}")
+
+    async def delete_file_field_md5(self, field_id: str):
+        """
+        Delete file MD5 hash records for a given field.
+        """
+        await file_md5.delete_by_field(self.txn, kbid=self.kbid, rid=self.uuid, field_id=f"f/{field_id}")
 
     @processor_observer.wrap({"type": "apply_fields_status"})
     async def apply_fields_status(self, message: BrokerMessage, updated_fields: list[FieldID]):
