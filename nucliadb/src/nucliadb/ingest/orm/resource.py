@@ -288,11 +288,13 @@ class Resource:
         self.user_relations = payload
 
     # Fields
-    async def get_fields(self, force: bool = False) -> dict[tuple[FieldType.ValueType, str], Field]:
+    async def get_fields(
+        self, force: bool = False, load: bool = True
+    ) -> dict[tuple[FieldType.ValueType, str], Field]:
         # Get all fields
         for type, field in await self.get_fields_ids(force=force):
             if (type, field) not in self.fields:
-                self.fields[(type, field)] = await self.get_field(field, type)
+                self.fields[(type, field)] = await self.get_field(field, type, load=load)
         return self.fields
 
     async def _inner_get_fields_ids(self) -> list[tuple[FieldType.ValueType, str]]:

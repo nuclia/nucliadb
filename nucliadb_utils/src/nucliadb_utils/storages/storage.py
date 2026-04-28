@@ -141,7 +141,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         """
         bucket = self.get_bucket_name(kbid)
         resource_storage_base_path = STORAGE_RESOURCE.format(kbid=kbid, uuid=uuid)
-        semaphore = asyncio.Semaphore(20)
+        semaphore = asyncio.Semaphore(50)
 
         async def _delete_object(object_info: ObjectInfo):
             async with semaphore:

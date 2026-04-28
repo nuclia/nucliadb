@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from collections.abc import AsyncGenerator, Callable, Coroutine, Sequence
 from datetime import datetime
 from functools import partial
@@ -41,6 +42,7 @@ from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest import SERVICE_NAME, logger
+from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.exceptions import (
     KnowledgeBoxConflict,
     KnowledgeBoxCreationError,
@@ -491,22 +493,51 @@ class KnowledgeBox:
                 logger.exception("Error deleting slug")
 
     async def storage_delete_resource(self, uuid: str, synchronous: bool = False):
-        if is_onprem_nucliadb() or synchronous:
+        if is_onprem_nucliadb():
             await self.storage.delete_resource(self.kbid, uuid)
         else:
+            if synchronous:
+                # Partial synchronous deletion: some resources may have a lot of data in storage, so
+                # we want to synchronously delete all those that are UI facing (like extracted text),
+                # but we can leave asynchronously the deletion of the rest of data (like vectors,
+                # extracted pages images, etc).
+                await self.partial_storage_delete_resource(uuid)
+
             # Deleting from storage can be slow, so we schedule its deletion and the purge cronjob
             # will take care of it
             await self.schedule_delete_resource(self.kbid, uuid)
+
+    async def partial_storage_delete_resource(self, uuid: str):
+        """
+        Iterate all fields of the resource and delete the extracted texts
+        """
+        resource = await self.get(uuid)
+        if resource is None:
+            logger.warning(f"Trying to delete storage of non-existing resource {uuid} in kb {self.kbid}")
+            return
+
+        semaphore = asyncio.Semaphore(30)
+
+        async def _partial_delete_field(field_obj: Field):
+            async with semaphore:
+                await field_obj.delete_extracted_text()
+
+        tasks = []
+        fields = await resource.get_fields(force=True, load=False)
+        for field_obj in fields.values():
+            tasks.append(_partial_delete_field(field_obj))
+
+        await asyncio.gather(*tasks)
 
     async def schedule_delete_resource(self, kbid: str, uuid: str):
         key = RESOURCE_TO_DELETE_STORAGE.format(kbid=kbid, uuid=uuid)
         await self.txn.set(key, b"")
 
     async def delete_resource(self, uuid: str, storage_synchronous: bool = False):
-        with processor_observer({"type": "delete_resource_maindb"}):
-            await self.maindb_delete_resource(uuid)
         with processor_observer({"type": "delete_resource_storage"}):
             await self.storage_delete_resource(uuid, synchronous=storage_synchronous)
+        with processor_observer({"type": "delete_resource_maindb"}):
+            await self.maindb_delete_resource(uuid)
 
     async def get_resource_uuid_by_slug(self, slug: str) -> str | None:
         return await datamanagers.resources.get_resource_uuid_from_slug(
