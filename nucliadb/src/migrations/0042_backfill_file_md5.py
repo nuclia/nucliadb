@@ -26,11 +26,10 @@ Backfill the file_md5 table with MD5 hashes from existing file fields.
 import logging
 from typing import cast
 
+from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
-from nucliadb.ingest.fields.file import File
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.resources_pb2 import FieldType, FieldFile
 
 logger = logging.getLogger(__name__)
 
@@ -44,61 +43,61 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
 
     BATCH_SIZE = 100
     inserted = 0
+    pages = 0
 
     async with context.kv_driver.rw_transaction() as txn:
         txn = cast(PGTransaction, txn)
-        continue_sql = ""
+        last_key = ""
         while True:
             async with txn.connection.cursor() as cur:
                 await cur.execute(
-                    f"""
-                    SELECT SPLIT_PART(key, '/', 5)::UUID FROM resources
-                    WHERE key SIMILAR TO %s
-                    {continue_sql}
+                    """
+                    SELECT key FROM resources
+                    WHERE key LIKE %s
+                    AND key > %s
                     ORDER BY key
                     LIMIT %s
                     """,
-                    (f"/kbs/{kbid}/r/[a-f0-9]*", BATCH_SIZE),
+                    (f"/kbs/{kbid}/r/%/f/f/%", last_key, BATCH_SIZE),
                 )
-                resource_uuids = [r[0] for r in await cur.fetchall()]
-                if len(resource_uuids) == 0:
+                rows = await cur.fetchall()
+                if len(rows) == 0:
                     break
 
-                for rid_uuid in resource_uuids:
-                    rid = str(rid_uuid).replace("-", "")
-                    resource = await Resource.get(txn, kbid=kbid, rid=rid)
-                    if resource is None:
+                for (key,) in rows:
+                    last_key = key
+                    # key format: /kbs/{kbid}/r/{rid}/f/f/{field_id}
+                    parts = key.split("/")
+                    # ['', 'kbs', kbid, 'r', rid, 'f', 'f', field_id]
+                    rid = parts[4]
+                    field_id = parts[7]
+                    # Get the field value to extract the MD5 hash
+                    payload = await datamanagers.fields.get_raw(
+                        txn,
+                        kbid=kbid,
+                        rid=rid,
+                        field_type=FieldType.FILE,
+                        field_id=field_id,
+                    )
+                    if payload is None or len(payload) == 0:
+                        # No payload found for this field, skip it
                         continue
-
-                    fields_ids = await resource.get_fields_ids()
-                    for field_type, field_id in fields_ids:
-                        if field_type != FieldType.FILE:
-                            continue
-                        field = await resource.get_field(field_id, field_type)
-                        if not isinstance(field, File):
-                            continue
-                        value = await field.get_value()
-                        if value is None or not value.file.md5:
-                            continue
-
-                        async with txn.connection.cursor() as insert_cur:
-                            await insert_cur.execute(
-                                """
-                                INSERT INTO file_md5 (kbid, md5, rid, field_id)
-                                VALUES (%(kbid)s, %(md5)s, %(rid)s, %(field_id)s)
-                                ON CONFLICT (kbid, md5, rid, field_id) DO NOTHING
-                                """,
-                                {
-                                    "kbid": kbid,
-                                    "md5": value.file.md5,
-                                    "rid": rid,
-                                    "field_id": field_id,
-                                },
-                            )
-                            inserted += 1
+                    value: FieldFile  = FieldFile.ParseFromString(payload)
+                    if not value.file.md5:
+                        # No md5 hash set to backfill for this field
+                        continue
+                    await file_md5.set(
+                        txn, kbid=kbid, md5=value.file.md5, rid=rid, field_id=field_id
+                    )
+                    inserted += 1
 
                 await txn.commit()
-                continue_sql = f"AND key > '/kbs/{kbid}/r/{rid}'"
+                pages += 1
+                if pages % 10 == 0:
+                    logger.info(
+                        "Backfill file_md5 in progress",
+                        extra={"kbid": kbid, "pages": pages, "inserted": inserted},
+                    )
 
     logger.info(
         "Backfilled file_md5 entries",

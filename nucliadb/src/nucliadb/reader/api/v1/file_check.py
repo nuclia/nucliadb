@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from fastapi import Query
+from fastapi import Path
 from fastapi.requests import Request
 from fastapi.responses import Response
 from fastapi_versioning import version
@@ -30,7 +30,7 @@ from nucliadb_utils.authentication import requires_one
 
 
 @api.head(
-    f"/{KB_PREFIX}/{{kbid}}/file-check",
+    f"/{KB_PREFIX}/{{kbid}}/file-exists/{{md5}}",
     status_code=200,
     summary="Check if a file with the given MD5 hash already exists in the knowledge box",
     tags=["Knowledge Box Services"],
@@ -38,10 +38,10 @@ from nucliadb_utils.authentication import requires_one
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
-async def file_check(
+async def file_exists(
     request: Request,
     kbid: str,
-    md5: str = Query(..., description="MD5 hash of the file to check"),
+    md5: str = Path(..., pattern=r"^[a-fA-F0-9]{32}$", description="MD5 hash of the file to check"),
 ):
     exists = await file_md5.exists(kbid=kbid, md5=md5)
     if not exists:

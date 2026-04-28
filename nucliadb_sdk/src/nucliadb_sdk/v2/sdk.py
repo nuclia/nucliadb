@@ -480,6 +480,12 @@ SDK_DEFINITION = {
         method="POST",
         path_params=("kbid",),
     ),
+    # File deduplication check
+    "file_exists": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/file-exists/{md5}",
+        method="HEAD",
+        path_params=("kbid", "md5"),
+    ),
 }
 
 
@@ -1227,6 +1233,9 @@ class NucliaDB(_NucliaDBBase):
         "run_text_agents", RunTextAgentsRequest, RunTextAgentsResponse
     )
 
+    # File deduplication check
+    file_exists = _request_bool_sync_builder("file_exists")
+
 
 class NucliaDBAsync(_NucliaDBBase):
     """
@@ -1434,3 +1443,6 @@ class NucliaDBAsync(_NucliaDBBase):
     run_text_agents = _request_async_builder(
         "run_text_agents", RunTextAgentsRequest, RunTextAgentsResponse
     )
+
+    # File deduplication check
+    file_exists = _request_bool_async_builder("file_exists")

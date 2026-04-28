@@ -434,8 +434,7 @@ class Resource:
         for field, file in message.files.items():
             fid = FieldID(field_type=FieldType.FILE, field=field)
             await self.set_field(fid.field_type, fid.field, file)
-            if file.file.md5:
-                await self.set_file_field_md5(field, file.file.md5)
+            await self.set_file_field_md5(field, file.file)
             message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
@@ -456,11 +455,18 @@ class Resource:
             )
             self.modified = True
 
-    async def set_file_field_md5(self, field_id: str, md5: str):
+    async def set_file_field_md5(self, field_id: str, file: CloudFile):
         """
         Record file MD5 hashes for deduplication checks.
         """
-        await file_md5.set(self.txn, kbid=self.kbid, md5=md5, rid=self.uuid, field_id=f"f/{field_id}")
+        if not file.md5:
+            # To be safe, delete any existing MD5 record for this field if the new file doesn't have an MD5.
+            # This is for PUT operations where the file is being replaced but the new md5 is not provided.
+            await self.delete_file_field_md5(field_id)
+        else:
+            await file_md5.set(
+                self.txn, kbid=self.kbid, md5=file.md5, rid=self.uuid, field_id=f"f/{field_id}"
+            )
 
     async def delete_file_field_md5(self, field_id: str):
         """
