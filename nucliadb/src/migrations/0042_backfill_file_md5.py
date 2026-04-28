@@ -29,7 +29,7 @@ from typing import cast
 from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb_protos.resources_pb2 import FieldType, FieldFile
+from nucliadb_protos.resources_pb2 import FieldFile
 
 logger = logging.getLogger(__name__)
 
@@ -76,19 +76,18 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                         txn,
                         kbid=kbid,
                         rid=rid,
-                        field_type=FieldType.FILE,
+                        field_type="f",
                         field_id=field_id,
                     )
                     if payload is None or len(payload) == 0:
                         # No payload found for this field, skip it
                         continue
-                    value: FieldFile  = FieldFile.ParseFromString(payload)
+                    value = FieldFile()
+                    value.ParseFromString(payload)
                     if not value.file.md5:
                         # No md5 hash set to backfill for this field
                         continue
-                    await file_md5.set(
-                        txn, kbid=kbid, md5=value.file.md5, rid=rid, field_id=field_id
-                    )
+                    await file_md5.set(txn, kbid=kbid, md5=value.file.md5, rid=rid, field_id=field_id)
                     inserted += 1
 
                 await txn.commit()
