@@ -62,7 +62,7 @@ message Error {
 
 
 message BrokerMessage {
-    reserved 2, 10, 12, 14, 15, 27;
+    reserved 2, 10, 12, 14, 15, 27, 46;
 
     string kbid = 1;
     string uuid = 3;
