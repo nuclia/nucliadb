@@ -32,6 +32,27 @@ class TelemetrySettings(BaseSettings):
         default=False, description="Instrument and observe GC metrics"
     )
 
+    prometheus_request_duration_buckets: list[float] = pydantic.Field(
+        default=[0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0],
+        description=(
+            "Histogram bucket boundaries (in seconds) for the "
+            "starlette_requests_processing_time_seconds metric. "
+            "Defaults to the standard Prometheus buckets (max 10 s). "
+            "Set this to cover the full latency range of the service, e.g. "
+            "[0.1, 0.5, 1, 2.5, 5, 10, 20, 30, 45, 60, 90, 120]"
+        ),
+    )
+
+    log_requests_start: bool = pydantic.Field(
+        default=False,
+        description=(
+            "Log an INFO entry when each request is received, including the "
+            "HTTP method, path template, and trace ID (when tracing is active). "
+            "FastAPI already logs requests upon completion; this flag adds the "
+            "arrival log that is otherwise missing"
+        ),
+    )
+
     def tracing_enabled(self) -> bool:
         return self.jaeger_enabled or self.otlp_collector_endpoint is not None
 
