@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import unittest
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -186,9 +187,13 @@ def storage():
 
 @pytest.fixture(scope="function")
 def kb():
-    mock = AsyncMock()
-    mock.kbid = "mock-kbid"
-    return mock
+    return "mock-kbid"
+
+
+@pytest.fixture(scope="function", autouse=True)
+def file_md5_mock():
+    with unittest.mock.patch("nucliadb.ingest.orm.resource.file_md5", AsyncMock()) as mock:
+        yield mock
 
 
 async def test_get_fields_ids_caches_keys(txn, storage, kb):
