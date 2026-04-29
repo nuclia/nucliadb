@@ -18,14 +18,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import hashlib
 import json
+import random
 from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pydantic
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, Response
 
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.processing import DummyProcessingEngine, PushPayload
 from nucliadb.learning_proxy import (
     LearningConfiguration,
@@ -58,6 +61,7 @@ from nucliadb_protos.train_pb2 import GetSentencesRequest, TrainParagraph
 from nucliadb_protos.train_pb2_grpc import TrainStub
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from nucliadb_utils.storages.storage import Storage
 from tests.utils import broker_resource, inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
@@ -2073,3 +2077,59 @@ async def test_concurrent_patch_operations(
     # At least some classifications should be present
     assert "classifications" in data["usermetadata"]
     assert len(data["usermetadata"]["classifications"]) > 0
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_successive_file_uploads_and_deletions_work(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
+    maindb_driver: Driver,
+    storage: Storage,
+):
+    """
+    Some clients upload, delete and re-upload files in a quick succession, testing out different processing strategies.
+    Make sure that resource ids are not reused in a way that can cause race conditions
+    """
+
+    kbid = standalone_knowledgebox
+
+    content = random.randbytes(1024)
+
+    async def _upload_file(content: bytes) -> Response:
+        # Create a resource using the /upload endpoint, return the resource id
+        md5 = hashlib.md5(content).hexdigest()
+        filename = "test_sync_delete.txt"
+        encoded_filename = base64.b64encode(filename.encode()).decode("utf-8")
+
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/upload",
+            headers={
+                "X-Filename": encoded_filename,
+                "X-MD5": md5,
+                "Content-Type": "text/plain",
+                "Content-Length": str(len(content)),
+            },
+            content=content,
+        )
+        return resp
+
+    # First try, it should work and create a resource
+    resp = await _upload_file(content)
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Second try with the same content should raise a 409 conflict, because the same file is being processed
+    resp = await _upload_file(content)
+    assert resp.status_code == 409, resp.text
+
+    # Delete the resource
+    resp = await nucliadb_writer.delete(f"/kb/{kbid}/resource/{rid}")
+    assert resp.status_code == 204, resp.text
+
+    # It should be able to create a new resource with the same content, because the previous one was deleted
+    resp = await _upload_file(content)
+    assert resp.status_code == 201, resp.text
+    new_rid = resp.json()["uuid"]
+    assert new_rid != rid, "Resource id was reused after deletion"

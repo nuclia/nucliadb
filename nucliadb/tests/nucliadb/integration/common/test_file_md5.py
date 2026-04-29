@@ -148,7 +148,7 @@ async def test_delete_by_kb(driver: PGDriver):
     assert await file_md5.exists(kbid=other_kb, md5="ccc") is True
 
 
-@pytest.mark.skip(reason="Only for local testing")
+#@pytest.mark.skip(reason="Only for local testing. Uncomment line to run")
 async def test_performance(driver: PGDriver):
     """Insert 2M rows across 300 KBs (5 large KBs hold ~70% of rows), then benchmark operations."""
     total_rows = 2_000_000
@@ -225,6 +225,25 @@ async def test_performance(driver: PGDriver):
         delete_field_ms = (time.monotonic() - start) * 1000
         await txn.commit()
 
+    # Insert a resource with multiple fields for resource-level delete benchmark
+    resource_rid = rid()
+    num_fields = 50
+    async with driver.rw_transaction() as txn:
+        for i in range(num_fields):
+            await file_md5.set(
+                txn, kbid=target_kb, md5=f"res_md5_{i}", rid=resource_rid, field_id=f"f/field_{i}"
+            )
+        await txn.commit()
+
+    # Benchmark delete by resource
+    async with driver.rw_transaction() as txn:
+        start = time.monotonic()
+        await file_md5.delete(txn, kbid=target_kb, rid=resource_rid)
+        delete_resource_ms = (time.monotonic() - start) * 1000
+        await txn.commit()
+
+    assert await file_md5.exists(kbid=target_kb, md5="res_md5_0") is False
+
     # Benchmark delete by KB (large KB, ~280k rows)
     async with driver.rw_transaction() as txn:
         start = time.monotonic()
@@ -249,6 +268,7 @@ async def test_performance(driver: PGDriver):
         f"  set (new):                  {set_new_ms:>8.2f} ms\n"
         f"  set (upsert):               {set_upsert_ms:>8.2f} ms\n"
         f"  delete (field):             {delete_field_ms:>8.2f} ms\n"
+        f"  delete (resource, {num_fields} fields): {delete_resource_ms:>8.2f} ms\n"
         f"  delete (large KB, ~{rows_per_large_kb:,}):  {delete_large_kb_ms:>8.2f} ms\n"
         f"  delete (small KB, ~{rows_per_small_kb:,}):   {delete_small_kb_ms:>8.2f} ms\n"
     )
@@ -260,3 +280,4 @@ async def test_performance(driver: PGDriver):
     assert set_new_ms < 100, f"set (new) too slow: {set_new_ms:.2f}ms"
     assert set_upsert_ms < 100, f"set (upsert) too slow: {set_upsert_ms:.2f}ms"
     assert delete_field_ms < 100, f"delete (field) too slow: {delete_field_ms:.2f}ms"
+    assert delete_resource_ms < 100, f"delete (resource) too slow: {delete_resource_ms:.2f}ms"

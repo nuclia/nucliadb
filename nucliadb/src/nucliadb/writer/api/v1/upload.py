@@ -273,10 +273,7 @@ async def _tus_post(
     else:
         metadata = {}
 
-    if has_feature(const.Features.FILE_MD5_READS, context={"kbid": kbid}):
-        path, rid, field = await validate_field_upload_v2(kbid, path_rid, field_id, metadata.get("md5"))
-    else:
-        path, rid, field = await validate_field_upload(kbid, path_rid, field_id, metadata.get("md5"))
+    path, rid, field = await validate_field_upload(kbid, path_rid, field_id, metadata.get("md5"))
 
     if implies_resource_creation:
         # When uploading a file to a new kb resource, we want to allow multiple
@@ -855,6 +852,18 @@ async def _upload(
 
 
 async def validate_field_upload(
+    kbid: str,
+    rid: str | None = None,
+    field: str | None = None,
+    md5: str | None = None,
+):
+    if has_feature(const.Features.FILE_MD5_READS, context={"kbid": kbid}):
+        return await validate_field_upload_v2(kbid, rid, field, md5)
+    else:
+        return await validate_field_upload_legacy(kbid, rid, field, md5)
+
+
+async def validate_field_upload_legacy(
     kbid: str,
     rid: str | None = None,
     field: str | None = None,
