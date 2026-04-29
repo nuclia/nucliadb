@@ -19,7 +19,7 @@
 #
 
 import logging
-from typing import cast
+from typing import cast, overload
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
@@ -28,7 +28,7 @@ from nucliadb_telemetry import metrics
 
 logger = logging.getLogger(__name__)
 
-observer = metrics.Observer("file_md5", labels={"op": ""})
+observer = metrics.Observer("nucliadb_file_md5", labels={"op": ""})
 
 
 def _pg_driver() -> PGDriver:
@@ -66,21 +66,48 @@ async def set(txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str)
         )
 
 
-@observer.wrap({"op": "delete_by_field"})
-async def delete_by_field(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None:
-    """Delete MD5 records for a specific field of a resource."""
-    async with _pg_transaction(txn).connection.cursor() as cur:
-        await cur.execute(
-            "DELETE FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_id = %(field_id)s",
-            {"kbid": kbid, "rid": rid, "field_id": field_id},
-        )
+@overload
+async def delete(txn: Transaction, *, kbid: str) -> None: ...
 
 
-@observer.wrap({"op": "delete_by_resource"})
-async def delete_by_resource(txn: Transaction, *, kbid: str, rid: str) -> None:
-    """Delete all MD5 records for a resource."""
-    async with _pg_transaction(txn).connection.cursor() as cur:
-        await cur.execute(
-            "DELETE FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s",
-            {"kbid": kbid, "rid": rid},
-        )
+@overload
+async def delete(txn: Transaction, *, kbid: str, rid: str) -> None: ...
+
+
+@overload
+async def delete(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None: ...
+
+
+@observer.wrap({"op": "delete"})
+async def delete(
+    txn: Transaction,
+    *,
+    kbid: str,
+    rid: str | None = None,
+    field_id: str | None = None,
+) -> None:
+    """Delete file MD5 records.
+
+    - kbid only: delete all records for the KB
+    - kbid + rid: delete all records for a resource
+    - kbid + rid + field_id: delete records for a specific field
+    """
+    pg_txn = _pg_transaction(txn)
+    if rid is None:
+        async with pg_txn.connection.cursor() as cur:
+            await cur.execute(
+                "DELETE FROM file_md5 WHERE kbid = %(kbid)s",
+                {"kbid": kbid},
+            )
+    elif field_id is None:
+        async with pg_txn.connection.cursor() as cur:
+            await cur.execute(
+                "DELETE FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s",
+                {"kbid": kbid, "rid": rid},
+            )
+    else:
+        async with pg_txn.connection.cursor() as cur:
+            await cur.execute(
+                "DELETE FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_id = %(field_id)s",
+                {"kbid": kbid, "rid": rid, "field_id": field_id},
+            )

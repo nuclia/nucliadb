@@ -27,7 +27,7 @@ from grpc import StatusCode
 from grpc.aio import AioRpcError
 from nidx_protos import nidx_pb2, noderesources_pb2
 
-from nucliadb.common import datamanagers
+from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 
@@ -438,7 +438,9 @@ class KnowledgeBox:
             await txn.set(storage_to_delete, b"")
 
             await catalog_delete_kb(txn, kbid)
-            await file_md5_delete_kb(txn, kbid)
+
+            if has_feature(const.Features.FILE_MD5_WRITES, context={"kbid": kbid}):
+                await file_md5.delete(txn, kbid=kbid)
 
             # Delete KB Shards
             shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
@@ -643,11 +645,3 @@ async def catalog_delete_kb(txn: Transaction, kbid: str):
         return
     async with txn.connection.cursor() as cur:
         await cur.execute("DELETE FROM catalog where kbid = %(kbid)s", {"kbid": kbid})
-
-
-@processor_observer.wrap({"type": "file_md5_delete_kb"})
-async def file_md5_delete_kb(txn: Transaction, kbid: str):
-    if not isinstance(txn, PGTransaction):
-        return
-    async with txn.connection.cursor() as cur:
-        await cur.execute("DELETE FROM file_md5 WHERE kbid = %(kbid)s", {"kbid": kbid})

@@ -70,8 +70,9 @@ from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_utils import const
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_storage
+from nucliadb_utils.utilities import get_storage, has_feature
 
 logger = logging.getLogger(__name__)
 
@@ -434,7 +435,8 @@ class Resource:
         for field, file in message.files.items():
             fid = FieldID(field_type=FieldType.FILE, field=field)
             await self.set_field(fid.field_type, fid.field, file)
-            await self.set_file_field_md5(field, file.file)
+            if has_feature(const.Features.FILE_MD5_WRITES, context={"kbid": self.kbid}):
+                await self.set_file_field_md5(field, file.file)
             message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
@@ -445,7 +447,8 @@ class Resource:
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
             if fieldid.field_type == FieldType.FILE:
-                await self.delete_file_field_md5(fieldid.field)
+                if has_feature(const.Features.FILE_MD5_WRITES, context={"kbid": self.kbid}):
+                    await self.delete_file_field_md5(fieldid.field)
 
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
             await self.update_all_field_ids(
@@ -472,7 +475,7 @@ class Resource:
         """
         Delete file MD5 hash records for a given field.
         """
-        await file_md5.delete_by_field(self.txn, kbid=self.kbid, rid=self.uuid, field_id=f"f/{field_id}")
+        await file_md5.delete(self.txn, kbid=self.kbid, rid=self.uuid, field_id=f"f/{field_id}")
 
     @processor_observer.wrap({"type": "apply_fields_status"})
     async def apply_fields_status(self, message: BrokerMessage, updated_fields: list[FieldID]):

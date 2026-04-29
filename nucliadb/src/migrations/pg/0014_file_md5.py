@@ -27,6 +27,10 @@ async def migrate(txn: PGTransaction) -> None:
 
     This enables deduplication checks: given an MD5 hash, callers can determine
     if a file with the same content has already been uploaded to a KB.
+
+    Note: lookups by (kbid, md5) and deletions by (kbid) are already fast
+    because the PK index starts with (kbid, md5, ...). Additional indexes
+    are only needed for (kbid, rid) and (kbid, rid, field_id) access patterns.
     """
     async with txn.connection.cursor() as cur:
         await cur.execute("""
@@ -38,12 +42,6 @@ async def migrate(txn: PGTransaction) -> None:
                 created_at TIMESTAMP NOT NULL DEFAULT NOW(),
                 PRIMARY KEY (kbid, md5, rid, field_id)
             );
-        """)
-
-        # Fast lookup by (kbid, md5) for dedup checks
-        await cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_file_md5_lookup
-            ON file_md5(kbid, md5);
         """)
 
         # Fast cleanup on resource deletion
