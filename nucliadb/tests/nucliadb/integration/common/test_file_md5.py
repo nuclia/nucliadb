@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import os
 import time
 import uuid
 
@@ -148,7 +149,10 @@ async def test_delete_by_kb(driver: PGDriver):
     assert await file_md5.exists(kbid=other_kb, md5="ccc") is True
 
 
-#@pytest.mark.skip(reason="Only for local testing. Uncomment line to run")
+@pytest.mark.skipif(
+    not os.environ.get("LOCAL_TEST"),
+    reason="Performance tests are skipped by default. Set LOCAL_TEST=1 to enable.",
+)
 async def test_performance(driver: PGDriver):
     """Insert 2M rows across 300 KBs (5 large KBs hold ~70% of rows), then benchmark operations."""
     total_rows = 2_000_000
