@@ -25,7 +25,9 @@ from fastapi.requests import Request
 from nucliadb.models.internal.processing import ProcessingInfo, Source
 from nucliadb.writer.api.v1.upload import (
     store_file_on_nuclia_db,
-    validate_field_upload,
+)
+from nucliadb.writer.api.v1.upload import (
+    validate_field_upload_legacy as validate_field_upload,
 )
 from nucliadb.writer.resource.field import ResourceClassifications
 from nucliadb.writer.tus.exceptions import HTTPConflict, HTTPNotFound
