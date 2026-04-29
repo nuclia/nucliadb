@@ -96,7 +96,6 @@ BM_FIELDS = {
         "delete_question_answers",
         "errors",
         "generated_by",
-        "synchronous_storage_deletion",
     ],
     # No longer used fields
     "deprecated": [
