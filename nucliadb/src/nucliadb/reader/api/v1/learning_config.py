@@ -151,7 +151,7 @@ async def get_models_group_by_providers(
         headers={
             "account-id": x_nucliadb_account,
             "account-type": x_nucliadb_account_type,
-            "allow-access-non-enterprise-models": x_allow_access_non_enterprise_models,
+            "allow-access-non-enterprise-models": str(x_allow_access_non_enterprise_models).lower(),
         },
     )
 
