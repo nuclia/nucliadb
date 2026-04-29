@@ -51,7 +51,7 @@ async def test_set_and_exists(driver: PGDriver):
     assert await file_md5.exists(kbid=kb, md5="aaa") is False
 
     async with driver.rw_transaction() as txn:
-        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="f/file1")
+        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="file1")
         await txn.commit()
 
     assert await file_md5.exists(kbid=kb, md5="aaa") is True
@@ -63,11 +63,11 @@ async def test_set_is_idempotent(driver: PGDriver):
     r1 = rid()
 
     async with driver.rw_transaction() as txn:
-        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="f/file1")
+        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="file1")
         await txn.commit()
 
     async with driver.rw_transaction() as txn:
-        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="f/file1")
+        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="file1")
         await txn.commit()
 
     assert await file_md5.exists(kbid=kb, md5="aaa") is True
@@ -78,14 +78,14 @@ async def test_same_md5_different_fields(driver: PGDriver):
     r1 = rid()
 
     async with driver.rw_transaction() as txn:
-        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="f/file1")
-        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="f/file2")
+        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="file1")
+        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="file2")
         await txn.commit()
 
     assert await file_md5.exists(kbid=kb, md5="aaa") is True
 
     async with driver.rw_transaction() as txn:
-        await file_md5.delete(txn, kbid=kb, rid=r1, field_id="f/file1")
+        await file_md5.delete(txn, kbid=kb, rid=r1, field_id="file1")
         await txn.commit()
 
     assert await file_md5.exists(kbid=kb, md5="aaa") is True
@@ -96,12 +96,12 @@ async def test_delete_by_field(driver: PGDriver):
     r1 = rid()
 
     async with driver.rw_transaction() as txn:
-        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="f/file1")
-        await file_md5.set(txn, kbid=kb, md5="bbb", rid=r1, field_id="f/file2")
+        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="file1")
+        await file_md5.set(txn, kbid=kb, md5="bbb", rid=r1, field_id="file2")
         await txn.commit()
 
     async with driver.rw_transaction() as txn:
-        await file_md5.delete(txn, kbid=kb, rid=r1, field_id="f/file1")
+        await file_md5.delete(txn, kbid=kb, rid=r1, field_id="file1")
         await txn.commit()
 
     assert await file_md5.exists(kbid=kb, md5="aaa") is False
@@ -114,9 +114,9 @@ async def test_delete_by_resource(driver: PGDriver):
     r2 = rid()
 
     async with driver.rw_transaction() as txn:
-        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="f/file1")
-        await file_md5.set(txn, kbid=kb, md5="bbb", rid=r1, field_id="f/file2")
-        await file_md5.set(txn, kbid=kb, md5="ccc", rid=r2, field_id="f/file1")
+        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="file1")
+        await file_md5.set(txn, kbid=kb, md5="bbb", rid=r1, field_id="file2")
+        await file_md5.set(txn, kbid=kb, md5="ccc", rid=r2, field_id="file1")
         await txn.commit()
 
     async with driver.rw_transaction() as txn:
@@ -135,9 +135,9 @@ async def test_delete_by_kb(driver: PGDriver):
     r2 = rid()
 
     async with driver.rw_transaction() as txn:
-        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="f/file1")
-        await file_md5.set(txn, kbid=kb, md5="bbb", rid=r2, field_id="f/file1")
-        await file_md5.set(txn, kbid=other_kb, md5="ccc", rid=r1, field_id="f/file1")
+        await file_md5.set(txn, kbid=kb, md5="aaa", rid=r1, field_id="file1")
+        await file_md5.set(txn, kbid=kb, md5="bbb", rid=r2, field_id="file1")
+        await file_md5.set(txn, kbid=other_kb, md5="ccc", rid=r1, field_id="file1")
         await txn.commit()
 
     async with driver.rw_transaction() as txn:
@@ -235,7 +235,7 @@ async def test_performance(driver: PGDriver):
     async with driver.rw_transaction() as txn:
         for i in range(num_fields):
             await file_md5.set(
-                txn, kbid=target_kb, md5=f"res_md5_{i}", rid=resource_rid, field_id=f"f/field_{i}"
+                txn, kbid=target_kb, md5=f"res_md5_{i}", rid=resource_rid, field_id=f"field_{i}"
             )
         await txn.commit()
 

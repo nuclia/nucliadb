@@ -62,7 +62,7 @@ async def set(txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str)
             ON CONFLICT (kbid, md5, rid, field_id) DO UPDATE SET
                 created_at = NOW()
             """,
-            {"kbid": kbid, "md5": md5, "rid": rid, "field_id": field_id},
+            {"kbid": kbid, "md5": md5, "rid": rid, "field_id": f"f/{field_id}"},
         )
 
 
@@ -109,5 +109,9 @@ async def delete(
         async with pg_txn.connection.cursor() as cur:
             await cur.execute(
                 "DELETE FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_id = %(field_id)s",
-                {"kbid": kbid, "rid": rid, "field_id": field_id},
+                {
+                    "kbid": kbid,
+                    "rid": rid,
+                    "field_id": f"f/{field_id}",
+                },
             )

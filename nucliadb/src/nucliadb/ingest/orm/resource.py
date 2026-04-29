@@ -469,15 +469,13 @@ class Resource:
             # This is for PUT operations where the file is being replaced but the new md5 is not provided.
             await self.delete_file_field_md5(field_id)
         else:
-            await file_md5.set(
-                self.txn, kbid=self.kbid, md5=file.md5, rid=self.uuid, field_id=f"f/{field_id}"
-            )
+            await file_md5.set(self.txn, kbid=self.kbid, md5=file.md5, rid=self.uuid, field_id=field_id)
 
     async def delete_file_field_md5(self, field_id: str):
         """
         Delete file MD5 hash records for a given field.
         """
-        await file_md5.delete(self.txn, kbid=self.kbid, rid=self.uuid, field_id=f"f/{field_id}")
+        await file_md5.delete(self.txn, kbid=self.kbid, rid=self.uuid, field_id=field_id)
 
     @processor_observer.wrap({"type": "apply_fields_status"})
     async def apply_fields_status(self, message: BrokerMessage, updated_fields: list[FieldID]):
