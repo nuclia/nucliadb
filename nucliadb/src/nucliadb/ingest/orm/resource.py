@@ -435,7 +435,7 @@ class Resource:
         for field, file in message.files.items():
             fid = FieldID(field_type=FieldType.FILE, field=field)
             await self.set_field(fid.field_type, fid.field, file)
-            if has_feature(const.Features.FILE_MD5_WRITES, context={"kbid": self.kbid}):
+            if has_feature(const.Features.FILE_MD5_WRITES, context={"kbid": self.kbid}, default=True):
                 await self.set_file_field_md5(field, file.file)
             message_updated_fields.append(fid)
 
@@ -447,7 +447,9 @@ class Resource:
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
             if fieldid.field_type == FieldType.FILE:
-                if has_feature(const.Features.FILE_MD5_WRITES, context={"kbid": self.kbid}):
+                if has_feature(
+                    const.Features.FILE_MD5_WRITES, context={"kbid": self.kbid}, default=True
+                ):
                     await self.delete_file_field_md5(fieldid.field)
 
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):

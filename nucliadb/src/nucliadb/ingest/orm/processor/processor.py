@@ -224,7 +224,7 @@ class Processor:
                         raise AttributeError("Shard not available")
 
                     await catalog_delete(txn, kbid, uuid)
-                    if has_feature(const.Features.FILE_MD5_WRITES, context={"kbid": kbid}):
+                    if has_feature(const.Features.FILE_MD5_WRITES, context={"kbid": kbid}, default=True):
                         await file_md5.delete(txn, kbid=kbid, rid=uuid)
                     external_index_manager = await get_external_index_manager(kbid=kbid)
                     if external_index_manager is not None:
