@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import logging
 import uuid
 from datetime import datetime
 from hashlib import md5
@@ -30,7 +31,7 @@ from fastapi.responses import Response
 from fastapi_versioning import version
 from starlette.requests import Request as StarletteRequest
 
-from nucliadb.common import datamanagers
+from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.models.internal.processing import PushPayload, Source
@@ -76,15 +77,19 @@ from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, FieldID, FieldType, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
+from nucliadb_utils import const
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 from nucliadb_utils.utilities import (
     get_partitioning,
     get_storage,
+    has_feature,
 )
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX, RSLUG_PREFIX, api
+
+logger = logging.getLogger(__name__)
 
 TUS_HEADERS = {
     "Tus-Resumable": "1.0.0",
@@ -852,6 +857,18 @@ async def validate_field_upload(
     field: str | None = None,
     md5: str | None = None,
 ):
+    if has_feature(const.Features.FILE_MD5_READS, context={"kbid": kbid}):
+        return await validate_field_upload_v2(kbid, rid, field, md5)
+    else:
+        return await validate_field_upload_legacy(kbid, rid, field, md5)
+
+
+async def validate_field_upload_legacy(
+    kbid: str,
+    rid: str | None = None,
+    field: str | None = None,
+    md5: str | None = None,
+):
     """Validate field upload and return blob storage path, rid and field id.
 
     This function assumes KB exists
@@ -877,6 +894,37 @@ async def validate_field_upload(
             field = uuid.uuid4().hex
         else:
             field = md5
+
+    path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)
+    return path, rid, field
+
+
+async def validate_field_upload_v2(
+    kbid: str,
+    rid: str | None = None,
+    field: str | None = None,
+    md5: str | None = None,
+):
+    """Validate field upload and return blob storage path, rid and field id.
+
+    This function assumes KB exists
+    """
+
+    if rid is None:
+        # we are going to create a new resource and a field
+        if md5 is not None:
+            exists = await file_md5.exists(kbid=kbid, md5=md5)
+            if exists:
+                raise HTTPConflict("File already exists in the Knowledge Box")
+        rid = uuid.uuid4().hex
+    else:
+        # we're adding a field to a resource
+        exists = await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
+        if not exists:
+            raise HTTPNotFound("Resource is not found or not yet available")
+
+    if field is None:
+        field = uuid.uuid4().hex
 
     path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)
     return path, rid, field
