@@ -23,7 +23,7 @@ use std::time::Duration;
 
 use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
-use nidx::indexer::index_resource;
+use nidx::indexer::{delete_resource, index_resource};
 use nidx::searcher::SyncedSearcher;
 use nidx::searcher::grpc::SearchServer;
 use nidx::searcher::shard_selector::ShardSelector;
@@ -116,6 +116,18 @@ impl NidxFixture {
             &tempfile::env::temp_dir(),
             shard_id,
             resource,
+            self.seq.into(),
+        )
+        .await?;
+        self.seq += 1;
+        Ok(())
+    }
+
+    pub async fn delete_resource(&mut self, shard_id: &str, resource_uuid: &str) -> anyhow::Result<()> {
+        delete_resource(
+            &self.settings.metadata,
+            shard_id,
+            resource_uuid.to_string(),
             self.seq.into(),
         )
         .await?;

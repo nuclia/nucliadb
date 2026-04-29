@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use nidx_json::JsonSearcher;
@@ -28,10 +29,11 @@ use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::VectorSearcher;
 use tracing::{Span, instrument};
+use uuid::Uuid;
 
 use crate::{
     errors::{NidxError, NidxResult},
-    searcher::query_planner::GraphIndexQueries,
+    searcher::query_planner::{GraphIndexQueries, IndexQueries},
 };
 
 use super::{
@@ -149,10 +151,45 @@ pub async fn search(index_cache: Arc<IndexCache>, search_request: SearchRequest)
     Ok(search_results)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn blocking_search(
-    query_plan: QueryPlan,
+fn compute_prefilter(
+    index_queries: &mut IndexQueries,
+    plan_prefilter: Option<PreFilterRequest>,
     json_searcher: Option<&JsonSearcher>,
+    text_searcher: Option<&TextSearcher>,
+) -> anyhow::Result<()> {
+    let mut text_prefilter_result: Option<anyhow::Result<PrefilterResult>> = None;
+    let mut json_prefilter_result: Option<anyhow::Result<HashSet<Uuid>>> = None;
+    let json_request = index_queries.json_request.take();
+
+    std::thread::scope(|scope| {
+        if let Some(prefilter) = plan_prefilter {
+            let current = Span::current();
+            let result = &mut text_prefilter_result;
+            scope.spawn(move || *result = Some(current.in_scope(|| text_searcher.unwrap().prefilter(&prefilter))));
+        }
+        if let Some(request) = json_request
+            && let Some(searcher) = json_searcher
+        {
+            let current = Span::current();
+            let result = &mut json_prefilter_result;
+            scope.spawn(move || *result = Some(current.in_scope(|| searcher.search(&request))));
+        }
+    });
+
+    let text_prefilter = text_prefilter_result.transpose()?.unwrap_or(PrefilterResult::All);
+    let filter_or = index_queries.filter_or;
+    let combined = if let Some(uuids) = json_prefilter_result.transpose()? {
+        text_prefilter.combine(uuids, filter_or)
+    } else {
+        text_prefilter
+    };
+    index_queries.apply_prefilter(combined);
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_index_searches(
+    index_queries: IndexQueries,
     paragraph_searcher: Option<&ParagraphSearcher>,
     relation_searcher: Option<&RelationSearcher>,
     text_searcher: Option<&TextSearcher>,
@@ -160,29 +197,8 @@ fn blocking_search(
     node_semantic_index: Option<&VectorSearcher>,
     edge_semantic_index: Option<&VectorSearcher>,
 ) -> anyhow::Result<SearchResponse> {
-    let mut index_queries = query_plan.index_queries;
-
-    // Apply JSON prefilter first (resource-level UUID set)
-    if let Some(request) = index_queries.json_request.take()
-        && let Some(searcher) = json_searcher
-    {
-        let uuids = searcher.search(&request)?;
-        index_queries.apply_json_prefilter(uuids, index_queries.filter_or);
-    }
-
-    // Early-exit if JSON prefilter already eliminated all results
-    if matches!(index_queries.prefilter_results, PrefilterResult::None) {
-        return Ok(SearchResponse::default());
-    }
-
-    // Apply pre-filtering to the query plan
-    if let Some(prefilter) = query_plan.prefilter {
-        let prefiltered = text_searcher.unwrap().prefilter(&prefilter)?;
-        index_queries.apply_prefilter(prefiltered);
-    }
     let prefilter = &index_queries.prefilter_results;
 
-    // Run the rest of the plan
     let text_task = index_queries
         .texts_request
         .map(|request| move || text_searcher.unwrap().search(&request));
@@ -243,6 +259,32 @@ fn blocking_search(
         vector: rvector.transpose()?,
         graph: rrelation.transpose()?,
     })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn blocking_search(
+    query_plan: QueryPlan,
+    json_searcher: Option<&JsonSearcher>,
+    paragraph_searcher: Option<&ParagraphSearcher>,
+    relation_searcher: Option<&RelationSearcher>,
+    text_searcher: Option<&TextSearcher>,
+    vector_searcher: Option<&VectorSearcher>,
+    node_semantic_index: Option<&VectorSearcher>,
+    edge_semantic_index: Option<&VectorSearcher>,
+) -> anyhow::Result<SearchResponse> {
+    let mut index_queries = query_plan.index_queries;
+
+    compute_prefilter(&mut index_queries, query_plan.prefilter, json_searcher, text_searcher)?;
+
+    run_index_searches(
+        index_queries,
+        paragraph_searcher,
+        relation_searcher,
+        text_searcher,
+        vector_searcher,
+        node_semantic_index,
+        edge_semantic_index,
+    )
 }
 
 #[instrument(skip_all, fields(shard_id = graph_request.shard))]

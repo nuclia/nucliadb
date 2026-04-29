@@ -33,11 +33,11 @@ pub struct JsonPathFilter {
 
 #[derive(Clone)]
 pub enum JsonPredicate {
-    String(String),
+    Text(String),
 
     IntRange { lower: Option<i64>, upper: Option<i64> },
     FloatRange { lower: Option<f64>, upper: Option<f64> },
-    BoolMatch(bool),
+    Boolean(bool),
 }
 
 #[derive(Clone)]
@@ -62,7 +62,7 @@ fn build_leaf_query(filter: &JsonPathFilter, json_field: Field) -> Box<dyn Query
     let path = tantivy_path(filter);
 
     match &filter.predicate {
-        JsonPredicate::String(val) => {
+        JsonPredicate::Text(val) => {
             let mut term = Term::from_field_json_path(json_field, &path, false);
             term.append_type_and_str(val);
             Box::new(TermQuery::new(term, IndexRecordOption::Basic))
@@ -96,7 +96,7 @@ fn build_leaf_query(filter: &JsonPathFilter, json_field: Field) -> Box<dyn Query
             Box::new(FastFieldRangeQuery::new(build_bound(lower), build_bound(upper)))
         }
 
-        JsonPredicate::BoolMatch(val) => {
+        JsonPredicate::Boolean(val) => {
             let mut term = Term::from_field_json_path(json_field, &path, false);
             term.append_type_and_fast_value(*val);
             Box::new(TermQuery::new(term, IndexRecordOption::Basic))
@@ -249,7 +249,7 @@ mod tests {
         let (svc, apple, _banana, _cherry) = build_test_index();
         let results = search(
             &svc,
-            path("t/product", "name", JsonPredicate::String("apple".to_string())),
+            path("t/product", "name", JsonPredicate::Text("apple".to_string())),
         );
         assert!(results.contains(&apple));
     }
@@ -312,7 +312,7 @@ mod tests {
     #[test]
     fn test_bool_match_true() {
         let (svc, apple, _banana, cherry) = build_test_index();
-        let results = search(&svc, path("t/product", "available", JsonPredicate::BoolMatch(true)));
+        let results = search(&svc, path("t/product", "available", JsonPredicate::Boolean(true)));
         assert!(results.contains(&apple));
         assert!(results.contains(&cherry));
     }
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn test_bool_match_false() {
         let (svc, _apple, banana, _cherry) = build_test_index();
-        let results = search(&svc, path("t/product", "available", JsonPredicate::BoolMatch(false)));
+        let results = search(&svc, path("t/product", "available", JsonPredicate::Boolean(false)));
         assert_eq!(results, HashSet::from([banana]));
     }
 
@@ -328,7 +328,7 @@ mod tests {
     fn test_and_combination() {
         let (svc, apple, _banana, _cherry) = build_test_index();
         let expr = JsonFilterExpression::And(vec![
-            path("t/product", "available", JsonPredicate::BoolMatch(true)),
+            path("t/product", "available", JsonPredicate::Boolean(true)),
             path(
                 "t/product",
                 "price",
@@ -345,7 +345,7 @@ mod tests {
     #[test]
     fn test_or_combination() {
         let (svc, _apple, banana, _cherry) = build_test_index();
-        let expr = JsonFilterExpression::Or(vec![path("t/product", "available", JsonPredicate::BoolMatch(false))]);
+        let expr = JsonFilterExpression::Or(vec![path("t/product", "available", JsonPredicate::Boolean(false))]);
         let results = search(&svc, expr);
         assert!(results.contains(&banana));
     }
@@ -353,11 +353,7 @@ mod tests {
     #[test]
     fn test_not_combination() {
         let (svc, apple, _banana, cherry) = build_test_index();
-        let expr = JsonFilterExpression::Not(Box::new(path(
-            "t/product",
-            "available",
-            JsonPredicate::BoolMatch(false),
-        )));
+        let expr = JsonFilterExpression::Not(Box::new(path("t/product", "available", JsonPredicate::Boolean(false))));
         let results = search(&svc, expr);
         assert!(results.contains(&apple));
         assert!(results.contains(&cherry));
@@ -369,7 +365,7 @@ mod tests {
         let (svc, apple, banana, cherry) = build_test_index();
         let expr = JsonFilterExpression::Or(vec![
             JsonFilterExpression::And(vec![
-                path("t/product", "available", JsonPredicate::BoolMatch(true)),
+                path("t/product", "available", JsonPredicate::Boolean(true)),
                 path(
                     "t/product",
                     "price",
@@ -379,7 +375,7 @@ mod tests {
                     },
                 ),
             ]),
-            path("t/product", "available", JsonPredicate::BoolMatch(false)),
+            path("t/product", "available", JsonPredicate::Boolean(false)),
         ]);
         let results = search(&svc, expr);
         assert!(results.contains(&apple));

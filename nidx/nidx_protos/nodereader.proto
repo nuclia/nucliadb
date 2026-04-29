@@ -325,11 +325,9 @@ enum FilterOperator {
     OR = 1;
 }
 
-// A filter expression tree operating on typed JSON field values.
-// Range bounds are inclusive. Absent bounds mean unbounded on that side.
 message JsonFieldPathFilter {
     string field_id  = 1;  // NucliaDB field id, e.g. "t/title"
-    string json_path = 2;  // Dot-separated path inside the JSON, e.g. "price"
+    string json_path = 2;  // Dot-separated path inside the JSON, e.g. "product.price"
 
     message IntegerRangePredicate {
         optional int64 lower = 1;
@@ -342,10 +340,10 @@ message JsonFieldPathFilter {
     }
 
     oneof predicate {
-        string  exact_match = 3;
+        string text = 3;
         IntegerRangePredicate int_range   = 4;
-        FloatRangePredicate   float_range = 5;
-        bool    bool_match  = 6;
+        FloatRangePredicate float_range = 5;
+        bool boolean = 6;
     }
 }
 

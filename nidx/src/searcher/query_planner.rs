@@ -142,107 +142,16 @@ pub struct IndexQueries {
 }
 
 impl IndexQueries {
-    /// When a pre-filter is run, the result can be used to modify the queries
-    /// that the indexes must resolve.
+    /// Apply the combined pre-filter result to the query plan. Clears all
+    /// sub-index requests when there are no matches.
     pub fn apply_prefilter(&mut self, prefiltered: PrefilterResult) {
         if matches!(prefiltered, PrefilterResult::None) {
-            // There are no matches so there is no need to run the rest of the search
             self.vectors_request = None;
             self.paragraphs_request = None;
             self.texts_request = None;
             self.relations_request = None;
-            return;
         }
-
         self.prefilter_results = prefiltered;
-    }
-
-    /// Merge a JSON prefilter result (resource-level UUIDs) into the existing
-    /// prefilter, respecting `filter_or`:
-    ///
-    /// - AND (`filter_or = false`): keep only FieldId entries whose resource_id
-    ///   is in the JSON hit set (intersection).
-    /// - OR  (`filter_or = true`):  add all JSON-hit resources to the existing
-    ///   set (union).
-    ///
-    /// Downstream searchers filter by FieldId, so resource-level JSON hits are
-    /// represented as sentinel FieldIds with an empty `field_id`.
-    pub fn apply_json_prefilter(&mut self, uuids: Vec<uuid::Uuid>, filter_or: bool) {
-        use nidx_types::prefilter::FieldId;
-        use std::collections::HashSet;
-
-        let uuid_set: HashSet<uuid::Uuid> = uuids.into_iter().collect();
-
-        self.prefilter_results = match std::mem::take(&mut self.prefilter_results) {
-            PrefilterResult::None => {
-                if filter_or {
-                    // OR with no prior results: JSON hits become the result set.
-                    PrefilterResult::Some(
-                        uuid_set
-                            .into_iter()
-                            .map(|u| FieldId {
-                                resource_id: u,
-                                field_id: None,
-                            })
-                            .collect(),
-                    )
-                } else {
-                    // AND with no prior results: stays empty.
-                    PrefilterResult::None
-                }
-            }
-            PrefilterResult::All => {
-                if filter_or {
-                    // OR with "all": everything still matches.
-                    PrefilterResult::All
-                } else {
-                    // AND with "all": constrain to JSON hits.
-                    PrefilterResult::Some(
-                        uuid_set
-                            .into_iter()
-                            .map(|u| FieldId {
-                                resource_id: u,
-                                field_id: None,
-                            })
-                            .collect(),
-                    )
-                }
-            }
-            PrefilterResult::Some(fields) => {
-                if filter_or {
-                    // OR: union — keep existing fields and add any JSON-hit
-                    // resources not already represented.
-                    let existing_rids: HashSet<uuid::Uuid> = fields.iter().map(|f| f.resource_id).collect();
-                    let mut merged = fields;
-                    for u in uuid_set {
-                        if !existing_rids.contains(&u) {
-                            merged.push(FieldId {
-                                resource_id: u,
-                                field_id: None,
-                            });
-                        }
-                    }
-                    PrefilterResult::Some(merged)
-                } else {
-                    // AND: intersect — keep only fields whose resource is in JSON hits.
-                    PrefilterResult::Some(
-                        fields
-                            .into_iter()
-                            .filter(|f| uuid_set.contains(&f.resource_id))
-                            .collect(),
-                    )
-                }
-            }
-        };
-
-        // On AND, an empty result means nothing can match — cancel all downstream queries.
-        if !filter_or && matches!(self.prefilter_results, PrefilterResult::Some(ref v) if v.is_empty()) {
-            self.prefilter_results = PrefilterResult::None;
-            self.vectors_request = None;
-            self.paragraphs_request = None;
-            self.texts_request = None;
-            self.relations_request = None;
-        }
     }
 }
 
@@ -316,7 +225,7 @@ fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> anyhow::Res
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("Missing predicate"))?
             {
-                Predicate::ExactMatch(s) => JsonPredicate::String(s.clone()),
+                Predicate::Text(s) => JsonPredicate::Text(s.clone()),
                 Predicate::IntRange(r) => JsonPredicate::IntRange {
                     lower: r.lower,
                     upper: r.upper,
@@ -325,7 +234,7 @@ fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> anyhow::Res
                     lower: r.lower,
                     upper: r.upper,
                 },
-                Predicate::BoolMatch(b) => JsonPredicate::BoolMatch(*b),
+                Predicate::Boolean(b) => JsonPredicate::Boolean(*b),
             };
             Ok(JsonFilterExpression::Path(JsonPathFilter {
                 field_id: path_filter.field_id.clone(),

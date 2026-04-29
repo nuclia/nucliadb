@@ -18,6 +18,8 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use std::collections::HashSet;
+
 use tantivy::collector::{Collector, SegmentCollector};
 use tantivy::columnar::Column;
 use tantivy::{Index, IndexReader, SegmentOrdinal, SegmentReader};
@@ -33,15 +35,15 @@ pub struct JsonReaderService {
 
 struct RidSegmentCollector {
     encoded_rid_reader: Column,
-    results: Vec<Uuid>,
+    results: HashSet<Uuid>,
 }
 
 impl SegmentCollector for RidSegmentCollector {
-    type Fruit = Vec<Uuid>;
+    type Fruit = HashSet<Uuid>;
 
     fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
         let rid = decode_rid(self.encoded_rid_reader.values_for_doc(doc));
-        self.results.push(rid);
+        self.results.insert(rid);
     }
 
     fn harvest(self) -> Self::Fruit {
@@ -52,14 +54,14 @@ impl SegmentCollector for RidSegmentCollector {
 struct RidCollector;
 
 impl Collector for RidCollector {
-    type Fruit = Vec<Uuid>;
+    type Fruit = HashSet<Uuid>;
     type Child = RidSegmentCollector;
 
     fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
         let encoded_rid_reader = segment.fast_fields().u64("encoded_field_id")?;
         Ok(RidSegmentCollector {
             encoded_rid_reader,
-            results: vec![],
+            results: HashSet::new(),
         })
     }
 
@@ -71,18 +73,12 @@ impl Collector for RidCollector {
         &self,
         segment_fruits: Vec<<Self::Child as SegmentCollector>::Fruit>,
     ) -> tantivy::Result<Self::Fruit> {
-        Ok(segment_fruits
-            .into_iter()
-            .reduce(|mut a, mut b| {
-                a.append(&mut b);
-                a
-            })
-            .unwrap_or_default())
+        Ok(segment_fruits.into_iter().flatten().collect())
     }
 }
 
 impl JsonReaderService {
-    pub fn search(&self, query: &dyn tantivy::query::Query) -> anyhow::Result<Vec<Uuid>> {
+    pub fn search(&self, query: &dyn tantivy::query::Query) -> anyhow::Result<HashSet<Uuid>> {
         let searcher = self.reader.searcher();
         Ok(searcher.search(query, &RidCollector)?)
     }

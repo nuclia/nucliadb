@@ -23,6 +23,7 @@ mod resource_indexer;
 mod schema;
 pub mod search;
 
+use std::collections::HashSet;
 use std::path::Path;
 
 use nidx_tantivy::{
@@ -30,6 +31,7 @@ use nidx_tantivy::{
     index_reader::{DeletionQueryBuilder, open_index_with_deletions},
 };
 use nidx_types::OpenIndexMetadata;
+
 use reader::JsonReaderService;
 use resource_indexer::index_json_fields;
 use schema::JsonSchema;
@@ -142,7 +144,7 @@ impl JsonSearcher {
     }
 
     #[instrument(name = "json::search", skip_all)]
-    pub fn search(&self, request: &JsonSearchRequest) -> anyhow::Result<Vec<Uuid>> {
+    pub fn search(&self, request: &JsonSearchRequest) -> anyhow::Result<HashSet<Uuid>> {
         let query = build_tantivy_query(&request.filter, self.reader.schema.json);
         self.reader.search(&*query)
     }
