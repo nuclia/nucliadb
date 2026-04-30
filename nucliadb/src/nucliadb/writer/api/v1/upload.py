@@ -855,9 +855,11 @@ async def validate_field_upload(
     field: str | None = None,
     md5: str | None = None,
 ):
-    """Validate field upload and return blob storage path, rid and field id.
+    """
+    Validate if the upload is correct regarding the resource and field existence and the file md5 uniqueness if provided.
+    This function assumes that the knowledgebox already exists.
 
-    This function assumes KB exists
+    Return the path where the file should be stored, the resource id and the field id.
     """
     # Check for file duplicates if the md5 was provided.
     if md5 is not None and await file_md5.exists(kbid=kbid, md5=md5):
