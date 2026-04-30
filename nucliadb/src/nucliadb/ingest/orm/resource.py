@@ -602,7 +602,6 @@ class Resource:
 
         for link_extracted_data in message.link_extracted_data:
             await self._apply_link_extracted_data(link_extracted_data)
-            await self.maybe_update_resource_title_from_link(link_extracted_data)
             extracted_languages.append(link_extracted_data.language)
 
         for file_extracted_data in message.file_extracted_data:
@@ -675,6 +674,7 @@ class Resource:
 
         maybe_update_basic_icon(self.basic, "application/stf-link")
 
+        await self.maybe_update_resource_title_from_link(link_extracted_data)
         maybe_update_basic_summary(self.basic, link_extracted_data.description)
         self.modified = True
 
