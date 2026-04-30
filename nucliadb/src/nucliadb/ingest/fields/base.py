@@ -133,10 +133,6 @@ class Field(Generic[PbType]):
     def storage(self) -> Storage:
         return self.resource.storage
 
-    @property
-    def resource_unique_id(self) -> str:
-        return f"{self.uuid}/{self.type}/{self.id}"
-
     def get_storage_field(self, field_type: FieldTypes) -> StorageField:
         return self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, field_type.value)
 
