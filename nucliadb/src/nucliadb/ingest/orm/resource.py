@@ -70,9 +70,8 @@ from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_utils import const
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import get_storage, has_feature
+from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
 
@@ -435,8 +434,7 @@ class Resource:
         for field, file in message.files.items():
             fid = FieldID(field_type=FieldType.FILE, field=field)
             await self.set_field(fid.field_type, fid.field, file)
-            if has_feature(const.Features.FILE_MD5_WRITES, context={"kbid": self.kbid}, default=True):
-                await self.set_file_field_md5(field, file.file)
+            await self.set_file_field_md5(field, file.file)
             message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
@@ -447,10 +445,7 @@ class Resource:
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
             if fieldid.field_type == FieldType.FILE:
-                if has_feature(
-                    const.Features.FILE_MD5_WRITES, context={"kbid": self.kbid}, default=True
-                ):
-                    await self.delete_file_field_md5(fieldid.field)
+                await self.delete_file_field_md5(fieldid.field)
 
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
             await self.update_all_field_ids(

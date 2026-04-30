@@ -65,14 +65,6 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "rollout": 0,
         "variants": {"environment": ["local"]},
     },
-    const.Features.FILE_MD5_WRITES: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
-    },
-    const.Features.FILE_MD5_READS: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
-    },
 }
 
 

@@ -25,9 +25,7 @@ from fastapi.requests import Request
 from nucliadb.models.internal.processing import ProcessingInfo, Source
 from nucliadb.writer.api.v1.upload import (
     store_file_on_nuclia_db,
-)
-from nucliadb.writer.api.v1.upload import (
-    validate_field_upload_legacy as validate_field_upload,
+    validate_field_upload,
 )
 from nucliadb.writer.resource.field import ResourceClassifications
 from nucliadb.writer.tus.exceptions import HTTPConflict, HTTPNotFound
@@ -111,27 +109,27 @@ async def test_store_file_on_nucliadb_does_not_store_passwords(
 
 
 @pytest.mark.parametrize(
-    "rid,field,md5,exists,result",
+    "rid,field,md5,resource_exists,md5_exists,result",
     [
-        (None, None, None, False, ("uuid4", "uuid4")),
-        (None, None, None, True, ("uuid4", "uuid4")),
-        (None, None, "md5", False, ("md5", "md5")),
-        (None, None, "md5", True, HTTPConflict),
-        (None, "field", None, False, ("uuid4", "field")),
-        (None, "field", None, True, ("uuid4", "field")),
-        (None, "field", "md5", False, ("md5", "field")),
-        (None, "field", "md5", True, HTTPConflict),
-        ("rid", None, None, False, HTTPNotFound),
-        ("rid", None, None, True, ("rid", "uuid4")),
-        ("rid", None, "md5", False, HTTPNotFound),
-        ("rid", None, "md5", True, ("rid", "md5")),
-        ("rid", "field", None, False, HTTPNotFound),
-        ("rid", "field", None, True, ("rid", "field")),
-        ("rid", "field", "md5", False, HTTPNotFound),
-        ("rid", "field", "md5", True, ("rid", "field")),
+        (None, None, None, False, False, ("uuid4", "uuid4")),
+        (None, None, None, True, False, ("uuid4", "uuid4")),
+        (None, None, "md5", False, True, HTTPConflict),
+        (None, None, "md5", False, False, ("uuid4", "uuid4")),
+        (None, "field", None, False, False, ("uuid4", "field")),
+        (None, "field", None, True, False, ("uuid4", "field")),
+        (None, "field", "md5", False, False, ("uuid4", "field")),
+        (None, "field", "md5", False, True, HTTPConflict),
+        ("rid", None, None, False, False, HTTPNotFound),
+        ("rid", None, None, True, False, ("rid", "uuid4")),
+        ("rid", None, "md5", False, False, HTTPNotFound),
+        ("rid", None, "md5", True, False, ("rid", "uuid4")),
+        ("rid", "field", None, False, False, HTTPNotFound),
+        ("rid", "field", None, True, False, ("rid", "field")),
+        ("rid", "field", "md5", False, False, HTTPNotFound),
+        ("rid", "field", "md5", True, False, ("rid", "field")),
     ],
 )
-async def test_validate_field_upload(rid, field, md5, exists: bool, result):
+async def test_validate_field_upload(rid, field, md5, resource_exists: bool, md5_exists: bool, result):
     mock_uuid = Mock()
     mock_uuid4 = Mock()
     mock_uuid4.hex = "uuid4"
@@ -141,7 +139,11 @@ async def test_validate_field_upload(rid, field, md5, exists: bool, result):
         patch("nucliadb.writer.api.v1.upload.uuid", mock_uuid),
         patch(
             "nucliadb.writer.api.v1.upload.datamanagers.atomic.resources.resource_exists",
-            AsyncMock(return_value=exists),
+            AsyncMock(return_value=resource_exists),
+        ),
+        patch(
+            "nucliadb.writer.api.v1.upload.file_md5.exists",
+            AsyncMock(return_value=md5_exists),
         ),
     ):
         if isinstance(result, tuple):
