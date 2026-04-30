@@ -118,7 +118,7 @@ class Field(Generic[PbType]):
         return self.resource.kbid
 
     @property
-    def uuid(self) -> str:
+    def rid(self) -> str:
         return self.resource.uuid
 
     @property
@@ -134,7 +134,7 @@ class Field(Generic[PbType]):
         return self.resource.storage
 
     def get_storage_field(self, field_type: FieldTypes) -> StorageField:
-        return self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, field_type.value)
+        return self.storage.file_extracted(self.kbid, self.rid, self.type, self.id, field_type.value)
 
     def _get_extracted_vectors_storage_field(
         self,
@@ -150,14 +150,14 @@ class Field(Generic[PbType]):
                 f"Can't do anything with UNSET or unknown vectorset storage key kind: {storage_key_kind}"
             )
 
-        return self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, key)
+        return self.storage.file_extracted(self.kbid, self.rid, self.type, self.id, key)
 
     async def db_get_value(self) -> PbType | None:
         if self.value is None:
             payload = await datamanagers.fields.get_raw(
                 self.resource.txn,
                 kbid=self.kbid,
-                rid=self.uuid,
+                rid=self.rid,
                 field_type=self.type,
                 field_id=self.id,
             )
@@ -172,7 +172,7 @@ class Field(Generic[PbType]):
         await datamanagers.fields.set(
             self.resource.txn,
             kbid=self.kbid,
-            rid=self.uuid,
+            rid=self.rid,
             field_type=self.type,
             field_id=self.id,
             value=payload,
@@ -184,7 +184,7 @@ class Field(Generic[PbType]):
         await datamanagers.fields.delete(
             self.resource.txn,
             kbid=self.kbid,
-            rid=self.uuid,
+            rid=self.rid,
             field_type=self.type,
             field_id=self.id,
         )
@@ -232,7 +232,7 @@ class Field(Generic[PbType]):
     ) -> None:
         # Try delete vectors
         node_key = FieldTypes.RELATION_NODE_VECTORS.value.format(vectorset=vectorset)
-        node_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, node_key)
+        node_sf = self.storage.file_extracted(self.kbid, self.rid, self.type, self.id, node_key)
         try:
             await self.storage.delete_upload(node_sf.key, node_sf.bucket)
         except KeyError:
@@ -244,7 +244,7 @@ class Field(Generic[PbType]):
     ) -> None:
         # Try delete vectors
         edge_key = FieldTypes.RELATION_EDGE_VECTORS.value.format(vectorset=vectorset)
-        edge_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, edge_key)
+        edge_sf = self.storage.file_extracted(self.kbid, self.rid, self.type, self.id, edge_key)
         try:
             await self.storage.delete_upload(edge_sf.key, edge_sf.bucket)
         except KeyError:
@@ -261,7 +261,7 @@ class Field(Generic[PbType]):
         return await datamanagers.fields.get_error(
             self.resource.txn,
             kbid=self.kbid,
-            rid=self.uuid,
+            rid=self.rid,
             field_type=self.type,
             field_id=self.id,
         )
@@ -270,7 +270,7 @@ class Field(Generic[PbType]):
         await datamanagers.fields.set_error(
             self.resource.txn,
             kbid=self.kbid,
-            rid=self.uuid,
+            rid=self.rid,
             field_type=self.type,
             field_id=self.id,
             error=error,
@@ -280,7 +280,7 @@ class Field(Generic[PbType]):
         return await datamanagers.fields.get_status(
             self.resource.txn,
             kbid=self.kbid,
-            rid=self.uuid,
+            rid=self.rid,
             field_type=self.type,
             field_id=self.id,
         )
@@ -289,7 +289,7 @@ class Field(Generic[PbType]):
         await datamanagers.fields.set_status(
             self.resource.txn,
             kbid=self.kbid,
-            rid=self.uuid,
+            rid=self.rid,
             field_type=self.type,
             field_id=self.id,
             status=status,
@@ -409,7 +409,7 @@ class Field(Generic[PbType]):
 
     async def set_relation_node_vectors(self, payload: SemanticGraphNodeVectors, vectorset: str):
         node_key = FieldTypes.RELATION_NODE_VECTORS.value.format(vectorset=vectorset)
-        node_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, node_key)
+        node_sf = self.storage.file_extracted(self.kbid, self.rid, self.type, self.id, node_key)
         if payload.HasField("node_file"):
             try:
                 await self.storage.normalize_binary(payload.node_file, node_sf)
@@ -435,7 +435,7 @@ class Field(Generic[PbType]):
     ) -> RelationNodeVectors | None:
         if self.relation_node_vectors.get(vectorset, None) is None or force:
             node_key = FieldTypes.RELATION_NODE_VECTORS.value.format(vectorset=vectorset)
-            node_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, node_key)
+            node_sf = self.storage.file_extracted(self.kbid, self.rid, self.type, self.id, node_key)
             payload = await self.storage.download_pb(node_sf, RelationNodeVectors)
             if payload is not None:
                 self.relation_node_vectors[vectorset] = payload
@@ -448,7 +448,7 @@ class Field(Generic[PbType]):
     ) -> RelationEdgeVectors | None:
         if self.relation_edge_vectors.get(vectorset, None) is None or force:
             edge_key = FieldTypes.RELATION_EDGE_VECTORS.value.format(vectorset=vectorset)
-            edge_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, edge_key)
+            edge_sf = self.storage.file_extracted(self.kbid, self.rid, self.type, self.id, edge_key)
             payload = await self.storage.download_pb(edge_sf, RelationEdgeVectors)
             if payload is not None:
                 self.relation_edge_vectors[vectorset] = payload
@@ -456,7 +456,7 @@ class Field(Generic[PbType]):
 
     async def set_relation_edge_vectors(self, payload: SemanticGraphEdgeVectors, vectorset: str):
         edge_key = FieldTypes.RELATION_EDGE_VECTORS.value.format(vectorset=vectorset)
-        edge_sf = self.storage.file_extracted(self.kbid, self.uuid, self.type, self.id, edge_key)
+        edge_sf = self.storage.file_extracted(self.kbid, self.rid, self.type, self.id, edge_key)
         if payload.HasField("edge_file"):
             try:
                 await self.storage.normalize_binary(payload.edge_file, edge_sf)

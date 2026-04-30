@@ -45,7 +45,7 @@ class File(Field[FieldFile]):
 
         is_external_file = payload.file.source == CloudFile.Source.EXTERNAL
         if not is_external_file:
-            sf: StorageField = self.storage.file_field(self.kbid, self.uuid, self.id, old_cf)
+            sf: StorageField = self.storage.file_field(self.kbid, self.rid, self.id, old_cf)
             cf: CloudFile = await self.storage.normalize_binary(payload.file, sf)
             payload.file.CopyFrom(cf)
 
@@ -57,7 +57,7 @@ class File(Field[FieldFile]):
     async def set_file_extracted_data(self, file_extracted_data: FileExtractedData):
         if file_extracted_data.HasField("file_preview"):
             sf_file_preview: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, "file_preview"
+                self.kbid, self.rid, self.type, self.id, "file_preview"
             )
             cf_file_preview: CloudFile = await self.storage.normalize_binary(
                 file_extracted_data.file_preview, sf_file_preview
@@ -66,7 +66,7 @@ class File(Field[FieldFile]):
 
         for page, preview in enumerate(file_extracted_data.file_pages_previews.pages):
             sf_file_page_preview: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, f"file_pages_previews/{page}"
+                self.kbid, self.rid, self.type, self.id, f"file_pages_previews/{page}"
             )
             cf_file_page_preview: CloudFile = await self.storage.normalize_binary(
                 preview, sf_file_page_preview
@@ -75,14 +75,14 @@ class File(Field[FieldFile]):
 
         for fileid, origincf in file_extracted_data.file_generated.items():
             sf_generated: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, f"generated/{fileid}"
+                self.kbid, self.rid, self.type, self.id, f"generated/{fileid}"
             )
             cf_generated: CloudFile = await self.storage.normalize_binary(origincf, sf_generated)
             file_extracted_data.file_generated[fileid].CopyFrom(cf_generated)
 
         if file_extracted_data.HasField("file_thumbnail"):
             sf_file_thumbnail: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, "file_thumbnail"
+                self.kbid, self.rid, self.type, self.id, "file_thumbnail"
             )
             cf_file_thumbnail: CloudFile = await self.storage.normalize_binary(
                 file_extracted_data.file_thumbnail, sf_file_thumbnail
@@ -90,7 +90,7 @@ class File(Field[FieldFile]):
             file_extracted_data.file_thumbnail.CopyFrom(cf_file_thumbnail)
 
         sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, FILE_METADATA
+            self.kbid, self.rid, self.type, self.id, FILE_METADATA
         )
         await self.storage.upload_pb(sf, file_extracted_data)
         self.file_extracted_data = file_extracted_data
@@ -98,7 +98,7 @@ class File(Field[FieldFile]):
     async def get_file_extracted_data(self) -> FileExtractedData | None:
         if self.file_extracted_data is None:
             sf: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, FILE_METADATA
+                self.kbid, self.rid, self.type, self.id, FILE_METADATA
             )
             self.file_extracted_data = await self.storage.download_pb(sf, FileExtractedData)
         return self.file_extracted_data
@@ -112,7 +112,7 @@ class File(Field[FieldFile]):
             return None
 
         sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, "file_thumbnail"
+            self.kbid, self.rid, self.type, self.id, "file_thumbnail"
         )
         sf.field = fed.file_thumbnail
         return sf
