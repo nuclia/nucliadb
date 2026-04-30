@@ -283,7 +283,7 @@ async def _tus_post(
         # When uploading to a specific resourece field, we want make sure that only one
         # upload is active at a time, so by default, unless you explicitly override it with the header,
         # concurrent uploads to the same file field will be blocked
-        upload_id = md5(f"{kbid}__{rid}__{field}".encode()).hexdigest()
+        upload_id = md5(f"{kbid}__{rid}__{field}".encode(), usedforsecurity=False).hexdigest()
 
     # This only happens in tus-java-client, redirect this POST to a PATCH
     if request.headers.get("x-http-method-override") == "PATCH":
@@ -770,7 +770,7 @@ async def _upload(
         # When uploading to a specific resourece field, we want make sure that only one
         # upload is active at a time, so by default, unless you explicitly override it with the header,
         # concurrent uploads to the same file field will be blocked
-        upload_id = md5(f"{kbid}__{rid}__{field}".encode()).hexdigest()
+        upload_id = md5(f"{kbid}__{rid}__{field}".encode(), usedforsecurity=False).hexdigest()
 
     await dm.load(upload_id)
 
