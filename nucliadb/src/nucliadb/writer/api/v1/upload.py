@@ -859,21 +859,20 @@ async def validate_field_upload(
 
     This function assumes KB exists
     """
+    # Check for file duplicates if the md5 was provided.
+    if md5 is not None and await file_md5.exists(kbid=kbid, md5=md5):
+        raise HTTPConflict("File already exists in the Knowledge Box")
 
-    if rid is None:
-        # we are going to create a new resource and a field
-        if md5 is not None:
-            exists = await file_md5.exists(kbid=kbid, md5=md5)
-            if exists:
-                raise HTTPConflict("File already exists in the Knowledge Box")
-        rid = uuid.uuid4().hex
-    else:
-        # we're adding a field to a resource
-        exists = await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
-        if not exists:
+    if rid is not None:
+        # Adding a field to an existing resource, the resource must exist.
+        if not await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid):
             raise HTTPNotFound("Resource is not found or not yet available")
+    else:
+        # We are creating a new resource. Assign a new resource id
+        rid = uuid.uuid4().hex
 
     if field is None:
+        # We are creating a new field. Assign a new field id
         field = uuid.uuid4().hex
 
     path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)
