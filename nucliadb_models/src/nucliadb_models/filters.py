@@ -465,7 +465,7 @@ class FilterExpression(BaseModel, extra="forbid"):
     paragraph: ParagraphFilterExpression | None = pydantic.Field(
         default=None, description="Filter to apply to each text block"
     )
-    key_value: KVFilterExpression | None = pydantic.Field(
+    key_value: pydantic.json_schema.SkipJsonSchema[KVFilterExpression | None] = pydantic.Field(
         default=None, description="Filter to apply to key-value fields (JSON index prefilter)"
     )
 
