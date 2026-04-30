@@ -250,7 +250,7 @@ pub fn rerank_top(
 
 #[cfg(test)]
 mod tests {
-    use rand::{Rng, SeedableRng, rngs::SmallRng};
+    use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng};
     use simsimd::SpatialSimilarity;
 
     use crate::{

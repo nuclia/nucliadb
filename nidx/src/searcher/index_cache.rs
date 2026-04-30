@@ -399,7 +399,7 @@ mod tests {
         use std::time::Duration;
 
         use anyhow::anyhow;
-        use rand::Rng;
+        use rand::RngExt;
         use tokio::task::JoinSet;
 
         use crate::searcher::index_cache::MemoryUsage;

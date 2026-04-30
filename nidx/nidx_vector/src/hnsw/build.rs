@@ -20,7 +20,7 @@
 
 use std::collections::BinaryHeap;
 
-use rand::{Rng, SeedableRng, distr::Uniform, rngs::SmallRng};
+use rand::{RngExt, SeedableRng, distr::Uniform, rngs::SmallRng};
 
 use crate::{
     VectorAddr,
