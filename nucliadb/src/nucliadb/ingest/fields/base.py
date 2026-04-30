@@ -30,7 +30,7 @@ from google.protobuf.message import DecodeError, Message
 
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FieldId
-from nucliadb.ingest.fields.exceptions import InvalidFieldClass, InvalidPBClass
+from nucliadb.ingest.fields.exceptions import InvalidFieldClass
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
@@ -95,13 +95,7 @@ class Field(Generic[PbType]):
     relation_node_vectors: dict[str, RelationNodeVectors]
     relation_edge_vectors: dict[str, RelationEdgeVectors]
 
-    def __init__(
-        self,
-        id: str,
-        resource: Resource,
-        pb: Any | None = None,
-        value: Any | None = None,
-    ):
+    def __init__(self, id: str, resource: Resource):
         if self.pbklass is None:
             raise InvalidFieldClass()
 
@@ -116,16 +110,6 @@ class Field(Generic[PbType]):
 
         self.id: str = id
         self.resource = resource
-
-        if value is not None:
-            newpb = self.pbklass()
-            newpb.ParseFromString(value)
-            self.value = newpb
-
-        elif pb is not None:
-            if not isinstance(pb, self.pbklass):
-                raise InvalidPBClass(self.__class__, pb.__class__)
-            self.value = pb
 
         self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 

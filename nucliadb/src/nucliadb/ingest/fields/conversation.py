@@ -46,14 +46,8 @@ class Conversation(Field[PBConversation]):
 
     _created: bool = False
 
-    def __init__(
-        self,
-        id: str,
-        resource: Any,
-        pb: Any | None = None,
-        value: dict[int, PBConversation] | None = None,
-    ):
-        super().__init__(id, resource, pb, value)
+    def __init__(self, id: str, resource: Any):
+        super().__init__(id, resource)
         self.value = {}
         self._splits_metadata: SplitsMetadata | None = None
         self.metadata = None

@@ -32,14 +32,8 @@ class File(Field[FieldFile]):
     type: str = "f"
     file_extracted_data: FileExtractedData | None
 
-    def __init__(
-        self,
-        id: str,
-        resource: Any,
-        pb: Any | None = None,
-        value: str | None = None,
-    ):
-        super().__init__(id, resource, pb, value)
+    def __init__(self, id: str, resource: Any):
+        super().__init__(id, resource)
         self.file_extracted_data = None
 
     async def set_value(self, payload: FieldFile):
