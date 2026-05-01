@@ -837,7 +837,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,
@@ -875,7 +875,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,
@@ -909,7 +909,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,
