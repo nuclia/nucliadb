@@ -346,7 +346,7 @@ class Processor:
                 await self.apply_resource(message, resource, update=(not created))
 
                 # index message
-                if resource and resource.modified:
+                if resource.modified:
                     index_message = await self.generate_index_message(resource, message, created)
                     try:
                         warnings = await self.index_resource(
@@ -392,7 +392,8 @@ class Processor:
                             else writer_pb2.Notification.WriteType.MODIFIED
                         ),
                     )
-                elif resource and resource.modified is False:
+                else:
+                    logger.info("This message did not modify the resource")
                     await txn.abort()
                     await self.notify_abort(
                         partition=partition,
@@ -401,7 +402,6 @@ class Processor:
                         rid=uuid,
                         source=message.source,
                     )
-                    logger.info("This message did not modify the resource")
             except (
                 asyncio.TimeoutError,
                 asyncio.CancelledError,
