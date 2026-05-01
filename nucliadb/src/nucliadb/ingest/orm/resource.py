@@ -23,7 +23,6 @@ import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from nucliadb.common import datamanagers
@@ -82,9 +81,6 @@ KB_FIELDS: dict[int, type] = {
     FieldType.GENERIC: Generic,
     FieldType.CONVERSATION: Conversation,
 }
-
-_executor = ThreadPoolExecutor(10)
-
 
 PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.PLAIN: "text/plain",
