@@ -239,7 +239,10 @@ class IndexMessageBuilder:
         self._apply_field_deletions(self.brain, message.delete_fields)
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()
-        fields_to_index = get_bm_modified_fields(message) + self.resource._modified_extracted_text
+        fields_to_index = get_bm_modified_fields(message)
+        fields_to_index.extend(
+            [x for x in self.resource._modified_extracted_text if x not in fields_to_index]
+        )
         vectorsets_configs = await self.get_vectorsets_configs()
         for fieldid in fields_to_index:
             if fieldid in message.delete_fields:
