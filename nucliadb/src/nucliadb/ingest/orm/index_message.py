@@ -239,7 +239,7 @@ class IndexMessageBuilder:
         self._apply_field_deletions(self.brain, message.delete_fields)
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()
-        fields_to_index = get_bm_modified_fields(message)
+        fields_to_index = get_bm_modified_fields(message) + self.resource._modified_extracted_text
         vectorsets_configs = await self.get_vectorsets_configs()
         for fieldid in fields_to_index:
             if fieldid in message.delete_fields:
@@ -261,8 +261,14 @@ class IndexMessageBuilder:
                 self.brain,
                 fieldid,
                 basic,
-                texts=needs_texts_update(fieldid, message),
-                paragraphs=needs_paragraphs_update(fieldid, message),
+                texts=(
+                    needs_texts_update(fieldid, message)
+                    or fieldid in self.resource._modified_extracted_text
+                ),
+                paragraphs=(
+                    needs_paragraphs_update(fieldid, message)
+                    or fieldid in self.resource._modified_extracted_text
+                ),
                 relations=needs_relations_update(fieldid, message),
                 vectors=needs_vectors_update(fieldid, message),
                 replace=replace_field,

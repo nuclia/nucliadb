@@ -701,17 +701,21 @@ class Resource:
 
     async def update_resource_title(self, computed_title: str) -> None:
         assert self.basic is not None
-        self.basic.title = computed_title
+
+        field_id_pb = FieldID(field="title", field_type=FieldType.GENERIC)
+
         # Extracted text
         field = await self.get_field("title", FieldType.GENERIC, load=False)
+        await field.set_value(computed_title)
+
         etw = ExtractedTextWrapper()
+        etw.field.CopyFrom(field_id_pb)
         etw.body.text = computed_title
         await field.set_extracted_text(etw)
 
         # Field computed metadata
         fcmw = FieldComputedMetadataWrapper()
-        fcmw.field.field = "title"
-        fcmw.field.field_type = FieldType.GENERIC
+        fcmw.field.CopyFrom(field_id_pb)
 
         # Merge with any existing field computed metadata
         fcm = await field.get_field_metadata(force=True)
@@ -722,6 +726,7 @@ class Resource:
         fcmw.metadata.metadata.paragraphs.append(paragraph)
 
         await field.set_field_metadata(fcmw)
+        self._modified_extracted_text.append(field_id_pb)
         self.modified = True
 
     async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
