@@ -246,7 +246,10 @@ class AugmentorOps:
         concurrency_control: asyncio.Semaphore | None = None,
     ) -> Augmented:
         nidx_extracted_texts = None
-        if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": self.kbid}):
+        if has_feature(
+            const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE,
+            context={"kbid": self.kbid, "component": "search"},
+        ):
             nidx_extracted_texts = await extracted_texts(
                 self.kbid, self.field_texts, self.paragraph_texts
             )

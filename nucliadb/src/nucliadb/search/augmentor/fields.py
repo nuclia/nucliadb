@@ -391,7 +391,8 @@ async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
     # we store all splits unordered inside nidx_text, so nidx can't support yet
     # conversation fields
     if field.type != Conversation.type and has_feature(
-        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}
+        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE,
+        context={"kbid": field.kbid, "component": "search"},
     ):
         nidx_extracted_texts = nidx_et_cache.get()
         if nidx_extracted_texts is not None:
