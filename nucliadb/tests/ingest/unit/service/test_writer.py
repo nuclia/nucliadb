@@ -55,7 +55,8 @@ class TestWriterServicer:
 
     @pytest.fixture
     def field(self, field_value):
-        val = Text("id", Mock(), value=field_value.SerializeToString())
+        val = Text("id", Mock())
+        val.value = field_value.SerializeToString()
         val.set_vectors = AsyncMock()
         yield val
 

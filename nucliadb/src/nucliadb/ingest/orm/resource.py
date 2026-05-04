@@ -23,7 +23,6 @@ import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from nucliadb.common import datamanagers, file_md5
@@ -83,9 +82,6 @@ KB_FIELDS: dict[int, type] = {
     FieldType.GENERIC: Generic,
     FieldType.CONVERSATION: Conversation,
 }
-
-_executor = ThreadPoolExecutor(10)
-
 
 PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.PLAIN: "text/plain",
@@ -627,7 +623,6 @@ class Resource:
 
         for link_extracted_data in message.link_extracted_data:
             await self._apply_link_extracted_data(link_extracted_data)
-            await self.maybe_update_resource_title_from_link(link_extracted_data)
             extracted_languages.append(link_extracted_data.language)
 
         for file_extracted_data in message.file_extracted_data:
@@ -700,6 +695,7 @@ class Resource:
 
         maybe_update_basic_icon(self.basic, "application/stf-link")
 
+        await self.maybe_update_resource_title_from_link(link_extracted_data)
         maybe_update_basic_summary(self.basic, link_extracted_data.description)
         self.modified = True
 
@@ -730,17 +726,21 @@ class Resource:
 
     async def update_resource_title(self, computed_title: str) -> None:
         assert self.basic is not None
-        self.basic.title = computed_title
+
+        field_id_pb = FieldID(field="title", field_type=FieldType.GENERIC)
+
         # Extracted text
         field = await self.get_field("title", FieldType.GENERIC, load=False)
+        await field.set_value(computed_title)
+
         etw = ExtractedTextWrapper()
+        etw.field.CopyFrom(field_id_pb)
         etw.body.text = computed_title
         await field.set_extracted_text(etw)
 
         # Field computed metadata
         fcmw = FieldComputedMetadataWrapper()
-        fcmw.field.field = "title"
-        fcmw.field.field_type = FieldType.GENERIC
+        fcmw.field.CopyFrom(field_id_pb)
 
         # Merge with any existing field computed metadata
         fcm = await field.get_field_metadata(force=True)
@@ -751,6 +751,7 @@ class Resource:
         fcmw.metadata.metadata.paragraphs.append(paragraph)
 
         await field.set_field_metadata(fcmw)
+        self._modified_extracted_text.append(field_id_pb)
         self.modified = True
 
     async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
@@ -866,7 +867,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,
@@ -904,7 +905,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,
@@ -938,7 +939,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,

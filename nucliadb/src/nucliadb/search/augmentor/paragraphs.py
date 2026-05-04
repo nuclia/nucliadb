@@ -319,7 +319,7 @@ async def get_paragraph_text_from_storage(field: Field, paragraph_id: ParagraphI
             "Dirty read: extracted text for field does not exist on DB. This should be temporal.",
             extra={
                 "kbid": field.kbid,
-                "field_id": field.resource_unique_id,
+                "field_id": field.field_id.full(),
             },
         )
         return None

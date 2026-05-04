@@ -392,7 +392,7 @@ async def test_suggestion_on_link_computed_titles_sc6088(
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
     nucliadb_reader: AsyncClient,
-    standalone_knowledgebox,
+    standalone_knowledgebox: str,
 ):
     # Create a resource with a link field
     link = "http://www.mylink.com"
@@ -412,7 +412,7 @@ async def test_suggestion_on_link_computed_titles_sc6088(
     rid = resp.json()["uuid"]
 
     # Simulate processing link extracted data
-    extracted_title = "MyLink Website"
+    extracted_title = "MyLink Website: the most marvelous website ever"
     bm = BrokerMessage()
     bm.type = BrokerMessage.MessageType.AUTOCOMMIT
     bm.source = BrokerMessage.MessageSource.PROCESSOR
@@ -432,7 +432,7 @@ async def test_suggestion_on_link_computed_titles_sc6088(
 
     # Test suggest returns the extracted title metadata
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/suggest", params={"query": "MyLink", "fields": "a/title"}
+        f"/kb/{kbid}/suggest", params={"query": "website", "fields": "a/title"}
     )
     assert resp.status_code == 200
     body = resp.json()
