@@ -146,9 +146,7 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         sources: dict[str, list[ScoredItem]],
     ) -> list[ScoredItem]:
         # accumulated scores per paragraph
-        scores: dict[ParagraphId, tuple[float, SCORE_TYPE, list[Score]]] = {}
-        # pointers from paragraph to the original source
-        match_positions: dict[ParagraphId, list[tuple[int, int]]] = {}
+        scores: dict[ParagraphId, tuple[RrfScore, ScoredItem]] = {}
 
         # sort results by it's score before fusing them, as we need the rank
         sources = {
@@ -162,26 +160,22 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
         for i, (ranking, weight) in enumerate(rankings):
             for rank, item in enumerate(ranking):
                 id = item.paragraph_id
-                score, score_type, history = scores.setdefault(id, (0, item.score_type, []))
-                score += 1 / (self._k + rank) * weight
-                history.append(item.current_score)
-                if {score_type, item.score_type} == {SCORE_TYPE.BM25, SCORE_TYPE.VECTOR}:
-                    score_type = SCORE_TYPE.BOTH
-                scores[id] = (score, score_type, history)
+                if id not in scores:
+                    score = 1 / (self._k + rank) * weight
+                    scores[id] = (RrfScore(score=score), item)
+                else:
+                    rrf_score, stored_item = scores[id]
+                    rrf_score.score += 1 / (self._k + rank) * weight
+                    stored_item.scores.append(item.current_score)
 
-                position = (i, rank)
-                match_positions.setdefault(item.paragraph_id, []).append(position)
+                    if (stored_item == SCORE_TYPE.BM25 and item.score_type == SCORE_TYPE.VECTOR) or (
+                        stored_item == SCORE_TYPE.VECTOR and item.score_type == SCORE_TYPE.BM25
+                    ):
+                        stored_item.score_type = SCORE_TYPE.BOTH
 
         merged = []
-        for paragraph_id, positions in match_positions.items():
-            # we are getting only one position, effectively deduplicating
-            # multiple matches for the same text block
-            i, j = match_positions[paragraph_id][0]
-            score, score_type, history = scores[paragraph_id]
-            item = rankings[i][0][j]
-            history.append(RrfScore(score=score))
-            item.scores = history
-            item.score_type = score_type
+        for paragraph_id, (rrf_score, item) in scores.items():
+            item.scores.append(rrf_score)
             merged.append(item)
 
         return merged
