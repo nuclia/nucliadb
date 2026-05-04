@@ -168,8 +168,12 @@ class ReciprocalRankFusion(RankFusionAlgorithm):
                     rrf_score.score += 1 / (self._k + rank) * weight
                     stored_item.scores.append(item.current_score)
 
-                    if (stored_item == SCORE_TYPE.BM25 and item.score_type == SCORE_TYPE.VECTOR) or (
-                        stored_item == SCORE_TYPE.VECTOR and item.score_type == SCORE_TYPE.BM25
+                    if (
+                        stored_item.score_type == SCORE_TYPE.BM25
+                        and item.score_type == SCORE_TYPE.VECTOR
+                    ) or (
+                        stored_item.score_type == SCORE_TYPE.VECTOR
+                        and item.score_type == SCORE_TYPE.BM25
                     ):
                         stored_item.score_type = SCORE_TYPE.BOTH
 
