@@ -95,7 +95,7 @@ impl FstIndexReader {
 mod tests {
     use std::{collections::BTreeMap, sync::Arc};
 
-    use rand::Rng;
+    use rand::RngExt;
     use tempfile::NamedTempFile;
 
     use crate::{

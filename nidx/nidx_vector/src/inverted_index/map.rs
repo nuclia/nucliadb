@@ -92,7 +92,7 @@ impl InvertedMapReader {
 
 #[cfg(test)]
 mod tests {
-    use rand::Rng;
+    use rand::RngExt;
     use tempfile::NamedTempFile;
 
     use crate::VectorR;
