@@ -117,12 +117,12 @@ spec:
             host: "search.{{ .Release.Namespace }}.svc.cluster.local"
             port:
               number: {{ .Values.serving.port }}
-          weight: {{ .Values.ask_canary.nucliadb_weight | default 100 }}
+          weight: {{ .Values.ask_canary.nucliadb_weight | default 0 }}
         - destination:
             host: "arag-api.arag.svc.cluster.local"
             port:
               number: {{ .Values.ask_canary.rao_serving_port }}
-          weight: {{ .Values.ask_canary.rao_weight | default 0 }}
+          weight: {{ .Values.ask_canary.rao_weight | default 100 }}
       retries:
         attempts: 3
         retryOn: connect-failure,5xx
