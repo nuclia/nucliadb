@@ -37,7 +37,7 @@ impl JsonSchema {
         let mut sb = Schema::builder();
 
         let rid = sb.add_bytes_field("uuid", STORED | INDEXED);
-        let encoded_rid = sb.add_u64_field("encoded_field_id", FAST);
+        let encoded_rid = sb.add_u64_field("encoded_resource_id", FAST);
 
         // STORED: field values are retrievable
         // TEXT: values are tokenised into the inverted index (enables TermQuery)
@@ -58,7 +58,7 @@ impl JsonSchema {
 }
 
 /// Encodes a resource and field id as a series of u64
-/// This is stored in the fast field `encoded_field_id`
+/// This is stored in the fast field `encoded_resource_id`
 /// We convert to bytes, batch them in sets of 8, and store
 /// as an array of u64
 pub fn encode_rid(rid: uuid::Uuid) -> Vec<u64> {
@@ -67,10 +67,10 @@ pub fn encode_rid(rid: uuid::Uuid) -> Vec<u64> {
 }
 
 /// Decodes a resource and field id from a series of u64
-/// This is retrieved from the fast field `encoded_field_id`
+/// This is retrieved from the fast field `encoded_resource_id`
 /// and used for faster loading in the prefilter Collector
 pub fn decode_rid(mut data: impl Iterator<Item = u64>) -> uuid::Uuid {
-    let w0 = data.next().expect("encoded_field_id missing first word");
-    let w1 = data.next().expect("encoded_field_id missing second word");
+    let w0 = data.next().expect("encoded_resource_id missing first word");
+    let w1 = data.next().expect("encoded_resource_id missing second word");
     uuid::Uuid::from_u64_pair(w0, w1)
 }

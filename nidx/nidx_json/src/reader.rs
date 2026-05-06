@@ -58,7 +58,7 @@ impl Collector for RidCollector {
     type Child = RidSegmentCollector;
 
     fn for_segment(&self, _segment_local_id: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
-        let encoded_rid_reader = segment.fast_fields().u64("encoded_field_id")?;
+        let encoded_rid_reader = segment.fast_fields().u64("encoded_resource_id")?;
         Ok(RidSegmentCollector {
             encoded_rid_reader,
             results: HashSet::new(),
