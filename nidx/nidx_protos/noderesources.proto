@@ -10,7 +10,7 @@ message TextInformation {
     repeated string labels = 2;
 }
 
-message JsonInformation {
+message JsonFieldValue {
     string value = 1; // JSON-encoded string
 }
 
@@ -167,7 +167,7 @@ message Resource {
     optional utils.Security security = 14;
 
     // Json index
-    map<string, JsonInformation> json_fields = 22;
+    map<string, JsonFieldValue> json_fields = 22;
     repeated string json_fields_to_delete = 23;
 
     // Boleans to indicate if the indexing needs to be done
