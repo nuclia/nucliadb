@@ -154,7 +154,7 @@ class FieldId:
         return f"FieldId({self.full()})"
 
     def __hash__(self) -> int:
-        return hash(self.full())
+        return hash((self.rid, self.type, self.key, self.subfield_id))
 
     @staticmethod
     def _parse_field_type(_type: str) -> str:
@@ -215,7 +215,16 @@ class ParagraphId:
         return f"ParagraphId({self.full()})"
 
     def __hash__(self) -> int:
-        return hash(self.full())
+        return hash(
+            (
+                self.field_id.rid,
+                self.field_id.type,
+                self.field_id.key,
+                self.field_id.subfield_id,
+                self.paragraph_start,
+                self.paragraph_end,
+            )
+        )
 
 
 @dataclass
@@ -265,7 +274,17 @@ class VectorId:
         return f"VectorId({self.full()})"
 
     def __hash__(self) -> int:
-        return hash(self.full())
+        return hash(
+            (
+                self.field_id.rid,
+                self.field_id.type,
+                self.field_id.key,
+                self.field_id.subfield_id,
+                self.index,
+                self.vector_start,
+                self.vector_end,
+            )
+        )
 
 
 def extract_data_augmentation_id(generated_field_id: str) -> str | None:
