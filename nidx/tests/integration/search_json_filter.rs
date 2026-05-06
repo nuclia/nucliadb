@@ -24,7 +24,7 @@ use crate::common::services::NidxFixture;
 use nidx_protos::nodereader::{
     self, JsonFieldPathFilter, JsonFilterExpression, json_field_path_filter, json_filter_expression,
 };
-use nidx_protos::noderesources::JsonInformation;
+use nidx_protos::noderesources::JsonFieldValue;
 use nidx_protos::{
     IndexParagraph, IndexParagraphs, NewShardRequest, Resource, Security, TextInformation, VectorIndexConfig,
 };
@@ -63,7 +63,7 @@ fn resource_with_json_and_security(
     });
     resource.json_fields.insert(
         "t/product".to_string(),
-        JsonInformation {
+        JsonFieldValue {
             value: json_value.to_string(),
         },
     );

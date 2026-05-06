@@ -177,9 +177,8 @@ fn compute_prefilter(
     });
 
     let text_prefilter = text_prefilter_result.transpose()?.unwrap_or(PrefilterResult::All);
-    let filter_or = index_queries.filter_or;
     let combined = if let Some(uuids) = json_prefilter_result.transpose()? {
-        text_prefilter.combine(uuids, filter_or)
+        text_prefilter.combine(uuids, index_queries.filter_operator)
     } else {
         text_prefilter
     };

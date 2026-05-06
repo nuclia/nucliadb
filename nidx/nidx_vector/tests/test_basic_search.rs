@@ -221,7 +221,7 @@ fn test_deletions() -> anyhow::Result<()> {
 #[test]
 fn test_filtered_search() -> anyhow::Result<()> {
     use common::{TestOpener, resource};
-    use nidx_types::prefilter::PrefilterResult;
+    use nidx_types::prefilter::{FilterOperator, PrefilterResult};
     use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher};
 
     let config = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 4 });
@@ -345,13 +345,13 @@ fn test_filtered_search() -> anyhow::Result<()> {
     );
 
     // Combinations with prefilter
-    let search = |filtering_formula, prefilter, filter_or| -> HashSet<u32> {
+    let search = |filtering_formula, prefilter, filter_operator| -> HashSet<u32> {
         let search_request = &VectorSearchRequest {
             vector: [0.0; 4].to_vec(),
             result_per_page: 10,
             min_score: -1.0,
             filtering_formula,
-            filter_or,
+            filter_operator,
             ..Default::default()
         };
         let results = searcher.search(search_request, &prefilter).unwrap();
@@ -375,7 +375,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
 
     // Prefilter only
     assert_eq!(
-        search(None, PrefilterResult::Some(vec![resource(0)]), false),
+        search(None, PrefilterResult::Some(vec![resource(0)]), FilterOperator::And),
         [0].into()
     );
 
@@ -384,7 +384,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
         search(
             Some(BooleanExpression::Literal("/l/labelset/label_1".into())),
             PrefilterResult::Some(vec![resource(0), resource(1)]),
-            false
+            FilterOperator::And
         ),
         [1].into()
     );
@@ -394,7 +394,7 @@ fn test_filtered_search() -> anyhow::Result<()> {
         search(
             Some(BooleanExpression::Literal("/l/labelset/label_3".into())),
             PrefilterResult::Some(vec![resource(1)]),
-            true
+            FilterOperator::Or
         ),
         [1, 3].into()
     );

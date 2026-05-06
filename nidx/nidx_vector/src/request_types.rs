@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nidx_types::prefilter::FilterOperator;
 use nidx_types::query_language::BooleanExpression;
 
 #[derive(Clone, Default)]
@@ -35,5 +36,5 @@ pub struct VectorSearchRequest {
     pub filtering_formula: Option<BooleanExpression<String>>,
     pub segment_filtering_formula: Option<BooleanExpression<String>>,
     /// Whether to do an OR/AND between prefilter results and filtering_formula
-    pub filter_or: bool,
+    pub filter_operator: FilterOperator,
 }

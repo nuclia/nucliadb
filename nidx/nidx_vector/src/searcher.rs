@@ -31,7 +31,7 @@ use crate::{formula::*, query_io};
 use anyhow::anyhow;
 use nidx_protos::prost::*;
 use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchResponse};
-use nidx_types::prefilter::PrefilterResult;
+use nidx_types::prefilter::{FilterOperator, PrefilterResult};
 use nidx_types::query_language::*;
 use rayon::prelude::*;
 use std::cmp::Ordering;
@@ -322,8 +322,9 @@ impl Searcher {
             formula.extend(clause);
         }
 
-        if request.filter_or {
-            formula.operator = BooleanOperator::Or;
+        match request.filter_operator {
+            FilterOperator::Or => formula.operator = BooleanOperator::Or,
+            FilterOperator::And => {}
         }
 
         let v = time.elapsed().as_millis();

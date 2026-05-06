@@ -26,7 +26,7 @@ use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
 
 use nidx_protos::StreamRequest;
-use nidx_types::prefilter::PrefilterResult;
+use nidx_types::prefilter::{FilterOperator, PrefilterResult};
 use nidx_types::query_language::BooleanExpression;
 
 use crate::query_io::translate_expression;
@@ -93,15 +93,18 @@ fn filter_query(
     schema: &ParagraphSchema,
     prefilter: &PrefilterResult,
     paragraph_formula: &Option<BooleanExpression<String>>,
-    filter_or: bool,
+    operator: FilterOperator,
 ) -> Option<Box<dyn Query>> {
     let mut filter_terms = vec![];
-    let operator = if filter_or { Occur::Should } else { Occur::Must };
+    let occur = match operator {
+        FilterOperator::Or => Occur::Should,
+        FilterOperator::And => Occur::Must,
+    };
 
     // Paragraph filter
     if let Some(formula) = &paragraph_formula {
         let query = translate_expression(formula, schema);
-        filter_terms.push((operator, query));
+        filter_terms.push((occur, query));
     }
 
     // Prefilter
@@ -136,7 +139,7 @@ fn filter_query(
             ));
         }
         if !prefilter_clauses.is_empty() {
-            filter_terms.push((operator, Box::new(BooleanQuery::new(prefilter_clauses))));
+            filter_terms.push((occur, Box::new(BooleanQuery::new(prefilter_clauses))));
         }
     }
 
@@ -167,7 +170,7 @@ pub fn suggest_query(
     fuzzies.push((Occur::Must, Box::new(term_query.clone())));
     originals.push((Occur::Must, Box::new(term_query)));
 
-    let filter_query = filter_query(schema, prefilter, &request.filtering_formula, request.filter_or);
+    let filter_query = filter_query(schema, prefilter, &request.filtering_formula, request.filter_operator);
     if let Some(query) = filter_query {
         originals.push((Occur::Must, query.box_clone()));
         fuzzies.push((Occur::Must, query));
@@ -211,7 +214,7 @@ pub fn search_query(
         fuzzy_subqueries.push((Occur::Must, advanced_query));
     }
 
-    let filter_query = filter_query(schema, prefilter, &request.filtering_formula, request.filter_or);
+    let filter_query = filter_query(schema, prefilter, &request.filtering_formula, request.filter_operator);
     if let Some(query) = filter_query {
         keyword_subqueries.push((Occur::Must, query.box_clone()));
         fuzzy_subqueries.push((Occur::Must, query));

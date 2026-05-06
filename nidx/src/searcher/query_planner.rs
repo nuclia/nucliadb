@@ -18,21 +18,21 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashMap;
-
+use anyhow::anyhow;
 use nidx_json::search::{JsonFilterExpression, JsonPathFilter, JsonPredicate, JsonSearchRequest};
 use nidx_paragraph::ParagraphSearchRequest;
 use nidx_protos::filter_expression::Expr;
 use nidx_protos::graph_query::{PathQuery, node, path_query, relation};
 use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::json_field_path_filter::Predicate;
-use nidx_protos::{FilterExpression, FilterOperator, GraphSearchRequest, SearchRequest};
+use nidx_protos::{FilterExpression, FilterOperator as ProtoFilterOperator, GraphSearchRequest, SearchRequest};
 use nidx_text::DocumentSearchRequest;
 use nidx_text::prefilter::*;
-use nidx_types::prefilter::PrefilterResult;
+use nidx_types::prefilter::{FilterOperator, PrefilterResult};
 use nidx_types::query_language::*;
 use nidx_vector::SEGMENT_TAGS;
 use nidx_vector::VectorSearchRequest;
+use std::collections::HashMap;
 
 use super::query_language::extract_label_filters;
 
@@ -133,7 +133,7 @@ impl GraphIndexQueries {
 #[derive(Default, Clone)]
 pub struct IndexQueries {
     pub prefilter_results: PrefilterResult,
-    pub filter_or: bool,
+    pub filter_operator: FilterOperator,
     pub json_request: Option<JsonSearchRequest>,
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
@@ -162,6 +162,14 @@ pub struct QueryPlan {
     pub index_queries: IndexQueries,
 }
 
+pub(crate) fn proto_filter_operator(value: i32) -> anyhow::Result<FilterOperator> {
+    match ProtoFilterOperator::try_from(value) {
+        Ok(ProtoFilterOperator::Or) => Ok(FilterOperator::Or),
+        Ok(ProtoFilterOperator::And) => Ok(FilterOperator::And),
+        _ => Err(anyhow!("Invalid FilterOperator value: {value}")),
+    }
+}
+
 pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
     let graph_request = compute_graph_request(&search_request)?;
     let texts_request = compute_texts_request(&search_request);
@@ -171,11 +179,13 @@ pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPl
 
     let prefilter = compute_prefilters(&search_request);
 
+    let filter_operator = proto_filter_operator(search_request.filter_operator)?;
+
     Ok(QueryPlan {
         prefilter,
         index_queries: IndexQueries {
             prefilter_results: PrefilterResult::All,
-            filter_or: search_request.filter_operator == FilterOperator::Or as i32,
+            filter_operator,
             json_request,
             vectors_request,
             paragraphs_request,
@@ -279,7 +289,7 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> anyhow::Result<
             .clone()
             .map(filter_to_boolean_expression)
             .transpose()?,
-        filter_or: search_request.filter_operator == FilterOperator::Or as i32,
+        filter_operator: proto_filter_operator(search_request.filter_operator)?,
     }))
 }
 
@@ -323,7 +333,7 @@ fn compute_vectors_request(search_request: &SearchRequest) -> anyhow::Result<Opt
             .map(filter_to_boolean_expression)
             .transpose()?,
         segment_filtering_formula,
-        filter_or: search_request.filter_operator == FilterOperator::Or as i32,
+        filter_operator: proto_filter_operator(search_request.filter_operator)?,
     }))
 }
 
