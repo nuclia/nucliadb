@@ -37,6 +37,7 @@ from nucliadb_models.resource import QueueType
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import FieldFile as FieldFilePB
 from nucliadb_telemetry import metrics
+from nucliadb_telemetry.aiohttp import InstrumentedClientSession
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.settings import (
     FileBackendConfig,
@@ -166,7 +167,7 @@ class ProcessingEngine:
         self._exit_stack = AsyncExitStack()
 
     async def initialize(self):
-        self.session = aiohttp.ClientSession()
+        self.session = InstrumentedClientSession("processing")
 
     async def finalize(self):
         await self.session.close()

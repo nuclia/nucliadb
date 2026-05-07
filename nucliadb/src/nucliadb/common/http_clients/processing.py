@@ -23,6 +23,7 @@ from datetime import datetime
 import aiohttp
 import pydantic
 
+from nucliadb_telemetry.aiohttp import InstrumentedClientSession
 from nucliadb_utils.helpers import MessageProgressUpdater
 from nucliadb_utils.settings import nuclia_settings
 
@@ -182,7 +183,7 @@ JSON_HEADERS = {"Content-Type": "application/json"}
 
 class ProcessingHTTPClient:
     def __init__(self) -> None:
-        self.session = aiohttp.ClientSession()
+        self.session = InstrumentedClientSession("processing_http")
         self.base_url = get_processing_api_url()
         self.base_url_v2 = get_processing_api_v2_url()
         self.headers: dict[str, str] = {}
@@ -200,7 +201,7 @@ class ProcessingHTTPClient:
 
     async def reset_session(self):
         await self.close()
-        self.session = aiohttp.ClientSession()
+        self.session = InstrumentedClientSession("processing_http")
 
     async def in_progress(self, ack_token: str):
         url = self.base_url_v2 + "/pull/in_progress"
