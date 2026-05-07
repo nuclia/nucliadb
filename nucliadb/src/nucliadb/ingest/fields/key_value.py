@@ -19,6 +19,8 @@
 #
 from __future__ import annotations
 
+from typing_extensions import assert_never
+
 from nucliadb.ingest.fields.base import Field
 from nucliadb_models.kv_schemas import KVFieldType, KVSchema
 from nucliadb_protos.resources_pb2 import FieldKeyValue
@@ -62,6 +64,8 @@ def check_kv_type(schema_name: str, key: str, value: object, expected: KVFieldTy
         ok = isinstance(value, (int, float)) and not isinstance(value, bool)
     elif expected is KVFieldType.BOOLEAN:
         ok = isinstance(value, bool)
+    else:
+        assert_never(expected)
     if not ok:
         raise ValueError(
             f"Key {key!r} in schema {schema_name!r} expects type {expected.value!r}, got {type(value).__name__}"

@@ -55,19 +55,6 @@ class KVSchema(BaseModel):
         return self
 
 
-class CreateKVSchema(BaseModel):
-    name: str = Field(pattern=r"^[^/.]{1,64}$")
-    description: str = ""
-    fields: list[KVSchemaField] = Field(default_factory=list, max_length=MAX_KV_SCHEMA_FIELDS)
-
-    @model_validator(mode="after")
-    def check_unique_keys(self) -> "CreateKVSchema":
-        keys = [f.key for f in self.fields]
-        if len(keys) != len(set(keys)):
-            raise ValueError("Schema field keys must be unique")
-        return self
-
-
 class UpdateKVSchema(BaseModel, extra="forbid"):
     description: str | None = None
     fields: list[KVSchemaField] | None = Field(default=None, max_length=MAX_KV_SCHEMA_FIELDS)

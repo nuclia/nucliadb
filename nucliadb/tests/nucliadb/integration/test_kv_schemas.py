@@ -20,6 +20,8 @@
 import pytest
 from httpx import AsyncClient
 
+from nucliadb_models.kv_schemas import MAX_KV_SCHEMAS
+
 PRODUCT_SCHEMA = {
     "name": "product",
     "description": "A product schema",
@@ -30,6 +32,28 @@ PRODUCT_SCHEMA = {
         {"key": "quantity", "type": "integer", "required": False},
     ],
 }
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_kv_schema_limit(
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox,
+):
+    kbid = standalone_knowledgebox
+
+    for i in range(MAX_KV_SCHEMAS):
+        resp = await nucliadb_writer.post(
+            f"/kb/{kbid}/kv-schemas",
+            json={"name": f"schema{i}", "fields": []},
+        )
+        assert resp.status_code == 201, f"Schema {i} creation failed: {resp.text}"
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/kv-schemas",
+        json={"name": "one_too_many", "fields": []},
+    )
+    assert resp.status_code == 422
+    assert str(MAX_KV_SCHEMAS) in resp.json()["detail"]
 
 
 @pytest.mark.deploy_modes("standalone")
