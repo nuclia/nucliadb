@@ -720,6 +720,7 @@ class Resource:
             extra={"kbid": self.kbid, "field": link_extracted_data.field, "rid": self.uuid},
         )
         title = link_extracted_data.title
+        # FIXME: this doesn't properly index the new title. See sc-6088 for more details
         await self.update_resource_title(title)
         await self.unmark_title_for_reset()
         self.modified = True
