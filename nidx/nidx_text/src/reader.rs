@@ -103,7 +103,7 @@ impl SegmentCollector for FieldUuidSegmentCollectorV2 {
 
         self.results.push(FieldId {
             resource_id: rid,
-            field_id: fid,
+            field_id: Some(fid),
         });
     }
 

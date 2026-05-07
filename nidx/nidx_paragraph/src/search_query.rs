@@ -26,7 +26,7 @@ use tantivy::schema::{Facet, IndexRecordOption};
 use tantivy::{DocId, InvertedIndexReader, Term};
 
 use nidx_protos::StreamRequest;
-use nidx_types::prefilter::PrefilterResult;
+use nidx_types::prefilter::{FilterOperator, PrefilterResult};
 use nidx_types::query_language::BooleanExpression;
 
 use crate::query_io::translate_expression;
@@ -93,26 +93,54 @@ fn filter_query(
     schema: &ParagraphSchema,
     prefilter: &PrefilterResult,
     paragraph_formula: &Option<BooleanExpression<String>>,
-    filter_or: bool,
+    operator: FilterOperator,
 ) -> Option<Box<dyn Query>> {
     let mut filter_terms = vec![];
-    let operator = if filter_or { Occur::Should } else { Occur::Must };
+    let occur = match operator {
+        FilterOperator::Or => Occur::Should,
+        FilterOperator::And => Occur::Must,
+    };
 
     // Paragraph filter
     if let Some(formula) = &paragraph_formula {
         let query = translate_expression(formula, schema);
-        filter_terms.push((operator, query));
+        filter_terms.push((occur, query));
     }
 
     // Prefilter
     if let PrefilterResult::Some(field_keys) = prefilter {
-        let set_query = Box::new(SetQuery::new(
-            schema.field_uuid,
-            field_keys
-                .iter()
-                .map(|x| format!("{}{}", x.resource_id.simple(), x.field_id)),
-        ));
-        filter_terms.push((operator, set_query));
+        // Field-granular entries match against field_uuid; resource-granular
+        // entries (field_id = None) match against the uuid field directly.
+        let field_terms: Vec<_> = field_keys
+            .iter()
+            .filter_map(|x| {
+                x.field_id
+                    .as_ref()
+                    .map(|fid| format!("{}{}", x.resource_id.simple(), fid))
+            })
+            .collect();
+        let resource_terms: Vec<_> = field_keys
+            .iter()
+            .filter(|x| x.field_id.is_none())
+            .map(|x| x.resource_id.simple().to_string())
+            .collect();
+
+        let mut prefilter_clauses: Vec<(Occur, Box<dyn Query>)> = vec![];
+        if !field_terms.is_empty() {
+            prefilter_clauses.push((
+                Occur::Should,
+                Box::new(SetQuery::new(schema.field_uuid, field_terms.into_iter())),
+            ));
+        }
+        if !resource_terms.is_empty() {
+            prefilter_clauses.push((
+                Occur::Should,
+                Box::new(SetQuery::new(schema.uuid, resource_terms.into_iter())),
+            ));
+        }
+        if !prefilter_clauses.is_empty() {
+            filter_terms.push((occur, Box::new(BooleanQuery::new(prefilter_clauses))));
+        }
     }
 
     if !filter_terms.is_empty() {
@@ -142,7 +170,7 @@ pub fn suggest_query(
     fuzzies.push((Occur::Must, Box::new(term_query.clone())));
     originals.push((Occur::Must, Box::new(term_query)));
 
-    let filter_query = filter_query(schema, prefilter, &request.filtering_formula, request.filter_or);
+    let filter_query = filter_query(schema, prefilter, &request.filtering_formula, request.filter_operator);
     if let Some(query) = filter_query {
         originals.push((Occur::Must, query.box_clone()));
         fuzzies.push((Occur::Must, query));
@@ -186,7 +214,7 @@ pub fn search_query(
         fuzzy_subqueries.push((Occur::Must, advanced_query));
     }
 
-    let filter_query = filter_query(schema, prefilter, &request.filtering_formula, request.filter_or);
+    let filter_query = filter_query(schema, prefilter, &request.filtering_formula, request.filter_operator);
     if let Some(query) = filter_query {
         keyword_subqueries.push((Occur::Must, query.box_clone()));
         fuzzy_subqueries.push((Occur::Must, query));

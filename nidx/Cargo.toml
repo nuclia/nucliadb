@@ -9,7 +9,18 @@ name = "nidx"
 required-features = ["telemetry"]
 
 [workspace]
-members = ["nidx_vector", "nidx_types", "nidx_protos", "nidx_tests", "nidx_text", "nidx_tantivy", "nidx_paragraph", "nidx_relation", "nidx_binding"]
+members = [
+    "nidx_binding",
+    "nidx_json",
+    "nidx_paragraph",
+    "nidx_protos",
+    "nidx_relation",
+    "nidx_tantivy",
+    "nidx_tests",
+    "nidx_text",
+    "nidx_types",
+    "nidx_vector",
+]
 
 [dependencies]
 anyhow = "1.0.89"
@@ -35,6 +46,7 @@ lru = "0.18"
 nidx_text = { version = "0.1.0", path = "nidx_text" }
 nidx_paragraph = { version = "0.1.0", path = "nidx_paragraph" }
 nidx_relation = { version = "0.1.0", path = "nidx_relation" }
+nidx_json = { version = "0.1.0", path = "nidx_json" }
 config = { version = "0.15.19", default-features = false }
 thiserror = "2.0.17"
 prometheus-client = "0.24.0"

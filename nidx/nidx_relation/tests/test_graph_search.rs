@@ -864,7 +864,7 @@ fn test_prefilter() -> anyhow::Result<()> {
         Query::Path(Path::default()),
         PrefilterResult::Some(vec![FieldId {
             resource_id: Uuid::nil(),
-            field_id: "/f/fake".to_string(),
+            field_id: Some("/f/fake".to_string()),
         }]),
     )?;
     assert_eq!(result.graph.len(), 0);
@@ -875,7 +875,7 @@ fn test_prefilter() -> anyhow::Result<()> {
         Query::Path(Path::default()),
         PrefilterResult::Some(vec![FieldId {
             resource_id: Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap(),
-            field_id: "/a/metadata".to_string(),
+            field_id: Some("/a/metadata".to_string()),
         }]),
     )?;
     assert_eq!(result.graph.len(), 17);
@@ -886,7 +886,7 @@ fn test_prefilter() -> anyhow::Result<()> {
         Query::Path(Path::default()),
         PrefilterResult::Some(vec![FieldId {
             resource_id: Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap(),
-            field_id: "/f/fake".to_string(),
+            field_id: Some("/f/fake".to_string()),
         }]),
     )?;
     assert_eq!(result.graph.len(), 17);
@@ -913,7 +913,7 @@ fn test_prefilter_file_field() -> anyhow::Result<()> {
         Query::Path(Path::default()),
         PrefilterResult::Some(vec![FieldId {
             resource_id: Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap(),
-            field_id: "/f/fake".to_string(),
+            field_id: Some("/f/fake".to_string()),
         }]),
     )?;
     assert_eq!(result.graph.len(), 0);
@@ -924,7 +924,7 @@ fn test_prefilter_file_field() -> anyhow::Result<()> {
         Query::Path(Path::default()),
         PrefilterResult::Some(vec![FieldId {
             resource_id: Uuid::parse_str("0123456789abcdef0123456789abcdef").unwrap(),
-            field_id: "/f/my_file".to_string(),
+            field_id: Some("/f/my_file".to_string()),
         }]),
     )?;
     assert_eq!(result.graph.len(), 17);

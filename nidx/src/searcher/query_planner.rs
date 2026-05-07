@@ -18,19 +18,21 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
-use std::collections::HashMap;
-
+use anyhow::anyhow;
+use nidx_json::search::{JsonFilterExpression, JsonPathFilter, JsonPredicate, JsonSearchRequest};
 use nidx_paragraph::ParagraphSearchRequest;
 use nidx_protos::filter_expression::Expr;
 use nidx_protos::graph_query::{PathQuery, node, path_query, relation};
 use nidx_protos::graph_search_request::QueryKind;
-use nidx_protos::{FilterExpression, FilterOperator, GraphSearchRequest, SearchRequest};
+use nidx_protos::json_field_path_filter::Predicate;
+use nidx_protos::{FilterExpression, FilterOperator as ProtoFilterOperator, GraphSearchRequest, SearchRequest};
 use nidx_text::DocumentSearchRequest;
 use nidx_text::prefilter::*;
-use nidx_types::prefilter::PrefilterResult;
+use nidx_types::prefilter::{FilterOperator, PrefilterResult};
 use nidx_types::query_language::*;
 use nidx_vector::SEGMENT_TAGS;
 use nidx_vector::VectorSearchRequest;
+use std::collections::HashMap;
 
 use super::query_language::extract_label_filters;
 
@@ -131,6 +133,8 @@ impl GraphIndexQueries {
 #[derive(Default, Clone)]
 pub struct IndexQueries {
     pub prefilter_results: PrefilterResult,
+    pub filter_operator: FilterOperator,
+    pub json_request: Option<JsonSearchRequest>,
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
     pub texts_request: Option<DocumentSearchRequest>,
@@ -138,18 +142,15 @@ pub struct IndexQueries {
 }
 
 impl IndexQueries {
-    /// When a pre-filter is run, the result can be used to modify the queries
-    /// that the indexes must resolve.
+    /// Apply the combined pre-filter result to the query plan. Clears all
+    /// sub-index requests when there are no matches.
     pub fn apply_prefilter(&mut self, prefiltered: PrefilterResult) {
         if matches!(prefiltered, PrefilterResult::None) {
-            // There are no matches so there is no need to run the rest of the search
             self.vectors_request = None;
             self.paragraphs_request = None;
             self.texts_request = None;
             self.relations_request = None;
-            return;
         }
-
         self.prefilter_results = prefiltered;
     }
 }
@@ -161,24 +162,97 @@ pub struct QueryPlan {
     pub index_queries: IndexQueries,
 }
 
+pub(crate) fn proto_filter_operator(value: i32) -> anyhow::Result<FilterOperator> {
+    match ProtoFilterOperator::try_from(value) {
+        Ok(ProtoFilterOperator::Or) => Ok(FilterOperator::Or),
+        Ok(ProtoFilterOperator::And) => Ok(FilterOperator::And),
+        _ => Err(anyhow!("Invalid FilterOperator value: {value}")),
+    }
+}
+
 pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
     let graph_request = compute_graph_request(&search_request)?;
     let texts_request = compute_texts_request(&search_request);
     let vectors_request = compute_vectors_request(&search_request)?;
     let paragraphs_request = compute_paragraphs_request(&search_request)?;
+    let json_request = compute_json_request(&search_request)?;
 
     let prefilter = compute_prefilters(&search_request);
+
+    let filter_operator = proto_filter_operator(search_request.filter_operator)?;
 
     Ok(QueryPlan {
         prefilter,
         index_queries: IndexQueries {
             prefilter_results: PrefilterResult::All,
+            filter_operator,
+            json_request,
             vectors_request,
             paragraphs_request,
             texts_request,
             relations_request: graph_request.map(GraphIndexQueries::build),
         },
     })
+}
+
+fn compute_json_request(search_request: &SearchRequest) -> anyhow::Result<Option<JsonSearchRequest>> {
+    let Some(json_filter) = &search_request.json_filter else {
+        return Ok(None);
+    };
+    Ok(Some(JsonSearchRequest {
+        filter: proto_to_json_filter(json_filter)?,
+    }))
+}
+
+fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> anyhow::Result<JsonFilterExpression> {
+    use nidx_protos::json_filter_expression::Expr as JsonExpr;
+
+    match expr
+        .expr
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("Empty JsonFilterExpression"))?
+    {
+        JsonExpr::BoolAnd(list) => {
+            let operands = list
+                .operands
+                .iter()
+                .map(proto_to_json_filter)
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(JsonFilterExpression::And(operands))
+        }
+        JsonExpr::BoolOr(list) => {
+            let operands = list
+                .operands
+                .iter()
+                .map(proto_to_json_filter)
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(JsonFilterExpression::Or(operands))
+        }
+        JsonExpr::BoolNot(inner) => Ok(JsonFilterExpression::Not(Box::new(proto_to_json_filter(inner)?))),
+        JsonExpr::Path(path_filter) => {
+            let predicate = match path_filter
+                .predicate
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Missing predicate"))?
+            {
+                Predicate::Text(s) => JsonPredicate::Text(s.clone()),
+                Predicate::IntRange(r) => JsonPredicate::IntRange {
+                    lower: r.lower,
+                    upper: r.upper,
+                },
+                Predicate::FloatRange(r) => JsonPredicate::FloatRange {
+                    lower: r.lower,
+                    upper: r.upper,
+                },
+                Predicate::Boolean(b) => JsonPredicate::Boolean(*b),
+            };
+            Ok(JsonFilterExpression::Path(JsonPathFilter {
+                field_id: path_filter.field_id.clone(),
+                json_path: path_filter.json_path.clone(),
+                predicate,
+            }))
+        }
+    }
 }
 
 fn compute_prefilters(search_request: &SearchRequest) -> Option<PreFilterRequest> {
@@ -215,7 +289,7 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> anyhow::Result<
             .clone()
             .map(filter_to_boolean_expression)
             .transpose()?,
-        filter_or: search_request.filter_operator == FilterOperator::Or as i32,
+        filter_operator: proto_filter_operator(search_request.filter_operator)?,
     }))
 }
 
@@ -259,7 +333,7 @@ fn compute_vectors_request(search_request: &SearchRequest) -> anyhow::Result<Opt
             .map(filter_to_boolean_expression)
             .transpose()?,
         segment_filtering_formula,
-        filter_or: search_request.filter_operator == FilterOperator::Or as i32,
+        filter_operator: proto_filter_operator(search_request.filter_operator)?,
     }))
 }
 

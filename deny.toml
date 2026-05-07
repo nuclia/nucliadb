@@ -124,6 +124,7 @@ exceptions = [
     { allow = ["AGPL-3.0-or-later"], crate = "nidx_text" },
     { allow = ["AGPL-3.0-or-later"], crate = "nidx_types" },
     { allow = ["AGPL-3.0-or-later"], crate = "nidx_vector" },
+    { allow = ["AGPL-3.0-or-later"], crate = "nidx_json" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
