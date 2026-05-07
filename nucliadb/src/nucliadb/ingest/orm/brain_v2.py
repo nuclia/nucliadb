@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from nidx_protos.noderesources_pb2 import IndexParagraph as BrainParagraph
 from nidx_protos.noderesources_pb2 import (
     IndexRelation,
-    JsonInformation,
+    JsonFieldValue,
     ParagraphMetadata,
     Representation,
     ResourceID,
@@ -517,7 +517,7 @@ class ResourceBrain:
             self.brain.json_fields_to_delete.append(full_field_id)
 
     def generate_json(self, field_id: str, kv_data: dict) -> None:
-        self.brain.json_fields[field_id].CopyFrom(JsonInformation(value=json.dumps(kv_data)))
+        self.brain.json_fields[field_id].CopyFrom(JsonFieldValue(value=json.dumps(kv_data)))
 
     @observer.wrap({"type": "generate_vectors"})
     def generate_vectors(

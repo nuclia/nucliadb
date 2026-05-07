@@ -21,15 +21,15 @@ import pytest
 from pydantic import ValidationError
 
 from nucliadb.ingest.fields.key_value import validate_kv_data
-from nucliadb_models.kv_schemas import MAX_KV_SCHEMA_FIELDS, KVSchema
+from nucliadb_models.kv_schemas import MAX_KV_SCHEMA_FIELDS, KVFieldType, KVSchema, KVSchemaField
 
 SCHEMA = KVSchema(
     name="product",
     fields=[
-        {"key": "color", "type": "text", "required": True},
-        {"key": "price", "type": "float", "required": True},
-        {"key": "in_stock", "type": "boolean", "required": False},
-        {"key": "quantity", "type": "integer", "required": False},
+        KVSchemaField(key="color", type=KVFieldType.TEXT, required=True),
+        KVSchemaField(key="price", type=KVFieldType.FLOAT, required=True),
+        KVSchemaField(key="in_stock", type=KVFieldType.BOOLEAN, required=False),
+        KVSchemaField(key="quantity", type=KVFieldType.INTEGER, required=False),
     ],
 )
 

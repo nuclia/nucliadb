@@ -151,7 +151,7 @@ def parse_kv_filter_expression(
             field_id=f"k/{expr.field_id}",
             json_path=expr.key,
         )
-        path.exact_match = expr.value
+        path.text = expr.value
         return nodereader_pb2.JsonFilterExpression(path=path)
     elif isinstance(expr, KVRange):
         path = nodereader_pb2.JsonFieldPathFilter(
@@ -178,7 +178,7 @@ def parse_kv_filter_expression(
             field_id=f"k/{expr.field_id}",
             json_path=expr.key,
         )
-        path.bool_match = expr.value
+        path.boolean = expr.value
         return nodereader_pb2.JsonFilterExpression(path=path)
     else:
         raise ValueError(f"Unknown KVFilterExpression type: {type(expr)}")
