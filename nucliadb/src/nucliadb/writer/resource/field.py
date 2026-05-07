@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import dataclasses
+import json
 from datetime import datetime
 
 from fastapi import HTTPException
@@ -28,6 +29,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.conversation import MAX_CONVERSATION_MESSAGES, Conversation
+from nucliadb.ingest.fields.key_value import validate_kv_data
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.models.internal import processing as processing_models
 from nucliadb.models.internal.processing import ClassificationLabel, PushConversation, PushPayload
@@ -256,12 +258,6 @@ async def parse_key_value_field(
     The entire data dict is JSON-encoded into the proto's single string data field.
     No NLP processing is needed for KV fields.
     """
-    import json
-
-    from fastapi import HTTPException
-
-    from nucliadb.ingest.fields.key_value import validate_kv_data
-
     if key != kv_field.schema_id:
         raise HTTPException(
             status_code=422,
@@ -281,7 +277,10 @@ async def parse_key_value_field(
             detail=f"KV schema '{kv_field.schema_id}' does not exist in this knowledge box",
         )
 
-    validate_kv_data(kv_field.data, schema)
+    try:
+        validate_kv_data(kv_field.data, schema)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
     pb = writer.key_value_fields[key]
     pb.schema_id = kv_field.schema_id

@@ -24,6 +24,9 @@ from pydantic import BaseModel, Field, model_validator
 # Type alias for valid KV field values
 KVValue = str | int | float | bool
 
+MAX_KV_SCHEMAS = 20
+MAX_KV_SCHEMA_FIELDS = 50
+
 
 class KVFieldType(str, Enum):
     TEXT = "text"
@@ -42,7 +45,7 @@ class KVSchemaField(BaseModel):
 class KVSchema(BaseModel):
     name: str = Field(pattern=r"^[^/.]{1,64}$")
     description: str = ""
-    fields: list[KVSchemaField] = Field(default_factory=list)
+    fields: list[KVSchemaField] = Field(default_factory=list, max_length=MAX_KV_SCHEMA_FIELDS)
 
     @model_validator(mode="after")
     def check_unique_keys(self) -> "KVSchema":
@@ -55,7 +58,7 @@ class KVSchema(BaseModel):
 class CreateKVSchema(BaseModel):
     name: str = Field(pattern=r"^[^/.]{1,64}$")
     description: str = ""
-    fields: list[KVSchemaField] = Field(default_factory=list)
+    fields: list[KVSchemaField] = Field(default_factory=list, max_length=MAX_KV_SCHEMA_FIELDS)
 
     @model_validator(mode="after")
     def check_unique_keys(self) -> "CreateKVSchema":
@@ -67,7 +70,7 @@ class CreateKVSchema(BaseModel):
 
 class UpdateKVSchema(BaseModel, extra="forbid"):
     description: str | None = None
-    fields: list[KVSchemaField] | None = None
+    fields: list[KVSchemaField] | None = Field(default=None, max_length=MAX_KV_SCHEMA_FIELDS)
 
     @model_validator(mode="after")
     def check_unique_keys(self) -> "UpdateKVSchema":

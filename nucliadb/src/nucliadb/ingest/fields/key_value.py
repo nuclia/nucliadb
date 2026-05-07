@@ -19,8 +19,6 @@
 #
 from __future__ import annotations
 
-from fastapi import HTTPException
-
 from nucliadb.ingest.fields.base import Field
 from nucliadb_models.kv_schemas import KVFieldType, KVSchema
 from nucliadb_protos.resources_pb2 import FieldKeyValue
@@ -48,10 +46,10 @@ def _validate_keys(data: dict, schema: KVSchema) -> None:
     schema_keys = {f.key for f in schema.fields}
     unknown = set(data.keys()) - schema_keys
     if unknown:
-        raise HTTPException(422, detail=f"Unknown keys for schema {schema.name!r}: {sorted(unknown)}")
+        raise ValueError(f"Unknown keys for schema {schema.name!r}: {sorted(unknown)}")
     missing = [f.key for f in schema.fields if f.required and f.key not in data]
     if missing:
-        raise HTTPException(422, detail=f"Missing required keys for schema {schema.name!r}: {missing}")
+        raise ValueError(f"Missing required keys for schema {schema.name!r}: {missing}")
 
 
 def check_kv_type(schema_name: str, key: str, value: object, expected: KVFieldType) -> None:
@@ -65,7 +63,6 @@ def check_kv_type(schema_name: str, key: str, value: object, expected: KVFieldTy
     elif expected is KVFieldType.BOOLEAN:
         ok = isinstance(value, bool)
     if not ok:
-        raise HTTPException(
-            422,
-            detail=f"Key {key!r} in schema {schema_name!r} expects type {expected.value!r}, got {type(value).__name__}",
+        raise ValueError(
+            f"Key {key!r} in schema {schema_name!r} expects type {expected.value!r}, got {type(value).__name__}"
         )

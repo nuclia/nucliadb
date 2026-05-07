@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 from typing import cast
 
 from fastapi import Header, HTTPException, Query, Request, Response
@@ -419,10 +420,7 @@ async def _get_resource_field(
                 resource_field.value = from_proto.field_link(value)
 
             if isinstance(value, resources_pb2.FieldKeyValue):
-                import json
-                from typing import Any
-
-                resource_field.value = cast(Any, json.loads(value.data) if value.data else {})
+                resource_field.value = json.loads(value.data) if value.data else None
 
             if field_type is FieldTypeName.KEY_VALUE and value is None:
                 raise HTTPException(status_code=404, detail="Key-value field does not exist")

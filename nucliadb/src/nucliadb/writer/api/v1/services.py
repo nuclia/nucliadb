@@ -26,7 +26,7 @@ from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.models_utils import to_proto
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
 from nucliadb_models.configuration import SearchConfiguration
-from nucliadb_models.kv_schemas import CreateKVSchema, KVSchema, UpdateKVSchema
+from nucliadb_models.kv_schemas import MAX_KV_SCHEMAS, CreateKVSchema, KVSchema, UpdateKVSchema
 from nucliadb_models.labels import LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
@@ -255,6 +255,13 @@ async def create_kv_schema(request: Request, kbid: str, item: CreateKVSchema) ->
 
         if await datamanagers.kv_schemas.get(txn, kbid=kbid, name=item.name) is not None:
             raise HTTPException(status_code=409, detail="KV schema already exists")
+
+        existing = await datamanagers.kv_schemas.get_all(txn, kbid=kbid)
+        if len(existing.schemas) >= MAX_KV_SCHEMAS:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Maximum number of KV schemas ({MAX_KV_SCHEMAS}) reached for this knowledge box",
+            )
 
         schema = KVSchema(name=item.name, description=item.description, fields=item.fields)
         await datamanagers.kv_schemas.set(txn, kbid=kbid, schema=schema)
