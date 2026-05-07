@@ -181,12 +181,12 @@ def parse_kv_filter_expression(
         path.boolean = expr.value
         return nodereader_pb2.JsonFilterExpression(path=path)
     else:
-        raise ValueError(f"Unknown KVFilterExpression type: {type(expr)}")
+        assert_never(expr)
 
 
 def _parse_kv_filter_expression(
     expr: KVFilterExpression,
-    all_schemas: "KBKVSchemas",
+    all_schemas: KBKVSchemas,
     kbid: str,
 ) -> nodereader_pb2.JsonFilterExpression:
     """Recursive helper that validates a KVFilterExpression tree using pre-fetched schemas."""
@@ -237,7 +237,7 @@ def _parse_kv_filter_expression(
             )
         return parse_kv_filter_expression(expr)
     else:
-        raise ValueError(f"Unknown KVFilterExpression type: {type(expr)}")
+        assert_never(expr)
 
 
 async def parse_kv_filter_expression_with_validation(

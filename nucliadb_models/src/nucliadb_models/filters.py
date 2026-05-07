@@ -328,6 +328,8 @@ class KVRange(BaseModel, extra="forbid"):
     def check_bounds(self) -> "KVRange":
         if self.gte is None and self.lte is None:
             raise ValueError("KVRange requires at least one bound (gte or lte)")
+        if self.gte is not None and self.lte is not None and self.lte < self.gte:
+            raise ValueError(f"KVRange lte ({self.lte}) must be >= gte ({self.gte})")
         return self
 
 

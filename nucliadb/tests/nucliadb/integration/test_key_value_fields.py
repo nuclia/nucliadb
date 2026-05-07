@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import asyncio
-
 import pytest
 from httpx import AsyncClient
 
@@ -274,9 +272,6 @@ async def test_kv_field_filter(
     )
     assert resp.status_code == 201, resp.text
     rid2 = resp.json()["uuid"]
-
-    # Indexing is awaited by the standalone_knowledgebox / nucliadb_reader fixtures
-    await asyncio.sleep(1)
 
     async def find_with_filter(filter_expression: dict) -> set:
         resp = await nucliadb_reader.post(
