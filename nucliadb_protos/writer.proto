@@ -157,7 +157,7 @@ message BrokerMessage {
     repeated resources.SemanticGraphEdgeVectors field_semantic_graph_edge_vectors = 45;
 
     // Field KeyValue
-    map<string, resources.FieldKeyValue> key_value_fields = 46;
+    map<string, resources.FieldKeyValue> key_value_fields = 47;
 }
 
 message BrokerMessageBlobReference {
