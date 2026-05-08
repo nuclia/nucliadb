@@ -16,8 +16,10 @@
 import asyncio
 import os
 from collections.abc import AsyncIterator
+from typing import Any, cast
 
 import nats
+import nats.js.errors
 import pytest
 import requests
 from fastapi import FastAPI
@@ -27,8 +29,8 @@ from nats.aio.msg import Msg
 from nats.js import api
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
-from pytest_docker_fixtures import images  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
+from pytest_docker_fixtures import images
+from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore[import-untyped]
 
 from nucliadb_telemetry.fastapi import instrument_app
 from nucliadb_telemetry.grpc import GRPCTelemetry
@@ -47,6 +49,7 @@ from nucliadb_telemetry.utils import (
     set_info_on_span,
 )
 
+images.settings = cast(dict[str, Any], images.settings)
 images.settings["jaeger"] = {
     "image": "jaegertracing/all-in-one",
     "version": "1.62.0",
@@ -61,6 +64,7 @@ class Jaeger(BaseImage):
     def get_port(self, port=None):
         if os.environ.get("TESTING", "") == "jenkins" or "TRAVIS" in os.environ:
             return port if port else self.port
+        assert self.container_obj is not None
         network = self.container_obj.attrs["NetworkSettings"]
         service_port = port or f"{self.port}/udp"
         for netport in network["Ports"].keys():
@@ -70,6 +74,7 @@ class Jaeger(BaseImage):
     def get_http_port(self, port=None):
         if os.environ.get("TESTING", "") == "jenkins" or "TRAVIS" in os.environ:
             return 16686
+        assert self.container_obj is not None
         network = self.container_obj.attrs["NetworkSettings"]
         service_port = "16686/tcp"
         for netport in network["Ports"].keys():
@@ -110,6 +115,7 @@ async def set_telemetry_settings(jaeger_server: Jaeger):
 async def telemetry_grpc(set_telemetry_settings):
     tracer_provider = get_telemetry("GRPC_SERVICE")
     await init_telemetry(tracer_provider)
+    assert tracer_provider is not None
     util = GRPCTelemetry("test_telemetry", tracer_provider)
     yield util
     await clean_telemetry("GRPC_SERVICE")
@@ -124,6 +130,7 @@ class GreeterStreaming(hellostreamingworld_pb2_grpc.MultiGreeterServicer):
         self.messages = []
 
     async def push_subscription_worker(self, msg: Msg):
+        assert self.tracer_provider is not None
         tracer = self.tracer_provider.get_tracer("message_worker")
         with tracer.start_as_current_span("message_worker_span") as _:
             self.messages.append(msg)
@@ -139,6 +146,7 @@ class GreeterStreaming(hellostreamingworld_pb2_grpc.MultiGreeterServicer):
 
         self.tracer_provider = get_telemetry("NATS_SERVICE")
         await init_telemetry(self.tracer_provider)
+        assert self.tracer_provider is not None
         self.jsotel = JetStreamContextTelemetry(self.js, "nats_service", self.tracer_provider)
 
         self.push_subscription = await self.jsotel.subscribe(
@@ -148,7 +156,9 @@ class GreeterStreaming(hellostreamingworld_pb2_grpc.MultiGreeterServicer):
         )
 
     async def finalize(self):
+        assert self.push_subscription is not None
         await self.push_subscription.unsubscribe()
+        assert self.nc is not None
         await self.nc.drain()
         await self.nc.close()
 
@@ -171,6 +181,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
         self.puller_task_one = None
 
     async def push_subscription_worker(self, msg: Msg):
+        assert self.tracer_provider is not None
         tracer = self.tracer_provider.get_tracer("message_worker")
         with tracer.start_as_current_span("message_worker_span") as _:
             self.messages.append(msg)
@@ -179,14 +190,17 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
         async def callback(message):
             self.messages.append(message)
 
+        assert self.pull_subscription_one is not None
         await self.jsotel.pull_one(self.pull_subscription_one, callback)
 
     async def pubsub_subscription_worker(self, msg: Msg):
+        assert self.tracer_provider is not None
         tracer = self.tracer_provider.get_tracer("pubsub_worker")
         with tracer.start_as_current_span("pubsub_worker_span") as _:
             self.messages.append(msg)
 
     async def reqresp_subscription_worker(self, msg: Msg):
+        assert self.tracer_provider is not None
         tracer = self.tracer_provider.get_tracer("reqresp_worker")
         with tracer.start_as_current_span("reqresp_worker_span") as _:
             self.messages.append(msg)
@@ -203,6 +217,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
         self.tracer_provider = get_telemetry("NATS_SERVICE")
         await init_telemetry(self.tracer_provider)
+        assert self.tracer_provider is not None
         self.jsotel = JetStreamContextTelemetry(self.js, "nats_service", self.tracer_provider)
 
         self.push_subscription = await self.jsotel.subscribe(
@@ -226,6 +241,7 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
 
         # Plain nats instrumentation and subscription
         # (no streams neither consumers used here)
+        assert self.tracer_provider is not None
         self.ncotel = NatsClientTelemetry(self.nc, "nats_service", self.tracer_provider)
 
         self.pubsub_subscription = await self.ncotel.subscribe(
@@ -243,13 +259,18 @@ class Greeter(helloworld_pb2_grpc.GreeterServicer):
         )
 
     async def finalize(self):
+        assert self.push_subscription is not None
         await self.push_subscription.unsubscribe()
 
+        assert self.pull_subscription_one is not None
         await self.pull_subscription_one.unsubscribe()
+        assert self.puller_task_one is not None
         self.puller_task_one.cancel()
         await self.js._jsm.delete_consumer(stream="testing", consumer="testing_consumer_one")
 
+        assert self.pubsub_subscription is not None
         await self.pubsub_subscription.unsubscribe()
+        assert self.nc is not None
         await self.nc.drain()
         await self.nc.close()
 
@@ -317,21 +338,22 @@ async def http_service(set_telemetry_settings, telemetry_grpc: GRPCTelemetry, gr
     @app.get("/")
     async def simple_api():
         set_info_on_span({"my.data": "is this"})
+        assert tracer_provider is not None
         tracer = tracer_provider.get_tracer(__name__)
         with tracer.start_as_current_span("simple_api_work") as _:
             channel = telemetry_grpc.init_client(f"localhost:{grpc_service}")
             stub = helloworld_pb2_grpc.GreeterStub(channel)
-            response = await stub.SayHello(
+            response = await stub.SayHello(  # type: ignore[ty:invalid-await]
                 helloworld_pb2.HelloRequest(name="you"),
                 # This metadata is here to make sure our instrumentor handles correctly
                 # requests with metadata, as it does some manipulation of in on start_client_span
                 # The servicer endpoint does not use this metadata
-                metadata=aio.Metadata.from_tuple((("header1", "value1"),)),
+                metadata=aio.Metadata.from_tuple((("header1", "value1"),)),  # type: ignore[ty:invalid-argument-type]
             )
         with tracer.start_as_current_span("simple_stream_api_work") as _:
             channel = telemetry_grpc.init_client(f"localhost:{grpc_service}")
             stub = hellostreamingworld_pb2_grpc.MultiGreeterStub(channel)
-            async for sresponse in stub.sayHello(helloworld_pb2.HelloRequest(name="you")):
+            async for sresponse in stub.sayHello(helloworld_pb2.HelloRequest(name="you")):  # type: ignore[ty:not-iterable, ty:invalid-argument-type]
                 assert sresponse
         return response.message
 

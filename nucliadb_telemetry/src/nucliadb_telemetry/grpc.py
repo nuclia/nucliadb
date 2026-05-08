@@ -14,7 +14,6 @@
 #
 
 import functools
-from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from concurrent import futures
 from contextlib import contextmanager
@@ -100,7 +99,7 @@ def start_span_client(
     span_context = set_span_in_context(span)
 
     if client_call_details.metadata is not None:
-        mutable_metadata: dict[str, str | bytes] = dict(client_call_details.metadata)
+        mutable_metadata: dict[str, str | bytes] = {k: v for k, v in client_call_details.metadata}
     else:
         mutable_metadata = {}
     inject(mutable_metadata, context=span_context, setter=_carrier_setter)
@@ -135,7 +134,7 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
     ):
         service, meth = handler_call_details.method.lstrip("/").split("/", 1)
 
-        attributes = {
+        attributes: dict[str, str | int | bytes] = {
             rpc_attributes.RPC_SYSTEM: "grpc",
             rpc_attributes.RPC_GRPC_STATUS_CODE: grpc.StatusCode.OK.value[0],
             rpc_attributes.RPC_METHOD: meth,
