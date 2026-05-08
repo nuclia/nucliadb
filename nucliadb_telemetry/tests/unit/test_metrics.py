@@ -189,7 +189,10 @@ class TestHistogram:
         histo.observe(5)
 
         assert (
-            next(s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "5.0").value == 1.0
+            next(
+                s for s in next(iter(histo.histo.collect())).samples if s.labels.get("le") == "5.0"
+            ).value
+            == 1.0
         )
 
     def test_histo_with_labels(self):
@@ -197,7 +200,10 @@ class TestHistogram:
         histo.observe(1, labels={"foo": "baz", "bar": "qux"})
 
         assert (
-            next(s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0").value == 1.0
+            next(
+                s for s in next(iter(histo.histo.collect())).samples if s.labels.get("le") == "1.0"
+            ).value
+            == 1.0
         )
 
     def test_histo_with_env_label(self, monkeypatch):
@@ -206,7 +212,10 @@ class TestHistogram:
         histo.observe(1)
 
         assert (
-            next(s for s in histo.histo.collect()[0].samples if s.labels.get("le") == "1.0").value == 1.0
+            next(
+                s for s in next(iter(histo.histo.collect())).samples if s.labels.get("le") == "1.0"
+            ).value
+            == 1.0
         )
 
 

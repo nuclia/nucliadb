@@ -22,6 +22,7 @@ import pydantic
 from opentelemetry.trace import format_span_id, format_trace_id
 
 from nucliadb_telemetry import context, logs
+from nucliadb_telemetry.settings import LogLevel
 
 
 def test_setup_logging(monkeypatch):
@@ -43,7 +44,7 @@ def test_setup_logging_plain(monkeypatch):
         logs.setup_logging(
             settings=logs.LogSettings(
                 log_format_type=logs.LogFormatType.PLAIN,
-                logger_levels={"foo": "WARNING"},
+                logger_levels={"foo": LogLevel.WARNING},
             )
         )
 

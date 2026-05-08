@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import urllib
+import urllib.parse
 from collections.abc import Callable
 from functools import wraps
+from typing import cast
 
 from asgiref.compatibility import guarantee_single_callable
 from fastapi import Request, Response
@@ -26,7 +27,8 @@ from opentelemetry.instrumentation.utils import (
     http_status_to_status_code,
 )
 from opentelemetry.propagators.textmap import Getter, Setter
-from opentelemetry.semconv.trace import SpanAttributes
+from opentelemetry.sdk.trace import Span as SDKSpan
+from opentelemetry.semconv._incubating.attributes import http_attributes, net_attributes
 from opentelemetry.trace import INVALID_SPAN, Span, format_trace_id, set_span_in_context
 from opentelemetry.trace.status import Status, StatusCode
 from opentelemetry.util.http import (
@@ -126,27 +128,27 @@ def collect_request_attributes(scope):
         http_url += "?" + urllib.parse.unquote(query_string)
 
     result = {
-        SpanAttributes.HTTP_SCHEME: scope.get("scheme"),
-        SpanAttributes.HTTP_HOST: server_host,
-        SpanAttributes.NET_HOST_PORT: port,
-        SpanAttributes.HTTP_FLAVOR: scope.get("http_version"),
-        SpanAttributes.HTTP_TARGET: scope.get("path"),
-        SpanAttributes.HTTP_URL: remove_url_credentials(http_url),
+        http_attributes.HTTP_SCHEME: scope.get("scheme"),
+        http_attributes.HTTP_HOST: server_host,
+        net_attributes.NET_HOST_PORT: port,
+        http_attributes.HTTP_FLAVOR: scope.get("http_version"),
+        http_attributes.HTTP_TARGET: scope.get("path"),
+        http_attributes.HTTP_URL: remove_url_credentials(http_url),
     }
     http_method = scope.get("method")
     if http_method:
-        result[SpanAttributes.HTTP_METHOD] = http_method
+        result[http_attributes.HTTP_METHOD] = http_method
 
     http_host_value_list = asgi_getter.get(scope, "host")
     if http_host_value_list:
-        result[SpanAttributes.HTTP_SERVER_NAME] = ",".join(http_host_value_list)
+        result[http_attributes.HTTP_SERVER_NAME] = ",".join(http_host_value_list)
     http_user_agent = asgi_getter.get(scope, "user-agent")
     if http_user_agent:
-        result[SpanAttributes.HTTP_USER_AGENT] = http_user_agent[0]
+        result[http_attributes.HTTP_USER_AGENT] = http_user_agent[0]
 
     if "client" in scope and scope["client"] is not None:
-        result[SpanAttributes.NET_PEER_IP] = scope.get("client")[0]
-        result[SpanAttributes.NET_PEER_PORT] = scope.get("client")[1]
+        result[net_attributes.NET_PEER_IP] = scope.get("client")[0]
+        result[net_attributes.NET_PEER_PORT] = scope.get("client")[1]
 
     # remove None values
     result = {k: v for k, v in result.items() if v is not None}
@@ -202,7 +204,8 @@ def get_host_port_url_tuple(scope):
     """Returns (host, port, full_url) tuple."""
     server = scope.get("server") or ["0.0.0.0", 80]
     port = server[1]
-    server_host = server[0] + (":" + str(port) if str(port) != "80" else "")
+    host = cast(str, server[0])
+    server_host = host + (":" + str(port) if str(port) != "80" else "")
     full_path = scope.get("root_path", "") + scope.get("path", "")
     http_url = scope.get("scheme", "http") + "://" + server_host + full_path
     return server_host, port, http_url
@@ -222,7 +225,7 @@ def set_status_code(span, status_code):
             )
         )
     else:
-        span.set_attribute(SpanAttributes.HTTP_STATUS_CODE, status_code)
+        span.set_attribute(http_attributes.HTTP_STATUS_CODE, status_code)
         span.set_status(Status(http_status_to_status_code(status_code, server_span=True)))
 
 
@@ -309,7 +312,7 @@ class OpenTelemetryMiddleware:
                     for key, value in attributes.items():
                         current_span.set_attribute(key, value)
 
-                    if current_span.kind == trace.SpanKind.SERVER:
+                    if isinstance(current_span, SDKSpan) and current_span.kind == trace.SpanKind.SERVER:
                         custom_attributes = collect_custom_request_headers_attributes(scope)
                         if len(custom_attributes) > 0:
                             current_span.set_attributes(custom_attributes)

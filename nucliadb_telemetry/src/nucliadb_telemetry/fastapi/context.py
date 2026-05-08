@@ -47,7 +47,7 @@ class ContextInjectorMiddleware:
         if scope["type"] == "http":
             # Add path parameters to context (including tracing spans)
             found_path_template = get_path_template(scope)
-            if found_path_template.match:
+            if found_path_template.match and found_path_template.scope:
                 context.add_context(
                     found_path_template.scope.get("path_params", {}),
                 )

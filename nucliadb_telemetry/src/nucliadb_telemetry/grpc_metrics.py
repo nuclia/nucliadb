@@ -18,7 +18,8 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 import grpc
-from grpc import ClientCallDetails, aio
+from grpc import aio
+from grpc.aio import ClientCallDetails
 from grpc.experimental import wrap_server_method_handler
 
 from nucliadb_telemetry import metrics
@@ -90,7 +91,7 @@ class UnaryUnaryClientInterceptor(aio.UnaryUnaryClientInterceptor):
     async def intercept_unary_unary(
         self,
         continuation,
-        client_call_details: ClientCallDetails,  # type: ignore
+        client_call_details: ClientCallDetails,
         request,
     ):
         metric = grpc_client_observer(labels={"method": _to_str(client_call_details.method)})
@@ -106,7 +107,7 @@ class UnaryStreamClientInterceptor(aio.UnaryStreamClientInterceptor):
     async def intercept_unary_stream(
         self,
         continuation,
-        client_call_details: ClientCallDetails,  # type: ignore
+        client_call_details: ClientCallDetails,
         request,
     ):
         metric = grpc_client_observer(labels={"method": _to_str(client_call_details.method)})
@@ -122,7 +123,7 @@ class StreamStreamClientInterceptor(aio.StreamStreamClientInterceptor):
     async def intercept_stream_stream(
         self,
         continuation,
-        client_call_details: ClientCallDetails,  # type: ignore
+        client_call_details: ClientCallDetails,
         request_iterator,
     ):
         metric = grpc_client_observer(labels={"method": _to_str(client_call_details.method)})
@@ -138,7 +139,7 @@ class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
     async def intercept_stream_unary(
         self,
         continuation,
-        client_call_details: ClientCallDetails,  # type: ignore
+        client_call_details: ClientCallDetails,
         request_iterator,
     ):
         metric = grpc_client_observer(labels={"method": _to_str(client_call_details.method)})
