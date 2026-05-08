@@ -40,6 +40,7 @@ from google.oauth2 import service_account  # type: ignore
 
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import errors, metrics
+from nucliadb_telemetry.aiohttp import InstrumentedClientSession
 from nucliadb_utils import logger
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import (
@@ -496,8 +497,10 @@ class GCSStorage(Storage):
 
     @storage_ops_observer.wrap({"type": "initialize"})
     async def initialize(self):
-        self._session = aiohttp.ClientSession(
-            connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5), timeout=TIMEOUT
+        self._session = InstrumentedClientSession(
+            "gcs",
+            connector=aiohttp.TCPConnector(ttl_dns_cache=60 * 5),
+            timeout=TIMEOUT,
         )
         try:
             if self.deadletter_bucket is not None and self.deadletter_bucket != "":

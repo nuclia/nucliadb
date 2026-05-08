@@ -19,9 +19,9 @@
 #
 import logging
 
-import aiohttp
 import pydantic
 
+from nucliadb_telemetry.aiohttp import InstrumentedClientSession
 from nucliadb_utils.settings import nuclia_settings
 
 from .utils import check_status
@@ -42,7 +42,7 @@ class AuthInfoResponse(pydantic.BaseModel):
 
 class NucliaAuthHTTPClient:
     def __init__(self):
-        self.session = aiohttp.ClientSession()
+        self.session = InstrumentedClientSession("auth")
         self.base_url = (
             nuclia_settings.nuclia_public_url.format(zone=nuclia_settings.nuclia_zone) + "/api"
         )

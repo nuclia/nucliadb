@@ -22,11 +22,11 @@ from unittest.mock import ANY, MagicMock, patch
 from nucliadb.writer.tus.gcs import GCloudBlobStore
 
 
-@patch("nucliadb.writer.tus.gcs.aiohttp")
+@patch("nucliadb.writer.tus.gcs.InstrumentedClientSession")
 @patch("nucliadb.writer.tus.gcs.ServiceAccountCredentials")
-async def test_tus_gcs(mock_sa, mock_aiohttp):
+async def test_tus_gcs(mock_sa, mock_instrumented_session):
     mock_session = MagicMock()
-    mock_aiohttp.ClientSession.return_value = mock_session
+    mock_instrumented_session.return_value = mock_session
     mock_aenter = MagicMock()
     mock_aenter.__aenter__.return_value = MagicMock(status=200)
     mock_session.get.return_value = mock_aenter

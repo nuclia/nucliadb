@@ -48,6 +48,7 @@ from nucliadb.writer.tus.exceptions import (
 from nucliadb.writer.tus.storage import BlobStore, FileStorageManager
 from nucliadb.writer.tus.utils import to_str
 from nucliadb_protos.resources_pb2 import CloudFile
+from nucliadb_telemetry.aiohttp import InstrumentedClientSession
 from nucliadb_utils.storages.gcs import CHUNK_SIZE, MIN_UPLOAD_SIZE, TIMEOUT
 
 
@@ -148,8 +149,7 @@ class GCloudBlobStore(BlobStore):
                 logger.warning("Setting up without credentials as couldn't find workload identity")
                 self._credentials = None
 
-        loop = asyncio.get_event_loop()
-        self._session = aiohttp.ClientSession(loop=loop, timeout=TIMEOUT)
+        self._session = InstrumentedClientSession("gcs_tus", timeout=TIMEOUT)
 
     async def check_exists(self, bucket_name: str):
         headers = await self.get_access_headers()
