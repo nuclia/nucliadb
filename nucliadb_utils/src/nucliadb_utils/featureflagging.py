@@ -117,7 +117,7 @@ class FlagService:
                     context=context,
                 )
             except EvaluationError as exc:
-                logger.exception("Flipt FF evaluation failed", exc_info=exc)
+                logger.warning("Flipt FF evaluation failed", exc_info=exc)
                 return False
             else:
                 logger.debug(f"Flipt evaluation of {flag_key} for {context} was {evaluation}")
