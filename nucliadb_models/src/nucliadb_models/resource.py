@@ -35,6 +35,7 @@ from nucliadb_models.extracted import (
     VectorObject,
 )
 from nucliadb_models.file import FieldFile
+from nucliadb_models.kv_schemas import KVValue
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import (
     ComputedMetadata,
@@ -257,12 +258,20 @@ class GenericFieldData(BaseModel):
     errors: list[Error] | None = None
 
 
+class KeyValueFieldData(BaseModel):
+    value: dict[str, KVValue] | None = None
+    error: Error | None = None
+    status: str | None = None
+    errors: list[Error] | None = None
+
+
 class ResourceData(BaseModel):
     texts: dict[str, TextFieldData] | None = None
     files: dict[str, FileFieldData] | None = None
     links: dict[str, LinkFieldData] | None = None
     conversations: dict[str, ConversationFieldData] | None = None
     generics: dict[str, GenericFieldData] | None = None
+    key_values: dict[str, KeyValueFieldData] | None = None
 
 
 class QueueType(str, Enum):

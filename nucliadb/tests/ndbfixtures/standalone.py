@@ -78,7 +78,6 @@ async def standalone_nucliadb(
         )
 
         config_nucliadb(settings)
-
         # Make sure tests don't write logs outside of the tmpdir
         os.environ["ERROR_LOG"] = str((tmp_path / "logs" / "error.log").absolute())
         os.environ["ACCESS_LOG"] = str((tmp_path / "logs" / "access.log").absolute())
@@ -92,6 +91,7 @@ async def standalone_nucliadb(
                 log_level=LogLevel.WARNING,
             )
         )
+
         server = await run_async_nucliadb(settings)
         assert server.started, "Nucliadb server did not start correctly"
 
