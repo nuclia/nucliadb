@@ -679,7 +679,7 @@ def prepare_request(
         or inspect.isasyncgen(content)
         or isinstance(content, io.IOBase)
     ):
-        data = content
+        data = content  # type: ignore[ty:invalid-assignment]
 
     query_params: QUERY_PARAMS_TYPE = kwargs.pop("query_params", None)
     if len(kwargs) > 0:
@@ -719,10 +719,10 @@ def _request_sync_builder(
         )
         if response_type is not None:
             if issubclass(response_type, SyncAskResponse):
-                return ask_response_parser(resp)  # type: ignore[return-value]
+                return ask_response_parser(resp)  # type: ignore[return-value, ty:invalid-return-type]
             elif issubclass(response_type, BaseModel):
-                return response_type.model_validate_json(resp.content)  # type: ignore[return-value]
-        return None  # type: ignore[return-value]
+                return response_type.model_validate_json(resp.content)  # type: ignore[return-value, ty:invalid-return-type]
+        return None  # type: ignore[return-value, ty:invalid-return-type]
 
     return _func
 

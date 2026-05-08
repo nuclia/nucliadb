@@ -24,12 +24,14 @@ from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import AsyncExitStack
 from datetime import datetime
 
-import aiobotocore  # type: ignore
+import aiobotocore  # type: ignore[import-untyped]
+import aiobotocore.config  # type: ignore[import-untyped]
 import aiohttp
 import backoff
-import botocore  # type: ignore
-from aiobotocore.client import AioBaseClient  # type: ignore
-from aiobotocore.session import AioSession, get_session  # type: ignore
+import botocore  # type: ignore[import-untyped]
+import botocore.exceptions  # type: ignore[import-untyped]
+from aiobotocore.client import AioBaseClient  # type: ignore[import-untyped]
+from aiobotocore.session import AioSession, get_session  # type: ignore[import-untyped]
 
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import errors, metrics
@@ -48,7 +50,7 @@ MAX_TRIES = 3
 
 RETRIABLE_EXCEPTIONS = (
     botocore.exceptions.ClientError,
-    aiohttp.client_exceptions.ClientPayloadError,
+    aiohttp.ClientPayloadError,
     botocore.exceptions.BotoCoreError,
 )
 
@@ -123,11 +125,11 @@ class S3StorageField(StorageField):
     @s3_ops_observer.wrap({"type": "abort_multipart"})
     async def _abort_multipart(self):
         try:
-            mpu = self.field.resumable_uri
+            assert self.field
             upload_file_id = self.field.upload_uri
             bucket_name = self.field.bucket_name
             await self.storage._s3aioclient.abort_multipart_upload(
-                Bucket=bucket_name, Key=upload_file_id, UploadId=mpu["UploadId"]
+                Bucket=bucket_name, Key=upload_file_id, UploadId=self.field.resumable_uri
             )
         except Exception:
             logger.warning("Could not abort multipart upload", exc_info=True)
@@ -197,12 +199,12 @@ class S3StorageField(StorageField):
             size += len(chunk)
             upload_chunk += chunk
             if len(upload_chunk) >= MIN_UPLOAD_SIZE:
-                part = await self._upload_part(cf, upload_chunk)
+                part = await self._upload_part(upload_chunk)
                 self.field.parts.append(part["ETag"])
                 self.field.offset += 1
                 upload_chunk = b""
         if len(upload_chunk) > 0:
-            part = await self._upload_part(cf, upload_chunk)
+            part = await self._upload_part(upload_chunk)
             self.field.parts.append(part["ETag"])
             self.field.offset += 1
 
@@ -215,7 +217,7 @@ class S3StorageField(StorageField):
         max_tries=MAX_TRIES,
     )
     @s3_ops_observer.wrap({"type": "upload_part"})
-    async def _upload_part(self, cf: CloudFile, data: bytes):
+    async def _upload_part(self, data: bytes):
         if self.field is None:
             raise AttributeError("No field configured")
         return await self.storage._s3aioclient.upload_part(
@@ -260,10 +262,11 @@ class S3StorageField(StorageField):
     )
     @s3_ops_observer.wrap({"type": "complete_multipart"})
     async def _complete_multipart_upload(self):
+        assert self.field
         # if blocks is 0, it means the file is of zero length so we need to
         # trick it to finish a multiple part with no data.
         if self.field.offset == 1:
-            part = await self._upload_part(None, b"")
+            part = await self._upload_part(b"")
             self.field.parts.append(part["ETag"])
             self.field.offset += 1
         part_info = {
@@ -520,9 +523,9 @@ class S3Storage(Storage):
         max_tries=MAX_TRIES,
     )
     @s3_ops_observer.wrap({"type": "insert_object"})
-    async def insert_object(self, bucket_name: str, key: str, data: bytes) -> None:
+    async def insert_object(self, bucket: str, key: str, data: bytes) -> None:
         await self._s3aioclient.put_object(
-            Bucket=bucket_name,
+            Bucket=bucket,
             Key=key,
             Body=data,
             ContentType="application/octet-stream",
@@ -530,7 +533,7 @@ class S3Storage(Storage):
         )
 
 
-async def bucket_exists(client: AioSession, bucket_name: str) -> bool:
+async def bucket_exists(client: AioBaseClient, bucket_name: str) -> bool:
     exists = True
     try:
         res = await client.head_bucket(Bucket=bucket_name)
@@ -550,7 +553,7 @@ async def bucket_exists(client: AioSession, bucket_name: str) -> bool:
     max_tries=MAX_TRIES,
 )
 async def create_bucket(
-    client: AioSession,
+    client: AioBaseClient,
     bucket_name: str,
     bucket_tags: dict[str, str] | None = None,
     region_name: str | None = None,

@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 from starlette.applications import Starlette
 from starlette.datastructures import URL
 from starlette.requests import ClientDisconnect, Request
-from starlette.routing import Match, Mount, Route
+from starlette.routing import BaseRoute, Match, Mount, Route
 from starlette.types import Scope
 
 from nucliadb_telemetry import errors
@@ -34,7 +34,7 @@ def get_path_template(scope: Scope) -> FoundPathTemplate:
     if "found_path_template" in scope:
         return scope["found_path_template"]
     app: Starlette = scope["app"]
-    path, sub_scope = find_route(scope, app.routes)  # type:ignore
+    path, sub_scope = find_route(scope, app.routes)
     if path is None:
         path = URL(scope=scope).path
     path_template = FoundPathTemplate(path, sub_scope, sub_scope is not None)
@@ -42,7 +42,7 @@ def get_path_template(scope: Scope) -> FoundPathTemplate:
     return path_template
 
 
-def find_route(scope: Scope, routes: list[Route]) -> tuple[str | None, Scope | None]:
+def find_route(scope: Scope, routes: list[BaseRoute]) -> tuple[str | None, Scope | None]:
     # we mutate scope, so we need a copy
     scope = scope.copy()  # type:ignore
     for route in routes:

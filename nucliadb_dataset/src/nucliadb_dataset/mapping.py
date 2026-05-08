@@ -15,7 +15,7 @@
 # Mapping to transform a text/labels onto tokens and multilabelbinarizer
 from typing import Any, TypeVar
 
-import pyarrow as pa  # type: ignore
+import pyarrow as pa  # type: ignore[import-untyped]
 
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,

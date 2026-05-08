@@ -33,10 +33,11 @@ from urllib.parse import quote_plus
 import aiohttp
 import aiohttp.client_exceptions
 import backoff
-import google.auth.transport.requests  # type: ignore
+import google.auth.credentials
+import google.auth.transport.requests
 import yarl
-from google.auth.exceptions import DefaultCredentialsError  # type: ignore
-from google.oauth2 import service_account  # type: ignore
+from google.auth.exceptions import DefaultCredentialsError
+from google.oauth2 import service_account
 
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import errors, metrics
@@ -355,6 +356,7 @@ class GCSStorageField(StorageField):
         return count
 
     async def finish(self):
+        assert self.field
         if self.field.old_uri not in ("", None):
             # Already has a file
             try:
@@ -483,6 +485,7 @@ class GCSStorage(Storage):
         self._session = None
 
     def _get_access_token(self):
+        assert self._credentials
         if self._credentials.expired or self._credentials.valid is False:
             request = google.auth.transport.requests.Request()
             self._credentials.refresh(request)
@@ -718,11 +721,11 @@ class GCSStorage(Storage):
         max_tries=MAX_TRIES,
     )
     @storage_ops_observer.wrap({"type": "insert_object"})
-    async def insert_object(self, bucket_name: str, key: str, data: bytes) -> None:
+    async def insert_object(self, bucket: str, key: str, data: bytes) -> None:
         """
         Put an object in the storage without any metadata.
         """
-        bucket_upload_url = self._upload_url.format(bucket=bucket_name)
+        bucket_upload_url = self._upload_url.format(bucket=bucket)
         url = f"{bucket_upload_url}?uploadType=media&name={quote_plus(key)}"
         headers = await self.get_access_headers()
         headers.update(

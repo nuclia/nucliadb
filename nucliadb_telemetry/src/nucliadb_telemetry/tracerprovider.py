@@ -16,7 +16,7 @@
 import asyncio
 import time
 
-from opentelemetry.context import Context  # type: ignore
+from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor, TracerProvider
 
 
@@ -84,7 +84,7 @@ class AsyncMultiSpanProcessor(SpanProcessor):
 
 class AsyncTracerProvider(TracerProvider):
     initialized: bool = False
-    _active_span_processor: AsyncMultiSpanProcessor  # type: ignore
+    _active_span_processor: AsyncMultiSpanProcessor  # type: ignore[assignment]
 
     async def async_add_span_processor(self, span_processor: SpanProcessor) -> None:
         await self._active_span_processor.async_add_span_processor(span_processor)

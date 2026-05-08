@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 import prometheus_client
 from fastapi import FastAPI
-from opentelemetry.instrumentation.fastapi import (  # type: ignore
+from opentelemetry.instrumentation.fastapi import (
     _get_default_span_details,
 )
 from prometheus_client import CONTENT_TYPE_LATEST

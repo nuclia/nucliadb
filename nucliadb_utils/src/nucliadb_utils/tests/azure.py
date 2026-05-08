@@ -20,17 +20,18 @@
 from collections.abc import AsyncIterator, Generator, Iterator
 from contextlib import ExitStack
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
-from pytest_docker_fixtures import images  # type: ignore  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore  # type: ignore
+from pytest_docker_fixtures import images
+from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore[import-untyped]
 
 from nucliadb_utils.settings import FileBackendConfig, storage_settings
 from nucliadb_utils.storages.azure import AzureStorage
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 
+images.settings = cast(dict[str, Any], images.settings)
 images.settings["azurite"] = {
     "image": "mcr.microsoft.com/azure-storage/azurite",
     "version": "3.31.0",
@@ -57,7 +58,7 @@ class Azurite(BaseImage):
 
     def check(self):
         try:
-            from azure.storage.blob import BlobServiceClient  # type: ignore
+            from azure.storage.blob import BlobServiceClient
 
             container_port = self.port
             host_port = self.get_port(port=container_port)
@@ -101,6 +102,7 @@ def get_connection_string(host, port) -> str:
 def azurite() -> Generator[AzuriteFixture, None, None]:
     container = Azurite()
     host, port = container.run()
+    assert container.container_obj
     try:
         yield AzuriteFixture(
             host=host,

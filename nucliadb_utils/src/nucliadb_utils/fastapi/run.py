@@ -24,8 +24,8 @@ from contextlib import AbstractContextManager, nullcontext
 
 import click
 from fastapi import FastAPI
-from uvicorn.config import Config  # type: ignore
-from uvicorn.server import Server  # type: ignore
+from uvicorn.config import Config
+from uvicorn.server import Server
 
 from nucliadb_telemetry.fastapi import application_metrics
 from nucliadb_utils import logger
@@ -112,7 +112,7 @@ async def run_server_forever(server: Server, config: Config):
     # compatibility with uvicorn<0.29
     capture_signals: AbstractContextManager
     if hasattr(server, "install_signal_handlers"):  # pragma: no cover
-        server.install_signal_handlers()
+        server.install_signal_handlers()  # type: ignore[ty:call-non-callable]
         capture_signals = nullcontext()
     else:
         # uvicorn>=0.29

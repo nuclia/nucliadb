@@ -26,8 +26,8 @@ from opentelemetry.exporter.jaeger.thrift.translate import ThriftTranslator, Tra
 from opentelemetry.sdk.resources import SERVICE_NAME
 from opentelemetry.sdk.trace import Span
 from opentelemetry.sdk.trace.export import SpanExportResult
-from thrift.protocol import TCompactProtocol  # type: ignore
-from thrift.transport import TTransport  # type: ignore
+from thrift.protocol import TCompactProtocol  # type: ignore[import-untyped]
+from thrift.transport import TTransport  # type: ignore[import-untyped]
 
 from nucliadb_telemetry import logger
 
@@ -135,7 +135,7 @@ class AgentClientUDPAsync:
         self.client.emitBatch(batch)
         buff = self.buffer.getvalue()
         if len(buff) > self.max_packet_size:
-            if self.split_oversized_batches and len(batch.spans) > 1:
+            if self.split_oversized_batches and batch.spans and len(batch.spans) > 1:
                 packets = math.ceil(len(buff) / self.max_packet_size)
                 div = math.ceil(len(batch.spans) / packets)
                 for packet in range(packets):

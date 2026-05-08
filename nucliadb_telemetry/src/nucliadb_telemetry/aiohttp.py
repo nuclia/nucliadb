@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 import time
+from types import SimpleNamespace
 
 import aiohttp
 
@@ -76,20 +77,19 @@ def _build_trace_config(pool_name: str) -> aiohttp.TraceConfig:
 
     async def on_connection_queued_start(
         session: aiohttp.ClientSession,
-        ctx: object,
+        ctx: SimpleNamespace,
         params: aiohttp.TraceConnectionQueuedStartParams,
     ) -> None:
         ctx._pool_wait_start = time.monotonic()  # type: ignore[attr-defined]
 
     async def on_connection_queued_end(
         session: aiohttp.ClientSession,
-        ctx: object,
+        ctx: SimpleNamespace,
         params: aiohttp.TraceConnectionQueuedEndParams,
     ) -> None:
-        start = getattr(ctx, "_pool_wait_start", None)
-        if start is not None:
+        if ctx._pool_wait_start:
             pool_wait_histogram.observe(
-                time.monotonic() - start,
+                time.monotonic() - ctx._pool_wait_start,
                 labels={"pool": pool_name},
             )
 

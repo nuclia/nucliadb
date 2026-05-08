@@ -40,7 +40,7 @@ from nucliadb_utils.nuclia_usage.utils.kb_usage_report import KbUsageReportUtili
 def kb_usage_report_finish_condition(kb_usage_report: KbUsageReportUtility, count_publish: int):
     return (
         kb_usage_report.queue.qsize() == 0
-        and kb_usage_report.nats_stream.publish.call_count == count_publish
+        and kb_usage_report.nats_stream.publish.call_count == count_publish  # type: ignore[ty:unresolved-attribute]
     )
 
 

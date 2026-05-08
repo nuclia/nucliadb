@@ -28,10 +28,10 @@ from math import ceil
 from typing import Any, ClassVar, TypeVar
 
 import pytest
-from pytest_benchmark.session import BenchmarkSession  # type: ignore
-from pytest_benchmark.stats import Metadata  # type: ignore
-from pytest_benchmark.timers import compute_timer_precision  # type: ignore
-from pytest_benchmark.utils import NameWrapper, format_time  # type: ignore
+from pytest_benchmark.session import BenchmarkSession  # type: ignore[import-untyped]
+from pytest_benchmark.stats import Metadata  # type: ignore[import-untyped]
+from pytest_benchmark.timers import compute_timer_precision  # type: ignore[import-untyped]
+from pytest_benchmark.utils import NameWrapper, format_time  # type: ignore[import-untyped]
 
 T = TypeVar("T")
 

@@ -103,7 +103,7 @@ class TestNatsConnectionManager:
         assert not manager.healthy()
 
         manager._last_unhealthy = None
-        manager._nc.is_connected = False
+        manager._nc.is_connected = False  # type: ignore[ty:invalid-assignment]
         assert manager.healthy()
         assert manager._last_unhealthy is not None
 
@@ -135,8 +135,8 @@ class TestNatsConnectionManager:
         await manager.unsubscribe(sub)
         await manager.unsubscribe(psub)
 
-        sub.unsubscribe.assert_awaited_once()
-        psub.unsubscribe.assert_awaited_once()
+        sub.unsubscribe.assert_awaited_once()  # type: ignore[ty:unresolved-attribute]
+        psub.unsubscribe.assert_awaited_once()  # type: ignore[ty:unresolved-attribute]
         assert len(manager._subscriptions) == 0
         assert len(manager._pull_subscriptions) == 0
 
@@ -171,7 +171,7 @@ class TestNatsConnectionManager:
             subscription_lost_cb=lost_cb,
             durable="queue",
         )
-        psub.fetch = fetch
+        psub.fetch = fetch  # type: ignore[ty:invalid-assignment]
 
         # We start with one subscription
         assert len(manager._pull_subscriptions) == 1

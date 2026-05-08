@@ -19,15 +19,17 @@
 
 import socket
 from collections.abc import AsyncIterator, Iterator
+from typing import Any, cast
 
 import nats
 import pytest
-from pytest_docker_fixtures import images  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
+from pytest_docker_fixtures import images
+from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore[import-untyped]
 
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.utilities import start_nats_manager, stop_nats_manager
 
+images.settings = cast(dict[str, Any], images.settings)
 images.settings["nats"] = {
     "image": "nats",
     "version": "2.10.21",
