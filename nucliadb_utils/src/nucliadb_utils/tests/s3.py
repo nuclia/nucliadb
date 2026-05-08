@@ -19,18 +19,19 @@
 #
 from collections.abc import AsyncIterator, Iterator
 from contextlib import ExitStack
-from typing import Any
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
 import requests
-from pytest_docker_fixtures import images  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
+from pytest_docker_fixtures import images
+from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore[import-untyped]
 
 from nucliadb_utils.settings import FileBackendConfig, storage_settings
 from nucliadb_utils.storages.s3 import S3Storage
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 
+images.settings = cast(dict[str, Any], images.settings)
 images.settings["s3"] = {
     "image": "localstack/localstack",
     "version": "0.12.18",

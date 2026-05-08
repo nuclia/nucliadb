@@ -180,12 +180,14 @@ class LocalStorageField(StorageField):
         return count
 
     async def finish(self):
+        assert self.field
         if self.field.old_uri not in ("", None):
             # Already has a file
             await self.storage.delete_upload(self.field.uri, self.field.bucket_name)
         if self.field.upload_uri != self.key:
             await self.move(self.field.upload_uri, self.key, self.field.bucket_name, self.bucket)
 
+        assert self._handler
         await self._handler.close()
         self.field.uri = self.key
         self.field.ClearField("offset")

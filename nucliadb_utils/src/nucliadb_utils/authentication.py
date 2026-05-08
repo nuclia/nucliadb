@@ -61,18 +61,18 @@ class NucliaCloudAuthenticationBackend(AuthenticationBackend):
         self.user_header = user_header
         self.security_groups_header = security_groups_header
 
-    async def authenticate(self, request: HTTPConnection) -> tuple[AuthCredentials, BaseUser] | None:
-        if self.roles_header not in request.headers:
+    async def authenticate(self, conn: HTTPConnection) -> tuple[AuthCredentials, BaseUser] | None:
+        if self.roles_header not in conn.headers:
             return None
         else:
-            header_roles = request.headers[self.roles_header]
+            header_roles = conn.headers[self.roles_header]
             roles = header_roles.split(";")
             auth_creds = AuthCredentials(roles)
 
-        if self.user_header in request.headers:
-            user = request.headers[self.user_header]
+        if self.user_header in conn.headers:
+            user = conn.headers[self.user_header]
 
-            raw_security_groups: str | None = request.headers.get(self.security_groups_header)
+            raw_security_groups: str | None = conn.headers.get(self.security_groups_header)
 
             security_groups: list[str] | None = None
             if raw_security_groups is not None:

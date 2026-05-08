@@ -35,6 +35,7 @@ from nucliadb_protos.kb_usage_pb2 import (
     Service,
     Storage,
 )
+from nucliadb_telemetry.jetstream import JetStreamContextTelemetry
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class KbUsageReportUtility:
 
     def __init__(
         self,
-        nats_stream: JetStreamContext,
+        nats_stream: JetStreamContext | JetStreamContextTelemetry,
         nats_subject: str,
         max_queue_size: int = 100,
     ):
@@ -88,10 +89,10 @@ class KbUsageReportUtility:
 
     def send_kb_usage(
         self,
-        service: Service,
+        service: Service.ValueType,
         account_id: str | None,
         kb_id: str | None,
-        kb_source: KBSource,
+        kb_source: KBSource.ValueType,
         processes: Iterable[Process] = (),
         predicts: Iterable[Predict] = (),
         searches: Iterable[Search] = (),
@@ -99,13 +100,13 @@ class KbUsageReportUtility:
         activity_log_match: ActivityLogMatch | None = None,
     ):
         usage = KbUsage()
-        usage.service = service  # type: ignore
+        usage.service = service
         usage.timestamp.FromDatetime(datetime.now(tz=timezone.utc))
         if account_id is not None:
             usage.account_id = account_id
         if kb_id is not None:
             usage.kb_id = kb_id
-        usage.kb_source = kb_source  # type: ignore
+        usage.kb_source = kb_source
         if activity_log_match is not None:
             if activity_log_match.id:
                 usage.activity_log_match.id = activity_log_match.id

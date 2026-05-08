@@ -243,7 +243,7 @@ async def get_pubsub() -> PubSubDriver | None:
 
 
 def get_ingest() -> WriterStub:
-    return get_utility(Utility.INGEST)  # type: ignore
+    return get_utility(Utility.INGEST)
 
 
 def start_partitioning_utility() -> PartitionUtility:
@@ -264,7 +264,7 @@ def stop_partitioning_utility():
 
 
 def get_partitioning() -> PartitionUtility:
-    return get_utility(Utility.PARTITION)  # type: ignore
+    return get_utility(Utility.PARTITION)
 
 
 def clear_global_cache():

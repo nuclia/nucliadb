@@ -23,6 +23,7 @@ import json
 import time
 from collections.abc import Callable
 from datetime import datetime, timezone
+from typing import Any
 
 import backoff
 import mmh3
@@ -185,6 +186,7 @@ class StreamAuditStorage(AuditStorage):
         logger.info("Got disconnected from NATS!")
 
     async def reconnected_cb(self):
+        assert self.nc
         # See who we are connected to on reconnect.
         logger.info(f"Got reconnected to NATS {self.nc.connected_url}")
 
@@ -195,7 +197,7 @@ class StreamAuditStorage(AuditStorage):
         logger.info("Connection is closed on NATS")
 
     async def initialize(self):
-        options = {
+        options: dict[str, Any] = {
             "error_cb": self.error_cb,
             "closed_cb": self.closed_cb,
             "reconnected_cb": self.reconnected_cb,
@@ -245,8 +247,8 @@ class StreamAuditStorage(AuditStorage):
                 if item_dequeued:
                     self.queue.task_done()
 
-    def send(self, message: AuditRequest):
-        self.queue.put_nowait(message)
+    def send(self, msg: AuditRequest):
+        self.queue.put_nowait(msg)
 
     @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=4)
     async def _send(self, message: AuditRequest):

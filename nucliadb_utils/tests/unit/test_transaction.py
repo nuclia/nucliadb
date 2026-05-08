@@ -21,6 +21,7 @@ import asyncio
 from unittest import mock
 
 import nats
+import nats.errors
 import pytest
 
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification

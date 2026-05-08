@@ -22,6 +22,7 @@ import functools
 import os
 import uuid
 from inspect import iscoroutinefunction
+from typing import Any
 
 import nats
 import nats.errors
@@ -95,7 +96,7 @@ class NatsPubsub(PubSubDriver[Msg]):
 
         async with self.lock:
             nc = Client()
-            options = {
+            options: dict[str, Any] = {
                 "servers": self._hosts,
                 "disconnected_cb": self.disconnected_cb,
                 "reconnected_cb": self.reconnected_cb,
@@ -151,6 +152,7 @@ class NatsPubsub(PubSubDriver[Msg]):
         logger.info("Got disconnected from NATS!")
 
     async def reconnected_cb(self):
+        assert self.nc and self.nc.connected_url
         # See who we are connected to on reconnect.
         logger.info(f"Got reconnected NATS to {self.nc.connected_url.netloc}")
 
@@ -197,9 +199,9 @@ class NatsPubsub(PubSubDriver[Msg]):
         else:
             raise KeyError(f"No subscription at {subscription_id}")
 
-    async def publish(self, key, value):
+    async def publish(self, channel_name: str, data: bytes):
         if self.nc is not None and self.nc.is_connected:
-            await self.nc.publish(key, value)
+            await self.nc.publish(channel_name, data)
         else:
             raise ErrConnectionClosed("Could not publish")
 

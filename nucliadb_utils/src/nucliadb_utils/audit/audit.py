@@ -64,7 +64,7 @@ class AuditStorage:
         self,
         kbid: str,
         user: str,
-        client: int,
+        client_type: int,
         origin: str,
         search: SearchRequest,
         timeit: float,

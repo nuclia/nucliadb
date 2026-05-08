@@ -26,8 +26,8 @@ from unittest.mock import patch
 import docker  # type: ignore[import-untyped]
 import pytest
 import requests
-from pytest_docker_fixtures import images  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
+from pytest_docker_fixtures import images
+from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore[import-untyped]
 
 from nucliadb_utils.settings import FileBackendConfig, storage_settings
 from nucliadb_utils.storages.gcs import GCSStorage
@@ -136,7 +136,7 @@ async def gcs_storage(gcs: str, gcs_storage_settings: dict[str, Any]) -> AsyncIt
     storage = GCSStorage(
         url=storage_settings.gcs_endpoint_url,
         account_credentials=storage_settings.gcs_base64_creds,
-        bucket=storage_settings.gcs_bucket,  # type: ignore
+        bucket=storage_settings.gcs_bucket,
         location=storage_settings.gcs_location,
         project=storage_settings.gcs_project,
         executor=ThreadPoolExecutor(extended_storage_settings.gcs_threads),
