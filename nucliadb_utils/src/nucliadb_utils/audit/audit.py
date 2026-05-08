@@ -77,7 +77,7 @@ class AuditStorage:
         self,
         kbid: str,
         user: str,
-        client: int,
+        client_type: int,
         origin: str,
         question: str,
         rephrased_question: str | None,

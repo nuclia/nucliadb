@@ -23,7 +23,7 @@ from contextlib import ExitStack
 from typing import Any, AsyncIterator, Iterator
 from unittest.mock import patch
 
-import docker  # type: ignore
+import docker  # type: ignore[import-untyped]
 import pytest
 import requests
 from pytest_docker_fixtures import images  # type: ignore

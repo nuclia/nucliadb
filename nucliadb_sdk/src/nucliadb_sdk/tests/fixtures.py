@@ -16,6 +16,7 @@ import os
 import subprocess
 import sys
 import time
+import typing
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ from nucliadb_models.resource import (
     KnowledgeBoxObj,
 )
 
+images.settings = typing.cast(dict[str, typing.Any], images.settings)
 images.settings["postgresql"]["version"] = "13"
 images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
 images.settings["postgresql"]["env"]["POSTGRES_DB"] = "postgres"
@@ -110,8 +112,9 @@ def nucliadb(pg) -> Iterator[NucliaFixture]:
     # Setup the connection to pg for the maindb driver
     url = f"postgresql://postgres:postgres@{pg_host}:{pg_port}/postgres"
 
-    images.settings["nucliadb"]["env"]["DRIVER"] = "PG"
-    images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = url
+    env = typing.cast(dict[str, str], images.settings["nucliadb"]["env"])
+    env["DRIVER"] = "PG"
+    env["DRIVER_PG_URL"] = url
 
     if os.environ.get("TEST_LOCAL_NUCLIADB"):
         host = os.environ["TEST_LOCAL_NUCLIADB"]
@@ -122,7 +125,7 @@ def nucliadb(pg) -> Iterator[NucliaFixture]:
             host = "localhost"
             child = subprocess.Popen(
                 os.path.join(os.path.dirname(sys.executable), "nucliadb"),
-                env=images.settings["nucliadb"]["env"],
+                env=env,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -150,13 +153,14 @@ def nucliadb(pg) -> Iterator[NucliaFixture]:
             child.kill()
     else:
         # We need to replace the localhost with the internal docker host to allow container-to-container communication
-        images.settings["nucliadb"]["env"]["DRIVER_PG_URL"] = (
-            images.settings["nucliadb"]["env"]["DRIVER_PG_URL"]
+        env["DRIVER_PG_URL"] = (
+            env["DRIVER_PG_URL"]
             .replace("localhost", get_docker_internal_host())
             .replace("127.0.0.1", get_docker_internal_host())
         )
         container = NucliaDB()
         host, port = container.run()
+        assert container.container_obj
         network = container.container_obj.attrs["NetworkSettings"]
         service_port = "8060/tcp"
         grpc = network["Ports"][service_port][0]["HostPort"]

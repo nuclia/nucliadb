@@ -108,7 +108,7 @@ class InputMessage(BaseModel):
         description="Unique identifier for the message. Must be unique within the conversation.",
         max_length=128,
     )
-    type_: MessageType | None = Field(None, alias="type")
+    type_: MessageType | None = Field(default=None, alias="type")
 
     @field_validator("ident", mode="after")
     @classmethod

@@ -17,7 +17,7 @@ import tempfile
 from collections.abc import AsyncIterator, Iterator
 from typing import TYPE_CHECKING
 
-import docker  # type: ignore
+import docker  # type: ignore[import-untyped]
 import grpc
 import pytest
 from grpc import aio
@@ -27,7 +27,6 @@ from nucliadb_models.labels import Label, LabelSet, LabelSetKind
 from nucliadb_models.metadata import UserMetadata
 from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.text import TextField
-from nucliadb_models.utils import FieldIdString, SlugString
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_sdk.v2.sdk import NucliaDB
@@ -66,8 +65,8 @@ def upload_data_field_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
-            slug=SlugString("doc1"),
-            texts={FieldIdString("text"): TextField(body="This is my lovely text")},
+            slug="doc1",
+            texts={"text": TextField(body="This is my lovely text")},
             usermetadata=UserMetadata(
                 classifications=[UserClassification(labelset="labelset1", label="A")]
             ),
@@ -77,8 +76,8 @@ def upload_data_field_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
-            slug=SlugString("doc2"),
-            texts={FieldIdString("text"): TextField(body="This is my lovely text2")},
+            slug="doc2",
+            texts={"text": TextField(body="This is my lovely text2")},
             usermetadata=UserMetadata(
                 classifications=[
                     UserClassification(labelset="labelset1", label="B"),
@@ -119,8 +118,8 @@ def upload_data_paragraph_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
-            slug=SlugString("doc1"),
-            texts={FieldIdString("text"): TextField(body="This is my lovely text")},
+            slug="doc1",
+            texts={"text": TextField(body="This is my lovely text")},
             usermetadata=UserMetadata(
                 classifications=[
                     UserClassification(labelset="labelset1", label="label1"),
@@ -132,8 +131,8 @@ def upload_data_paragraph_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
-            slug=SlugString("doc2"),
-            texts={FieldIdString("text"): TextField(body="This is my lovely text2")},
+            slug="doc2",
+            texts={"text": TextField(body="This is my lovely text2")},
             usermetadata=UserMetadata(
                 classifications=[
                     UserClassification(labelset="labelset1", label="label1"),
@@ -146,8 +145,8 @@ def upload_data_paragraph_classification(sdk: NucliaDB, kb: KnowledgeBoxObj):
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
-            slug=SlugString("doc3"),
-            texts={FieldIdString("text"): TextField(body="Yet another lovely text")},
+            slug="doc3",
+            texts={"text": TextField(body="Yet another lovely text")},
             usermetadata=UserMetadata(
                 classifications=[
                     UserClassification(labelset="labelset1", label="label1"),
@@ -165,13 +164,9 @@ def text_editors_kb(sdk: NucliaDB, kb: KnowledgeBoxObj):
         kbid=kb.uuid,
         content=CreateResourcePayload(
             title="GNU Emacs",
-            slug=SlugString("doc-emacs"),
+            slug="doc-emacs",
             summary="An extensible, customizable, free/libre text editor - and more",
-            texts={
-                FieldIdString("text"): TextField(
-                    body="Text won't appear as we are not mocking processing"
-                )
-            },
+            texts={"text": TextField(body="Text won't appear as we are not mocking processing")},
         ),
     )
 
@@ -179,39 +174,27 @@ def text_editors_kb(sdk: NucliaDB, kb: KnowledgeBoxObj):
         kbid=kb.uuid,
         content=CreateResourcePayload(
             title="vi",
-            slug=SlugString("doc-vi"),
+            slug="doc-vi",
             summary="A screen-oriented text editor originally created for the Unix operating system",
-            texts={
-                FieldIdString("text"): TextField(
-                    body="Text won't appear as we are not mocking processing"
-                )
-            },
+            texts={"text": TextField(body="Text won't appear as we are not mocking processing")},
         ),
     )
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
             title="VIM",
-            slug=SlugString("doc-vim"),
+            slug="doc-vim",
             summary="Vi IMproved, a programmer's text editor",
-            texts={
-                FieldIdString("text"): TextField(
-                    body="Text won't appear as we are not mocking processing"
-                )
-            },
+            texts={"text": TextField(body="Text won't appear as we are not mocking processing")},
         ),
     )
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
             title="ex",
-            slug=SlugString("doc-ex"),
+            slug="doc-ex",
             summary="Line editor for Unix systems originally written by Bill Joy in 1976",
-            texts={
-                FieldIdString("text"): TextField(
-                    body="Text won't appear as we are not mocking processing"
-                )
-            },
+            texts={"text": TextField(body="Text won't appear as we are not mocking processing")},
         ),
     )
     return kb
@@ -235,5 +218,5 @@ async def ingest_stub(nucliadb) -> AsyncIterator["WriterAsyncStub"]:
 def ingest_stub_sync(nucliadb) -> Iterator[WriterStub]:
     channel = grpc.insecure_channel(f"{nucliadb.host}:{nucliadb.grpc}")
     stub = WriterStub(channel)
-    yield stub  # type: ignore
+    yield stub
     channel.close()

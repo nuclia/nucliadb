@@ -14,7 +14,7 @@
 
 import tempfile
 
-import pyarrow as pa  # type: ignore
+import pyarrow as pa  # type: ignore[import-untyped]
 
 from nucliadb_dataset.dataset import NucliaDBDataset
 from nucliadb_models.resource import KnowledgeBoxObj
