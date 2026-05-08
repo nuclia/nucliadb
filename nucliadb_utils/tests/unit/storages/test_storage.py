@@ -34,6 +34,7 @@ from nucliadb_utils.storages.storage import (
     iter_and_add_size,
     iter_in_chunk_size,
 )
+from nucliadb_utils.storages.utils import Range
 
 
 class TestStorageField:
@@ -57,21 +58,20 @@ class TestStorageField:
 class StorageTest(Storage):
     def __init__(self):
         self.source = 0
-        self.field_klass = lambda: MagicMock()
+        self.field_klass = lambda: MagicMock()  # type: ignore[ty:invalid-assignment]
         self.deadletter_bucket = "deadletter_bucket"
         self.indexing_bucket = "indexing_bucket"
-        self.delete_upload = AsyncMock()
-        self.chunked_upload_object = AsyncMock()
-        self.upload_object = AsyncMock()
-        self.move = AsyncMock()
+        self.chunked_upload_object = AsyncMock()  # type: ignore[ty:invalid-assignment]
+        self.upload_object = AsyncMock()  # type: ignore[ty:invalid-assignment]
+        self.move = AsyncMock()  # type: ignore[ty:invalid-assignment]
 
     def get_bucket_name(self, kbid):
         return "bucket"
 
-    async def iterate_objects(self, bucket_name, prefix, start: str | None = None):
+    async def iterate_objects(self, bucket, prefix, start: str | None = None):
         yield ObjectInfo(name="uri")
 
-    async def download(self, bucket_name, uri):
+    async def download(self, bucket: str, key: str, range: Range | None = None):
         br = BrainResource(labels=["label"])
         yield br.SerializeToString()
 
@@ -81,7 +81,7 @@ class StorageTest(Storage):
     async def delete_kb(self, kbid):
         return True
 
-    async def delete_upload(self, uri, bucket):
+    async def delete_upload(self, uri: str, bucket_name: str):  # type: ignore[override]
         return True
 
     async def initialize(self) -> None:
@@ -103,17 +103,19 @@ class StorageTest(Storage):
 class TestStorage:
     @pytest.fixture
     def storage(self):
-        yield StorageTest()
+        s = StorageTest()
+        s.delete_upload = AsyncMock()  # type: ignore[ty:invalid-assignment]
+        yield s
 
     async def test_delete_resource(self, storage: StorageTest):
         await storage.delete_resource("bucket", "uri")
-        storage.delete_upload.assert_called_once_with("uri", "bucket")
+        storage.delete_upload.assert_called_once_with("uri", "bucket")  # type: ignore[ty:unresolved-attribute]
 
     async def test_indexing(self, storage: StorageTest):
         msg = BrainResource(resource=ResourceID(uuid="uuid"))
         await storage.indexing(msg, 1, "1", "kb", "shard")
 
-        storage.upload_object.assert_called_once_with(
+        storage.upload_object.assert_called_once_with(  # type: ignore[ty:unresolved-attribute]
             "indexing_bucket", "index/kb/shard/uuid/1", msg.SerializeToString()
         )
 
@@ -121,7 +123,7 @@ class TestStorage:
         msg = BrainResource(resource=ResourceID(uuid="uuid"))
         await storage.reindexing(msg, "reindex_id", "1", "kb", "shard")
 
-        storage.upload_object.assert_called_once_with(
+        storage.upload_object.assert_called_once_with(  # type: ignore[ty:unresolved-attribute]
             "indexing_bucket", "index/kb/shard/uuid/reindex_id", msg.SerializeToString()
         )
 
@@ -149,7 +151,7 @@ class TestStorage:
             resource_uid="resource_uid", txid=1, kb="kb", logical_shard="logical_shard"
         )
 
-        storage.upload_object.assert_called_once()
+        storage.upload_object.assert_called_once()  # type: ignore[ty:unresolved-attribute]
 
     async def test_download_pb(self, storage: StorageTest):
         assert isinstance(

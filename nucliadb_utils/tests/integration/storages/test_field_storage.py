@@ -121,5 +121,5 @@ async def storage_field_test(storage: Storage):
 
     sfield: StorageField = storage.file_field(kbid, rid, field=field_id)
     metadata = await sfield.exists()
-    assert metadata.filename == filename
+    assert metadata.filename == filename  # type: ignore[ty:unresolved-attribute]
     await check_downloaded_data(sfield, binary_data)

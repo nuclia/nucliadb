@@ -101,8 +101,8 @@ def get_connection_string(host, port) -> str:
 @pytest.fixture(scope="session")
 def azurite() -> Generator[AzuriteFixture, None, None]:
     container = Azurite()
-    assert container.container_obj
     host, port = container.run()
+    assert container.container_obj
     try:
         yield AzuriteFixture(
             host=host,

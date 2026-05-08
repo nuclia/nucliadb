@@ -55,7 +55,7 @@ def stream_audit_finish_condition(audit_storage: StreamAuditStorage, count_publi
     return (
         audit_storage.queue.qsize() == 0
         and audit_storage.kb_usage_utility.queue.qsize() == 0
-        and audit_storage.js.publish.call_count == count_publish
+        and audit_storage.js.publish.call_count == count_publish  # type: ignore[ty:unresolved-attribute]
     )
 
 
