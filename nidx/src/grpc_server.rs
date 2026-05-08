@@ -18,8 +18,10 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use axum::serve::ListenerExt;
 use tokio::net::{TcpListener, ToSocketAddrs};
 use tokio_util::sync::CancellationToken;
+use tracing::warn;
 
 #[cfg(feature = "telemetry")]
 use crate::telemetry;
@@ -40,7 +42,13 @@ impl GrpcServer {
         #[cfg(feature = "telemetry")]
         let router = router.layer(telemetry::middleware::GrpcInstrumentorLayer);
 
-        axum::serve(self.0, router.into_make_service())
+        let listener = self.0.tap_io(|tcp_stream| {
+            if let Err(err) = tcp_stream.set_nodelay(true) {
+                warn!("unable to set TCP_NODELAY on connection: {err:?}");
+            }
+        });
+
+        axum::serve(listener, router.into_make_service())
             .with_graceful_shutdown(async move { shutdown.cancelled().await })
             .await?;
         Ok(())
