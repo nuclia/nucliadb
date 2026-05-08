@@ -119,14 +119,14 @@ class OAuth2AuthenticationBackend(NucliaCloudAuthenticationBackend):
         token = request.headers[_AUTHORIZATION_HEADER].split(" ")[-1]
         token_split = token.split(".")
         if len(token_split) != 3:
-            logger.info(f"Invalid token, expected valid jwt bearer: {token}")
+            logger.info("Invalid token, expected valid JWT bearer")
             # invalid token
             return None
 
         try:
             token_data = orjson.loads(base64.b64decode(token_split[1] + "==="))
         except Exception:
-            logger.warning(f"Could not parse jwt bearer token value: {token}", exc_info=True)
+            logger.warning("Could not parse JWT bearer token", exc_info=True)
             return None
 
         if "sub" not in token_data:
