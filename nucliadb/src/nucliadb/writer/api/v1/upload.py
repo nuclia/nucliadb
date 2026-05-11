@@ -77,14 +77,12 @@ from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, FieldID, FieldType, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
-from nucliadb_utils import const
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 from nucliadb_utils.utilities import (
     get_partitioning,
     get_storage,
-    has_feature,
 )
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX, RSLUG_PREFIX, api
@@ -857,73 +855,26 @@ async def validate_field_upload(
     field: str | None = None,
     md5: str | None = None,
 ):
-    if has_feature(const.Features.FILE_MD5_READS, context={"kbid": kbid}):
-        return await validate_field_upload_v2(kbid, rid, field, md5)
-    else:
-        return await validate_field_upload_legacy(kbid, rid, field, md5)
-
-
-async def validate_field_upload_legacy(
-    kbid: str,
-    rid: str | None = None,
-    field: str | None = None,
-    md5: str | None = None,
-):
-    """Validate field upload and return blob storage path, rid and field id.
-
-    This function assumes KB exists
     """
+    Validate if the upload is correct regarding the resource and field existence and the file md5 uniqueness if provided.
+    This function assumes that the knowledgebox already exists.
 
-    if rid is None:
-        # we are going to create a new resource and a field
-        if md5 is not None:
-            exists = await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=md5)
-            if exists:
-                raise HTTPConflict("A resource with the same uploaded file already exists")
-            rid = md5
-        else:
-            rid = uuid.uuid4().hex
-    else:
-        # we're adding a field to a resource
-        exists = await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
-        if not exists:
-            raise HTTPNotFound("Resource is not found or not yet available")
-
-    if field is None:
-        if md5 is None:
-            field = uuid.uuid4().hex
-        else:
-            field = md5
-
-    path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)
-    return path, rid, field
-
-
-async def validate_field_upload_v2(
-    kbid: str,
-    rid: str | None = None,
-    field: str | None = None,
-    md5: str | None = None,
-):
-    """Validate field upload and return blob storage path, rid and field id.
-
-    This function assumes KB exists
+    Return the path where the file should be stored, the resource id and the field id.
     """
-
     if rid is None:
-        # we are going to create a new resource and a field
-        if md5 is not None:
-            exists = await file_md5.exists(kbid=kbid, md5=md5)
-            if exists:
-                raise HTTPConflict("File already exists in the Knowledge Box")
+        # Check for file duplicates if the md5 was provided.
+        if md5 is not None and await file_md5.exists(kbid=kbid, md5=md5):
+            raise HTTPConflict("File already exists in the Knowledge Box")
+
+        # We are creating a new resource. Assign a new resource id
         rid = uuid.uuid4().hex
     else:
-        # we're adding a field to a resource
-        exists = await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
-        if not exists:
+        # Adding a field to an existing resource, the resource must exist.
+        if not await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid):
             raise HTTPNotFound("Resource is not found or not yet available")
 
     if field is None:
+        # We are creating a new field. Assign a new field id
         field = uuid.uuid4().hex
 
     path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)

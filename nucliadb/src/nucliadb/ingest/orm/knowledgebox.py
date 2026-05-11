@@ -439,8 +439,7 @@ class KnowledgeBox:
 
             await catalog_delete_kb(txn, kbid)
 
-            if has_feature(const.Features.FILE_MD5_WRITES, context={"kbid": kbid}, default=True):
-                await file_md5.delete(txn, kbid=kbid)
+            await file_md5.delete(txn, kbid=kbid)
 
             # Delete KB Shards
             shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)

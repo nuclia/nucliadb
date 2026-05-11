@@ -43,8 +43,6 @@ class Features:
     IGNORE_EXTRACTED_IN_SEARCH = "nucliadb_ignore_extracted_in_search"
     SEMANTIC_GRAPH = "nucliadb_semantic_graph"
     AUDIT_RETRIEVE_AND_AUGMENT = "nucliadb_audit_retrieve_and_augment"
-    FILE_MD5_WRITES = "nucliadb_file_md5_writes"
-    FILE_MD5_READS = "nucliadb_file_md5_reads"
     # Flipt features
     NIDX_AS_EXTRACTED_TEXT_STORAGE = "nidx-as-extracted-text-storage"
     KEY_VALUE_FIELDS = "nucliadb_key_value_fields"
