@@ -73,7 +73,7 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
     driver = get_driver()
     rollback_learning_config = None
 
-    kbid = KnowledgeBox.new_unique_kbid()
+    kbid = item.uuid or KnowledgeBox.new_unique_kbid()
 
     # Onprem KB creation doesn't have an existing learning configuration yet, so
     # we need to call learning proxy to create it

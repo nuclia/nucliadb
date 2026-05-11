@@ -52,7 +52,43 @@ async def test_knowledgebox_lifecycle(nucliadb_writer_manager: AsyncClient):
 
 
 @pytest.mark.deploy_modes("component")
-async def test_create_knowledgebox_with_learning_config(nucliadb_writer_manager: AsyncClient):
+async def test_create_knowledgebox_with_custom_uuid(nucliadb_writer_manager: AsyncClient):
+    custom_uuid = "00000000-0000-0000-0000-000000000001"
+    resp = await nucliadb_writer_manager.post(
+        f"/{KBS_PREFIX}",
+        json={
+            "slug": "kb-custom-uuid",
+            "uuid": custom_uuid,
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["uuid"] == custom_uuid
+
+
+@pytest.mark.deploy_modes("component")
+async def test_create_knowledgebox_custom_uuid_skips_uuid_generation(
+    nucliadb_writer_manager: AsyncClient,
+):
+    custom_uuid = "00000000-0000-0000-0000-000000000002"
+    with (
+        patch("nucliadb.writer.api.v1.knowledgebox.KnowledgeBox", new=AsyncMock()) as kb,
+        patch("nucliadb.writer.api.v1.knowledgebox.learning_proxy", new=AsyncMock()) as learning_proxy,
+    ):
+        kb.create.return_value = (custom_uuid, "slug")
+        learning_proxy.set_configuration.return_value = None
+
+        resp = await nucliadb_writer_manager.post(
+            f"/{KBS_PREFIX}",
+            json={
+                "slug": "slug",
+                "uuid": custom_uuid,
+            },
+        )
+        assert resp.status_code == 201
+        assert kb.new_unique_kbid.call_count == 0
+        assert kb.create.call_args.kwargs["kbid"] == custom_uuid
+
     with (
         patch("nucliadb.writer.api.v1.knowledgebox.KnowledgeBox", new=AsyncMock()) as kb,
         patch("nucliadb.writer.api.v1.knowledgebox.learning_proxy", new=AsyncMock()) as learning_proxy,

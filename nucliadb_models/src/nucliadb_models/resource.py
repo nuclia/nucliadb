@@ -78,6 +78,11 @@ class ExtractedDataTypeName(str, Enum):
 
 
 class KnowledgeBoxConfig(BaseModel):
+    uuid: str | None = Field(
+        default=None,
+        title="UUID",
+        description="UUID for the Knowledge Box. If not provided, a new UUID will be generated.",
+    )
     slug: SlugString | None = Field(
         default=None, title="Slug", description="Slug for the Knowledge Box."
     )
