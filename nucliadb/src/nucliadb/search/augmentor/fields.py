@@ -333,7 +333,7 @@ async def db_augment_conversation_field(
                 augmented_message.attachments = []
                 for ref in message.content.attachments_fields:
                     field_id = FieldId.from_pb(
-                        field.uuid, ref.field_type, ref.field_id, ref.split or None
+                        field.rid, ref.field_type, ref.field_id, ref.split or None
                     )
                     augmented_message.attachments.append(field_id)
 
@@ -391,7 +391,8 @@ async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
     # we store all splits unordered inside nidx_text, so nidx can't support yet
     # conversation fields
     if field.type != Conversation.type and has_feature(
-        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}
+        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE,
+        context={"kbid": field.kbid, "component": "search"},
     ):
         nidx_extracted_texts = nidx_et_cache.get()
         if nidx_extracted_texts is not None:
@@ -471,7 +472,7 @@ async def get_file_thumbnail_path(field: File, field_id: FieldId) -> str | None:
     # return a path that can be used with the download API to get the
     # actual image
     _expected_prefix = STORAGE_FILE_EXTRACTED.format(
-        kbid=field.kbid, uuid=field.uuid, field_type=field_id.type, field=field_id.key, key=""
+        kbid=field.kbid, uuid=field.rid, field_type=field_id.type, field=field_id.key, key=""
     )
     assert thumbnail.key.startswith(_expected_prefix), (
         "we use a hardcoded path for file thumbnails and we assume is this"

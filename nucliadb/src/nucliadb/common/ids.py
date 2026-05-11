@@ -34,6 +34,7 @@ FIELD_TYPE_STR_TO_PB: dict[str, FieldType.ValueType] = {
     "u": FieldType.LINK,
     "a": FieldType.GENERIC,
     "c": FieldType.CONVERSATION,
+    "k": FieldType.KEY_VALUE,
 }
 
 FIELD_TYPE_PB_TO_STR = {v: k for k, v in FIELD_TYPE_STR_TO_PB.items()}
@@ -44,6 +45,7 @@ FIELD_TYPE_NAME_TO_STR = {
     FieldTypeName.LINK: "u",
     FieldTypeName.GENERIC: "a",
     FieldTypeName.CONVERSATION: "c",
+    FieldTypeName.KEY_VALUE: "k",
 }
 
 FIELD_TYPE_STR_TO_NAME = {v: k for k, v in FIELD_TYPE_NAME_TO_STR.items()}
@@ -154,7 +156,7 @@ class FieldId:
         return f"FieldId({self.full()})"
 
     def __hash__(self) -> int:
-        return hash(self.full())
+        return hash((self.rid, self.type, self.key, self.subfield_id))
 
     @staticmethod
     def _parse_field_type(_type: str) -> str:
@@ -215,7 +217,16 @@ class ParagraphId:
         return f"ParagraphId({self.full()})"
 
     def __hash__(self) -> int:
-        return hash(self.full())
+        return hash(
+            (
+                self.field_id.rid,
+                self.field_id.type,
+                self.field_id.key,
+                self.field_id.subfield_id,
+                self.paragraph_start,
+                self.paragraph_end,
+            )
+        )
 
 
 @dataclass
@@ -265,7 +276,17 @@ class VectorId:
         return f"VectorId({self.full()})"
 
     def __hash__(self) -> int:
-        return hash(self.full())
+        return hash(
+            (
+                self.field_id.rid,
+                self.field_id.type,
+                self.field_id.key,
+                self.field_id.subfield_id,
+                self.index,
+                self.vector_start,
+                self.vector_end,
+            )
+        )
 
 
 def extract_data_augmentation_id(generated_field_id: str) -> str | None:

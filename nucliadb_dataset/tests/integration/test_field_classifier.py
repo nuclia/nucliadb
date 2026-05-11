@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pyarrow as pa  # type: ignore
+import pyarrow as pa  # type: ignore[import-untyped]
 
 from integration.utils import export_dataset
 from nucliadb_dataset.dataset import download_all_partitions
@@ -20,7 +20,6 @@ from nucliadb_models.common import UserClassification
 from nucliadb_models.metadata import UserMetadata
 from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.text import TextField
-from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_sdk.v2.sdk import NucliaDB
@@ -53,7 +52,7 @@ def test_datascientist(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
-            texts={FieldIdString("text"): TextField(body="I'm Ramon")},
+            texts={"text": TextField(body="I'm Ramon")},
             usermetadata=UserMetadata(
                 classifications=[
                     UserClassification(labelset="labelset", label="positive"),
@@ -65,7 +64,7 @@ def test_datascientist(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
-            texts={FieldIdString("text"): TextField(body="I'm not Ramon")},
+            texts={"text": TextField(body="I'm not Ramon")},
             usermetadata=UserMetadata(
                 classifications=[
                     UserClassification(labelset="labelset", label="negative"),
@@ -77,7 +76,7 @@ def test_datascientist(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
-            texts={FieldIdString("text"): TextField(body="I'm Aleix")},
+            texts={"text": TextField(body="I'm Aleix")},
             usermetadata=UserMetadata(
                 classifications=[
                     UserClassification(labelset="labelset", label="smart"),

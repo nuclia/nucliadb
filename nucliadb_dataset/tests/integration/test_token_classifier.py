@@ -13,12 +13,11 @@
 # limitations under the License.
 
 
-import pyarrow as pa  # type: ignore
+import pyarrow as pa  # type: ignore[import-untyped]
 
 from nucliadb_dataset.dataset import download_all_partitions
 from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_models.text import TextField
-from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_sdk.v2.sdk import NucliaDB
 
@@ -27,20 +26,20 @@ def test_datascientist_tokens(sdk: NucliaDB, temp_folder, kb: KnowledgeBoxObj):
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
-            texts={FieldIdString("text"): TextField(body="I'm Ramon")},
+            texts={"text": TextField(body="I'm Ramon")},
         ),
     )
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
-            texts={FieldIdString("text"): TextField(body="I'm not Ramon")},
+            texts={"text": TextField(body="I'm not Ramon")},
         ),
     )
 
     sdk.create_resource(
         kbid=kb.uuid,
         content=CreateResourcePayload(
-            texts={FieldIdString("text"): TextField(body="I'm Aleix")},
+            texts={"text": TextField(body="I'm Aleix")},
         ),
     )
 

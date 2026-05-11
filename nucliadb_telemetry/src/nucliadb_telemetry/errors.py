@@ -36,8 +36,9 @@ try:
 except ImportError:  # pragma: no cover
     Scope = sentry_sdk = None  # type: ignore
 
-    class LoggingIntegration:  # type: ignore
-        pass
+    class LoggingIntegration:  # type: ignore[no-redef]
+        def __init__(self, level):
+            pass
 
     EventHandler = BreadcrumbHandler = LoggingIntegration  # type: ignore
     SENTRY = False
@@ -120,7 +121,7 @@ class SentryHandler(EventHandler):
             super().emit(record)
 
 
-class SentryLoggingIntegration(LoggingIntegration):
+class SentryLoggingIntegration(LoggingIntegration):  # ty: ignore[unsupported-base]
     def __init__(self, allowed_loggers: list[str], level=logging.INFO, event_level=logging.ERROR):
         self._breadcrumb_handler = BreadcrumbHandler(level=level)
         self._handler = SentryHandler(allowed_loggers, level=event_level)

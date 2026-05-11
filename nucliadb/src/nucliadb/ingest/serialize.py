@@ -19,6 +19,8 @@
 #
 
 
+import json
+
 import nucliadb_models as models
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Transaction
@@ -52,6 +54,7 @@ from nucliadb_models.resource import (
     FileFieldData,
     FileFieldExtractedData,
     GenericFieldData,
+    KeyValueFieldData,
     LinkFieldData,
     LinkFieldExtractedData,
     QueueType,
@@ -299,6 +302,18 @@ async def serialize_resource(
                     resource.data.generics[field.id].extracted = TextFieldExtractedData(
                         text=models.ExtractedText(text=resource.data.generics[field.id].value)
                     )
+            elif field_type_name is FieldTypeName.KEY_VALUE:
+                if resource.data.key_values is None:
+                    resource.data.key_values = {}
+                if field.id not in resource.data.key_values:
+                    resource.data.key_values[field.id] = KeyValueFieldData()
+                if include_value and value is not None:
+                    # data is a single JSON string containing the entire KV payload
+                    resource.data.key_values[field.id].value = (
+                        json.loads(value.data) if value.data else {}
+                    )
+                if include_errors:
+                    await serialize_field_errors(field, resource.data.key_values[field.id])
     return resource
 
 
@@ -336,7 +351,12 @@ async def serialize_security(resource: ORMResource) -> ResourceSecurity:
 async def serialize_field_errors(
     field: Field,
     serialized: (
-        TextFieldData | FileFieldData | LinkFieldData | ConversationFieldData | GenericFieldData
+        TextFieldData
+        | FileFieldData
+        | LinkFieldData
+        | ConversationFieldData
+        | GenericFieldData
+        | KeyValueFieldData
     ),
 ):
     status = await field.get_status()

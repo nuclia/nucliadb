@@ -348,7 +348,7 @@ class Processor:
                 await self.apply_resource(message, resource, update=(not created))
 
                 # index message
-                if resource and resource.modified:
+                if resource.modified:
                     index_message = await self.generate_index_message(resource, message, created)
                     try:
                         warnings = await self.index_resource(
@@ -394,7 +394,8 @@ class Processor:
                             else writer_pb2.Notification.WriteType.MODIFIED
                         ),
                     )
-                elif resource and resource.modified is False:
+                else:
+                    logger.info("This message did not modify the resource")
                     await txn.abort()
                     await self.notify_abort(
                         partition=partition,
@@ -403,7 +404,6 @@ class Processor:
                         rid=uuid,
                         source=message.source,
                     )
-                    logger.info("This message did not modify the resource")
             except (
                 asyncio.TimeoutError,
                 asyncio.CancelledError,
@@ -754,26 +754,3 @@ def has_vectors_operation(index_message: PBBrainResource) -> bool:
                 if len(vectorset_sentences.sentences) > 0:
                     return True
     return False
-
-
-def needs_reindex(bm: writer_pb2.BrokerMessage) -> bool:
-    return bm.reindex or is_vectorset_migration_bm(bm)
-
-
-def is_vectorset_migration_bm(bm: writer_pb2.BrokerMessage) -> bool:
-    """
-    This is a temporary solution to avoid duplicating paragraphs and text fields during vector migrations.
-    We need to reindex all the fields of a resource to avoid this issue.
-    TODO: Remove this when the index message generation logic has been decoupled into its own method.
-
-    Broker messages from semantic model migration task only contain the `field_vectors` field set.
-    """
-    return (
-        len(bm.field_vectors) > 0
-        and not bm.HasField("basic")
-        and len(bm.delete_fields) == 0
-        and len(bm.files) == 0
-        and len(bm.texts) == 0
-        and len(bm.conversations) == 0
-        and len(bm.links) == 0
-    )

@@ -72,7 +72,7 @@ class Observer:
             f"{name}_duration_seconds",
             f"Histogram for {name} duration.",
             labelnames=tuple(self.labels.keys()),
-            **hist_kwargs,  # type: ignore
+            **hist_kwargs,  # type: ignore[arg-type]
         )
 
     def wrap(self, labels: dict[str, str] | None = None) -> Callable[[F], F]:
@@ -126,17 +126,19 @@ class ObserverRecorder:
     def set_status(self, status: str):
         self.labels[_STATUS_METRIC] = status
 
+    _start: float
+
     def start(self):
-        self.start = time.monotonic()
+        self._start = time.monotonic()
 
     def end(self):
         finished = time.monotonic()
         status = self.labels.pop(_STATUS_METRIC, OK)
 
         if len(self.labels) > 0:
-            self.observer.histogram.labels(**self.labels).observe(finished - self.start)
+            self.observer.histogram.labels(**self.labels).observe(finished - self._start)
         else:
-            self.observer.histogram.observe(finished - self.start)
+            self.observer.histogram.observe(finished - self._start)
 
         self.observer.counter.labels(status=status, **self.labels).inc()
 
@@ -241,7 +243,7 @@ class Histogram:
             name,
             f"Counter for {name}.",
             labelnames=tuple(self.labels.keys()),
-            **kwargs,  # type: ignore
+            **kwargs,  # type: ignore[arg-type]
         )
 
     def observe(self, value: float, labels: dict[str, str] | None = None):
@@ -284,7 +286,7 @@ class GarbageCollectorObserver:
     def callback(
         self,
         phase: Literal["start"] | Literal["stop"],
-        info: dict[Literal["generation"] | Literal["collected"] | Literal["uncollectable"], int],
+        info: dict[str, int],
     ):
         if phase == "start":
             self.collection_start = time.monotonic()

@@ -18,7 +18,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from grpc import HandlerCallDetails, RpcMethodHandler
-from grpc.experimental import (  # type: ignore
+from grpc.experimental import (  # type: ignore[attr-defined]
     aio,
     wrap_server_method_handler,
 )

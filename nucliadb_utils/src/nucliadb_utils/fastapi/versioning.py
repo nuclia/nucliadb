@@ -33,7 +33,7 @@ CallableT = TypeVar("CallableT", bound=Callable[..., Any])
 
 def version(major: int, minor: int = 0) -> Callable[[CallableT], CallableT]:  # pragma: no cover
     def decorator(func: CallableT) -> CallableT:
-        func._api_version = (major, minor)  # type: ignore
+        func._api_version = (major, minor)  # type: ignore[attr-defined]
         return func
 
     return decorator

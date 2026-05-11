@@ -21,7 +21,7 @@
 use std::sync::Arc;
 
 use nidx_paragraph::{ParagraphSearcher, ParagraphSuggestRequest};
-use nidx_protos::{FilterOperator, RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
+use nidx_protos::{RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
 use nidx_relation::RelationSearcher;
 use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
@@ -29,7 +29,10 @@ use tracing::{Span, instrument};
 
 use crate::errors::{NidxError, NidxResult};
 
-use super::{index_cache::IndexCache, query_planner::filter_to_boolean_expression};
+use super::{
+    index_cache::IndexCache,
+    query_planner::{filter_to_boolean_expression, proto_filter_operator},
+};
 
 /// Max number of words accepted as a suggest query. This is useful for
 /// compounds with semantic meaning (like a name and a surname) but can add
@@ -109,7 +112,7 @@ fn blocking_suggest(
                 .clone()
                 .map(filter_to_boolean_expression)
                 .transpose()?,
-            filter_or: request.filter_operator == FilterOperator::Or as i32,
+            filter_operator: proto_filter_operator(request.filter_operator)?,
         })
     } else {
         None

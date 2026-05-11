@@ -37,7 +37,7 @@ from nucliadb_telemetry.settings import (
 from . import context
 
 try:
-    from uvicorn.logging import AccessFormatter  # type: ignore
+    from uvicorn.logging import AccessFormatter
 except ImportError:  # pragma: no cover
     AccessFormatter = logging.Formatter  # type: ignore
 
@@ -144,13 +144,14 @@ class ExtraFormatter(logging.Formatter):
 class UvicornAccessFormatter(JSONFormatter):
     def format(self, record: logging.LogRecord) -> str:
         recordcopy = copy(record)
+        assert recordcopy.args is not None
         (
             client_addr,
             method,
             full_path,
             http_version,
             status_code,
-        ) = recordcopy.args  # type: ignore[misc]
+        ) = recordcopy.args
         request_line = f"{method} {full_path} HTTP/{http_version}"
         recordcopy.__dict__.update(
             {

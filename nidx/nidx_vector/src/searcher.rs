@@ -31,7 +31,7 @@ use crate::{formula::*, query_io};
 use anyhow::anyhow;
 use nidx_protos::prost::*;
 use nidx_protos::{DocumentScored, DocumentVectorIdentifier, SentenceMetadata, VectorSearchResponse};
-use nidx_types::prefilter::PrefilterResult;
+use nidx_types::prefilter::{FilterOperator, PrefilterResult};
 use nidx_types::query_language::*;
 use rayon::prelude::*;
 use std::cmp::Ordering;
@@ -303,9 +303,15 @@ impl Searcher {
         let mut formula = Formula::new();
 
         if let PrefilterResult::Some(valid_fields) = prefilter {
+            // Field-granular entries: "{uuid_simple}{field_id}" — prefix-matched by KeyPrefixSet.
+            // Resource-granular entries (field_id = None): "{uuid_simple}" — prefix matches all
+            // fields on that resource since keys are stored as "{uuid_simple}{field_id}".
             let field_ids = valid_fields
                 .iter()
-                .map(|f| format!("{}{}", f.resource_id.simple(), f.field_id))
+                .map(|f| match &f.field_id {
+                    Some(fid) => format!("{}{}", f.resource_id.simple(), fid),
+                    None => f.resource_id.simple().to_string(),
+                })
                 .collect();
             let clause_labels = AtomClause::key_set(field_ids);
             formula.extend(clause_labels);
@@ -316,8 +322,9 @@ impl Searcher {
             formula.extend(clause);
         }
 
-        if request.filter_or {
-            formula.operator = BooleanOperator::Or;
+        match request.filter_operator {
+            FilterOperator::Or => formula.operator = BooleanOperator::Or,
+            FilterOperator::And => {}
         }
 
         let v = time.elapsed().as_millis();
@@ -490,14 +497,14 @@ mod tests {
         };
         let mut field_filter = FieldId {
             resource_id: uuid::Uuid::parse_str("6c5fc1f7a69042d4b24b7f18ea354b4a").unwrap(),
-            field_id: "/f/field1".to_string(),
+            field_id: Some("/f/field1".to_string()),
         };
         let result = searcher
             .search(&request, &PrefilterResult::Some(vec![field_filter.clone()]))
             .unwrap();
         assert_eq!(result.documents.len(), 4);
 
-        field_filter.field_id = "/f/field2".to_string();
+        field_filter.field_id = Some("/f/field2".to_string());
         let result = searcher
             .search(&request, &PrefilterResult::Some(vec![field_filter]))
             .unwrap();

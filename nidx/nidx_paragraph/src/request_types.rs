@@ -18,6 +18,7 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 
+use nidx_types::prefilter::FilterOperator;
 use nidx_types::query_language::BooleanExpression;
 use tantivy::schema::Facet;
 
@@ -36,14 +37,14 @@ pub struct ParagraphSearchRequest {
 
     pub filtering_formula: Option<BooleanExpression<String>>,
     /// Whether to do an OR/AND between prefilter results and filtering_formula
-    pub filter_or: bool,
+    pub filter_operator: FilterOperator,
 }
 
 pub struct ParagraphSuggestRequest {
     pub body: String,
     pub filtering_formula: Option<BooleanExpression<String>>,
     /// Whether to do an OR/AND between prefilter results and filtering_formula
-    pub filter_or: bool,
+    pub filter_operator: FilterOperator,
 }
 
 impl ParagraphSearchRequest {

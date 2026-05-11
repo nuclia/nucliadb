@@ -10,6 +10,7 @@ format:
 lint:
 	ruff check --config=../ruff.toml .
 	ruff format --check --config=../ruff.toml .
+	ty check .
 	mypy --config-file=../mypy.ini src
 
 .PHONY: test

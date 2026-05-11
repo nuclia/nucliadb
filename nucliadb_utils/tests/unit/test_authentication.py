@@ -47,7 +47,9 @@ class TestNucliaCloudAuthenticationBackend:
             backend.user_header: "user",
         }
 
-        creds, user = await backend.authenticate(req)
+        auth_result = await backend.authenticate(req)
+        assert auth_result
+        creds, user = auth_result
 
         assert creds.scopes == ["admin"]
         assert user.username == "user"
@@ -57,7 +59,9 @@ class TestNucliaCloudAuthenticationBackend:
     ):
         req.headers = {backend.roles_header: "admin"}
 
-        creds, user = await backend.authenticate(req)
+        auth_result = await backend.authenticate(req)
+        assert auth_result
+        creds, user = auth_result
 
         assert creds.scopes == ["admin"]
         assert user.username == "anonymous"
@@ -139,4 +143,4 @@ class TestRequires:
         with patch.object(req, "close", return_value=None):
             assert await authentication.requires(["notallowed"])(noop)(req) is None
 
-            req.close.assert_called_once()
+            req.close.assert_called_once()  # type: ignore[ty:unresolved-attribute]

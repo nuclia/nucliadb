@@ -61,6 +61,7 @@ from nucliadb_models.search import (
 from nucliadb_protos.resources_pb2 import FieldMetadata
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_telemetry import errors, metrics
+from nucliadb_telemetry.aiohttp import InstrumentedClientSession
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -211,7 +212,7 @@ class PredictEngine:
         self.local_predict_headers = local_predict_headers
 
     async def initialize(self):
-        self.session = aiohttp.ClientSession()
+        self.session = InstrumentedClientSession("predict")
 
     async def finalize(self):
         await self.session.close()

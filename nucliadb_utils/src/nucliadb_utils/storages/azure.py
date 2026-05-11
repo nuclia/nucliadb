@@ -127,6 +127,7 @@ class AzureStorageField(StorageField):
         )
 
     async def finish(self):
+        assert self.field
         self.field.uri = self.key
         self.field.ClearField("resumable_uri")
         self.field.ClearField("offset")
@@ -258,7 +259,8 @@ class AzureObjectStore(ObjectStore):
             self._service_client = BlobServiceClient.from_connection_string(self.connection_string)
         else:
             self._service_client = BlobServiceClient(
-                self.account_url, credential=DefaultAzureCredential()
+                self.account_url,
+                credential=DefaultAzureCredential(),  # type: ignore[ty:invalid-argument-type]
             )
 
     async def finalize(self):
@@ -397,8 +399,8 @@ class AzureObjectStore(ObjectStore):
             length = range.end - offset + 1 if range.end is not None else None
         try:
             downloader = await blob_client.download_blob(
-                offset=offset,  # type: ignore
-                length=length,  # type: ignore
+                offset=offset,  # type: ignore[arg-type]
+                length=length,  # type: ignore[arg-type]
             )
         except ResourceNotFoundError:
             raise KeyError(f"Not found: {bucket}/{key}")

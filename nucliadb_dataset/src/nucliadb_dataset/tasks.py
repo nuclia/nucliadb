@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-import pyarrow as pa  # type: ignore
+import pyarrow as pa  # type: ignore[import-untyped]
 
 from nucliadb_dataset.mapping import (
     batch_to_field_streaming_arrow,

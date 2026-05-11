@@ -261,7 +261,8 @@ async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | N
     # we store all splits unordered inside nidx_text, so nidx can't support yet
     # conversation fields
     if field.type != Conversation.type and has_feature(
-        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}
+        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE,
+        context={"kbid": field.kbid, "component": "search"},
     ):
         nidx_extracted_texts = nidx_et_cache.get()
         if nidx_extracted_texts is not None:
@@ -319,7 +320,7 @@ async def get_paragraph_text_from_storage(field: Field, paragraph_id: ParagraphI
             "Dirty read: extracted text for field does not exist on DB. This should be temporal.",
             extra={
                 "kbid": field.kbid,
-                "field_id": field.resource_unique_id,
+                "field_id": field.field_id.full(),
             },
         )
         return None

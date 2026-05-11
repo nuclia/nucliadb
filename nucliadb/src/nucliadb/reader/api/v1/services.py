@@ -42,6 +42,7 @@ from nucliadb_models.entities import (
     EntitiesGroup,
     KnowledgeBoxEntities,
 )
+from nucliadb_models.kv_schemas import KBKVSchemas, KVSchema
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
@@ -358,3 +359,43 @@ async def list_search_configurations(request: Request, kbid: str) -> dict[str, S
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         return await datamanagers.search_configurations.list(txn, kbid=kbid)
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/kv-schemas",
+    status_code=200,
+    summary="List KV schemas",
+    tags=["Knowledge Box Services"],
+    response_model=KBKVSchemas,
+    include_in_schema=False,
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def list_kv_schemas(request: Request, kbid: str) -> KBKVSchemas:
+    async with datamanagers.with_ro_transaction() as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+        return await datamanagers.kv_schemas.get_all(txn, kbid=kbid)
+
+
+@api.get(
+    f"/{KB_PREFIX}/{{kbid}}/kv-schemas/{{schema_name}}",
+    status_code=200,
+    summary="Get a KV schema",
+    tags=["Knowledge Box Services"],
+    response_model=KVSchema,
+    include_in_schema=False,
+)
+@requires(NucliaDBRoles.READER)
+@version(1)
+async def get_kv_schema(request: Request, kbid: str, schema_name: str) -> KVSchema:
+    async with datamanagers.with_ro_transaction() as txn:
+        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+
+        schema = await datamanagers.kv_schemas.get(txn, kbid=kbid, name=schema_name)
+        if schema is None:
+            raise HTTPException(status_code=404, detail="KV schema does not exist")
+
+        return schema

@@ -18,7 +18,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
-import pyarrow as pa  # type: ignore
+import pyarrow as pa  # type: ignore[import-untyped]
 
 from nucliadb_dataset.streamer import Streamer
 from nucliadb_dataset.tasks import (

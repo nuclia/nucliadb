@@ -9,7 +9,18 @@ name = "nidx"
 required-features = ["telemetry"]
 
 [workspace]
-members = ["nidx_vector", "nidx_types", "nidx_protos", "nidx_tests", "nidx_text", "nidx_tantivy", "nidx_paragraph", "nidx_relation", "nidx_binding"]
+members = [
+    "nidx_binding",
+    "nidx_json",
+    "nidx_paragraph",
+    "nidx_protos",
+    "nidx_relation",
+    "nidx_tantivy",
+    "nidx_tests",
+    "nidx_text",
+    "nidx_types",
+    "nidx_vector",
+]
 
 [dependencies]
 anyhow = "1.0.89"
@@ -31,10 +42,11 @@ tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json"] }
 nidx_protos = { version = "0.1.0", path = "nidx_protos" }
 tonic = "0.14.2"
-lru = "0.16"
+lru = "0.18"
 nidx_text = { version = "0.1.0", path = "nidx_text" }
 nidx_paragraph = { version = "0.1.0", path = "nidx_paragraph" }
 nidx_relation = { version = "0.1.0", path = "nidx_relation" }
+nidx_json = { version = "0.1.0", path = "nidx_json" }
 config = { version = "0.15.19", default-features = false }
 thiserror = "2.0.17"
 prometheus-client = "0.24.0"
@@ -45,8 +57,8 @@ kube = { version = "3.0.0", features = ["runtime"] }
 k8s-openapi = { version = "0.27.0", features = ["latest"] }
 
 # Telemetry dependencies (can be disabled, e.g: in nidx_binding)
-sentry = { version = "0.46.1", optional = true }
-sentry-tracing = { version = "0.46.1", optional = true }
+sentry = { version = "0.48.0", optional = true }
+sentry-tracing = { version = "0.48.0", optional = true }
 opentelemetry_sdk = { version = "0.31.0", optional = true, features = ["rt-tokio"] }
 opentelemetry-zipkin = { version = "0.31.0", optional = true }
 opentelemetry-otlp = { version = "0.31.0", optional = true, features = ["grpc-tonic"] }
@@ -76,7 +88,7 @@ telemetry = [
 [dev-dependencies]
 itertools = "0.14.0"
 nidx_tests = { path = "nidx_tests" }
-rand = "0.9.2"
+rand = "0.10.1"
 
 [profile.samply]
 inherits = "release"

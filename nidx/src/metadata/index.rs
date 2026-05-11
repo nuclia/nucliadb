@@ -43,6 +43,7 @@ pub enum IndexKind {
     Relation,
     VectorRelationNode,
     VectorRelationEdge,
+    Json,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, sqlx::Type, Serialize, Deserialize)]
@@ -81,6 +82,7 @@ pub enum IndexConfig {
     Relation(RelationConfig),
     VectorRelationNode(VectorConfig),
     VectorRelationEdge(VectorConfig),
+    Json(()),
 }
 
 impl Index {
@@ -299,6 +301,7 @@ impl IndexConfig {
             Self::Relation(_) => IndexKind::Relation,
             Self::VectorRelationNode(_) => IndexKind::VectorRelationNode,
             Self::VectorRelationEdge(_) => IndexKind::VectorRelationEdge,
+            Self::Json(_) => IndexKind::Json,
         }
     }
 }
@@ -315,6 +318,7 @@ impl Serialize for IndexConfig {
             Self::Relation(config) => config.serialize(serializer),
             Self::VectorRelationNode(config) => config.serialize(serializer),
             Self::VectorRelationEdge(config) => config.serialize(serializer),
+            Self::Json(config) => config.serialize(serializer),
         }
     }
 }
@@ -357,6 +361,10 @@ impl IndexConfig {
 
     pub fn new_relation() -> Self {
         Self::Relation(RelationConfig::default())
+    }
+
+    pub fn new_json() -> Self {
+        Self::Json(())
     }
 }
 

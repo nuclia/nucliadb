@@ -23,7 +23,6 @@ import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from nucliadb.common import datamanagers, file_md5
@@ -34,6 +33,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
+from nucliadb.ingest.fields.key_value import KeyValue
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain_v2 import FilePagePositions
@@ -81,10 +81,8 @@ KB_FIELDS: dict[int, type] = {
     FieldType.LINK: Link,
     FieldType.GENERIC: Generic,
     FieldType.CONVERSATION: Conversation,
+    FieldType.KEY_VALUE: KeyValue,
 }
-
-_executor = ThreadPoolExecutor(10)
-
 
 PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.PLAIN: "text/plain",
@@ -442,6 +440,11 @@ class Resource:
             await self.set_field(fid.field_type, fid.field, conversation)
             message_updated_fields.append(fid)
 
+        for field, kv in message.key_value_fields.items():
+            fid = FieldID(field_type=FieldType.KEY_VALUE, field=field)
+            await self.set_field(fid.field_type, fid.field, kv)
+            message_updated_fields.append(fid)
+
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
             if fieldid.field_type == FieldType.FILE:
@@ -622,7 +625,6 @@ class Resource:
 
         for link_extracted_data in message.link_extracted_data:
             await self._apply_link_extracted_data(link_extracted_data)
-            await self.maybe_update_resource_title_from_link(link_extracted_data)
             extracted_languages.append(link_extracted_data.language)
 
         for file_extracted_data in message.file_extracted_data:
@@ -695,6 +697,7 @@ class Resource:
 
         maybe_update_basic_icon(self.basic, "application/stf-link")
 
+        await self.maybe_update_resource_title_from_link(link_extracted_data)
         maybe_update_basic_summary(self.basic, link_extracted_data.description)
         self.modified = True
 
@@ -719,23 +722,28 @@ class Resource:
             extra={"kbid": self.kbid, "field": link_extracted_data.field, "rid": self.uuid},
         )
         title = link_extracted_data.title
+        # FIXME: this doesn't properly index the new title. See sc-6088 for more details
         await self.update_resource_title(title)
         await self.unmark_title_for_reset()
         self.modified = True
 
     async def update_resource_title(self, computed_title: str) -> None:
         assert self.basic is not None
-        self.basic.title = computed_title
+
+        field_id_pb = FieldID(field="title", field_type=FieldType.GENERIC)
+
         # Extracted text
         field = await self.get_field("title", FieldType.GENERIC, load=False)
+        await field.set_value(computed_title)
+
         etw = ExtractedTextWrapper()
+        etw.field.CopyFrom(field_id_pb)
         etw.body.text = computed_title
         await field.set_extracted_text(etw)
 
         # Field computed metadata
         fcmw = FieldComputedMetadataWrapper()
-        fcmw.field.field = "title"
-        fcmw.field.field_type = FieldType.GENERIC
+        fcmw.field.CopyFrom(field_id_pb)
 
         # Merge with any existing field computed metadata
         fcm = await field.get_field_metadata(force=True)
@@ -746,6 +754,7 @@ class Resource:
         fcmw.metadata.metadata.paragraphs.append(paragraph)
 
         await field.set_field_metadata(fcmw)
+        self._modified_extracted_text.append(field_id_pb)
         self.modified = True
 
     async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
@@ -861,7 +870,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,
@@ -899,7 +908,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,
@@ -933,7 +942,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,

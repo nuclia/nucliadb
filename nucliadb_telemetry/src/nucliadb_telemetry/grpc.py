@@ -14,20 +14,20 @@
 #
 
 import functools
-from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from concurrent import futures
 from contextlib import contextmanager
 from typing import Any
 
 import grpc
-from grpc import ChannelCredentials, ClientCallDetails, aio
+from grpc import ChannelCredentials, aio
+from grpc.aio import ClientCallDetails
 from grpc.experimental import wrap_server_method_handler
 from opentelemetry.context import attach, detach
 from opentelemetry.propagate import extract, inject
 from opentelemetry.propagators.textmap import CarrierT, Setter
 from opentelemetry.sdk.trace import Span, TracerProvider
-from opentelemetry.semconv.trace import SpanAttributes
+from opentelemetry.semconv._incubating.attributes import net_attributes, rpc_attributes
 from opentelemetry.trace import SpanKind, Tracer, set_span_in_context
 from opentelemetry.trace.status import Status, StatusCode
 
@@ -40,7 +40,7 @@ class _CarrierSetter(Setter):
     keys as is required by grpc.
     """
 
-    def set(self, carrier: CarrierT, key: str, value: str):  # type: ignore
+    def set(self, carrier: CarrierT, key: str, value: str):
         carrier[key.lower()] = value  # type: ignore
 
 
@@ -53,7 +53,7 @@ def finish_span_grpc(span: Span, result):
     # grpc.StatusCode value is a tuple like:
     #    <StatusCode.OK: (0, 'ok')>
     # so we cannot compare it with the code we get from the result directly
-    if code == grpc.StatusCode.OK.value[0]:  # type: ignore
+    if code == grpc.StatusCode.OK.value[0]:
         span.set_status(
             Status(
                 status_code=StatusCode.OK,
@@ -71,7 +71,7 @@ def finish_span_grpc(span: Span, result):
 
 def start_span_client(
     tracer: Tracer,
-    client_call_details: grpc.ClientCallDetails,
+    client_call_details: grpc.ClientCallDetails | ClientCallDetails,
     set_status_on_exception=False,
 ):
     if isinstance(client_call_details.method, bytes):
@@ -81,11 +81,11 @@ def start_span_client(
         service, meth = client_call_details.method.lstrip("/").split("/", 1)
         method_name = client_call_details.method
 
-    attributes = {
-        SpanAttributes.RPC_SYSTEM: "grpc",
-        SpanAttributes.RPC_GRPC_STATUS_CODE: grpc.StatusCode.OK.value[0],  # type: ignore
-        SpanAttributes.RPC_METHOD: meth,
-        SpanAttributes.RPC_SERVICE: service,
+    attributes: dict[str, str | int] = {
+        rpc_attributes.RPC_SYSTEM: "grpc",
+        rpc_attributes.RPC_GRPC_STATUS_CODE: int(grpc.StatusCode.OK.value[0]),
+        rpc_attributes.RPC_METHOD: meth,
+        rpc_attributes.RPC_SERVICE: service,
     }
 
     span = tracer.start_span(
@@ -99,9 +99,9 @@ def start_span_client(
     span_context = set_span_in_context(span)
 
     if client_call_details.metadata is not None:
-        mutable_metadata = OrderedDict(tuple(client_call_details.metadata))
+        mutable_metadata: dict[str, str | bytes] = {k: v for k, v in client_call_details.metadata}
     else:
-        mutable_metadata = OrderedDict()
+        mutable_metadata = {}
     inject(mutable_metadata, context=span_context, setter=_carrier_setter)
     if client_call_details.metadata is not None:
         for key, value in mutable_metadata.items():
@@ -134,11 +134,11 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
     ):
         service, meth = handler_call_details.method.lstrip("/").split("/", 1)
 
-        attributes = {
-            SpanAttributes.RPC_SYSTEM: "grpc",
-            SpanAttributes.RPC_GRPC_STATUS_CODE: grpc.StatusCode.OK.value[0],  # type: ignore
-            SpanAttributes.RPC_METHOD: meth,
-            SpanAttributes.RPC_SERVICE: service,
+        attributes: dict[str, str | int | bytes] = {
+            rpc_attributes.RPC_SYSTEM: "grpc",
+            rpc_attributes.RPC_GRPC_STATUS_CODE: grpc.StatusCode.OK.value[0],
+            rpc_attributes.RPC_METHOD: meth,
+            rpc_attributes.RPC_SERVICE: service,
         }
 
         # add some attributes from the metadata
@@ -154,11 +154,11 @@ class OpenTelemetryServerInterceptor(aio.ServerInterceptor):
         #
         try:
             ip, port = context.peer().split(",")[0].split(":", 1)[1].rsplit(":", 1)
-            attributes.update({SpanAttributes.NET_PEER_IP: ip, SpanAttributes.NET_PEER_PORT: port})
+            attributes.update({net_attributes.NET_PEER_IP: ip, net_attributes.NET_PEER_PORT: port})
 
             # other telemetry sources add this, so we will too
             if ip in ("[::1]", "127.0.0.1"):
-                attributes[SpanAttributes.NET_PEER_NAME] = "localhost"
+                attributes[net_attributes.NET_PEER_NAME] = "localhost"
 
         except IndexError:
             logger.warning("Failed to parse peer address '%s'", context.peer())
@@ -255,7 +255,7 @@ class UnaryUnaryClientInterceptor(aio.UnaryUnaryClientInterceptor):
     async def intercept_unary_unary(
         self,
         continuation,
-        client_call_details: ClientCallDetails,  # type: ignore
+        client_call_details: ClientCallDetails,
         request,
     ):
         span = start_span_client(self.tracer, client_call_details)
@@ -279,7 +279,7 @@ class UnaryStreamClientInterceptor(aio.UnaryStreamClientInterceptor):
     async def intercept_unary_stream(
         self,
         continuation,
-        client_call_details: ClientCallDetails,  # type: ignore
+        client_call_details: ClientCallDetails,
         request,
     ):
         span = start_span_client(self.tracer, client_call_details)
@@ -305,7 +305,7 @@ class StreamStreamClientInterceptor(aio.StreamStreamClientInterceptor):
     async def intercept_stream_stream(
         self,
         continuation,
-        client_call_details: ClientCallDetails,  # type: ignore
+        client_call_details: ClientCallDetails,
         request_iterator,
     ):
         span = start_span_client(self.tracer, client_call_details)
@@ -330,7 +330,7 @@ class StreamUnaryClientInterceptor(aio.StreamUnaryClientInterceptor):
     async def intercept_stream_unary(
         self,
         continuation,
-        client_call_details: ClientCallDetails,  # type: ignore
+        client_call_details: ClientCallDetails,
         request_iterator,
     ):
         span = start_span_client(self.tracer, client_call_details)

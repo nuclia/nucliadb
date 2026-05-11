@@ -39,6 +39,7 @@ class StorageKeys:
     LABELS = "backups/{backup_id}/labels.pb"
     SYNONYMS = "backups/{backup_id}/synonyms.pb"
     SEARCH_CONFIGURATIONS = "backups/{backup_id}/search_configurations.pb"
+    KV_SCHEMAS = "backups/{backup_id}/kv_schemas.json"
 
 
 class BackupFinishedStream:

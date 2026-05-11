@@ -699,7 +699,7 @@ mod test {
     use std::collections::{BTreeMap, HashSet};
 
     use nidx_protos::{Position, Representation, SentenceMetadata};
-    use rand::{Rng, SeedableRng, rngs::SmallRng};
+    use rand::{Rng, RngExt, SeedableRng, rngs::SmallRng};
     use tempfile::tempdir;
 
     use crate::{

@@ -19,6 +19,7 @@
 #
 
 
+from nidx_protos import nodereader_pb2
 from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
 from typing_extensions import assert_never
 
@@ -37,6 +38,10 @@ from nucliadb_models.filters import (
     Generated,
     Keyword,
     Kind,
+    KVBoolMatch,
+    KVExactMatch,
+    KVFilterExpression,
+    KVRange,
     Label,
     Language,
     Not,
@@ -51,6 +56,7 @@ from nucliadb_models.filters import (
     ResourceMimetype,
     Status,
 )
+from nucliadb_models.kv_schemas import KBKVSchemas
 from nucliadb_models.metadata import ResourceProcessingStatus
 
 # Filters that end up as a facet
@@ -122,6 +128,128 @@ async def parse_expression(
         assert_never(expr)
 
     return f
+
+
+def parse_kv_filter_expression(
+    expr: KVFilterExpression,
+) -> nodereader_pb2.JsonFilterExpression:
+    """Convert a KVFilterExpression tree into a JsonFilterExpression proto."""
+    if isinstance(expr, And):
+        result = nodereader_pb2.JsonFilterExpression()
+        result.bool_and.operands.extend([parse_kv_filter_expression(op) for op in expr.operands])
+        return result
+    elif isinstance(expr, Or):
+        result = nodereader_pb2.JsonFilterExpression()
+        result.bool_or.operands.extend([parse_kv_filter_expression(op) for op in expr.operands])
+        return result
+    elif isinstance(expr, Not):
+        result = nodereader_pb2.JsonFilterExpression()
+        result.bool_not.CopyFrom(parse_kv_filter_expression(expr.operand))
+        return result
+    elif isinstance(expr, KVExactMatch):
+        path = nodereader_pb2.JsonFieldPathFilter(
+            field_id=f"k/{expr.field_id}",
+            json_path=expr.key,
+        )
+        path.text = expr.value
+        return nodereader_pb2.JsonFilterExpression(path=path)
+    elif isinstance(expr, KVRange):
+        path = nodereader_pb2.JsonFieldPathFilter(
+            field_id=f"k/{expr.field_id}",
+            json_path=expr.key,
+        )
+        # Detect int vs float from the bound values
+        is_int = all(
+            v is None or (isinstance(v, int) and not isinstance(v, bool)) for v in [expr.gte, expr.lte]
+        )
+        if is_int:
+            if expr.gte is not None:
+                path.int_range.lower = int(expr.gte)
+            if expr.lte is not None:
+                path.int_range.upper = int(expr.lte)
+        else:
+            if expr.gte is not None:
+                path.float_range.lower = expr.gte
+            if expr.lte is not None:
+                path.float_range.upper = expr.lte
+        return nodereader_pb2.JsonFilterExpression(path=path)
+    elif isinstance(expr, KVBoolMatch):
+        path = nodereader_pb2.JsonFieldPathFilter(
+            field_id=f"k/{expr.field_id}",
+            json_path=expr.key,
+        )
+        path.boolean = expr.value
+        return nodereader_pb2.JsonFilterExpression(path=path)
+    else:
+        assert_never(expr)
+
+
+def _parse_kv_filter_expression(
+    expr: KVFilterExpression,
+    all_schemas: KBKVSchemas,
+    kbid: str,
+) -> nodereader_pb2.JsonFilterExpression:
+    """Recursive helper that validates a KVFilterExpression tree using pre-fetched schemas."""
+    if isinstance(expr, And):
+        result = nodereader_pb2.JsonFilterExpression()
+        result.bool_and.operands.extend(
+            [_parse_kv_filter_expression(op, all_schemas, kbid) for op in expr.operands]
+        )
+        return result
+    elif isinstance(expr, Or):
+        result = nodereader_pb2.JsonFilterExpression()
+        result.bool_or.operands.extend(
+            [_parse_kv_filter_expression(op, all_schemas, kbid) for op in expr.operands]
+        )
+        return result
+    elif isinstance(expr, Not):
+        result = nodereader_pb2.JsonFilterExpression()
+        result.bool_not.CopyFrom(_parse_kv_filter_expression(expr.operand, all_schemas, kbid))
+        return result
+    elif isinstance(expr, (KVExactMatch, KVRange, KVBoolMatch)):
+        schema = all_schemas.schemas.get(expr.field_id)
+        if schema is None:
+            raise InvalidQueryError("key_value", f"Unknown key-value schema: '{expr.field_id}'")
+        field_map = {f.key: f for f in schema.fields}
+        if expr.key not in field_map:
+            raise InvalidQueryError(
+                "key_value",
+                f"Key '{expr.key}' not found in schema '{expr.field_id}'",
+            )
+        schema_field = field_map[expr.key]
+        if isinstance(expr, KVExactMatch) and schema_field.type != "text":
+            raise InvalidQueryError(
+                "key_value",
+                f"Key '{expr.key}' in schema '{expr.field_id}' is of type '{schema_field.type}', "
+                f"but 'exact_match' requires type 'text'",
+            )
+        elif isinstance(expr, KVRange) and schema_field.type not in ("float", "integer"):
+            raise InvalidQueryError(
+                "key_value",
+                f"Key '{expr.key}' in schema '{expr.field_id}' is of type '{schema_field.type}', "
+                f"but 'range' requires type 'float' or 'integer'",
+            )
+        elif isinstance(expr, KVBoolMatch) and schema_field.type != "boolean":
+            raise InvalidQueryError(
+                "key_value",
+                f"Key '{expr.key}' in schema '{expr.field_id}' is of type '{schema_field.type}', "
+                f"but 'bool_match' requires type 'boolean'",
+            )
+        return parse_kv_filter_expression(expr)
+    else:
+        assert_never(expr)
+
+
+async def parse_kv_filter_expression_with_validation(
+    expr: KVFilterExpression,
+    kbid: str,
+) -> nodereader_pb2.JsonFilterExpression:
+    """Convert a KVFilterExpression tree into a JsonFilterExpression proto,
+    validating field_id and key against the KV schema.
+    Fetches all schemas once and passes them through the recursive helper."""
+    async with datamanagers.with_ro_transaction() as txn:
+        all_schemas = await datamanagers.kv_schemas.get_all(txn, kbid=kbid)
+    return _parse_kv_filter_expression(expr, all_schemas, kbid)
 
 
 def facet_from_filter(expr: FacetFilter) -> str:

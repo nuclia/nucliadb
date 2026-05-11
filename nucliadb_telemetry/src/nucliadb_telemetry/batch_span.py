@@ -16,7 +16,7 @@
 import asyncio
 import time
 
-from opentelemetry.context import (  # type: ignore
+from opentelemetry.context import (
     _SUPPRESS_INSTRUMENTATION_KEY,
     Context,
     attach,
@@ -105,7 +105,7 @@ class BatchSpanProcessor(SpanProcessor):
             return
 
         try:
-            self.queue.put_nowait(span)  # type: ignore
+            self.queue.put_nowait(span)  # type: ignore[arg-type]
         except asyncio.QueueFull:
             if not self._spans_dropped:
                 logger.warning(f"Queue is full. Queue size : {self.queue.qsize()}")

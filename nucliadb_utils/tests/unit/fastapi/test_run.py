@@ -20,7 +20,7 @@
 from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
 from fastapi import FastAPI
-from uvicorn.server import Server  # type: ignore
+from uvicorn.server import Server
 
 from nucliadb_utils.fastapi import run
 from nucliadb_utils.settings import running_settings
@@ -40,7 +40,7 @@ async def test_run_server_forever():
 def test_metrics_app():
     server, config = run.metrics_app()
 
-    assert len([r for r in config.app.routes if r.name == "metrics_endpoint"]) == 1
+    assert len([r for r in config.app.routes if r.name == "metrics_endpoint"]) == 1  # type: ignore[ty:unresolved-attribute]
     assert isinstance(server, Server)
 
     assert config.host == running_settings.metrics_host

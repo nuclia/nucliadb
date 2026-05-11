@@ -24,6 +24,7 @@ use std::sync::{Arc, Weak};
 use std::time::Instant;
 
 use lru::LruCache;
+use nidx_json::JsonSearcher;
 use nidx_paragraph::ParagraphSearcher;
 use nidx_relation::RelationSearcher;
 use nidx_text::TextSearcher;
@@ -42,6 +43,7 @@ use crate::metrics::searcher::*;
 use super::sync::{Operations, ShardIndexes, SyncMetadata};
 
 pub enum IndexSearcher {
+    Json(JsonSearcher),
     Paragraph(ParagraphSearcher),
     Relation(RelationSearcher),
     Text(TextSearcher),
@@ -84,9 +86,19 @@ impl<'a> From<&'a IndexSearcher> for &'a RelationSearcher {
     }
 }
 
+impl<'a> From<&'a IndexSearcher> for &'a JsonSearcher {
+    fn from(value: &'a IndexSearcher) -> Self {
+        match value {
+            IndexSearcher::Json(v) => v,
+            _ => unreachable!(),
+        }
+    }
+}
+
 impl MemoryUsage for IndexSearcher {
     fn memory_usage(&self) -> usize {
         match self {
+            IndexSearcher::Json(json_searcher) => json_searcher.space_usage(),
             IndexSearcher::Paragraph(paragraph_searcher) => paragraph_searcher.space_usage(),
             IndexSearcher::Relation(relation_searcher) => relation_searcher.space_usage(),
             IndexSearcher::Text(text_searcher) => text_searcher.space_usage(),
@@ -96,6 +108,7 @@ impl MemoryUsage for IndexSearcher {
 
     fn prewarm_memory_usage(&self) -> usize {
         match self {
+            IndexSearcher::Json(_) => 0,
             IndexSearcher::Paragraph(_) => 0,
             IndexSearcher::Relation(_) => 0,
             IndexSearcher::Text(_) => 0,
@@ -216,6 +229,7 @@ impl IndexCache {
         };
 
         let searcher = match meta.index.kind {
+            IndexKind::Json => IndexSearcher::Json(JsonSearcher::open(open_index)?),
             IndexKind::Text => IndexSearcher::Text(TextSearcher::open(meta.index.config()?, open_index)?),
             IndexKind::Paragraph => IndexSearcher::Paragraph(ParagraphSearcher::open(open_index)?),
             IndexKind::Vector | IndexKind::VectorRelationNode | IndexKind::VectorRelationEdge => {
@@ -399,7 +413,7 @@ mod tests {
         use std::time::Duration;
 
         use anyhow::anyhow;
-        use rand::Rng;
+        use rand::RngExt;
         use tokio::task::JoinSet;
 
         use crate::searcher::index_cache::MemoryUsage;

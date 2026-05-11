@@ -20,7 +20,7 @@ from nucliadb_models import security
 def test_security_groups_alias() -> None:
     assert (
         security.RequestSecurity(groups=["A", "B", "C"])
-        == security.RequestSecurity(access_groups=["A", "B", "C"])  # type: ignore[call-arg]
+        == security.RequestSecurity(access_groups=["A", "B", "C"])  # type: ignore[call-arg,ty:unknown-argument] # We want to explictly use the alias
         == security.RequestSecurity.model_validate({"groups": ["A", "B", "C"]})
         == security.RequestSecurity.model_validate({"access_groups": ["A", "B", "C"]})
     )

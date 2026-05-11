@@ -35,4 +35,5 @@ def test_get_path_template():
     path_template = utils.get_path_template(scope)
     assert path_template.path == "/api/v1/kb/{kbid}"
     assert path_template.match is True
+    assert path_template.scope is not None
     assert path_template.scope["path_params"] == {"kbid": "123"}

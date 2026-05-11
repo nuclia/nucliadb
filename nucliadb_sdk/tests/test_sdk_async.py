@@ -70,7 +70,7 @@ async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.delete_resource_by_slug(kbid=kb.uuid, rslug="resource")
     try:
         await sdk_async.delete_resource(kbid=kb.uuid, rid=resource.id)
-    except nucliadb_sdk.v2.exceptions.NotFoundError:
+    except nucliadb_sdk.exceptions.NotFoundError:
         pass
 
 
@@ -85,7 +85,7 @@ async def test_search_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     await sdk_async.feedback(
         kbid=kb.uuid, ident="bar", good=True, feedback="baz", task=FeedbackTasks.CHAT
     )
-    with pytest.raises(nucliadb_sdk.v2.exceptions.PreconditionFailed) as err:
+    with pytest.raises(nucliadb_sdk.exceptions.PreconditionFailed) as err:
         await sdk_async.summarize(kbid=kb.uuid, resources=["foobar"])
     assert "Could not summarize" in str(err.value)
 

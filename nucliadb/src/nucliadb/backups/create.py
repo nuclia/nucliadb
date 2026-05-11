@@ -37,6 +37,7 @@ from nucliadb.export_import.utils import (
     download_binary,
     get_broker_message,
     get_cloud_files,
+    get_kv_schemas,
     get_labels,
     get_search_configurations,
     get_synonyms,
@@ -77,6 +78,7 @@ async def backup_kb(context: ApplicationContext, kbid: str, backup_id: str):
     await backup_labels(context, kbid, backup_id)
     await backup_synonyms(context, kbid, backup_id)
     await backup_search_configurations(context, kbid, backup_id)
+    await backup_kv_schemas(context, kbid, backup_id)
     await notify_backup_completed(context, kbid, backup_id)
     await delete_metadata(context, kbid, backup_id)
 
@@ -252,6 +254,15 @@ async def backup_search_configurations(context: ApplicationContext, kbid: str, b
         bucket=settings.backups_bucket,
         key=StorageKeys.SEARCH_CONFIGURATIONS.format(backup_id=backup_id),
         data=json.dumps(serialized_search_configs).encode(),
+    )
+
+
+async def backup_kv_schemas(context: ApplicationContext, kbid: str, backup_id: str):
+    schemas = await get_kv_schemas(context, kbid)
+    await context.blob_storage.upload_object(
+        bucket=settings.backups_bucket,
+        key=StorageKeys.KV_SCHEMAS.format(backup_id=backup_id),
+        data=schemas.model_dump_json().encode(),
     )
 
 
