@@ -76,10 +76,10 @@ async def test_create_knowledgebox_custom_uuid_skips_uuid_generation(
         patch("nucliadb.writer.api.v1.knowledgebox.learning_proxy", new=AsyncMock()) as learning_proxy,
     ):
         kb.create.return_value = (custom_uuid, "slug")
-        learning_config = AsyncMock()
-        learning_config.into_semantic_models_metadata.return_value = {}
+        learning_config_mock = AsyncMock()
+        learning_config_mock.into_semantic_models_metadata.return_value = {}
 
-        learning_proxy.set_configuration.return_value = learning_config
+        learning_proxy.set_configuration.return_value = learning_config_mock
 
         resp = await nucliadb_writer_manager.post(
             f"/{KBS_PREFIX}",
