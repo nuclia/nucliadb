@@ -17,6 +17,7 @@ import string
 from datetime import datetime
 from enum import Enum
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -78,6 +79,11 @@ class ExtractedDataTypeName(str, Enum):
 
 
 class KnowledgeBoxConfig(BaseModel):
+    uuid: UUID | None = Field(
+        default=None,
+        title="UUID",
+        description="UUID for the Knowledge Box. If not provided, a new UUID will be generated.",
+    )
     slug: SlugString | None = Field(
         default=None, title="Slug", description="Slug for the Knowledge Box."
     )
