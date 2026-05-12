@@ -74,6 +74,8 @@ async def initialize():
             endpoint_url=storage_settings.s3_endpoint,
             region_name=storage_settings.s3_region_name,
             bucket=storage_settings.s3_bucket,
+            use_path_addressing_style=storage_settings.s3_path_style_addressing,
+            disable_checksums=storage_settings.s3_disable_checksums,
             bucket_tags=storage_settings.s3_bucket_tags,
             kms_key_id=storage_settings.s3_kms_key_id,
         )
