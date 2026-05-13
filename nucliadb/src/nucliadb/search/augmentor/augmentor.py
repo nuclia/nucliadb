@@ -52,8 +52,6 @@ from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import Resource
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 from .extracted_text import extracted_texts, nidx_et_cache
 from .fields import augment_field
@@ -245,14 +243,7 @@ class AugmentorOps:
         *,
         concurrency_control: asyncio.Semaphore | None = None,
     ) -> Augmented:
-        nidx_extracted_texts = None
-        if has_feature(
-            const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE,
-            context={"kbid": self.kbid, "component": "search"},
-        ):
-            nidx_extracted_texts = await extracted_texts(
-                self.kbid, self.field_texts, self.paragraph_texts
-            )
+        nidx_extracted_texts = await extracted_texts(self.kbid, self.field_texts, self.paragraph_texts)
 
         # we don't care here if nidx has been available or not as the fallback
         # is on the augmentors logic (paragraph and fields)
