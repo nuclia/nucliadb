@@ -351,10 +351,6 @@ impl IndexConfig {
         Self::Text(TextConfig::default())
     }
 
-    pub fn new_text_with(version: u64) -> Self {
-        Self::Text(TextConfig { version })
-    }
-
     pub fn new_paragraph() -> Self {
         Self::Paragraph(())
     }
@@ -387,7 +383,7 @@ mod tests {
         let index = Index::create(&meta.pool, shard.id, "multilingual", IndexConfig::new_text())
             .await
             .unwrap();
-        assert_eq!(index.config::<TextConfig>()?.version, 4);
+        assert_eq!(index.config::<TextConfig>()?.version, 5);
 
         // Default version if DB is empty is 1
         sqlx::query("UPDATE indexes SET configuration = NULL")

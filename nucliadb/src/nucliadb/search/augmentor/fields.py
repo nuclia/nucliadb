@@ -64,9 +64,7 @@ from nucliadb.search.augmentor.resources import get_basic
 from nucliadb.search.search import cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_protos import resources_pb2
-from nucliadb_utils import const
 from nucliadb_utils.storages.storage import STORAGE_FILE_EXTRACTED
-from nucliadb_utils.utilities import has_feature
 
 from .extracted_text import nidx_et_cache
 
@@ -390,10 +388,7 @@ async def db_augment_generic_field(
 async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
     # we store all splits unordered inside nidx_text, so nidx can't support yet
     # conversation fields
-    if field.type != Conversation.type and has_feature(
-        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE,
-        context={"kbid": field.kbid, "component": "search"},
-    ):
+    if field.type != Conversation.type:
         nidx_extracted_texts = nidx_et_cache.get()
         if nidx_extracted_texts is not None:
             text = await get_field_extracted_text_from_nidx(field.kbid, id)

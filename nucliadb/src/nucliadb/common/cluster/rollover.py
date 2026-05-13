@@ -165,8 +165,8 @@ async def create_rollover_shards(
                         nucliadb_index_config_to_nidx(model.vectorset_index_config)
                     )
 
-            if has_feature(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": kbid}):
-                req.features.append(const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE)
+            # TODO: remove this once nidx has been deployed. This is just for bw/c while removing the FF
+            req.features.append("nidx-as-extracted-text-storage")
 
             nidx_shard = await get_nidx_api_client().NewShard(req)
 
