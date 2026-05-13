@@ -23,7 +23,7 @@ from uuid import uuid4
 
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb_protos.resources_pb2 import CloudFile, FieldType, LinkExtractedData
+from nucliadb_protos.resources_pb2 import CloudFile, LinkExtractedData
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -54,7 +54,7 @@ async def test_create_resource_orm_link_extracted(
     ex1.link_thumbnail.CopyFrom(cf1)
     ex1.file_generated["asd"].CopyFrom(cf1)
 
-    field_obj: Link = await r.get_field(ex1.field, FieldType.LINK, load=False)
+    field_obj: Link = await r.get_link_field(ex1.field, load=False)
     await field_obj.set_link_extracted_data(ex1)
 
     ex2: LinkExtractedData | None = await field_obj.get_link_extracted_data()

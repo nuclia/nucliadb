@@ -103,7 +103,7 @@ async def get_field_text(
         logger.warning(f"{rid} {field} {field_type_int} extracted_text does not exist on DB")
         return {}, {}, {}
 
-    split_text: dict[str, str] = extracted_text.split_text
+    split_text = dict(extracted_text.split_text)
     split_text[MAIN] = extracted_text.text
 
     split_ners: dict[
@@ -145,32 +145,32 @@ async def get_field_text(
         # Legacy processor entities
         # TODO: Remove once processor doesn't use this anymore and remove the positions and ner fields from the message
         for entity_key, positions in field_metadata.metadata.positions.items():
-            entities = entity_key.split("/")
-            entity_group = entities[0]
-            entity = "/".join(entities[1:])
+            entities_ = entity_key.split("/")
+            entity_group = entities_[0]
+            entity_ = "/".join(entities_[1:])
 
             if entity_group in valid_entity_groups:
-                split_ners[MAIN].setdefault(entity_group, {}).setdefault(entity, [])
+                split_ners[MAIN].setdefault(entity_group, {}).setdefault(entity_, [])
                 for position in positions.position:
-                    split_ners[MAIN][entity_group][entity].append((position.start, position.end))
+                    split_ners[MAIN][entity_group][entity_].append((position.start, position.end))
 
         for split, split_metadata in field_metadata.split_metadata.items():
             for entity_key, positions in split_metadata.positions.items():
-                entities = entity_key.split("/")
-                entity_group = entities[0]
-                entity = "/".join(entities[1:])
+                entities_ = entity_key.split("/")
+                entity_group = entities_[0]
+                entity_ = "/".join(entities_[1:])
                 if entity_group in valid_entity_groups:
-                    split_ners.setdefault(split, {}).setdefault(entity_group, {}).setdefault(entity, [])
+                    split_ners.setdefault(split, {}).setdefault(entity_group, {}).setdefault(entity_, [])
                     for position in positions.position:
-                        split_ners[split][entity_group][entity].append((position.start, position.end))
+                        split_ners[split][entity_group][entity_].append((position.start, position.end))
 
     ordered_positions: dict[str, POSITION_DICT] = {}
     for split, ners in split_ners.items():
         split_positions: dict[tuple[int, int], tuple[str, str]] = {}
-        for entity_group, entities in ners.items():
-            for entity, positions in entities.items():
-                for position in positions:
-                    split_positions[position] = (entity_group, entity)
+        for entity_group, entities__ in ners.items():
+            for entity__, positions_ in entities__.items():
+                for position_ in positions_:
+                    split_positions[position_] = (entity_group, entity__)
 
         ordered_positions[split] = OrderedDict(sorted(split_positions.items(), key=lambda x: x[0]))
 

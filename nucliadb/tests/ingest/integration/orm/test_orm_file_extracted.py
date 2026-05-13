@@ -24,7 +24,6 @@ from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
-    FieldType,
     FileExtractedData,
     RowsPreview,
 )
@@ -61,7 +60,7 @@ async def test_create_resource_orm_file_extracted(
     ex1.file_pages_previews.pages.append(cf1)
     ex1.field = "file1"
 
-    field_obj: File = await r.get_field(ex1.field, FieldType.FILE, load=False)
+    field_obj: File = await r.get_file_field(ex1.field, load=False)
     await field_obj.set_file_extracted_data(ex1)
 
     ex2: FileExtractedData | None = await field_obj.get_file_extracted_data()

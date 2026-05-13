@@ -51,7 +51,7 @@ async def test_create_resource_orm_field_link(
 
     async with maindb_driver.ro_transaction() as txn:
         r.txn = txn
-        linkfield: Link = await r.get_field("link1", FieldType.LINK, load=True)
+        linkfield: Link = await r.get_link_field("link1", load=True)
         assert linkfield.value.uri == t2.uri
 
     async with maindb_driver.rw_transaction() as txn:
@@ -61,5 +61,5 @@ async def test_create_resource_orm_field_link(
 
     async with maindb_driver.ro_transaction() as txn:
         r.txn = txn
-        linkfield = await r.get_field("link1", FieldType.LINK, load=True)
+        linkfield = await r.get_link_field("link1", load=True)
         assert linkfield.value is None

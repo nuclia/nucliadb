@@ -37,7 +37,7 @@ async def test_create_resource_orm_field_text(
     t2 = PBFieldText(body="This is my text field", format=PBFieldText.Format.PLAIN)
     await r.set_field(FieldType.TEXT, "text1", t2)
 
-    textfield: Text = await r.get_field("text1", FieldType.TEXT, load=True)
+    textfield: Text = await r.get_text_field("text1", load=True)
     assert textfield.value.body == t2.body
 
 
@@ -53,5 +53,5 @@ async def test_create_resource_orm_field_text_file(
 
     await r.set_field(FieldType.TEXT, "text1", t2)
 
-    textfield: Text = await r.get_field("text1", FieldType.TEXT, load=True)
+    textfield: Text = await r.get_text_field("text1", load=True)
     assert textfield.value.body == t2.body

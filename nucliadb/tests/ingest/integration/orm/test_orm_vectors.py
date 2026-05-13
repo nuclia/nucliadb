@@ -61,7 +61,7 @@ async def test_create_resource_orm_vector(
     v1 = Vector(start=1, end=2, vector=b"ansjkdn")
     ex1.vectors.vectors.vectors.append(v1)
 
-    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj = await r.get_text_field(ex1.field.field, load=False)
     await field_obj.set_vectors(ex1, vectorset_id, storage_key_kind)
 
     ex2: VectorObject | None = await field_obj.get_vectors(vectorset_id, storage_key_kind)
@@ -94,7 +94,7 @@ async def test_create_resource_orm_vector_file(
     )
     ex1.file.CopyFrom(cf1)
 
-    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj = await r.get_text_field(ex1.field.field, load=False)
     await field_obj.set_vectors(ex1, vectorset_id, storage_key_kind)
 
     ex2: VectorObject | None = await field_obj.get_vectors(vectorset_id, storage_key_kind)
@@ -126,7 +126,7 @@ async def test_create_resource_orm_vector_split(
     ex1.vectors.split_vectors["es1"].vectors.append(v1)
     ex1.vectors.split_vectors["es2"].vectors.append(v1)
 
-    field_obj: Conversation = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj: Conversation = await r.get_conversation_field(ex1.field.field, load=False)
     await field_obj.set_vectors(ex1, vectorset_id, storage_key_kind)
 
     ex1 = ExtractedVectorsWrapper()
@@ -138,7 +138,7 @@ async def test_create_resource_orm_vector_split(
     ex1.vectors.split_vectors["es3"].vectors.append(v1)
     ex1.vectors.split_vectors["es2"].vectors.append(v1)
 
-    field_obj2: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj2: Text = await r.get_text_field(ex1.field.field, load=False)
     await field_obj2.set_vectors(ex1, vectorset_id, storage_key_kind)
 
     ex2: VectorObject | None = await field_obj2.get_vectors(vectorset_id, storage_key_kind)

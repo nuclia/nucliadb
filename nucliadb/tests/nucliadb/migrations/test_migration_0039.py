@@ -21,7 +21,7 @@ import uuid
 from unittest.mock import Mock, patch
 
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.fields.conversation import CONVERSATION_SPLITS_METADATA, Conversation
+from nucliadb.ingest.fields.conversation import CONVERSATION_SPLITS_METADATA
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.migrator.models import Migration
 from nucliadb_protos import resources_pb2
@@ -65,8 +65,6 @@ async def test_migration_0039(maindb_driver: Driver):
             kb_obj = KnowledgeBox(txn, storage, kbid)
             resource_obj = await kb_obj.get(rid)
             assert resource_obj
-            conv: Conversation = await resource_obj.get_field(
-                field_id, resources_pb2.FieldType.CONVERSATION, load=False
-            )
+            conv = await resource_obj.get_conversation_field(field_id, load=False)
             splits_metadata = await conv.get_splits_metadata()
             assert splits_metadata.metadata["foo"] is not None

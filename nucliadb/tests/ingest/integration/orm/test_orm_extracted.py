@@ -44,7 +44,7 @@ async def test_create_resource_orm_extracted(
     ex1.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field="text1"))
     ex1.body.text = "My Text"
 
-    field_obj: Text | None = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj: Text | None = await r.get_text_field(ex1.field.field, load=False)
     assert field_obj is not None
     await field_obj.set_extracted_text(ex1)
 
@@ -79,7 +79,7 @@ async def test_create_resource_orm_extracted_file(
     )
     ex1.file.CopyFrom(cf1)
 
-    field_obj: Text | None = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj: Text | None = await r.get_text_field(ex1.field.field, load=False)
     assert field_obj is not None
     await field_obj.set_extracted_text(ex1)
 
@@ -104,7 +104,7 @@ async def test_create_resource_orm_extracted_delta(
     ex1.body.split_text["ident1"] = "My text"
     ex1.body.text = "all text"
 
-    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj: Text = await r.get_text_field(ex1.field.field, load=False)
     await field_obj.set_extracted_text(ex1)
 
     ex2: ExtractedText | None = await field_obj.get_extracted_text()
@@ -116,7 +116,7 @@ async def test_create_resource_orm_extracted_delta(
     ex1.body.split_text["ident2"] = "My text"
     ex1.body.text = "all text 2"
 
-    field_obj = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj = await r.get_text_field(ex1.field.field, load=False)
     await field_obj.set_extracted_text(ex1)
 
     ex2 = await field_obj.get_extracted_text()

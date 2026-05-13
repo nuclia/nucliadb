@@ -54,7 +54,7 @@ async def test_create_resource_orm_field_file(
 
     await r.set_field(FieldType.FILE, "file1", t2)
 
-    filefield: File = await r.get_field("file1", FieldType.FILE, load=True)
+    filefield: File = await r.get_file_field("file1", load=True)
     assert filefield.value.file == t2.file
 
     assert filefield.value.file.source == storage.source

@@ -22,7 +22,7 @@ from typing import cast
 
 from typing_extensions import assert_never
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId, ParagraphId
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.file import File
 from nucliadb.search import SERVICE_NAME
@@ -91,7 +91,7 @@ async def download_page_preview(field: Field, page: int) -> Image | None:
     nucliadb
 
     """
-    field_type = FIELD_TYPE_STR_TO_NAME[field.type]
+    field_type = FieldTypeName.from_abbreviation(field.type)
 
     if field_type == FieldTypeName.FILE:
         field = cast(File, field)

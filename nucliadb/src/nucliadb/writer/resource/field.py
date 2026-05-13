@@ -20,6 +20,7 @@
 import dataclasses
 import json
 from datetime import datetime
+from typing import cast
 
 from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
@@ -620,9 +621,8 @@ async def _conversation_append_checks(
         resource_obj = await ORMResource.get(txn, kbid=kbid, rid=rid)
         if resource_obj is None:
             return
-        conv: Conversation = await resource_obj.get_field(
-            field_id, resources_pb2.FieldType.CONVERSATION, load=False
-        )
+        conv = await resource_obj.get_field(field_id, resources_pb2.FieldType.CONVERSATION, load=False)
+        conv = cast(Conversation, conv)
 
         # Make sure that the max number of messages is not exceeded
         current_message_count = (await conv.get_metadata()).total

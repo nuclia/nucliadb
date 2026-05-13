@@ -46,7 +46,7 @@ async def test_create_resource_orm_field_conversation(
     c2.messages.append(conv1)
     await r.set_field(FieldType.CONVERSATION, "conv1", c2)
 
-    convfield: Conversation = await r.get_field("conv1", FieldType.CONVERSATION, load=True)
+    convfield: Conversation = await r.get_conversation_field("conv1", load=True)
     assert convfield.metadata is not None
     assert convfield.metadata.pages == 1
     assert convfield.value[1].messages[0].content.text == "hello"
@@ -57,7 +57,7 @@ async def test_create_resource_orm_field_conversation(
         c2.messages.append(conv1)
     await r.set_field(FieldType.CONVERSATION, "conv1", c2)
 
-    convfield = await r.get_field("conv1", FieldType.CONVERSATION, load=True)
+    convfield = await r.get_conversation_field("conv1", load=True)
     assert convfield.metadata is not None
     assert convfield.metadata.pages == 2
     assert convfield.value[1].messages[0].content.text == "hello"
@@ -99,7 +99,7 @@ async def test_create_resource_orm_field_conversation_file(
 
     await r.set_field(FieldType.CONVERSATION, "conv1", c2)
 
-    convfield: Conversation = await r.get_field("conv1", FieldType.CONVERSATION, load=True)
+    convfield: Conversation = await r.get_conversation_field("conv1", load=True)
     assert convfield.metadata is not None
     assert convfield.metadata.pages == 1
     assert convfield.value[1].messages[0].content.text == "hello"

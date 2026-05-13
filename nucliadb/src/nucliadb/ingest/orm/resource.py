@@ -350,6 +350,18 @@ class Resource:
                     self.fields[field] = field_obj
         return self.fields[field]
 
+    async def get_conversation_field(self, key: str, load: bool = True) -> Conversation:
+        return cast(Conversation, await self.get_field(key=key, type=FieldType.CONVERSATION, load=load))
+
+    async def get_link_field(self, key: str, load: bool = True) -> Link:
+        return cast(Link, await self.get_field(key=key, type=FieldType.LINK, load=load))
+
+    async def get_file_field(self, key: str, load: bool = True) -> File:
+        return cast(File, await self.get_field(key=key, type=FieldType.FILE, load=load))
+
+    async def get_text_field(self, key: str, load: bool = True) -> Text:
+        return cast(Text, await self.get_field(key=key, type=FieldType.TEXT, load=load))
+
     async def set_field(self, type: FieldType.ValueType, key: str, payload: Any):
         field = (type, key)
         if field not in self.fields:
@@ -720,12 +732,7 @@ class Resource:
 
     async def _apply_link_extracted_data(self, link_extracted_data: LinkExtractedData):
         assert self.basic is not None
-        field_link = await self.get_field(
-            link_extracted_data.field,
-            FieldType.LINK,
-            load=False,
-        )
-        field_link = cast(Link, field_link)
+        field_link = await self.get_link_field(link_extracted_data.field, load=False)
         maybe_update_basic_thumbnail(self.basic, link_extracted_data.link_thumbnail, self.kbid)
 
         await field_link.set_link_extracted_data(link_extracted_data)

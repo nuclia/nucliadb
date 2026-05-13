@@ -45,7 +45,6 @@ from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.resources_pb2 import (
-    TEXT,
     Answers,
     Classification,
     CloudFile,
@@ -236,7 +235,7 @@ async def test_ingest_error_message(kbid: str, storage: Storage, processor, main
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         r = await kb_obj.get(message1.uuid)
         assert r is not None
-        field_obj = await r.get_field("wikipedia_ml", TEXT)
+        field_obj = await r.get_text_field("wikipedia_ml")
         ext1 = await field_obj.get_extracted_text()
         lfm1 = await field_obj.get_large_field_metadata()
         fm1 = await field_obj.get_field_metadata()
@@ -531,7 +530,7 @@ async def test_qa(
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         r = await kb_obj.get(message.uuid)
         assert r is not None
-        res = await r.get_field(key="qa", type=FieldType.FILE)
+        res = await r.get_file_field(key="qa")
         res_qa = await res.get_question_answers()
 
     assert qaw.question_answers == res_qa

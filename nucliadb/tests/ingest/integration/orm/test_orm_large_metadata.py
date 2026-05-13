@@ -49,7 +49,7 @@ async def test_create_resource_orm_large_metadata(
     ex1.real.metadata.entities.append(en2)
     ex1.real.metadata.tokens["tok"] = 3
 
-    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj: Text = await r.get_text_field(ex1.field.field, load=False)
     await field_obj.set_large_field_metadata(ex1)
 
     ex2: LargeComputedMetadata | None = await field_obj.get_large_field_metadata()
@@ -89,7 +89,7 @@ async def test_create_resource_orm_large_metadata_file(
     )
     ex1.file.CopyFrom(cf1)
 
-    field_obj: Text = await r.get_field(ex1.field.field, ex1.field.field_type, load=False)
+    field_obj: Text = await r.get_text_field(ex1.field.field, load=False)
     await field_obj.set_large_field_metadata(ex1)
 
     ex2: LargeComputedMetadata | None = await field_obj.get_large_field_metadata()

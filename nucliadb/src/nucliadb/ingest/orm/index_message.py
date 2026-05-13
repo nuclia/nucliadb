@@ -22,6 +22,7 @@
 import asyncio
 import json
 from collections.abc import Sequence
+from typing import cast
 
 from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 
@@ -443,7 +444,8 @@ async def get_stored_split_ids(
     resource: Resource,
 ) -> set[str]:
     fid = conversation_field_id
-    conv: Conversation = await resource.get_field(fid.field, fid.field_type, load=False)
+    conv = await resource.get_field(fid.field, fid.field_type, load=False)
+    conv = cast(Conversation, conv)
     splits_metadata = await conv.get_splits_metadata()
     return set(splits_metadata.metadata)
 
