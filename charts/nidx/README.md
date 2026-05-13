@@ -23,7 +23,7 @@ nidx chart
 | imagePullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | containerRegistry | string | `"CONTAINER_REGISTRY_TO_REPLACE"` | Container registry (e.g. docker.io/nuclia) |
 | image | string | `"IMAGE_TO_REPLACE"` | Image name (without registry eg. nidx:latest) |
-| env | string | `nil` |  |
+| env | object | `{}` | Global environment variables to add to all containers |
 | envFrom | object | `{}` | Global environment variables mount to add to all containers |
 | podAnnotations | object | `{}` | Global pod annotations to add to all pods |
 | podLabels | object | `{"nidxMetrics":"enabled"}` | Global pod labels to add to all pods |

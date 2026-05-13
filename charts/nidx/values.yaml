@@ -13,7 +13,8 @@ containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 # -- Image name (without registry eg. nidx:latest)
 image: IMAGE_TO_REPLACE
 
-env:
+# -- Global environment variables to add to all containers
+env: {}
   # -- Object store backend type for indexer.
   # INDEXER__OBJECT_STORE: s3
   # -- S3 bucket name used by indexer.
