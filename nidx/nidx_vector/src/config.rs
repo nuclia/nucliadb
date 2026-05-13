@@ -176,12 +176,10 @@ impl VectorConfig {
             && matches!(&self.vector_type, VectorType::DenseF32 { dimension } if dimension.is_multiple_of(64))
     }
 
-    /// Whether to deduplicate paragraphs based on their key, using `metadata` to store the list of field_keys
-    pub fn deduplicate_keys(&self) -> bool {
-        match self.entity {
-            IndexEntity::Paragraph => false,
-            IndexEntity::RelationNode | IndexEntity::RelationEdge => true,
-        }
+    /// Whether this index uses relation-style inverted indexes (field mapping from metadata)
+    /// rather than paragraph-style inverted indexes (field mapping from key).
+    pub fn uses_relation_inverted_index(&self) -> bool {
+        matches!(self.entity, IndexEntity::RelationNode | IndexEntity::RelationEdge)
     }
 
     pub fn from_paragraph_proto(proto: VectorIndexConfig) -> VectorR<Self> {

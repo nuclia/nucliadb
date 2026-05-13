@@ -77,8 +77,6 @@ class ResourceBrain:
         self.rid = rid
         self.brain: PBBrainResource = PBBrainResource(resource=ResourceID(uuid=rid))
         self.labels: dict[str, set[str]] = deepcopy(BASE_LABELS)
-        self._relation_node_vectors: set[str] = set()
-        self._relation_edge_vectors: set[str] = set()
 
     @observer.wrap({"type": "generate_resource_metadata"})
     def generate_resource_metadata(
@@ -598,22 +596,32 @@ class ResourceBrain:
         self,
         vectors: utils_pb2.RelationNodeVectors,
         vectorset: str,
+        field_id: str,
+        replace_field: bool = False,
     ):
+        if replace_field:
+            ftype, fkey = field_id.split("/")
+            full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
+            self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
         for vector in vectors.vectors:
-            if vector.node_value not in self._relation_node_vectors:
-                self.brain.relation_node_vectors[vectorset].vectors.append(vector)
-                self._relation_node_vectors.add(vector.node_value)
+            vector.field_id = field_id
+            self.brain.relation_node_vectors[vectorset].vectors.append(vector)
 
     @observer.wrap({"type": "generate_relation_edge_vectors"})
     def generate_relation_edge_vectors(
         self,
         vectors: utils_pb2.RelationEdgeVectors,
         vectorset: str,
+        field_id: str,
+        replace_field: bool = False,
     ):
+        if replace_field:
+            ftype, fkey = field_id.split("/")
+            full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
+            self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
         for vector in vectors.vectors:
-            if vector.relation_label not in self._relation_edge_vectors:
-                self.brain.relation_edge_vectors[vectorset].vectors.append(vector)
-                self._relation_edge_vectors.add(vector.relation_label)
+            vector.field_id = field_id
+            self.brain.relation_edge_vectors[vectorset].vectors.append(vector)
 
     @observer.wrap({"type": "apply_field_vector"})
     def _apply_field_vector(

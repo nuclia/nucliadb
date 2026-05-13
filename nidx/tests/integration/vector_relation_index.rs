@@ -64,6 +64,7 @@ fn node_vector(value: &str, vector: Vec<f32>) -> RelationNodeVector {
     RelationNodeVector {
         node_value: value.to_string(),
         vector,
+        field_id: "f/file".to_string(),
     }
 }
 
@@ -71,6 +72,7 @@ fn relation_vector(value: &str, vector: Vec<f32>) -> RelationEdgeVector {
     RelationEdgeVector {
         vector,
         relation_label: value.to_string(),
+        field_id: "f/file".to_string(),
     }
 }
 

@@ -21,7 +21,7 @@
 pub mod config;
 mod data_store;
 mod data_types;
-mod field_list_metadata;
+
 pub mod formula;
 mod hnsw;
 mod indexer;

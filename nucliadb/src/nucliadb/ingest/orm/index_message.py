@@ -167,6 +167,8 @@ class IndexMessageBuilder:
                             brain.generate_relation_node_vectors,
                             node_vectors,
                             vectorset_config.vectorset_id,
+                            self.resource.generate_field_id(fieldid),
+                            replace,
                         )
 
                     edge_vectors = await field.get_relation_edge_vectors(
@@ -177,6 +179,8 @@ class IndexMessageBuilder:
                             brain.generate_relation_edge_vectors,
                             edge_vectors,
                             vectorset_config.vectorset_id,
+                            self.resource.generate_field_id(fieldid),
+                            replace,
                         )
 
         if isinstance(field, KeyValue):

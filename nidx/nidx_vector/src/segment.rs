@@ -23,19 +23,19 @@ mod tests;
 
 use crate::config::{VectorConfig, flags};
 use crate::data_store::{DataStore, DataStoreV1, DataStoreV2, OpenReason, ParagraphRef, VectorRef};
-use crate::field_list_metadata::{paragraph_alive_fields, paragraph_is_deleted};
+
 use crate::formula::Formula;
 use crate::hnsw::{self, *};
 use crate::inverted_index::{self, InvertedIndexes};
 use crate::inverted_index::{FilterBitSet, build_indexes};
-use crate::utils::{FieldKey, wincode_config};
+use crate::utils::FieldKey;
 use crate::vector_types::rabitq;
 use crate::{ParagraphAddr, VectorAddr, VectorErr, VectorR, VectorSegmentMeta, VectorSegmentMetadata};
 use core::f32;
 use rayon::prelude::*;
 
 use std::cmp::Reverse;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::iter::empty;
 use std::path::Path;
 use std::time::Instant;
@@ -136,32 +136,7 @@ pub fn merge(
             .map(|(s, _)| (s.alive_paragraphs(), s.data_store.as_ref()))
             .collect();
 
-        // If the metadata represents the list of fields the paragraph appears in, we need to get the new list as the
-        // union of the fields in all segments, taking deletions into account
-        let paragraph_deduplicator = if config.deduplicate_keys() {
-            let mut per_paragraph_alive_fields: HashMap<String, Vec<FieldKey>> = HashMap::new();
-            for (segment, deletions) in &operants {
-                for paragraph_id in segment.alive_paragraphs() {
-                    let paragraph = segment.data_store.get_paragraph(paragraph_id);
-                    for f in paragraph_alive_fields(&paragraph, deletions) {
-                        per_paragraph_alive_fields
-                            .entry(paragraph.id().to_string())
-                            .or_default()
-                            .push(f.to_owned());
-                    }
-                }
-            }
-
-            Some(
-                per_paragraph_alive_fields
-                    .into_iter()
-                    .map(|(k, v)| (k, wincode::config::serialize(&v, wincode_config()).unwrap()))
-                    .collect(),
-            )
-        } else {
-            None
-        };
-        DataStoreV2::merge(segment_path, node_producers, config, paragraph_deduplicator)?;
+        DataStoreV2::merge(segment_path, node_producers, config)?;
 
         let data_store = DataStoreV2::open(segment_path, &config.vector_type, OpenReason::Create)?;
         merge_indexes(segment_path, data_store, segments, config)
@@ -469,11 +444,9 @@ impl OpenSegment {
                 }
             }
             InvertedIndexes::Relation(indexes) => {
-                let affected_paragraphs = keys.iter().flat_map(|k| indexes.ids_for_field_key(k));
-                for paragraph_id in affected_paragraphs {
-                    let paragraph = self.data_store.get_paragraph(paragraph_id);
-                    if paragraph_is_deleted(&paragraph, keys) {
-                        self.alive_bitset.remove(paragraph_id);
+                for key in keys {
+                    for id in indexes.ids_for_field_key(key) {
+                        self.alive_bitset.remove(id);
                     }
                 }
             }
