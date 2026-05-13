@@ -383,7 +383,7 @@ mod tests {
         let index = Index::create(&meta.pool, shard.id, "multilingual", IndexConfig::new_text())
             .await
             .unwrap();
-        assert_eq!(index.config::<TextConfig>()?.version, 4);
+        assert_eq!(index.config::<TextConfig>()?.version, 5);
 
         // Default version if DB is empty is 1
         sqlx::query("UPDATE indexes SET configuration = NULL")
