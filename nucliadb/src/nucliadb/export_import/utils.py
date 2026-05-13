@@ -38,6 +38,7 @@ from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.export_import import Status
+from nucliadb_models.kv_schemas import KBKVSchemas
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -68,6 +69,7 @@ BM_FIELDS = {
         "files",
         "extra",
         "security",
+        "key_value_fields",
     ],
     "processor": [
         "link_extracted_data",
@@ -96,7 +98,6 @@ BM_FIELDS = {
         "delete_question_answers",
         "errors",
         "generated_by",
-        "synchronous_storage_deletion",
     ],
     # No longer used fields
     "deprecated": [
@@ -295,6 +296,18 @@ async def get_search_configurations(
 ) -> dict[str, SearchConfiguration]:
     async with datamanagers.with_ro_transaction() as txn:
         return await datamanagers.search_configurations.list(txn, kbid=kbid)
+
+
+async def get_kv_schemas(context: ApplicationContext, kbid: str) -> KBKVSchemas:
+    async with datamanagers.with_ro_transaction() as txn:
+        return await datamanagers.kv_schemas.get_all(txn, kbid=kbid)
+
+
+async def set_kv_schemas(context: ApplicationContext, kbid: str, schemas: KBKVSchemas) -> None:
+    async with datamanagers.with_transaction() as txn:
+        for schema in schemas.schemas.values():
+            await datamanagers.kv_schemas.set(txn, kbid=kbid, schema=schema)
+        await txn.commit()
 
 
 class EndOfStream(Exception): ...

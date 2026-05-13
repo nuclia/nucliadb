@@ -21,6 +21,7 @@ import asyncio
 from unittest import mock
 
 import nats
+import nats.errors
 import pytest
 
 from nucliadb_protos.writer_pb2 import BrokerMessage, Notification
@@ -64,7 +65,9 @@ async def test_wait_for_commited(txn: TransactionUtility, pubsub):
 
     pubsub.subscribe.side_effect = _subscribe
 
-    await (await txn.wait_for_commited(kbid, waiting_for, request_id=request_id)).wait()
+    waiter = await txn.wait_for_commited(kbid, waiting_for, request_id=request_id)
+    assert waiter
+    await waiter.wait()
 
 
 async def test_wait_for_commit_stop_waiting(txn: TransactionUtility, pubsub):

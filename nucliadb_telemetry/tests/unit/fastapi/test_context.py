@@ -30,7 +30,7 @@ def get_kb(kbid: str):
 async def test_context_injected():
     app.add_middleware(ContextInjectorMiddleware)
 
-    transport = ASGITransport(app=app)  # type: ignore
+    transport = ASGITransport(app=app)
     client = AsyncClient(transport=transport, base_url="http://test/api/v1")
 
     with patch("nucliadb_telemetry.fastapi.context.context.add_context") as add_context:

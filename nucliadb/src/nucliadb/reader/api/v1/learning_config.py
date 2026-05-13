@@ -142,12 +142,17 @@ async def get_models_group_by_providers(
     kbid: str,
     x_nucliadb_account: str = Header(default="", include_in_schema=False),
     x_nucliadb_account_type: str = Header(default="", include_in_schema=False),
+    x_allow_access_non_enterprise_models: bool = Header(False, include_in_schema=False),
 ):
     return await learning_config_proxy(
         request,
         "GET",
         f"/generative_providers/{kbid}",
-        headers={"account-id": x_nucliadb_account, "account-type": x_nucliadb_account_type},
+        headers={
+            "account-id": x_nucliadb_account,
+            "account-type": x_nucliadb_account_type,
+            "allow-access-non-enterprise-models": str(x_allow_access_non_enterprise_models).lower(),
+        },
     )
 
 

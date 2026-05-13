@@ -81,8 +81,9 @@ from nucliadb_models.augment import (
     AugmentResponse,
 )
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName
+from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import NucliaDBClientType, ResourceProperties
+from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_audit
 
 
@@ -93,6 +94,7 @@ from nucliadb_utils.utilities import get_audit
     include_in_schema=False,
     tags=["Augment"],
 )
+@requires(NucliaDBRoles.READER)
 @version(1)
 async def _augment_endpoint(
     request: Request,

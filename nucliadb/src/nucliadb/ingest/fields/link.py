@@ -32,14 +32,8 @@ class Link(Field[FieldLink]):
     type: str = "u"
     link_extracted_data: LinkExtractedData | None
 
-    def __init__(
-        self,
-        id: str,
-        resource: Any,
-        pb: Any | None = None,
-        value: str | None = None,
-    ):
-        super().__init__(id, resource, pb, value)
+    def __init__(self, id: str, resource: Any):
+        super().__init__(id, resource)
         self.link_extracted_data = None
 
     async def set_value(self, payload: FieldLink):
@@ -51,7 +45,7 @@ class Link(Field[FieldLink]):
     async def set_link_extracted_data(self, link_extracted_data: LinkExtractedData):
         if link_extracted_data.HasField("link_thumbnail"):
             sf_link_thumbnail: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, "link_thumbnail"
+                self.kbid, self.rid, self.type, self.id, "link_thumbnail"
             )
             cf_link_thumbnail: CloudFile = await self.storage.normalize_binary(
                 link_extracted_data.link_thumbnail, sf_link_thumbnail
@@ -59,7 +53,7 @@ class Link(Field[FieldLink]):
             link_extracted_data.link_thumbnail.CopyFrom(cf_link_thumbnail)
         if link_extracted_data.HasField("link_preview"):
             sf_link_preview: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, "link_preview"
+                self.kbid, self.rid, self.type, self.id, "link_preview"
             )
             cf_link_preview: CloudFile = await self.storage.normalize_binary(
                 link_extracted_data.link_preview, sf_link_preview
@@ -68,7 +62,7 @@ class Link(Field[FieldLink]):
 
         if link_extracted_data.HasField("link_image"):
             sf_link_image: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, "link_image"
+                self.kbid, self.rid, self.type, self.id, "link_image"
             )
             cf_link_image: CloudFile = await self.storage.normalize_binary(
                 link_extracted_data.link_image, sf_link_image
@@ -77,13 +71,13 @@ class Link(Field[FieldLink]):
 
         for fileid, origincf in link_extracted_data.file_generated.items():
             sf_generated: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, f"generated/{fileid}"
+                self.kbid, self.rid, self.type, self.id, f"generated/{fileid}"
             )
             cf_generated: CloudFile = await self.storage.normalize_binary(origincf, sf_generated)
             link_extracted_data.file_generated[fileid].CopyFrom(cf_generated)
 
         sf: StorageField = self.storage.file_extracted(
-            self.kbid, self.uuid, self.type, self.id, LINK_METADATA
+            self.kbid, self.rid, self.type, self.id, LINK_METADATA
         )
         await self.storage.upload_pb(sf, link_extracted_data)
         self.link_extracted_data = link_extracted_data
@@ -91,7 +85,7 @@ class Link(Field[FieldLink]):
     async def get_link_extracted_data(self) -> LinkExtractedData | None:
         if self.link_extracted_data is None:
             sf: StorageField = self.storage.file_extracted(
-                self.kbid, self.uuid, self.type, self.id, LINK_METADATA
+                self.kbid, self.rid, self.type, self.id, LINK_METADATA
             )
             self.link_extracted_data = await self.storage.download_pb(sf, LinkExtractedData)
         return self.link_extracted_data

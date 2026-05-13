@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import dataclasses
+import json
 from datetime import datetime
 
 from fastapi import HTTPException
@@ -28,6 +29,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.conversation import MAX_CONVERSATION_MESSAGES, Conversation
+from nucliadb.ingest.fields.key_value import validate_kv_data
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.models.internal import processing as processing_models
 from nucliadb.models.internal.processing import ClassificationLabel, PushConversation, PushPayload
@@ -37,6 +39,7 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_models.writer import (
     CreateResourcePayload,
+    KeyValueField,
     UpdateResourcePayload,
 )
 from nucliadb_protos import resources_pb2
@@ -229,6 +232,66 @@ async def parse_fields(
             resource_classifications,
             replace_field=True,
         )
+
+    for key, kv_field in item.key_values.items():
+        await parse_key_value_field(
+            key,
+            kv_field,
+            writer,
+            kbid=kbid,
+        )
+
+
+async def parse_key_value_field(
+    key: str,
+    kv_field: KeyValueField,
+    writer: BrokerMessage,
+    *,
+    kbid: str,
+    txn: Transaction | None = None,
+) -> None:
+    """
+    Validate and populate writer.key_value_fields[key] from a KeyValueField API model.
+
+    Validation against the KB schema happens here (writer side) so we can return
+    a 422 to the HTTP client before the BrokerMessage is committed.
+    The entire data dict is JSON-encoded into the proto's single string data field.
+    No NLP processing is needed for KV fields.
+    """
+    if key != kv_field.schema_id:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Key-value field name '{key}' must match schema_id '{kv_field.schema_id}'",
+        )
+
+    # Fetch schema and validate before touching the BrokerMessage
+    if txn is not None:
+        schema = await datamanagers.kv_schemas.get(txn, kbid=kbid, name=kv_field.schema_id)
+    else:
+        async with datamanagers.with_ro_transaction() as ro_txn:
+            schema = await datamanagers.kv_schemas.get(ro_txn, kbid=kbid, name=kv_field.schema_id)
+
+    if schema is None:
+        raise HTTPException(
+            status_code=422,
+            detail=f"KV schema '{kv_field.schema_id}' does not exist in this knowledge box",
+        )
+
+    try:
+        validate_kv_data(kv_field.data, schema)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    pb = writer.key_value_fields[key]
+    pb.schema_id = kv_field.schema_id
+    pb.data = json.dumps(kv_field.data)
+
+    writer.field_statuses.append(
+        FieldIDStatus(
+            id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.KEY_VALUE, field=key),
+            status=FieldStatus.Status.PROCESSED,
+        )
+    )
 
 
 def parse_text_field(

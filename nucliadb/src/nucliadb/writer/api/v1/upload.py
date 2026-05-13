@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
+import logging
 import uuid
 from datetime import datetime
 from hashlib import md5
@@ -30,7 +31,7 @@ from fastapi.responses import Response
 from fastapi_versioning import version
 from starlette.requests import Request as StarletteRequest
 
-from nucliadb.common import datamanagers
+from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.models.internal.processing import PushPayload, Source
@@ -85,6 +86,8 @@ from nucliadb_utils.utilities import (
 )
 
 from .router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX, RSLUG_PREFIX, api
+
+logger = logging.getLogger(__name__)
 
 TUS_HEADERS = {
     "Tus-Resumable": "1.0.0",
@@ -278,7 +281,7 @@ async def _tus_post(
         # When uploading to a specific resourece field, we want make sure that only one
         # upload is active at a time, so by default, unless you explicitly override it with the header,
         # concurrent uploads to the same file field will be blocked
-        upload_id = md5(f"{kbid}__{rid}__{field}".encode()).hexdigest()
+        upload_id = md5(f"{kbid}__{rid}__{field}".encode(), usedforsecurity=False).hexdigest()
 
     # This only happens in tus-java-client, redirect this POST to a PATCH
     if request.headers.get("x-http-method-override") == "PATCH":
@@ -765,7 +768,7 @@ async def _upload(
         # When uploading to a specific resourece field, we want make sure that only one
         # upload is active at a time, so by default, unless you explicitly override it with the header,
         # concurrent uploads to the same file field will be blocked
-        upload_id = md5(f"{kbid}__{rid}__{field}".encode()).hexdigest()
+        upload_id = md5(f"{kbid}__{rid}__{field}".encode(), usedforsecurity=False).hexdigest()
 
     await dm.load(upload_id)
 
@@ -852,31 +855,27 @@ async def validate_field_upload(
     field: str | None = None,
     md5: str | None = None,
 ):
-    """Validate field upload and return blob storage path, rid and field id.
-
-    This function assumes KB exists
     """
+    Validate if the upload is correct regarding the resource and field existence and the file md5 uniqueness if provided.
+    This function assumes that the knowledgebox already exists.
 
+    Return the path where the file should be stored, the resource id and the field id.
+    """
     if rid is None:
-        # we are going to create a new resource and a field
-        if md5 is not None:
-            exists = await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=md5)
-            if exists:
-                raise HTTPConflict("A resource with the same uploaded file already exists")
-            rid = md5
-        else:
-            rid = uuid.uuid4().hex
+        # Check for file duplicates if the md5 was provided.
+        if md5 is not None and await file_md5.exists(kbid=kbid, md5=md5):
+            raise HTTPConflict("File already exists in the Knowledge Box")
+
+        # We are creating a new resource. Assign a new resource id
+        rid = uuid.uuid4().hex
     else:
-        # we're adding a field to a resource
-        exists = await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)
-        if not exists:
+        # Adding a field to an existing resource, the resource must exist.
+        if not await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid):
             raise HTTPNotFound("Resource is not found or not yet available")
 
     if field is None:
-        if md5 is None:
-            field = uuid.uuid4().hex
-        else:
-            field = md5
+        # We are creating a new field. Assign a new field id
+        field = uuid.uuid4().hex
 
     path = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, field=field)
     return path, rid, field

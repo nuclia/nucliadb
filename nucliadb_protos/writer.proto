@@ -62,7 +62,7 @@ message Error {
 
 
 message BrokerMessage {
-    reserved 2, 10, 12, 14, 15, 27;
+    reserved 2, 10, 12, 14, 15, 27, 46;
 
     string kbid = 1;
     string uuid = 3;
@@ -156,9 +156,8 @@ message BrokerMessage {
     repeated resources.SemanticGraphNodeVectors field_semantic_graph_node_vectors = 44;
     repeated resources.SemanticGraphEdgeVectors field_semantic_graph_edge_vectors = 45;
 
-    // Set to true when we want the deletion operation to happen during the transaction.
-    // Otherwise, objects in storage are marked for deletion and deleted by the purge cronjob.
-    bool synchronous_storage_deletion = 46;
+    // Field KeyValue
+    map<string, resources.FieldKeyValue> key_value_fields = 47;
 }
 
 message BrokerMessageBlobReference {

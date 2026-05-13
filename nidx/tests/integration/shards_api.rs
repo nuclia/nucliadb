@@ -53,10 +53,10 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
     let shard = shards::create_shard(&meta, kbid, vector_configs, HashSet::new()).await?;
 
     let indexes = shard.indexes(&meta.pool).await?;
-    assert_eq!(indexes.len(), 5);
+    assert_eq!(indexes.len(), 6);
 
     let names = indexes.iter().map(|index| index.name.as_str()).collect::<HashSet<_>>();
-    let expected = HashSet::from(["multilingual", "english", "text", "paragraph", "relation"]);
+    let expected = HashSet::from(["multilingual", "english", "text", "paragraph", "relation", "json"]);
     assert_eq!(names, expected);
 
     let shard = Shard::get(&meta.pool, shard.id).await?;
@@ -89,6 +89,11 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
     .await?;
 
     for index in shard.indexes(&meta.pool).await? {
+        // JSON index only gets segments when resources have json_fields populated;
+        // test fixtures don't include json_fields so skip this index.
+        if index.kind == IndexKind::Json {
+            continue;
+        }
         let segments = index.segments(&meta.pool).await?;
         assert!(!segments.is_empty());
     }
@@ -137,9 +142,9 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
     assert_eq!(count_shards(&meta.pool).await?, 1);
     assert_eq!(Shard::list_ids(&meta.pool).await?, vec![surviving_shard.id]);
 
-    assert_eq!(count_indexes(&meta.pool).await?, 4);
+    assert_eq!(count_indexes(&meta.pool).await?, 5);
     let indexes = Index::for_shard(&meta.pool, surviving_shard.id).await?;
-    assert_eq!(indexes.len(), 4);
+    assert_eq!(indexes.len(), 5);
 
     let mut expected_segments = 0;
     let mut expected_deletions = 0;

@@ -26,7 +26,7 @@ import nats.js.errors
 from nidx_protos import noderesources_pb2, nodewriter_pb2
 from nidx_protos.noderesources_pb2 import Resource as PBBrainResource
 
-from nucliadb.common import datamanagers, locking
+from nucliadb.common import datamanagers, file_md5, locking
 from nucliadb.common.catalog import catalog_delete, catalog_update
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
@@ -224,6 +224,8 @@ class Processor:
                         raise AttributeError("Shard not available")
 
                     await catalog_delete(txn, kbid, uuid)
+                    await file_md5.delete(txn, kbid=kbid, rid=uuid)
+
                     external_index_manager = await get_external_index_manager(kbid=kbid)
                     if external_index_manager is not None:
                         await self.external_index_delete_resource(external_index_manager, uuid)
@@ -232,9 +234,7 @@ class Processor:
                             shard, uuid, seqid, partition, kbid
                         )
                     try:
-                        await kb.delete_resource(
-                            uuid, storage_synchronous=message.synchronous_storage_deletion
-                        )
+                        await kb.delete_resource(uuid)
                     except Exception as exc:
                         await txn.abort()
                         await self.notify_abort(
@@ -348,7 +348,7 @@ class Processor:
                 await self.apply_resource(message, resource, update=(not created))
 
                 # index message
-                if resource and resource.modified:
+                if resource.modified:
                     index_message = await self.generate_index_message(resource, message, created)
                     try:
                         warnings = await self.index_resource(
@@ -394,7 +394,8 @@ class Processor:
                             else writer_pb2.Notification.WriteType.MODIFIED
                         ),
                     )
-                elif resource and resource.modified is False:
+                else:
+                    logger.info("This message did not modify the resource")
                     await txn.abort()
                     await self.notify_abort(
                         partition=partition,
@@ -403,7 +404,6 @@ class Processor:
                         rid=uuid,
                         source=message.source,
                     )
-                    logger.info("This message did not modify the resource")
             except (
                 asyncio.TimeoutError,
                 asyncio.CancelledError,
@@ -754,26 +754,3 @@ def has_vectors_operation(index_message: PBBrainResource) -> bool:
                 if len(vectorset_sentences.sentences) > 0:
                     return True
     return False
-
-
-def needs_reindex(bm: writer_pb2.BrokerMessage) -> bool:
-    return bm.reindex or is_vectorset_migration_bm(bm)
-
-
-def is_vectorset_migration_bm(bm: writer_pb2.BrokerMessage) -> bool:
-    """
-    This is a temporary solution to avoid duplicating paragraphs and text fields during vector migrations.
-    We need to reindex all the fields of a resource to avoid this issue.
-    TODO: Remove this when the index message generation logic has been decoupled into its own method.
-
-    Broker messages from semantic model migration task only contain the `field_vectors` field set.
-    """
-    return (
-        len(bm.field_vectors) > 0
-        and not bm.HasField("basic")
-        and len(bm.delete_fields) == 0
-        and len(bm.files) == 0
-        and len(bm.texts) == 0
-        and len(bm.conversations) == 0
-        and len(bm.links) == 0
-    )

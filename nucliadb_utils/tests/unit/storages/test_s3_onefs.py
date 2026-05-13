@@ -66,7 +66,7 @@ def make_storage(**kwargs) -> S3Storage:
 async def test_create_bucket_without_tags_does_not_call_tagging():
     storage = make_storage()
     storage._s3aioclient.head_bucket.side_effect = make_client_error("404", 404)
-    storage._s3aioclient.create_bucket = AsyncMock()
+    storage._s3aioclient.create_bucket = AsyncMock()  # type: ignore[ty:unresolved-attribute]
     storage._s3aioclient.put_bucket_tagging.side_effect = NotImplementedError
 
     await storage.create_bucket("mybucket")
@@ -78,7 +78,7 @@ async def test_create_bucket_without_tags_does_not_call_tagging():
 async def test_create_bucket_without_kms_keys_does_not_encrypt():
     storage = make_storage()
     storage._s3aioclient.head_bucket.side_effect = make_client_error("404", 404)
-    storage._s3aioclient.create_bucket = AsyncMock()
+    storage._s3aioclient.create_bucket = AsyncMock()  # type: ignore[ty:unresolved-attribute]
     storage._s3aioclient.put_bucket_encryption.side_effect = NotImplementedError
 
     await storage.create_bucket("mybucket")
@@ -92,7 +92,7 @@ async def test_create_bucket_without_kms_keys_does_not_encrypt():
 
 async def test_delete_bucket_conflict_string_code():
     storage = make_storage()
-    storage._s3aioclient.head_bucket = AsyncMock(
+    storage._s3aioclient.head_bucket = AsyncMock(  # type: ignore[ty:unresolved-attribute]
         return_value={"ResponseMetadata": {"HTTPStatusCode": 200}}
     )
     storage._s3aioclient.delete_bucket.side_effect = make_client_error("BucketNotEmpty", 409)
@@ -105,7 +105,7 @@ async def test_delete_bucket_conflict_string_code():
 
 async def test_delete_bucket_conflict_numeric_string_code():
     storage = make_storage()
-    storage._s3aioclient.head_bucket = AsyncMock(
+    storage._s3aioclient.head_bucket = AsyncMock(  # type: ignore[ty:unresolved-attribute]
         return_value={"ResponseMetadata": {"HTTPStatusCode": 200}}
     )
     storage._s3aioclient.delete_bucket.side_effect = make_client_error("409", 409)
@@ -118,7 +118,7 @@ async def test_delete_bucket_conflict_numeric_string_code():
 
 async def test_delete_bucket_nosuchbucket():
     storage = make_storage()
-    storage._s3aioclient.head_bucket = AsyncMock(
+    storage._s3aioclient.head_bucket = AsyncMock(  # type: ignore[ty:unresolved-attribute]
         return_value={"ResponseMetadata": {"HTTPStatusCode": 200}}
     )
     storage._s3aioclient.delete_bucket.side_effect = make_client_error("NoSuchBucket", 404)
@@ -164,7 +164,7 @@ async def test_exists_raises_on_other_errors():
 
 async def test_normalize_binary_content_type():
     storage = make_storage()
-    storage._s3aioclient.head_object = AsyncMock(
+    storage._s3aioclient.head_object = AsyncMock(  # type: ignore[ty:unresolved-attribute]
         return_value={
             "Metadata": {},
             "ContentLength": 100,
@@ -182,7 +182,7 @@ async def test_normalize_binary_content_type():
 
 async def test_normalize_binary_content_type_does_not_change_other_types():
     storage = make_storage(normalize_binary_content_type=True)
-    storage._s3aioclient.head_object = AsyncMock(
+    storage._s3aioclient.head_object = AsyncMock(  # type: ignore[ty:unresolved-attribute]
         return_value={
             "Metadata": {},
             "ContentLength": 50,

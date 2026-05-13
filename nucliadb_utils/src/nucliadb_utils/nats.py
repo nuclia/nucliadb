@@ -194,6 +194,7 @@ class NatsConnectionManager:
         self._last_unhealthy = time.monotonic()
 
     async def reconnected_cb(self):
+        assert self._nc.connected_url
         # See who we are connected to on reconnect.
         logger.warning(
             f"Reconnected to NATS {self._nc.connected_url.netloc}. Attempting to re-subscribe."
@@ -205,6 +206,7 @@ class NatsConnectionManager:
             self._reconnect_task = asyncio.create_task(self._reconnect())
 
     async def _reconnect(self):
+        assert self._nc.connected_url
         tries = 0
         # Loop in case we receive another reconnection request while one is ongoing
         while self._needs_reconnection:
@@ -395,7 +397,7 @@ class NatsConnectionManager:
         await self._remove_subscription(subscription)
 
         if isinstance(subscription, JetStreamContext.PullSubscription):
-            self._expected_subscriptions.remove(subscription._consumer)  # type: ignore
+            self._expected_subscriptions.remove(subscription._consumer)
 
     async def _verify_expected_subscriptions(self):
         failures = 0

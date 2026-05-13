@@ -79,30 +79,8 @@ spec:
               number: {{.Values.serving.port}}
             host: "search.{{ .Release.Namespace }}.svc.cluster.local"
 
-{{- if .Values.ask_canary.rao_kbid_regex }}
-    # Canary release (traffic shifting) for /ask endpoints by specified kbids
-    - name: nucliadb_search_canary_by_kbid
-      match:
-        - uri:
-            regex: '^/api/v\d+/kb/{{ .Values.ask_canary.rao_kbid_regex }}/ask$'
-          method:
-            regex: "POST|OPTIONS"
-        - uri:
-            regex: '^/api/v\d+/kb/{{ .Values.ask_canary.rao_kbid_regex }}/(resource|slug)/[^/]+/ask$'
-          method:
-            regex: "POST|OPTIONS"
-      route:
-        - destination:
-            host: "arag-api.arag.svc.cluster.local"
-            port:
-              number: {{ .Values.ask_canary.rao_serving_port }}
-      retries:
-        attempts: 3
-        retryOn: connect-failure,5xx
-{{- end }}
-
     # Generic canary release (traffic shifting) for /ask endpoints
-    - name: nucliadb_search_canary
+    - name: ask_endpoint
       match:
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/ask$'
@@ -114,15 +92,9 @@ spec:
             regex: "POST|OPTIONS"
       route:
         - destination:
-            host: "search.{{ .Release.Namespace }}.svc.cluster.local"
-            port:
-              number: {{ .Values.serving.port }}
-          weight: {{ .Values.ask_canary.nucliadb_weight | default 100 }}
-        - destination:
             host: "arag-api.arag.svc.cluster.local"
             port:
               number: {{ .Values.ask_canary.rao_serving_port }}
-          weight: {{ .Values.ask_canary.rao_weight | default 0 }}
       retries:
         attempts: 3
         retryOn: connect-failure,5xx

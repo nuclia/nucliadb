@@ -44,8 +44,6 @@ from nucliadb.search.augmentor.metrics import augmentor_observer
 from nucliadb.search.search import cache
 from nucliadb_models.search import TextPosition
 from nucliadb_protos import resources_pb2
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 from .extracted_text import nidx_et_cache
 
@@ -260,9 +258,7 @@ def _find_paragraph(
 async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | None:
     # we store all splits unordered inside nidx_text, so nidx can't support yet
     # conversation fields
-    if field.type != Conversation.type and has_feature(
-        const.Features.NIDX_AS_EXTRACTED_TEXT_STORAGE, context={"kbid": field.kbid}
-    ):
+    if field.type != Conversation.type:
         nidx_extracted_texts = nidx_et_cache.get()
         if nidx_extracted_texts is not None:
             text = await get_paragraph_text_from_nidx(paragraph_id)
@@ -319,7 +315,7 @@ async def get_paragraph_text_from_storage(field: Field, paragraph_id: ParagraphI
             "Dirty read: extracted text for field does not exist on DB. This should be temporal.",
             extra={
                 "kbid": field.kbid,
-                "field_id": field.resource_unique_id,
+                "field_id": field.field_id.full(),
             },
         )
         return None

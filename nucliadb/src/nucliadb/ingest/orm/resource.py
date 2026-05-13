@@ -23,10 +23,9 @@ import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from nucliadb.common import datamanagers
+from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB, FieldId
 from nucliadb.common.maindb.driver import Transaction
@@ -34,6 +33,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
+from nucliadb.ingest.fields.key_value import KeyValue
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain_v2 import FilePagePositions
@@ -81,10 +81,8 @@ KB_FIELDS: dict[int, type] = {
     FieldType.LINK: Link,
     FieldType.GENERIC: Generic,
     FieldType.CONVERSATION: Conversation,
+    FieldType.KEY_VALUE: KeyValue,
 }
-
-_executor = ThreadPoolExecutor(10)
-
 
 PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.PLAIN: "text/plain",
@@ -347,6 +345,7 @@ class Resource:
         if self.all_fields_keys is None:
             self.all_fields_keys = []
         self.all_fields_keys.append(field)
+
         self.modified = True
         return field_obj
 
@@ -361,7 +360,6 @@ class Resource:
         if self.all_fields_keys is not None:
             if field in self.all_fields_keys:
                 self.all_fields_keys.remove(field)
-
         await field_obj.delete()
 
     async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
@@ -434,6 +432,7 @@ class Resource:
         for field, file in message.files.items():
             fid = FieldID(field_type=FieldType.FILE, field=field)
             await self.set_field(fid.field_type, fid.field, file)
+            await self.set_file_field_md5(field, file.file)
             message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
@@ -441,8 +440,15 @@ class Resource:
             await self.set_field(fid.field_type, fid.field, conversation)
             message_updated_fields.append(fid)
 
+        for field, kv in message.key_value_fields.items():
+            fid = FieldID(field_type=FieldType.KEY_VALUE, field=field)
+            await self.set_field(fid.field_type, fid.field, kv)
+            message_updated_fields.append(fid)
+
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
+            if fieldid.field_type == FieldType.FILE:
+                await self.delete_file_field_md5(fieldid.field)
 
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
             await self.update_all_field_ids(
@@ -451,6 +457,23 @@ class Resource:
                 errors=message.errors,  # type: ignore
             )
             self.modified = True
+
+    async def set_file_field_md5(self, field_id: str, file: CloudFile):
+        """
+        Record file MD5 hashes for deduplication checks.
+        """
+        if not file.md5:
+            # To be safe, delete any existing MD5 record for this field if the new file doesn't have an MD5.
+            # This is for PUT operations where the file is being replaced but the new md5 is not provided.
+            await self.delete_file_field_md5(field_id)
+        else:
+            await file_md5.set(self.txn, kbid=self.kbid, md5=file.md5, rid=self.uuid, field_id=field_id)
+
+    async def delete_file_field_md5(self, field_id: str):
+        """
+        Delete file MD5 hash records for a given field.
+        """
+        await file_md5.delete(self.txn, kbid=self.kbid, rid=self.uuid, field_id=field_id)
 
     @processor_observer.wrap({"type": "apply_fields_status"})
     async def apply_fields_status(self, message: BrokerMessage, updated_fields: list[FieldID]):
@@ -602,7 +625,6 @@ class Resource:
 
         for link_extracted_data in message.link_extracted_data:
             await self._apply_link_extracted_data(link_extracted_data)
-            await self.maybe_update_resource_title_from_link(link_extracted_data)
             extracted_languages.append(link_extracted_data.language)
 
         for file_extracted_data in message.file_extracted_data:
@@ -675,6 +697,7 @@ class Resource:
 
         maybe_update_basic_icon(self.basic, "application/stf-link")
 
+        await self.maybe_update_resource_title_from_link(link_extracted_data)
         maybe_update_basic_summary(self.basic, link_extracted_data.description)
         self.modified = True
 
@@ -699,23 +722,28 @@ class Resource:
             extra={"kbid": self.kbid, "field": link_extracted_data.field, "rid": self.uuid},
         )
         title = link_extracted_data.title
+        # FIXME: this doesn't properly index the new title. See sc-6088 for more details
         await self.update_resource_title(title)
         await self.unmark_title_for_reset()
         self.modified = True
 
     async def update_resource_title(self, computed_title: str) -> None:
         assert self.basic is not None
-        self.basic.title = computed_title
+
+        field_id_pb = FieldID(field="title", field_type=FieldType.GENERIC)
+
         # Extracted text
         field = await self.get_field("title", FieldType.GENERIC, load=False)
+        await field.set_value(computed_title)
+
         etw = ExtractedTextWrapper()
+        etw.field.CopyFrom(field_id_pb)
         etw.body.text = computed_title
         await field.set_extracted_text(etw)
 
         # Field computed metadata
         fcmw = FieldComputedMetadataWrapper()
-        fcmw.field.field = "title"
-        fcmw.field.field_type = FieldType.GENERIC
+        fcmw.field.CopyFrom(field_id_pb)
 
         # Merge with any existing field computed metadata
         fcm = await field.get_field_metadata(force=True)
@@ -726,6 +754,7 @@ class Resource:
         fcmw.metadata.metadata.paragraphs.append(paragraph)
 
         await field.set_field_metadata(fcmw)
+        self._modified_extracted_text.append(field_id_pb)
         self.modified = True
 
     async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
@@ -841,7 +870,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,
@@ -879,7 +908,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,
@@ -913,7 +942,7 @@ class Resource:
             if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
-                return
+                continue
 
             field_obj = await self.get_field(
                 field_vectors.field.field,

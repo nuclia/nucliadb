@@ -46,21 +46,15 @@ class Conversation(Field[PBConversation]):
 
     _created: bool = False
 
-    def __init__(
-        self,
-        id: str,
-        resource: Any,
-        pb: Any | None = None,
-        value: dict[int, PBConversation] | None = None,
-    ):
-        super().__init__(id, resource, pb, value)
+    def __init__(self, id: str, resource: Any):
+        super().__init__(id, resource)
         self.value = {}
         self._splits_metadata: SplitsMetadata | None = None
         self.metadata = None
 
     async def delete_value(self):
         await self.resource.txn.delete_by_prefix(
-            CONVERSATION_METADATA.format(kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id)
+            CONVERSATION_METADATA.format(kbid=self.kbid, uuid=self.rid, type=self.type, field=self.id)
         )
         self._split_metadata = None
         self.metadata = None
@@ -101,7 +95,7 @@ class Conversation(Field[PBConversation]):
                     else:
                         message_ident = message.ident
                     sf: StorageField = self.storage.conversation_field_attachment(
-                        self.kbid, self.uuid, self.id, message_ident, attachment_index=idx
+                        self.kbid, self.rid, self.id, message_ident, attachment_index=idx
                     )
                     cf: CloudFile = await self.storage.normalize_binary(file, sf)
                     new_message_files.append(cf)
@@ -172,7 +166,7 @@ class Conversation(Field[PBConversation]):
         if self.metadata is None:
             payload = await self.resource.txn.get(
                 CONVERSATION_METADATA.format(
-                    kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id
+                    kbid=self.kbid, uuid=self.rid, type=self.type, field=self.id
                 )
             )
             self.metadata = FieldConversation()
@@ -192,7 +186,7 @@ class Conversation(Field[PBConversation]):
         if self.value.get(page) is None:
             field_key = CONVERSATION_PAGE_VALUE.format(
                 kbid=self.kbid,
-                uuid=self.uuid,
+                uuid=self.rid,
                 type=self.type,
                 field=self.id,
                 page=page,
@@ -206,7 +200,7 @@ class Conversation(Field[PBConversation]):
 
     async def db_set_value(self, payload: PBConversation, page: int = 0):
         field_key = CONVERSATION_PAGE_VALUE.format(
-            kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id, page=page
+            kbid=self.kbid, uuid=self.rid, type=self.type, field=self.id, page=page
         )
         await self.resource.txn.set(
             field_key,
@@ -217,7 +211,7 @@ class Conversation(Field[PBConversation]):
 
     async def db_set_metadata(self, payload: FieldConversation):
         await self.resource.txn.set(
-            CONVERSATION_METADATA.format(kbid=self.kbid, uuid=self.uuid, type=self.type, field=self.id),
+            CONVERSATION_METADATA.format(kbid=self.kbid, uuid=self.rid, type=self.type, field=self.id),
             payload.SerializeToString(),
         )
         self.metadata = payload
@@ -228,7 +222,7 @@ class Conversation(Field[PBConversation]):
         if self._splits_metadata is None:
             field_key = CONVERSATION_SPLITS_METADATA.format(
                 kbid=self.kbid,
-                uuid=self.uuid,
+                uuid=self.rid,
                 type=self.type,
                 field=self.id,
             )
@@ -242,7 +236,7 @@ class Conversation(Field[PBConversation]):
     async def set_splits_metadata(self, payload: SplitsMetadata) -> None:
         key = CONVERSATION_SPLITS_METADATA.format(
             kbid=self.kbid,
-            uuid=self.uuid,
+            uuid=self.rid,
             type=self.type,
             field=self.id,
         )

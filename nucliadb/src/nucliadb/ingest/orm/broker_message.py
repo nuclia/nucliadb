@@ -156,6 +156,15 @@ class _BrokerMessageBuilder:
             field = cast(Conversation, field)
             value = await field.get_full_conversation()
             self.bm.conversations[field_id].CopyFrom(value)
+        elif type_id == FieldType.KEY_VALUE:
+            value = await field.get_value()
+            if value is not None:
+                self.bm.key_value_fields[field_id].CopyFrom(value)
+        elif type_id == FieldType.GENERIC:
+            # Generic fields (title, summary) are stored in basic, already exported above
+            pass
+        else:
+            raise NotImplementedError(f"Unhandled field type in broker message generation: {type_id}")
 
     async def generate_extracted_text(
         self,

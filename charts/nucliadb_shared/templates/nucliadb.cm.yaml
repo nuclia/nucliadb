@@ -27,12 +27,13 @@ data:
   GCS_PROJECT: {{ .Values.storage.gcs_project }}
   GCS_BUCKET_LABELS: {{ toJson .Values.storage.gcs_bucket_labels | quote }}
 {{- else if eq .Values.storage.file_backend "s3" }}
-{{- if .Values.storage.s3_endpoint }}
+{{- with .Values.storage.s3_endpoint }}
   S3_ENDPOINT: {{ . }}
 {{- end }}
 {{- if .Values.storage.s3_ssl }}
   S3_SSL: "True"
 {{- end }}
+  S3_VERIFY_SSL: {{ .Values.storage.s3_verify_ssl | quote }}
   S3_MAX_POOL_CONNECTIONS: {{ .Values.storage.s3_max_pool_connections | quote }}
   S3_REGION_NAME: {{ .Values.storage.s3_region_name }}
   S3_BUCKET: {{ .Values.storage.s3_bucket }}

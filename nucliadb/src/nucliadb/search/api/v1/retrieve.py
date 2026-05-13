@@ -34,6 +34,7 @@ from nucliadb.search.search.query_parser.parsers.retrieve import parse_retrieve
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import get_rephrased_query
 from nucliadb.search.search.rerankers import RerankableItem, Reranker, RerankingOptions, get_reranker
 from nucliadb.search.search.retrieval import text_block_search
+from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.retrieval import (
     Metadata,
     RerankerScore,
@@ -43,6 +44,7 @@ from nucliadb_models.retrieval import (
     Scores,
 )
 from nucliadb_models.search import NucliaDBClientType
+from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_audit
 
 
@@ -53,6 +55,7 @@ from nucliadb_utils.utilities import get_audit
     include_in_schema=False,
     tags=["Search"],
 )
+@requires(NucliaDBRoles.READER)
 @version(1)
 async def _retrieve_endpoint(
     request: Request,

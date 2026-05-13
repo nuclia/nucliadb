@@ -51,13 +51,14 @@ from nucliadb.writer.resource.field import (
     get_stored_resource_classifications,
     parse_conversation_field,
     parse_file_field,
+    parse_key_value_field,
     parse_link_field,
     parse_text_field,
 )
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
-from nucliadb_models.writer import ResourceFieldAdded, ResourceUpdated
+from nucliadb_models.writer import KeyValueField, ResourceFieldAdded, ResourceUpdated
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import FieldID, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
@@ -73,7 +74,13 @@ if TYPE_CHECKING:  # pragma: no cover
 else:
     FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP: dict[models.FieldTypeName, int]
 
-FieldModelType = models.TextField | models.LinkField | models.InputConversationField | models.FileField
+FieldModelType = (
+    models.TextField
+    | models.LinkField
+    | models.InputConversationField
+    | models.FileField
+    | KeyValueField
+)
 
 FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP = {
     models.FieldTypeName.FILE: resources_pb2.FieldType.FILE,
@@ -81,6 +88,7 @@ FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP = {
     models.FieldTypeName.TEXT: resources_pb2.FieldType.TEXT,
     # models.FieldTypeName.GENERIC: resources_pb2.FieldType.GENERIC,
     models.FieldTypeName.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
+    models.FieldTypeName.KEY_VALUE: resources_pb2.FieldType.KEY_VALUE,
 }
 
 
@@ -274,15 +282,70 @@ async def parse_file_field_adapter(
     )
 
 
+async def parse_key_value_field_adapter(
+    kbid: str,
+    _rid: str,
+    field_id: FieldIdString,
+    field_payload: KeyValueField,
+    writer: BrokerMessage,
+    toprocess: PushPayload,
+    resource_classifications: ResourceClassifications,
+):
+    return await parse_key_value_field(field_id, field_payload, writer, kbid=kbid)
+
+
 FIELD_PARSERS_MAP: dict[type, Callable] = {
     models.TextField: parse_text_field_adapter,
     models.LinkField: parse_link_field_adapter,
     models.InputConversationField: parse_conversation_field_adapter,
     models.FileField: parse_file_field_adapter,
+    KeyValueField: parse_key_value_field_adapter,
 }
 
 
 # API endpoints
+
+# Key-value field endpoints — follow the same pattern as text, link, file, conversation.
+
+
+@api.put(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/key_value/{{field_id}}",
+    status_code=201,
+    summary="Add resource key-value field (by slug)",
+    response_model=ResourceFieldAdded,
+    tags=["Resource fields"],
+    include_in_schema=False,
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def add_resource_field_key_value_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_id: FieldIdString,
+    item: KeyValueField,
+):
+    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, item)
+
+
+@api.put(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/key_value/{{field_id}}",
+    status_code=201,
+    summary="Add resource key-value field (by id)",
+    response_model=ResourceFieldAdded,
+    tags=["Resource fields"],
+    include_in_schema=False,
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def add_resource_field_key_value_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: FieldIdString,
+    item: KeyValueField,
+):
+    return await add_field_to_resource(request, kbid, rid, field_id, item)
 
 
 @api.put(

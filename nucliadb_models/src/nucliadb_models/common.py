@@ -192,6 +192,7 @@ class FieldTypeName(str, Enum):
     LINK = "link"
     CONVERSATION = "conversation"
     GENERIC = "generic"
+    KEY_VALUE = "key_value"
 
     @classmethod
     def from_abbreviation(cls, abbr: str) -> "FieldTypeName":
@@ -201,6 +202,7 @@ class FieldTypeName(str, Enum):
             "u": FieldTypeName.LINK,
             "c": FieldTypeName.CONVERSATION,
             "a": FieldTypeName.GENERIC,
+            "k": FieldTypeName.KEY_VALUE,
         }[abbr]
 
     def abbreviation(self) -> str:
@@ -210,6 +212,7 @@ class FieldTypeName(str, Enum):
             FieldTypeName.LINK: "u",
             FieldTypeName.CONVERSATION: "c",
             FieldTypeName.GENERIC: "a",
+            FieldTypeName.KEY_VALUE: "k",
         }[self]
 
 

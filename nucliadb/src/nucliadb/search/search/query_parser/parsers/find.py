@@ -22,7 +22,10 @@ from nidx_protos import nodereader_pb2
 from pydantic import ValidationError
 
 from nucliadb.common.exceptions import InvalidQueryError
-from nucliadb.common.filter_expression import parse_expression
+from nucliadb.common.filter_expression import (
+    parse_expression,
+    parse_kv_filter_expression_with_validation,
+)
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
@@ -228,9 +231,14 @@ class _FindParser:
             )
             field_expr, paragraph_expr = await parse_old_filters(old_filters, self.fetcher)
 
+        json_expr = None
         if self.item.filter_expression is not None:
             if self.item.filter_expression.field:
                 field_expr = await parse_expression(self.item.filter_expression.field, self.kbid)
+            if self.item.filter_expression.key_value:
+                json_expr = await parse_kv_filter_expression_with_validation(
+                    self.item.filter_expression.key_value, self.kbid
+                )
             if self.item.filter_expression.paragraph:
                 paragraph_expr = await parse_expression(self.item.filter_expression.paragraph, self.kbid)
             if self.item.filter_expression.operator == FilterExpression.Operator.OR:
@@ -246,6 +254,7 @@ class _FindParser:
             field_expression=field_expr,
             paragraph_expression=paragraph_expr,
             filter_expression_operator=filter_operator,
+            json_expression=json_expr,
             security=security,
             hidden=hidden,
             with_duplicates=self.item.with_duplicates,

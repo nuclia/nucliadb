@@ -155,16 +155,21 @@ def test_ask_response_parser_stream():
     assert ask_response.answer == "This is your Nuclia answer."
     assert ask_response.reasoning == "test reasoning."
     assert ask_response.status == "success"
+    assert ask_response.relations
     assert ask_response.relations.entities["Nuclia"].related_to[0].entity == "Semantic Search"
     assert ask_response.relations.entities["Nuclia"].related_to[0].entity_subtype == "concept"
     assert ask_response.citations["some/paragraph/id"] == "This is a citation"
     assert ask_response.retrieval_results.resources == {}
+    assert ask_response.metadata
+    assert ask_response.metadata.tokens
     assert ask_response.metadata.tokens.input == 10
     assert ask_response.metadata.tokens.output == 5
     assert ask_response.metadata.tokens.input_nuclia == 0.01
     assert ask_response.metadata.tokens.output_nuclia == 0.005
+    assert ask_response.metadata.timings
     assert ask_response.metadata.timings.generative_first_chunk == 0.1
     assert ask_response.metadata.timings.generative_total == 0.2
+    assert ask_response.consumption
     assert ask_response.consumption.normalized_tokens.input == 1
     assert ask_response.consumption.normalized_tokens.output == 2
     assert ask_response.consumption.normalized_tokens.image == 3
@@ -231,16 +236,21 @@ async def test_ask_response_parser_async_stream():
     assert ask_response.answer == "This is your Nuclia answer."
     assert ask_response.reasoning == "test reasoning."
     assert ask_response.status == "success"
+    assert ask_response.relations
     assert ask_response.relations.entities["Nuclia"].related_to[0].entity == "Semantic Search"
     assert ask_response.relations.entities["Nuclia"].related_to[0].entity_subtype == "concept"
     assert ask_response.citations["some/paragraph/id"] == "This is a citation"
     assert ask_response.retrieval_results.resources == {}
+    assert ask_response.metadata
+    assert ask_response.metadata.tokens
     assert ask_response.metadata.tokens.input == 10
     assert ask_response.metadata.tokens.output == 5
     assert ask_response.metadata.tokens.input_nuclia == 0.01
     assert ask_response.metadata.tokens.output_nuclia == 0.005
+    assert ask_response.metadata.timings
     assert ask_response.metadata.timings.generative_first_chunk == 0.1
     assert ask_response.metadata.timings.generative_total == 0.2
+    assert ask_response.consumption
     assert ask_response.consumption.normalized_tokens.input == 1
     assert ask_response.consumption.normalized_tokens.output == 2
     assert ask_response.consumption.normalized_tokens.image == 3

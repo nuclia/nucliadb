@@ -43,6 +43,7 @@ pub enum IndexKind {
     Relation,
     VectorRelationNode,
     VectorRelationEdge,
+    Json,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, sqlx::Type, Serialize, Deserialize)]
@@ -81,6 +82,7 @@ pub enum IndexConfig {
     Relation(RelationConfig),
     VectorRelationNode(VectorConfig),
     VectorRelationEdge(VectorConfig),
+    Json(()),
 }
 
 impl Index {
@@ -299,6 +301,7 @@ impl IndexConfig {
             Self::Relation(_) => IndexKind::Relation,
             Self::VectorRelationNode(_) => IndexKind::VectorRelationNode,
             Self::VectorRelationEdge(_) => IndexKind::VectorRelationEdge,
+            Self::Json(_) => IndexKind::Json,
         }
     }
 }
@@ -315,6 +318,7 @@ impl Serialize for IndexConfig {
             Self::Relation(config) => config.serialize(serializer),
             Self::VectorRelationNode(config) => config.serialize(serializer),
             Self::VectorRelationEdge(config) => config.serialize(serializer),
+            Self::Json(config) => config.serialize(serializer),
         }
     }
 }
@@ -347,16 +351,16 @@ impl IndexConfig {
         Self::Text(TextConfig::default())
     }
 
-    pub fn new_text_with(version: u64) -> Self {
-        Self::Text(TextConfig { version })
-    }
-
     pub fn new_paragraph() -> Self {
         Self::Paragraph(())
     }
 
     pub fn new_relation() -> Self {
         Self::Relation(RelationConfig::default())
+    }
+
+    pub fn new_json() -> Self {
+        Self::Json(())
     }
 }
 
@@ -379,7 +383,7 @@ mod tests {
         let index = Index::create(&meta.pool, shard.id, "multilingual", IndexConfig::new_text())
             .await
             .unwrap();
-        assert_eq!(index.config::<TextConfig>()?.version, 4);
+        assert_eq!(index.config::<TextConfig>()?.version, 5);
 
         // Default version if DB is empty is 1
         sqlx::query("UPDATE indexes SET configuration = NULL")

@@ -20,6 +20,7 @@
 
 
 import asyncio
+import json
 from collections.abc import Sequence
 
 from nidx_protos.noderesources_pb2 import Resource as IndexMessage
@@ -28,6 +29,7 @@ from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb.ingest.fields.file import File
+from nucliadb.ingest.fields.key_value import KeyValue
 from nucliadb.ingest.orm.brain_v2 import ResourceBrain
 from nucliadb.ingest.orm.metrics import index_message_observer as observer
 from nucliadb.ingest.orm.resource import Resource, get_file_page_positions
@@ -177,6 +179,12 @@ class IndexMessageBuilder:
                             vectorset_config.vectorset_id,
                         )
 
+        if isinstance(field, KeyValue):
+            field_value = await field.get_value()
+            if field_value is not None:
+                kv_dict = json.loads(field_value.data)
+                brain.generate_json(self.resource.generate_field_id(fieldid), kv_dict)
+
     def _apply_field_deletions(
         self,
         brain: ResourceBrain,
@@ -240,6 +248,9 @@ class IndexMessageBuilder:
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()
         fields_to_index = get_bm_modified_fields(message)
+        fields_to_index.extend(
+            [x for x in self.resource._modified_extracted_text if x not in fields_to_index]
+        )
         vectorsets_configs = await self.get_vectorsets_configs()
         for fieldid in fields_to_index:
             if fieldid in message.delete_fields:
@@ -261,8 +272,14 @@ class IndexMessageBuilder:
                 self.brain,
                 fieldid,
                 basic,
-                texts=needs_texts_update(fieldid, message),
-                paragraphs=needs_paragraphs_update(fieldid, message),
+                texts=(
+                    needs_texts_update(fieldid, message)
+                    or fieldid in self.resource._modified_extracted_text
+                ),
+                paragraphs=(
+                    needs_paragraphs_update(fieldid, message)
+                    or fieldid in self.resource._modified_extracted_text
+                ),
                 relations=needs_relations_update(fieldid, message),
                 vectors=needs_vectors_update(fieldid, message),
                 replace=replace_field,
@@ -323,6 +340,8 @@ def get_bm_modified_fields(message: BrokerMessage) -> list[FieldID]:
         modified.add((conv, FieldType.CONVERSATION))
     for text in message.texts:
         modified.add((text, FieldType.TEXT))
+    for kv in message.key_value_fields:
+        modified.add((kv, FieldType.KEY_VALUE))
     if message.HasField("basic"):
         # Add title and summary only if they have changed
         if message.basic.title != "":

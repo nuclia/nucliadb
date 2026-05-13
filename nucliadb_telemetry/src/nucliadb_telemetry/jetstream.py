@@ -20,13 +20,14 @@ from typing import Any
 from urllib.parse import ParseResult
 
 import nats
+import nats.js
 from nats.aio.client import DEFAULT_FLUSH_TIMEOUT, Client
 from nats.aio.msg import Msg
 from nats.aio.subscription import Subscription
 from nats.js.client import JetStreamContext
 from opentelemetry.propagate import extract, inject
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.semconv.trace import SpanAttributes
+from opentelemetry.semconv._incubating.attributes import messaging_attributes
 from opentelemetry.trace import SpanKind, Tracer
 
 from nucliadb_telemetry import logger, metrics
@@ -63,9 +64,9 @@ msg_sent_counter = metrics.Counter("nuclia_nats_msg_sent", labels={"subject": ""
 
 def start_span_message_receiver(tracer: Tracer, msg: Msg):
     attributes: dict[str, str | int] = {
-        SpanAttributes.MESSAGING_DESTINATION_KIND: "nats",
-        SpanAttributes.MESSAGING_MESSAGE_PAYLOAD_SIZE_BYTES: len(msg.data),
-        SpanAttributes.MESSAGING_MESSAGE_ID: msg.reply,
+        messaging_attributes.MESSAGING_SYSTEM: "nats",
+        messaging_attributes.MESSAGING_MESSAGE_BODY_SIZE: len(msg.data),
+        messaging_attributes.MESSAGING_MESSAGE_ID: msg.reply,
     }
 
     # add some attributes from the metadata
@@ -83,11 +84,11 @@ def start_span_message_receiver(tracer: Tracer, msg: Msg):
 
 def start_span_message_publisher(tracer: Tracer, subject: str):
     attributes = {
-        SpanAttributes.MESSAGING_DESTINATION_KIND: "nats",
-        SpanAttributes.MESSAGING_DESTINATION: subject,
+        messaging_attributes.MESSAGING_SYSTEM: "nats",
+        messaging_attributes.MESSAGING_DESTINATION_NAME: subject,
     }
 
-    span = tracer.start_as_current_span(  # type: ignore
+    span = tracer.start_as_current_span(
         name=f"Published on {subject}",
         kind=SpanKind.CLIENT,
         attributes=attributes,
@@ -175,7 +176,7 @@ class JetStreamContextTelemetry:
         stream: str | None = None,
         config: nats.js.api.ConsumerConfig | None = None,
     ) -> JetStreamContext.PullSubscription:
-        return await self.js.pull_subscribe(subject, durable=durable, stream=stream, config=config)  # type: ignore
+        return await self.js.pull_subscribe(subject, durable=durable, stream=stream, config=config)
 
     async def pull_subscribe_bind(self, *args, **kwargs) -> JetStreamContext.PullSubscription:
         return await self.js.pull_subscribe_bind(*args, **kwargs)

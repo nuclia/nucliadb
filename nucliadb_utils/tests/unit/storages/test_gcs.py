@@ -32,7 +32,7 @@ from nucliadb_utils.storages.gcs import (
 
 @pytest.fixture(scope="function")
 def storage_field():
-    yield GCSStorageField("bucket", "fullkey", "field")
+    yield GCSStorageField(None, "bucket", "fullkey", None)  # type: ignore[ty:invalid-argument-type]  # First param should be a storage, ignoring it for unit testing
 
 
 @pytest.fixture(scope="function")
@@ -51,13 +51,11 @@ class MockInnerIterData:
         self.await_count += 1
         if self.error:
             raise self.error
-        for item in self.to_yield:
+        for item in self.to_yield or []:
             yield item
 
 
-@pytest.mark.parametrize(
-    "error", [GoogleCloudException, aiohttp.client_exceptions.ServerDisconnectedError]
-)
+@pytest.mark.parametrize("error", [GoogleCloudException, aiohttp.ServerDisconnectedError])
 async def test_iter_data_error_retries(storage_field, error, asyncio_sleep):
     storage_field._inner_iter_data = MockInnerIterData(error=error)
 

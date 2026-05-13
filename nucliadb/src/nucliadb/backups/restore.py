@@ -36,12 +36,14 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import (
     import_binary,
     restore_broker_message,
+    set_kv_schemas,
     set_labels,
     set_search_configurations,
     set_synonyms,
 )
 from nucliadb.tasks.retries import TaskRetryHandler
 from nucliadb_models.configuration import SearchConfiguration
+from nucliadb_models.kv_schemas import KBKVSchemas
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -76,6 +78,7 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
     await restore_labels(context, kbid, backup_id)
     await restore_synonyms(context, kbid, backup_id)
     await restore_search_configurations(context, kbid, backup_id)
+    await restore_kv_schemas(context, kbid, backup_id)
     await delete_last_restored(context, kbid, backup_id)
 
 
@@ -281,3 +284,16 @@ async def restore_search_configurations(context: ApplicationContext, kbid: str, 
         config: SearchConfiguration = TypeAdapter(SearchConfiguration).validate_python(data)
         search_configurations[name] = config
     await set_search_configurations(context, kbid, search_configurations)
+
+
+async def restore_kv_schemas(context: ApplicationContext, kbid: str, backup_id: str):
+    raw = await context.blob_storage.downloadbytes(
+        bucket=settings.backups_bucket,
+        key=StorageKeys.KV_SCHEMAS.format(backup_id=backup_id),
+    )
+    value = raw.getvalue()
+    if not value:
+        # No KV schemas to restore
+        return
+    schemas = KBKVSchemas.model_validate_json(value)
+    await set_kv_schemas(context, kbid, schemas)

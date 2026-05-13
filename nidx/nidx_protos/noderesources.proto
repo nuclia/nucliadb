@@ -10,6 +10,10 @@ message TextInformation {
     repeated string labels = 2;
 }
 
+message JsonFieldValue {
+    string value = 1; // JSON-encoded string
+}
+
 message IndexMetadata {
     google.protobuf.Timestamp modified = 1; // Tantivy doc & para
     google.protobuf.Timestamp created = 2; // Tantivy doc & para
@@ -162,9 +166,14 @@ message Resource {
 
     optional utils.Security security = 14;
 
+    // Json index
+    map<string, JsonFieldValue> json_fields = 22;
+    repeated string json_fields_to_delete = 23;
+
     // Boleans to indicate if the indexing needs to be done
     bool skip_texts = 18;
     bool skip_paragraphs = 19;
+    bool skip_json = 24;
 
     map<string, utils.RelationNodeVectors> relation_node_vectors = 20;
     map<string, utils.RelationEdgeVectors> relation_edge_vectors = 21;

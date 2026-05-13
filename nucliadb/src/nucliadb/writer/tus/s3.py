@@ -186,14 +186,16 @@ class S3BlobStore(BlobStore):
 
     async def initialize(
         self,
-        client_id,
-        client_secret,
-        ssl,
-        verify_ssl: bool | str,
-        max_pool_connections,
-        endpoint_url,
-        region_name,
-        bucket,
+        client_id: str | None,
+        client_secret: str | None,
+        ssl: bool,
+        verify_ssl: bool,
+        max_pool_connections: int,
+        endpoint_url: str | None,
+        region_name: str | None,
+        bucket: str,
+        use_path_addressing_style: bool,
+        disable_checksums: bool,
         bucket_tags: dict[str, str] | None = None,
         kms_key_id: str | None = None,
     ):
@@ -205,6 +207,10 @@ class S3BlobStore(BlobStore):
 
         self._exit_stack = AsyncExitStack()
 
+        s3_config = {}
+        if use_path_addressing_style:
+            s3_config["addressing_style"] = "path"
+
         self.opts = dict(
             aws_secret_access_key=client_secret,
             aws_access_key_id=client_id,
@@ -212,7 +218,19 @@ class S3BlobStore(BlobStore):
             verify=verify_ssl,
             use_ssl=ssl,
             region_name=region_name,
-            config=aiobotocore.config.AioConfig(None, max_pool_connections=max_pool_connections),
+            config=aiobotocore.config.AioConfig(
+                None,
+                max_pool_connections=max_pool_connections,
+                s3=s3_config,
+                **(
+                    {
+                        "request_checksum_calculation": "when_required",
+                        "response_checksum_validation": "when_required",
+                    }
+                    if disable_checksums
+                    else {}
+                ),
+            ),
         )
         session = AioSession()
         self._s3aioclient = await self._exit_stack.enter_async_context(

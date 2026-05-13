@@ -325,6 +325,41 @@ enum FilterOperator {
     OR = 1;
 }
 
+message JsonFieldPathFilter {
+    string field_id  = 1;  // NucliaDB field id, e.g. "t/title"
+    string json_path = 2;  // Dot-separated path inside the JSON, e.g. "product.price"
+
+    message IntegerRangePredicate {
+        optional int64 lower = 1;
+        optional int64 upper = 2;
+    }
+
+    message FloatRangePredicate {
+        optional double lower = 1;
+        optional double upper = 2;
+    }
+
+    oneof predicate {
+        string text = 3;
+        IntegerRangePredicate int_range   = 4;
+        FloatRangePredicate float_range = 5;
+        bool boolean = 6;
+    }
+}
+
+message JsonFilterExpression {
+    message List {
+        repeated JsonFilterExpression operands = 1;
+    }
+
+    oneof expr {
+        List                  bool_and = 1;
+        List                  bool_or  = 2;
+        JsonFilterExpression  bool_not = 3;
+        JsonFieldPathFilter   path     = 4;
+    }
+}
+
 message SearchRequest {
     reserved 7, 20, 21;
 
@@ -369,6 +404,8 @@ message SearchRequest {
         GraphQuery query = 1;
     }
     GraphSearch graph_search = 29;
+
+    optional JsonFilterExpression json_filter = 32;
 }
 
 enum SuggestFeatures {

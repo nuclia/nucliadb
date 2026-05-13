@@ -27,7 +27,7 @@ from grpc import StatusCode
 from grpc.aio import AioRpcError
 from nidx_protos import nidx_pb2, noderesources_pb2
 
-from nucliadb.common import datamanagers
+from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 
@@ -439,6 +439,8 @@ class KnowledgeBox:
 
             await catalog_delete_kb(txn, kbid)
 
+            await file_md5.delete(txn, kbid=kbid)
+
             # Delete KB Shards
             shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
             if shards_obj is None:
@@ -490,8 +492,8 @@ class KnowledgeBox:
             except Exception:
                 logger.exception("Error deleting slug")
 
-    async def storage_delete_resource(self, uuid: str, synchronous: bool = False):
-        if is_onprem_nucliadb() or synchronous:
+    async def storage_delete_resource(self, uuid: str):
+        if is_onprem_nucliadb():
             await self.storage.delete_resource(self.kbid, uuid)
         else:
             # Deleting from storage can be slow, so we schedule its deletion and the purge cronjob
@@ -502,11 +504,11 @@ class KnowledgeBox:
         key = RESOURCE_TO_DELETE_STORAGE.format(kbid=kbid, uuid=uuid)
         await self.txn.set(key, b"")
 
-    async def delete_resource(self, uuid: str, storage_synchronous: bool = False):
+    async def delete_resource(self, uuid: str):
         with processor_observer({"type": "delete_resource_maindb"}):
             await self.maindb_delete_resource(uuid)
         with processor_observer({"type": "delete_resource_storage"}):
-            await self.storage_delete_resource(uuid, synchronous=storage_synchronous)
+            await self.storage_delete_resource(uuid)
 
     async def get_resource_uuid_by_slug(self, slug: str) -> str | None:
         return await datamanagers.resources.get_resource_uuid_from_slug(

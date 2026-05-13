@@ -208,6 +208,8 @@ class _Converter:
             self.req.field_filter.CopyFrom(self.retrieval.filters.field_expression)
         if self.retrieval.filters.paragraph_expression:
             self.req.paragraph_filter.CopyFrom(self.retrieval.filters.paragraph_expression)
+        if self.retrieval.filters.json_expression is not None:
+            self.req.json_filter.CopyFrom(self.retrieval.filters.json_expression)
         self.req.filter_operator = self.retrieval.filters.filter_expression_operator
 
         if self.retrieval.filters.hidden is not None:

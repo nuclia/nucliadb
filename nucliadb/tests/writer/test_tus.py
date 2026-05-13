@@ -32,7 +32,7 @@ from nucliadb_utils.storages.storage import KB_RESOURCE_FIELD
 
 
 @pytest.fixture(scope="function")
-async def s3_storage_tus(s3):
+async def s3_storage_tus(s3: str):
     storage = S3BlobStore()
     await storage.initialize(
         client_id="",
@@ -43,6 +43,8 @@ async def s3_storage_tus(s3):
         ssl=False,
         region_name=None,
         bucket="test_{kbid}",
+        use_path_addressing_style=True,
+        disable_checksums=False,
         bucket_tags={"testTag": "test"},
         kms_key_id="test_kms_key_id",
     )
@@ -51,7 +53,7 @@ async def s3_storage_tus(s3):
 
 
 @pytest.fixture(scope="function")
-async def gcs_storage_tus(gcs):
+async def gcs_storage_tus(gcs: str):
     storage = GCloudBlobStore()
     await storage.initialize(
         json_credentials=None,

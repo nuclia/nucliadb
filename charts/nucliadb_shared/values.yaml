@@ -37,6 +37,7 @@ storage:
   s3_client_id: XX
   s3_client_secret: XX
   s3_ssl: True
+  s3_verify_ssl: True
   s3_max_pool_connections: 30
   s3_region_name: XX
   s3_bucket: nucliadb-{kbid}

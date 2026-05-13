@@ -83,6 +83,7 @@ async def src_kb(
     )
     assert resp.status_code == 204
 
+    first_rid = None
     # Create some simple resources with a text field
     for i in range(N_RESOURCES):
         resp = await nucliadb_writer.post(
@@ -101,7 +102,8 @@ async def src_kb(
         )
         assert resp.status_code == 201
         rid = resp.json()["uuid"]
-
+        if first_rid is None:
+            first_rid = rid
         # Add some binary files to backup
         content = b"Test for /upload endpoint"
         resp = await nucliadb_writer.post(
@@ -126,6 +128,27 @@ async def src_kb(
         },
     )
     assert resp.status_code == 200
+
+    # Create a KV schema and attach a KV field to the first resource
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/kv-schemas",
+        json={
+            "name": "product",
+            "fields": [
+                {"key": "color", "type": "text", "required": True},
+                {"key": "price", "type": "float", "required": True},
+            ],
+        },
+    )
+    assert resp.status_code == 201
+
+    assert first_rid is not None
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/resource/{first_rid}/key_value/product",
+        json={"schema_id": "product", "data": {"color": "red", "price": 9.99}},
+    )
+    assert resp.status_code == 201
+
     yield kbid
 
 
@@ -197,6 +220,7 @@ async def check_kb(nucliadb_reader: AsyncClient, kbid: str):
     await check_synonyms(nucliadb_reader, kbid)
     await check_search_configuration(nucliadb_reader, kbid)
     await check_labelset(nucliadb_reader, kbid)
+    await check_kv_schema(nucliadb_reader, kbid)
 
 
 async def check_synonyms(nucliadb_reader: AsyncClient, kbid: str):
@@ -226,6 +250,29 @@ async def check_labelset(nucliadb_reader: AsyncClient, kbid: str):
     label = labels[0]
     assert label["title"] == "Foo title"
     assert label["text"] == "Foo text"
+
+
+async def check_kv_schema(nucliadb_reader: AsyncClient, kbid: str):
+    # Schema itself must be restored
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/kv-schemas/product")
+    assert resp.status_code == 200
+    schema = resp.json()
+    assert schema["name"] == "product"
+    assert len(schema["fields"]) == 2
+
+    # KV field data on the resource must be restored
+    resp = await nucliadb_reader.get(f"/kb/{kbid}/resources")
+    assert resp.status_code == 200
+    resources = resp.json()["resources"]
+    kv_values = []
+    for resource in resources:
+        rid = resource["id"]
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}/key_value/product")
+        if resp.status_code == 200:
+            kv_values.append(resp.json()["value"])
+    assert len(kv_values) == 1, "Expected exactly one resource with a KV field"
+    assert kv_values[0]["color"] == "red"
+    assert kv_values[0]["price"] == 9.99
 
 
 async def check_resources(nucliadb_reader: AsyncClient, kbid: str):

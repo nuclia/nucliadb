@@ -17,7 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import botocore  # type: ignore
+import botocore
+import botocore.exceptions
 import pytest
 
 from nucliadb_utils.storages import s3

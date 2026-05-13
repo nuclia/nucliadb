@@ -17,7 +17,7 @@ import re
 import tempfile
 from uuid import uuid4
 
-import pyarrow as pa  # type: ignore
+import pyarrow as pa  # type: ignore[import-untyped]
 import pytest
 
 from nucliadb_dataset.export import FileSystemExport, NucliaDatasetsExport

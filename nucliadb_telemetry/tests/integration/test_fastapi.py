@@ -182,6 +182,50 @@ class TestCasePrometheusMiddlewareFilterUnhandledPaths:
         )
 
 
+class TestCasePrometheusMiddlewareLogRequestsStart:
+    @pytest.fixture(scope="class")
+    def app(self):
+        app_ = Starlette()
+        app_.add_middleware(PrometheusMiddleware)
+
+        @app_.route("/foo/")
+        def foo(request):
+            return PlainTextResponse("Foo")
+
+        @app_.route("/foo/{bar}/")
+        def foobar(request):
+            return PlainTextResponse(f"Foo: {request.path_params['bar']}")
+
+        return app_
+
+    @pytest.fixture
+    def client(self, app):
+        return TestClient(app)
+
+    def test_log_requests_start_off_by_default(self, client):
+        with patch("nucliadb_telemetry.fastapi.metrics.logger") as mock_logger:
+            client.get("/foo/")
+        mock_logger.info.assert_not_called()
+
+    def test_log_requests_start_logs_method_and_path(self, client):
+        with (
+            patch("nucliadb_telemetry.fastapi.metrics.telemetry_settings") as mock_settings,
+            patch("nucliadb_telemetry.fastapi.metrics.logger") as mock_logger,
+        ):
+            mock_settings.log_requests_start = True
+            client.get("/foo/")
+        mock_logger.info.assert_called_once_with("HTTP Request start: %s %s", "GET", "/foo/")
+
+    def test_log_requests_start_uses_path_template(self, client):
+        with (
+            patch("nucliadb_telemetry.fastapi.metrics.telemetry_settings") as mock_settings,
+            patch("nucliadb_telemetry.fastapi.metrics.logger") as mock_logger,
+        ):
+            mock_settings.log_requests_start = True
+            client.get("/foo/baz/")
+        mock_logger.info.assert_called_once_with("HTTP Request start: %s %s", "GET", "/foo/{bar}/")
+
+
 class TestCaseCaptureTraceIdMiddleware:
     @pytest.fixture(scope="class")
     def app(self):

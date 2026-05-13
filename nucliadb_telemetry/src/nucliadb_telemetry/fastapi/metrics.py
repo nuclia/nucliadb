@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 
+import logging
 import time
 
 from prometheus_client import Counter, Gauge, Histogram
@@ -21,7 +22,11 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
+from nucliadb_telemetry.settings import telemetry_settings
+
 from .utils import get_path_template
+
+logger = logging.getLogger(__name__)
 
 try:
     from starlette_prometheus.middleware import (  # type: ignore
@@ -48,6 +53,7 @@ except ImportError:  # pragma: no cover
         "starlette_requests_processing_time_seconds",
         "Histogram of requests processing time by path (in seconds)",
         ["method", "path_template"],
+        buckets=telemetry_settings.prometheus_request_duration_buckets,
     )
     EXCEPTIONS = Counter(
         "starlette_exceptions_total",
@@ -73,6 +79,8 @@ class PrometheusMiddleware(BaseHTTPMiddleware):
 
         REQUESTS_IN_PROGRESS.labels(method=method, path_template=path_template).inc()
         REQUESTS.labels(method=method, path_template=path_template).inc()
+        if telemetry_settings.log_requests_start:
+            logger.info("HTTP Request start: %s %s", method, path_template)
         before_time = time.perf_counter()
         try:
             response = await call_next(request)

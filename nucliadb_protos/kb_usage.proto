@@ -15,6 +15,7 @@ enum Service {
     NUCLIA_DB = 2;
     TASK = 3;
     PREDICT_INTERNAL = 4;
+    RAO = 5;
 }
 
 enum SearchType {
