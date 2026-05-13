@@ -884,3 +884,85 @@ async def test_conversation_search(
     # New message is searchable too
     await _test_keyword_search(new_message_text, new_message_id)
     await _test_semantic_search(new_message_text, new_message_id, new_message_vector)
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_append_messages_to_non_existent_conversation_field_creates_it(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    """Test that appending messages to a non-existent conversation field creates it."""
+    kbid = standalone_knowledgebox
+
+    # Create a resource without any conversation field
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": "test_resource",
+            "title": "Test Resource",
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Try to get the conversation field before appending - should fail
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/conversation/new_conversation",
+        params={"page": 1},
+    )
+    assert resp.status_code == 404
+
+    # Append messages to a non-existent conversation field
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/resource/{rid}/conversation/new_conversation/messages",
+        json=[
+            {
+                "to": ["assistant"],
+                "who": "user",
+                "timestamp": datetime.now().isoformat(),
+                "content": {"text": "Hello, how are you?"},
+                "ident": "1",
+                "type": MessageType.QUESTION.value,
+            },
+            {
+                "to": ["user"],
+                "who": "assistant",
+                "timestamp": datetime.now().isoformat(),
+                "content": {"text": "I'm doing well, thank you!"},
+                "ident": "2",
+                "type": MessageType.ANSWER.value,
+            },
+        ],
+    )
+    assert resp.status_code == 200
+    assert "seqid" in resp.json()
+
+    # Get the conversation field and verify the messages were added
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/conversation/new_conversation",
+        params={"page": 1, "show": ["value"]},
+    )
+    assert resp.status_code == 200
+    field_resp = ResourceField.model_validate(resp.json())
+    msgs = field_resp.value["messages"]  # type: ignore
+    assert len(msgs) == 2
+    assert msgs[0]["ident"] == "1"
+    assert msgs[0]["who"] == "user"
+    assert msgs[0]["content"]["text"] == "Hello, how are you?"
+    assert msgs[1]["ident"] == "2"
+    assert msgs[1]["who"] == "assistant"
+    assert msgs[1]["content"]["text"] == "I'm doing well, thank you!"
+
+    # Verify the field exists in the resource summary
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}",
+        params={"show": ["values"]},
+    )
+    assert resp.status_code == 200
+    res_resp = ResponseResponse.model_validate(resp.json())
+    assert "new_conversation" in res_resp.data.conversations  # type: ignore
+    conv_field = res_resp.data.conversations["new_conversation"]  # type: ignore
+    assert conv_field.value is not None
+    assert conv_field.value.total == 2
+    assert conv_field.value.pages == 1

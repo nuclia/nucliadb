@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import overload
+
 from nucliadb_models.common import FieldID, FieldTypeName
 from nucliadb_models.search import FeedbackTasks, NucliaDBClientType
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
@@ -33,25 +35,50 @@ def feedback_task(obj: FeedbackTasks) -> TaskType.ValueType:
     return TaskType.Value(obj.name)
 
 
-def field_type_name(obj: FieldTypeName) -> resources_pb2.FieldType.ValueType:
-    return {
+@overload
+def field_type(obj: FieldTypeName) -> resources_pb2.FieldType.ValueType: ...
+
+
+@overload
+def field_type(obj: FieldID.FieldType) -> resources_pb2.FieldType.ValueType: ...
+
+
+@overload
+def field_type(obj: str) -> resources_pb2.FieldType.ValueType: ...
+
+
+def field_type(obj: FieldTypeName | FieldID.FieldType | str) -> resources_pb2.FieldType.ValueType:
+    """Convert field type to protobuf FieldType.ValueType.
+
+    Supports FieldTypeName and FieldID.FieldType enums, also strings.
+
+    Args:
+        obj: Either a string, a FieldTypeName or FieldID.FieldType enum value
+
+    Returns:
+        The corresponding resources_pb2.FieldType.ValueType
+    """
+    field_type_map = {
         FieldTypeName.LINK: resources_pb2.FieldType.LINK,
-        FieldTypeName.FILE: resources_pb2.FieldType.FILE,
-        FieldTypeName.TEXT: resources_pb2.FieldType.TEXT,
-        FieldTypeName.GENERIC: resources_pb2.FieldType.GENERIC,
-        FieldTypeName.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
-        FieldTypeName.KEY_VALUE: resources_pb2.FieldType.KEY_VALUE,
-    }[obj]
-
-
-def field_type(obj: FieldID.FieldType) -> resources_pb2.FieldType.ValueType:
-    return {
         FieldID.FieldType.LINK: resources_pb2.FieldType.LINK,
+        "u": resources_pb2.FieldType.LINK,
+        FieldTypeName.FILE: resources_pb2.FieldType.FILE,
         FieldID.FieldType.FILE: resources_pb2.FieldType.FILE,
+        "f": resources_pb2.FieldType.FILE,
+        FieldTypeName.TEXT: resources_pb2.FieldType.TEXT,
         FieldID.FieldType.TEXT: resources_pb2.FieldType.TEXT,
+        "t": resources_pb2.FieldType.TEXT,
+        FieldTypeName.GENERIC: resources_pb2.FieldType.GENERIC,
         FieldID.FieldType.GENERIC: resources_pb2.FieldType.GENERIC,
+        "a": resources_pb2.FieldType.GENERIC,
+        FieldTypeName.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
         FieldID.FieldType.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
-    }[obj]
+        "c": resources_pb2.FieldType.CONVERSATION,
+        FieldTypeName.KEY_VALUE: resources_pb2.FieldType.KEY_VALUE,
+        FieldID.FieldType.KEY_VALUE: resources_pb2.FieldType.KEY_VALUE,
+        "k": resources_pb2.FieldType.KEY_VALUE,
+    }
+    return field_type_map[obj]
 
 
 def kb_synonyms(obj: KnowledgeBoxSynonyms) -> knowledgebox_pb2.Synonyms:

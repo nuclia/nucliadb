@@ -526,7 +526,7 @@ async def parse_conversation_field(
         cm.content.attachments_fields.extend(
             [
                 resources_pb2.FieldRef(
-                    field_type=to_proto.field_type_name(attachment.field_type),
+                    field_type=to_proto.field_type(attachment.field_type),
                     field_id=attachment.field_id,
                     split=attachment.split if attachment.split is not None else "",
                 )

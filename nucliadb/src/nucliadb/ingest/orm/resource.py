@@ -23,12 +23,17 @@ import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, overload
 
 from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB, FieldId
+from nucliadb.common.ids import (
+    FIELD_TYPE_PB_TO_STR,
+    FIELD_TYPE_STR_TO_PB,
+    FieldId,
+)
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.models_utils import to_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
@@ -39,7 +44,7 @@ from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain_v2 import FilePagePositions
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb_models import content_types
-from nucliadb_models.common import CloudLink
+from nucliadb_models.common import CloudLink, FieldTypeName
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
@@ -362,8 +367,26 @@ class Resource:
                 self.all_fields_keys.remove(field)
         await field_obj.delete()
 
-    async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
-        """Return whether this resource has this field or not."""
+    @overload
+    async def field_exists(self, type: FieldType.ValueType, field: str) -> bool: ...
+
+    @overload
+    async def field_exists(self, type: FieldTypeName, field: str) -> bool: ...
+
+    @overload
+    async def field_exists(self, type: str, field: str) -> bool: ...
+
+    async def field_exists(self, type: FieldType.ValueType | str, field: str) -> bool:
+        """Return whether this resource has this field or not.
+        Args:
+            type: Field type as either a FieldType.ValueType or a string representation
+            field: Field ID to check
+        Returns:
+            True if the field exists, False otherwise
+        """
+        if not isinstance(type, FieldType.ValueType):
+            type = to_proto.field_type(type)
+
         all_fields_ids = await self.get_fields_ids()
         for field_type, field_id in all_fields_ids:
             if field_type == type and field_id == field:

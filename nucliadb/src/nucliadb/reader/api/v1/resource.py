@@ -387,7 +387,7 @@ async def _get_resource_field(
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
-    pb_field_id = to_proto.field_type_name(field_type)
+    pb_field_id = to_proto.field_type(field_type)
     async with driver.ro_transaction() as txn:
         kb = ORMKnowledgeBox(txn, storage, kbid)
 
@@ -399,33 +399,26 @@ async def _get_resource_field(
 
         resource = ORMResource(txn, storage, kbid, rid)
         field = await resource.get_field(field_id, pb_field_id, load=True)
-        if field is None:
-            raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
+        if not await resource.field_exists(field_type, field_id):
+            raise HTTPException(status_code=404, detail="Field does not exist")
 
         resource_field = ResourceField(field_id=field_id, field_type=field_type)
 
         if ResourceFieldProperties.VALUE in show:
             value = await field.get_value()
-
             if isinstance(value, resources_pb2.FieldText):
-                value = await field.get_value()
                 resource_field.value = from_proto.field_text(value)
 
-            if isinstance(value, resources_pb2.FieldFile):
-                value = await field.get_value()
+            elif isinstance(value, resources_pb2.FieldFile):
                 resource_field.value = from_proto.field_file(value)
 
-            if isinstance(value, resources_pb2.FieldLink):
-                value = await field.get_value()
+            elif isinstance(value, resources_pb2.FieldLink):
                 resource_field.value = from_proto.field_link(value)
 
-            if isinstance(value, resources_pb2.FieldKeyValue):
+            elif isinstance(value, resources_pb2.FieldKeyValue):
                 resource_field.value = json.loads(value.data) if value.data else None
 
-            if field_type is FieldTypeName.KEY_VALUE and value is None:
-                raise HTTPException(status_code=404, detail="Key-value field does not exist")
-
-            if isinstance(field, Conversation):
+            elif isinstance(field, Conversation):
                 if page == "first":
                     page_to_fetch = 1
                 elif page == "last":

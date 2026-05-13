@@ -101,7 +101,7 @@ async def _download_extract_file(
 
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    pb_field_type = to_proto.field_type_name(field_type)
+    pb_field_type = to_proto.field_type(field_type)
     field_type_letter = FIELD_TYPE_PB_TO_STR[pb_field_type]
 
     sf = storage.file_extracted(kbid, rid, field_type_letter, field_id, download_field)
