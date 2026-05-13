@@ -78,7 +78,12 @@ def field_type(field_type: resources_pb2.FieldType.ValueType) -> FieldID.FieldTy
         resources_pb2.FieldType.TEXT: FieldID.FieldType.TEXT,
         resources_pb2.FieldType.GENERIC: FieldID.FieldType.GENERIC,
         resources_pb2.FieldType.CONVERSATION: FieldID.FieldType.CONVERSATION,
+        resources_pb2.FieldType.KEY_VALUE: FieldID.FieldType.KEY_VALUE,
     }[field_type]
+
+
+def field_type_abbreviation(field_type: resources_pb2.FieldType.ValueType) -> str:
+    return field_type_name(field_type).abbreviation()
 
 
 def user_field_metadata(message: resources_pb2.UserFieldMetadata) -> UserFieldMetadata:

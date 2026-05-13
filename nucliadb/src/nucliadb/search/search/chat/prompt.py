@@ -28,9 +28,9 @@ import yaml
 from pydantic import BaseModel
 
 from nucliadb.common import datamanagers
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.models_utils import from_proto
+from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
@@ -210,7 +210,7 @@ async def get_expanded_conversation_messages(
     resource = await kb.get(rid)
     if resource is None:  # pragma: no cover
         return []
-    field_obj: Conversation = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)  # type: ignore
+    field_obj: Conversation = await resource.get_field(field_id, to_proto.field_type("c"), load=True)  # type: ignore
     found_message, found_page, found_idx = await find_conversation_message(
         field_obj=field_obj, mident=mident
     )
@@ -832,7 +832,7 @@ async def conversation_prompt_context(
                     continue
 
                 field_obj: Conversation = await resource.get_field(
-                    field_id, FIELD_TYPE_STR_TO_PB["c"], load=True
+                    field_id, to_proto.field_type("c"), load=True
                 )  # type: ignore
                 cmetadata = await field_obj.get_metadata()
 
@@ -924,7 +924,9 @@ async def conversation_prompt_context(
                         )  # type: ignore
                         extracted_text = await field.get_extracted_text()
                         if extracted_text is not None:
-                            attachment_field_type = FIELD_TYPE_PB_TO_STR[attachment.field_type]
+                            attachment_field_type = from_proto.field_type_abbreviation(
+                                attachment.field_type
+                            )
                             pid = f"{rid}/{attachment_field_type}/{attachment.field_id}/0-{len(extracted_text.text)}"
                             if pid in context:
                                 continue

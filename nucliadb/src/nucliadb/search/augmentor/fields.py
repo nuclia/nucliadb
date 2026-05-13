@@ -23,8 +23,8 @@ from typing import Deque, cast
 
 from typing_extensions import assert_never
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId
-from nucliadb.common.models_utils import from_proto
+from nucliadb.common.ids import FieldId
+from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
@@ -85,7 +85,7 @@ async def augment_field(
         # skip resources that aren't in the DB
         return None
 
-    field_type_pb = FIELD_TYPE_STR_TO_PB[field_id.type]
+    field_type_pb = to_proto.field_type(field_id.type)
     # we must check if field exists or get_field will return an empty field
     # (behaviour thought for ingestion) that we don't want
     if not (await resource.field_exists(field_type_pb, field_id.key)):

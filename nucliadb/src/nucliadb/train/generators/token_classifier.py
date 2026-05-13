@@ -24,7 +24,7 @@ from typing import cast
 
 from nidx_protos.nodereader_pb2 import StreamFilter, StreamRequest
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
+from nucliadb.common.models_utils import to_proto
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
@@ -96,7 +96,7 @@ async def get_field_text(
         logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return {}, {}, {}
 
-    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
+    field_type_int = to_proto.field_type(field_type)
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:

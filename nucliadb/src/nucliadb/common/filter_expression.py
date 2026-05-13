@@ -25,7 +25,6 @@ from typing_extensions import assert_never
 
 from nucliadb.common import datamanagers
 from nucliadb.common.exceptions import InvalidQueryError
-from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR
 from nucliadb_models.common import Paragraph
 from nucliadb_models.filters import (
     And,
@@ -105,7 +104,7 @@ async def parse_expression(
             # Cannot happen due to model validation
             raise ValueError("Resource needs id or slug")
     elif isinstance(expr, Field):
-        f.field.field_type = FIELD_TYPE_NAME_TO_STR[expr.type]
+        f.field.field_type = expr.type.abbreviation()
         if expr.name:
             f.field.field_id = expr.name
     elif isinstance(expr, Keyword):

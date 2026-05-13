@@ -27,8 +27,7 @@ from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
 from nucliadb.common import datamanagers
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
-from nucliadb.common.models_utils import to_proto
+from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.reader import RANGE_HEADER, SERVICE_NAME, logger
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
@@ -102,7 +101,7 @@ async def _download_extract_file(
     storage = await get_storage(service_name=SERVICE_NAME)
 
     pb_field_type = to_proto.field_type(field_type)
-    field_type_letter = FIELD_TYPE_PB_TO_STR[pb_field_type]
+    field_type_letter = from_proto.field_type_abbreviation(pb_field_type)
 
     sf = storage.file_extracted(kbid, rid, field_type_letter, field_id, download_field)
 

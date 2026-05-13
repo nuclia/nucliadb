@@ -23,7 +23,7 @@ from collections.abc import AsyncGenerator
 from fastapi import HTTPException
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
+from nucliadb.common.models_utils import to_proto
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
@@ -103,7 +103,7 @@ async def get_sentences(kbid: str, result: str) -> list[str]:
         logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return []
 
-    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
+    field_type_int = to_proto.field_type(field_type)
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     field_metadata = await field_obj.get_field_metadata()

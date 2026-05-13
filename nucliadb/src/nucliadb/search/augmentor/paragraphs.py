@@ -23,7 +23,8 @@ from typing import cast
 
 from typing_extensions import assert_never
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
+from nucliadb.common.ids import ParagraphId
+from nucliadb.common.models_utils import to_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.resource import Resource
@@ -62,7 +63,7 @@ async def augment_paragraph(
         return None
 
     field_id = paragraph_id.field_id
-    field_type_pb = FIELD_TYPE_STR_TO_PB[field_id.type]
+    field_type_pb = to_proto.field_type(field_id.type)
     # we must check if field exists or get_field will return an empty field
     # (behaviour thought for ingestion) that we don't want
     if not (await resource.field_exists(field_type_pb, field_id.key)):

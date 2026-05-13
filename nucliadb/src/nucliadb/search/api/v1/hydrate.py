@@ -24,7 +24,8 @@ from async_lru import alru_cache
 from fastapi import Request, Response
 from fastapi_versioning import version
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
+from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.models_utils import to_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search import cache
@@ -212,7 +213,7 @@ class Hydrator:
                 # skip resources that aren't in the DB
                 continue
 
-            field_type_pb = FIELD_TYPE_STR_TO_PB[field_id.type]
+            field_type_pb = to_proto.field_type(field_id.type)
             if not (await resource.field_exists(field_type_pb, field_id.key)):
                 # skip a fields that aren't in the DB
                 continue
@@ -277,7 +278,7 @@ class Hydrator:
                     # skip resources that aren't in the DB
                     continue
 
-                field_type_pb = FIELD_TYPE_STR_TO_PB[field_id.type]
+                field_type_pb = to_proto.field_type(field_id.type)
                 if not (await resource.field_exists(field_type_pb, field_id.key)):
                     # skip a fields that aren't in the DB
                     continue

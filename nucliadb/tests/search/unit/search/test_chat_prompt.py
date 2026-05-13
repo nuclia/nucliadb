@@ -22,7 +22,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
+from nucliadb.common.ids import ParagraphId
+from nucliadb.common.models_utils import to_proto
 from nucliadb.search.search.chat import prompt as chat_prompt
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.search import (
@@ -145,7 +146,7 @@ async def test_get_expanded_conversation_messages_question(kb, messages):
     )
 
     kb.get.assert_called_with("rid")
-    kb.get.return_value.get_field.assert_called_with("field_id", FIELD_TYPE_STR_TO_PB["c"], load=True)
+    kb.get.return_value.get_field.assert_called_with("field_id", to_proto.field_type("c"), load=True)
 
 
 async def test_get_expanded_conversation_messages_missing(kb, messages):

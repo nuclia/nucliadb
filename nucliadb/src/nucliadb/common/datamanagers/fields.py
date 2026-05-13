@@ -22,8 +22,8 @@
 from google.protobuf.message import Message
 
 from nucliadb.common.datamanagers.utils import get_kv_pb
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.models_utils import from_proto
 from nucliadb_protos import writer_pb2
 
 KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
@@ -94,7 +94,7 @@ async def get_statuses(
 ) -> list[writer_pb2.FieldStatus]:
     keys = [
         KB_RESOURCE_FIELD_STATUS.format(
-            kbid=kbid, uuid=rid, type=FIELD_TYPE_PB_TO_STR[fid.field_type], field=fid.field
+            kbid=kbid, uuid=rid, type=from_proto.field_type_abbreviation(fid.field_type), field=fid.field
         )
         for fid in fields
     ]

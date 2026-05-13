@@ -25,7 +25,7 @@ from typing_extensions import assert_never
 import nucliadb_models
 import nucliadb_models.resource
 from nucliadb.common import datamanagers
-from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR, FieldId, ParagraphId
+from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.models.internal.augment import (
     Augment,
     Augmented,
@@ -192,7 +192,7 @@ class AugmentorOps:
 
                     elif isinstance(filter, nucliadb_models.filters.Generated):
                         # generated fields are always text fields starting with "da-"
-                        if field_id.type == FIELD_TYPE_NAME_TO_STR[FieldTypeName.TEXT] and (
+                        if field_id.type == FieldTypeName.TEXT.abbreviation() and (
                             filter.da_task is None or field_id.key.startswith(f"da-{filter.da_task}-")
                         ):
                             field_ids.append(field_id)

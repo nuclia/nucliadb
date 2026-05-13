@@ -23,17 +23,15 @@ import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any, overload
+from typing import Any, cast, overload
 
 from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
 from nucliadb.common.ids import (
-    FIELD_TYPE_PB_TO_STR,
-    FIELD_TYPE_STR_TO_PB,
     FieldId,
 )
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.models_utils import to_proto
+from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
@@ -327,7 +325,20 @@ class Resource:
             self.all_fields_keys = await self._inner_get_fields_ids()
         return self.all_fields_keys
 
-    async def get_field(self, key: str, type: FieldType.ValueType, load: bool = True):
+    @overload
+    async def get_field(self, key: str, type: int, load: bool = True) -> Field: ...
+
+    @overload
+    async def get_field(self, key: str, type: str, load: bool = True) -> Field: ...
+
+    async def get_field(
+        self, key: str, type: FieldType.ValueType | str | int, load: bool = True
+    ) -> Field:
+        if isinstance(type, str):
+            type = to_proto.field_type(type)
+        elif isinstance(type, int):
+            type = FieldType.ValueType(type)
+
         field = (type, key)
         if field not in self.fields:
             async with self.locks["field"]:
@@ -591,7 +602,7 @@ class Resource:
         self, field_id: str, message: str, severity: writer_pb2.Error.Severity.ValueType
     ):
         (field_type_str, field_name) = field_id.split("/")
-        field_type = FIELD_TYPE_STR_TO_PB[field_type_str]
+        field_type = to_proto.field_type(field_type_str)
         field = await self.get_field(field_name, field_type)
         status = await field.get_status()
         if status is not None:
@@ -709,11 +720,12 @@ class Resource:
 
     async def _apply_link_extracted_data(self, link_extracted_data: LinkExtractedData):
         assert self.basic is not None
-        field_link: Link = await self.get_field(
+        field_link = await self.get_field(
             link_extracted_data.field,
             FieldType.LINK,
             load=False,
         )
+        field_link = cast(Link, field_link)
         maybe_update_basic_thumbnail(self.basic, link_extracted_data.link_thumbnail, self.kbid)
 
         await field_link.set_link_extracted_data(link_extracted_data)
@@ -782,13 +794,13 @@ class Resource:
 
     async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
         assert self.basic is not None
-        field_file: File = await self.get_field(
+        field_file = await self.get_field(
             file_extracted_data.field,
             FieldType.FILE,
             load=False,
         )
         # uri can change after extraction
-        await field_file.set_file_extracted_data(file_extracted_data)
+        await cast(File, field_file).set_file_extracted_data(file_extracted_data)
         maybe_update_basic_icon(self.basic, file_extracted_data.icon)
         maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail, self.kbid)
         self.modified = True
@@ -985,7 +997,7 @@ class Resource:
         self.modified = True
 
     def generate_field_id(self, field: FieldID) -> str:
-        return f"{FIELD_TYPE_PB_TO_STR[field.field_type]}/{field.field}"
+        return f"{from_proto.field_type_abbreviation(field.field_type)}/{field.field}"
 
     def clean(self):
         self.txn = None

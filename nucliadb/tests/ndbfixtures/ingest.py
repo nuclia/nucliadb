@@ -33,8 +33,8 @@ from grpc import aio
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import KBShardManager
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.models_utils import to_proto
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -688,7 +688,7 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox: str) -
 
 
 async def add_field_id(resource: Resource, field: Field):
-    field_type = FIELD_TYPE_STR_TO_PB[field.type]
+    field_type = to_proto.field_type(field.type)
     field_id = rpb.FieldID(field_type=field_type, field=field.id)
     await resource.update_all_field_ids(updated=[field_id])
 

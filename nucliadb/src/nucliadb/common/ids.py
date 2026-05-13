@@ -25,30 +25,9 @@ paragraphs... Avoiding spread of id construction and parsing everywhere
 
 from dataclasses import dataclass
 
+from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb_models.common import FieldTypeName
 from nucliadb_protos.resources_pb2 import FieldType
-
-FIELD_TYPE_STR_TO_PB: dict[str, FieldType.ValueType] = {
-    "t": FieldType.TEXT,
-    "f": FieldType.FILE,
-    "u": FieldType.LINK,
-    "a": FieldType.GENERIC,
-    "c": FieldType.CONVERSATION,
-    "k": FieldType.KEY_VALUE,
-}
-
-FIELD_TYPE_PB_TO_STR = {v: k for k, v in FIELD_TYPE_STR_TO_PB.items()}
-
-FIELD_TYPE_NAME_TO_STR = {
-    FieldTypeName.TEXT: "t",
-    FieldTypeName.FILE: "f",
-    FieldTypeName.LINK: "u",
-    FieldTypeName.GENERIC: "a",
-    FieldTypeName.CONVERSATION: "c",
-    FieldTypeName.KEY_VALUE: "k",
-}
-
-FIELD_TYPE_STR_TO_NAME = {v: k for k, v in FIELD_TYPE_NAME_TO_STR.items()}
 
 
 @dataclass
@@ -116,15 +95,21 @@ class FieldId:
     def from_pb(
         cls, rid: str, field_type: FieldType.ValueType, key: str, subfield_id: str | None = None
     ) -> "FieldId":
-        return cls(rid=rid, type=FIELD_TYPE_PB_TO_STR[field_type], key=key, subfield_id=subfield_id)
+        return cls(
+            rid=rid,
+            type=from_proto.field_type_abbreviation(field_type),
+            key=key,
+            subfield_id=subfield_id,
+        )
 
     @property
     def pb_type(self) -> FieldType.ValueType:
-        return FIELD_TYPE_STR_TO_PB[self.type]
+        return to_proto.field_type(self.type)
 
     @property
     def type_name(self) -> FieldTypeName:
-        return FIELD_TYPE_STR_TO_NAME[self.type]
+        pb = to_proto.field_type(self.type)
+        return from_proto.field_type_name(pb)
 
     def full(self) -> str:
         if self.subfield_id is None:
@@ -160,19 +145,19 @@ class FieldId:
 
     @staticmethod
     def _parse_field_type(_type: str) -> str:
-        if _type not in FIELD_TYPE_STR_TO_PB:
+        try:
+            to_proto.field_type(_type)
+        except KeyError:
             # Try to parse the enum value
             # XXX: This is to support field types that are integer values of FieldType
             # Which is how legacy processor relations reported the paragraph_id
             try:
                 type_pb = FieldType.ValueType(int(_type))
-            except ValueError:
+                return from_proto.field_type_abbreviation(type_pb)
+            except (ValueError, KeyError):
                 raise ValueError(f"Invalid FieldId: {_type}")
-            if type_pb in FIELD_TYPE_PB_TO_STR:
-                return FIELD_TYPE_PB_TO_STR[type_pb]
-            else:
-                raise ValueError(f"Invalid FieldId: {_type}")
-        return _type
+        else:
+            return _type
 
 
 @dataclass

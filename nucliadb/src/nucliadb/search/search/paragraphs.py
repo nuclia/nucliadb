@@ -21,7 +21,8 @@ import logging
 import re
 import string
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
+from nucliadb.common.ids import ParagraphId
+from nucliadb.common.models_utils import to_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.search.augmentor.paragraphs import get_paragraph_text as _augmentor_get_paragraph_text
@@ -76,7 +77,7 @@ async def get_paragraph_text(
                 )
             return ""
 
-    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
+    field_type_int = to_proto.field_type(field_type)
     field_obj = await orm_resource.get_field(field_key, field_type_int, load=False)
 
     text = await get_paragraph_from_full_text(
@@ -116,7 +117,7 @@ async def get_text_sentence(
         logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return ""
 
-    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
+    field_type_int = to_proto.field_type(field_type)
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:

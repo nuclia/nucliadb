@@ -22,7 +22,8 @@ import dataclasses
 from collections.abc import Iterator
 from datetime import datetime
 
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FieldId, ParagraphId
+from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.models_utils import from_proto
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
 from nucliadb_utils.storages.azure import AzureStorage
@@ -255,7 +256,7 @@ class FieldBuilder:
             field_id=FieldId(
                 rid=self._rid,
                 key=self.id.field,
-                type=FIELD_TYPE_PB_TO_STR[self.id.field_type],
+                type=from_proto.field_type_abbreviation(self.id.field_type),
                 subfield_id=split,
             ),
             paragraph_start=start,
@@ -387,7 +388,7 @@ class FieldBuilder:
                 field_id=FieldId(
                     rid=self._rid,
                     key=self.id.field,
-                    type=FIELD_TYPE_PB_TO_STR[self.id.field_type],
+                    type=from_proto.field_type_abbreviation(self.id.field_type),
                     subfield_id=split,
                 ),
                 paragraph_start=paragraph.start,
