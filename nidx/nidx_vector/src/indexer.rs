@@ -168,22 +168,20 @@ pub fn index_relation_nodes(
     };
     let rid = &resource_id.uuid;
 
-    // Index each vector, using the field_id from the vector proto
     let mut elems = Vec::new();
-    if let Some(vectorset) = &resource.relation_node_vectors.get(index_name) {
+    for (field_id, field_data) in &resource.field_node_vectors {
+        let Some(vectorset) = field_data.node_vectors.get(index_name) else {
+            continue;
+        };
+        let Some(metadata) = encode_metadata_field(rid, field_id) else {
+            continue;
+        };
         for node_vector in &vectorset.vectors {
-            if node_vector.field_id.is_empty() {
-                continue;
-            }
-            let vector = node_vector.vector.clone();
-            let Some(metadata) = encode_metadata_field(rid, &node_vector.field_id) else {
-                continue;
-            };
             elems.push(Elem::new(
                 node_vector.node_value.clone(),
-                vector,
+                node_vector.vector.clone(),
                 vec![],
-                Some(metadata),
+                Some(metadata.clone()),
             ));
         }
     }
@@ -211,22 +209,20 @@ pub fn index_relation_edges(
     };
     let rid = &resource_id.uuid;
 
-    // Index each vector, using the field_id from the vector proto
     let mut elems = Vec::new();
-    if let Some(vectorset) = &resource.relation_edge_vectors.get(index_name) {
+    for (field_id, field_data) in &resource.field_edge_vectors {
+        let Some(vectorset) = field_data.edge_vectors.get(index_name) else {
+            continue;
+        };
+        let Some(metadata) = encode_metadata_field(rid, field_id) else {
+            continue;
+        };
         for rel_vector in &vectorset.vectors {
-            if rel_vector.field_id.is_empty() {
-                continue;
-            }
-            let vector = rel_vector.vector.clone();
-            let Some(metadata) = encode_metadata_field(rid, &rel_vector.field_id) else {
-                continue;
-            };
             elems.push(Elem::new(
                 rel_vector.relation_label.clone(),
-                vector,
+                rel_vector.vector.clone(),
                 vec![],
-                Some(metadata),
+                Some(metadata.clone()),
             ));
         }
     }

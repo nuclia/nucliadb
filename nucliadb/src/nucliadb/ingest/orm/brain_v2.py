@@ -604,8 +604,7 @@ class ResourceBrain:
             full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
             self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
         for vector in vectors.vectors:
-            vector.field_id = field_id
-            self.brain.relation_node_vectors[vectorset].vectors.append(vector)
+            self.brain.field_node_vectors[field_id].node_vectors[vectorset].vectors.append(vector)
 
     @observer.wrap({"type": "generate_relation_edge_vectors"})
     def generate_relation_edge_vectors(
@@ -620,8 +619,7 @@ class ResourceBrain:
             full_field_id = ids.FieldId(rid=self.rid, type=ftype, key=fkey).full()
             self.brain.vector_prefixes_to_delete[vectorset].items.append(full_field_id)
         for vector in vectors.vectors:
-            vector.field_id = field_id
-            self.brain.relation_edge_vectors[vectorset].vectors.append(vector)
+            self.brain.field_edge_vectors[field_id].edge_vectors[vectorset].vectors.append(vector)
 
     @observer.wrap({"type": "apply_field_vector"})
     def _apply_field_vector(

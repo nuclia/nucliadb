@@ -23,8 +23,9 @@ mod common;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use nidx_protos::{
-    IndexRelation, IndexRelations, Relation, RelationEdgeVector, RelationEdgeVectors, RelationNode, RelationNodeVector,
-    RelationNodeVectors, Resource, ResourceId, relation::RelationType, relation_node::NodeType,
+    IndexFieldEdgeVectors, IndexFieldNodeVectors, IndexRelation, IndexRelations, Relation, RelationEdgeVector,
+    RelationEdgeVectors, RelationNode, RelationNodeVector, RelationNodeVectors, Resource, ResourceId,
+    relation::RelationType, relation_node::NodeType,
 };
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher, config::*};
@@ -72,11 +73,10 @@ fn vector_for(value: &str) -> Vec<f32> {
     normalize(hash.to_le_bytes().map(|v| v as f32).to_vec())
 }
 
-fn node_vector(value: &str, field_id: &str) -> RelationNodeVector {
+fn node_vector(value: &str) -> RelationNodeVector {
     RelationNodeVector {
         node_value: value.into(),
         vector: vector_for(value),
-        field_id: field_id.into(),
     }
 }
 
@@ -111,22 +111,44 @@ fn test_relations_deletion() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![
-                    // a/title nodes
-                    node_vector("dog", "a/title"),
-                    node_vector("cat", "a/title"),
-                    // f/file nodes
-                    node_vector("dog", "f/file"),
-                    node_vector("fish", "f/file"),
-                    // f/other nodes
-                    node_vector("sheep", "f/other"),
-                    node_vector("fish", "f/other"),
-                ],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/other".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("sheep"), node_vector("fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -278,17 +300,32 @@ fn test_relations_merge() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![
-                    node_vector("dog", "a/title"),
-                    node_vector("cat", "a/title"),
-                    node_vector("dog", "f/file"),
-                    node_vector("fish", "f/file"),
-                ],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -319,17 +356,32 @@ fn test_relations_merge() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![
-                    node_vector("dog", "a/title"),
-                    node_vector("cat", "a/title"),
-                    node_vector("sheep", "f/file"),
-                    node_vector("rat", "f/file"),
-                ],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("sheep"), node_vector("rat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -447,17 +499,32 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![
-                    node_vector("dog", "a/title"),
-                    node_vector("cat", "a/title"),
-                    node_vector("dog", "f/file"),
-                    node_vector("fish", "f/file"),
-                ],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -488,17 +555,32 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![
-                    node_vector("dog", "a/title"),
-                    node_vector("cat", "a/title"),
-                    node_vector("sheep", "f/file"),
-                    node_vector("rat", "f/file"),
-                ],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("sheep"), node_vector("rat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -624,17 +706,32 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![
-                    node_vector("dog", "a/title"),
-                    node_vector("cat", "a/title"),
-                    node_vector("dog", "f/file"),
-                    node_vector("fish", "f/file"),
-                ],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -666,17 +763,32 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![
-                    node_vector("my dog", "a/title"),
-                    node_vector("my cat", "a/title"),
-                    node_vector("my dog", "f/file"),
-                    node_vector("my fish", "f/file"),
-                ],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("my dog"), node_vector("my cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("my dog"), node_vector("my fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -846,28 +958,44 @@ fn test_relations_labels() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_edge_vectors: [(
-            "default".to_string(),
-            RelationEdgeVectors {
-                vectors: vec![
-                    RelationEdgeVector {
-                        relation_label: "faster than".into(),
-                        vector: vec![1.0, 0.0, 0.0, 0.0],
-                        field_id: "a/title".into(),
-                    },
-                    RelationEdgeVector {
-                        relation_label: "bigger than".into(),
-                        vector: vec![0.0, 1.0, 0.0, 0.0],
-                        field_id: "f/file".into(),
-                    },
-                    RelationEdgeVector {
-                        relation_label: "faster than".into(),
-                        vector: vec![1.0, 0.0, 0.0, 0.0],
-                        field_id: "f/file".into(),
-                    },
-                ],
-            },
-        )]
+        field_edge_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldEdgeVectors {
+                    edge_vectors: [(
+                        "default".to_string(),
+                        RelationEdgeVectors {
+                            vectors: vec![RelationEdgeVector {
+                                relation_label: "faster than".into(),
+                                vector: vec![1.0, 0.0, 0.0, 0.0],
+                            }],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldEdgeVectors {
+                    edge_vectors: [(
+                        "default".to_string(),
+                        RelationEdgeVectors {
+                            vectors: vec![
+                                RelationEdgeVector {
+                                    relation_label: "bigger than".into(),
+                                    vector: vec![0.0, 1.0, 0.0, 0.0],
+                                },
+                                RelationEdgeVector {
+                                    relation_label: "faster than".into(),
+                                    vector: vec![1.0, 0.0, 0.0, 0.0],
+                                },
+                            ],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
