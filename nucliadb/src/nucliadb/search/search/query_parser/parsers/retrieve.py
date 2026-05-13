@@ -23,7 +23,10 @@ from typing_extensions import assert_never
 
 import nucliadb_models.retrieval
 from nucliadb.common.exceptions import InvalidQueryError
-from nucliadb.common.filter_expression import parse_expression
+from nucliadb.common.filter_expression import (
+    parse_expression,
+    parse_kv_filter_expression_with_validation,
+)
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
@@ -320,6 +323,10 @@ class _RetrievalParser:
                 filters.paragraph_expression = await parse_expression(
                     self.item.filters.filter_expression.paragraph,
                     self.kbid,
+                )
+            if self.item.filters.filter_expression.key_value is not None:
+                filters.json_expression = await parse_kv_filter_expression_with_validation(
+                    self.item.filters.filter_expression.key_value, self.kbid
                 )
             if self.item.filters.filter_expression.operator == FilterExpression.Operator.OR:
                 filter_operator = nodereader_pb2.FilterOperator.OR
