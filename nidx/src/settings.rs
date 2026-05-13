@@ -71,52 +71,28 @@ fn deserialize_u64<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<
     ))
 }
 
-fn deserialize_bool_option<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<bool>, D::Error> {
-    use serde::de::Error;
-    
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum BoolOrString {
-        Bool(bool),
-        String(String),
-    }
-    
-    match BoolOrString::deserialize(deserializer)? {
-        BoolOrString::Bool(b) => Ok(Some(b)),
-        BoolOrString::String(s) => {
-            match s.to_lowercase().as_str() {
-                "true" | "1" | "yes" => Ok(Some(true)),
-                "false" | "0" | "no" => Ok(Some(false)),
-                _ => Err(Error::custom("expected 'true' or 'false' for boolean")),
-            }
-        }
-    }
-}
-
 // Wrapper type for boolean that deserializes from both bool and string
-#[derive(Clone, Copy, Debug)]
-struct VerifySSL(pub Option<bool>);
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VerifySSL(pub Option<bool>);
 
 impl<'de> Deserialize<'de> for VerifySSL {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         use serde::de::Error;
-        
+
         #[derive(Deserialize)]
         #[serde(untagged)]
         enum BoolOrString {
             Bool(bool),
             String(String),
         }
-        
+
         match BoolOrString::deserialize(deserializer)? {
             BoolOrString::Bool(b) => Ok(VerifySSL(Some(b))),
-            BoolOrString::String(s) => {
-                match s.to_lowercase().as_str() {
-                    "true" | "1" | "yes" => Ok(VerifySSL(Some(true))),
-                    "false" | "0" | "no" => Ok(VerifySSL(Some(false))),
-                    _ => Err(Error::custom("expected 'true' or 'false' for boolean")),
-                }
-            }
+            BoolOrString::String(s) => match s.to_lowercase().as_str() {
+                "true" | "1" | "yes" => Ok(VerifySSL(Some(true))),
+                "false" | "0" | "no" => Ok(VerifySSL(Some(false))),
+                _ => Err(Error::custom("expected 'true' or 'false' for boolean")),
+            },
         }
     }
 }
@@ -187,10 +163,8 @@ impl ObjectStoreConfig {
                     if let Some(t) = self.timeout {
                         options = options.with_timeout(Duration::from_secs(t));
                     }
-                    if let Some(VerifySSL(ssl_opt)) = verify_ssl {
-                        if let Some(verify) = ssl_opt {
-                            options = options.with_allow_invalid_certificates(!verify);
-                        }
+                    if let Some(VerifySSL(Some(verify))) = verify_ssl {
+                        options = options.with_allow_invalid_certificates(!verify);
                     }
                     builder = builder.with_client_options(options);
                 }
