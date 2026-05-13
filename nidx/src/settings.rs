@@ -56,7 +56,7 @@ pub enum ObjectStoreKind {
         client_secret: Option<String>,
         region_name: String,
         endpoint: Option<String>,
-        verify_ssl: Option<bool>,
+        verify_ssl: Option<VerifySSL>,
     },
     Azure {
         container_url: String,
@@ -69,6 +69,56 @@ fn deserialize_u64<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<
     Ok(Some(
         String::deserialize(deserializer)?.parse().expect("Expected a number"),
     ))
+}
+
+fn deserialize_bool_option<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<bool>, D::Error> {
+    use serde::de::Error;
+    
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum BoolOrString {
+        Bool(bool),
+        String(String),
+    }
+    
+    match BoolOrString::deserialize(deserializer)? {
+        BoolOrString::Bool(b) => Ok(Some(b)),
+        BoolOrString::String(s) => {
+            match s.to_lowercase().as_str() {
+                "true" | "1" | "yes" => Ok(Some(true)),
+                "false" | "0" | "no" => Ok(Some(false)),
+                _ => Err(Error::custom("expected 'true' or 'false' for boolean")),
+            }
+        }
+    }
+}
+
+// Wrapper type for boolean that deserializes from both bool and string
+#[derive(Clone, Copy, Debug)]
+struct VerifySSL(pub Option<bool>);
+
+impl<'de> Deserialize<'de> for VerifySSL {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+        
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum BoolOrString {
+            Bool(bool),
+            String(String),
+        }
+        
+        match BoolOrString::deserialize(deserializer)? {
+            BoolOrString::Bool(b) => Ok(VerifySSL(Some(b))),
+            BoolOrString::String(s) => {
+                match s.to_lowercase().as_str() {
+                    "true" | "1" | "yes" => Ok(VerifySSL(Some(true))),
+                    "false" | "0" | "no" => Ok(VerifySSL(Some(false))),
+                    _ => Err(Error::custom("expected 'true' or 'false' for boolean")),
+                }
+            }
+        }
+    }
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -132,13 +182,15 @@ impl ObjectStoreConfig {
                     // This is needed for minio compatibility
                     builder = builder.with_endpoint(endpoint.clone().unwrap()).with_allow_http(true);
                 }
-                if self.timeout.is_some() || matches!(verify_ssl, Some(false)) {
+                if self.timeout.is_some() || matches!(verify_ssl, Some(VerifySSL(Some(false)))) {
                     let mut options = ClientOptions::new();
                     if let Some(t) = self.timeout {
                         options = options.with_timeout(Duration::from_secs(t));
                     }
-                    if let Some(verify_ssl) = verify_ssl {
-                        options = options.with_allow_invalid_certificates(!*verify_ssl);
+                    if let Some(VerifySSL(ssl_opt)) = verify_ssl {
+                        if let Some(verify) = ssl_opt {
+                            options = options.with_allow_invalid_certificates(!verify);
+                        }
                     }
                     builder = builder.with_client_options(options);
                 }
@@ -483,7 +535,7 @@ mod tests {
 
         match config.kind {
             ObjectStoreKind::S3 { verify_ssl, .. } => {
-                assert_eq!(verify_ssl, Some(false));
+                assert_eq!(verify_ssl, Some(VerifySSL(Some(false))));
             }
             _ => panic!("Expected s3 object store kind"),
         }
