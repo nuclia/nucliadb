@@ -13,7 +13,58 @@ containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 # -- Image name (without registry eg. nidx:latest)
 image: IMAGE_TO_REPLACE
 
+# -- Global environment variables to add to all containers
 env: {}
+  # -- Object store backend type for indexer.
+  # INDEXER__OBJECT_STORE: s3
+  # -- S3 bucket name used by indexer.
+  # INDEXER__BUCKET: ndb-index-env-name
+  # -- S3 region used by indexer.
+  # INDEXER__REGION_NAME: env-name
+  # -- Custom S3 endpoint URL for indexer.
+  # INDEXER__ENDPOINT: https://<url>:9021
+  # -- Enable or disable TLS certificate verification for indexer S3 connections.
+  # INDEXER__ALLOW_INVALID_CERTIFICATES: "true"
+  # -- S3 access key for indexer (if not using IAM or default credentials).
+  # INDEXER__CLIENT_ID: "your-access-key"
+  # -- S3 secret key for indexer (if not using IAM or default credentials).
+  # INDEXER__CLIENT_SECRET: "your-secret-key"
+  # -- GCP service account credentials for indexer (base64-encoded JSON).
+  # INDEXER__BASE64_CREDS: "base64-encoded-json"
+  # -- Azure Blob container URL for indexer.
+  # INDEXER__CONTAINER_URL: "https://account.blob.core.windows.net/container"
+  # -- Maximum number of concurrent indexer object store requests.
+  # INDEXER__MAX_REQUESTS: "10"
+  # -- Request timeout in seconds for indexer object store operations.
+  # INDEXER__TIMEOUT: "120"
+  # -- Azure storage account key for indexer.
+  # INDEXER__ACCOUNT_KEY: "your-azure-account-key"
+  # -- Object store backend type for storage.
+  # STORAGE__OBJECT_STORE: s3
+  # -- S3 bucket name used by storage.
+  # STORAGE__BUCKET: ndb-nidx-env-name
+  # -- S3 region used by storage.
+  # STORAGE__REGION_NAME: env-name
+  # -- Maximum number of concurrent storage object store requests.
+  # STORAGE__MAX_REQUESTS: "10"
+  # -- Request timeout in seconds for storage object store operations.
+  # STORAGE__TIMEOUT: "120"
+  # -- Custom S3 endpoint URL for storage.
+  # STORAGE__ENDPOINT: https://<url>:9021
+  # -- Enable or disable TLS certificate verification for storage S3 connections.
+  # STORAGE__ALLOW_INVALID_CERTIFICATES: "true"
+  # -- S3 access key for storage (if not using IAM or default credentials).
+  # STORAGE__CLIENT_ID: "your-access-key"
+  # -- S3 secret key for storage (if not using IAM or default credentials).
+  # STORAGE__CLIENT_SECRET: "your-secret-key"
+  # -- GCP service account credentials for storage (base64-encoded JSON).
+  # STORAGE__BASE64_CREDS: "base64-encoded-json"
+  # -- Azure Blob container URL for storage.
+  # STORAGE__CONTAINER_URL: "https://account.blob.core.windows.net/container"
+  # -- Azure storage account key for storage.
+  # STORAGE__ACCOUNT_KEY: "your-azure-account-key"
+
+# -- Global environment variables mount to add to all containers
 envFrom: {}
 
 # -- Global pod annotations to add to all pods
