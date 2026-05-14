@@ -24,7 +24,7 @@ env: {}
   # -- Custom S3 endpoint URL for indexer.
   # INDEXER__ENDPOINT: https://<url>:9021
   # -- Enable or disable TLS certificate verification for indexer S3 connections.
-  # INDEXER__VERIFY_SSL: "False"
+  # INDEXER__ALLOW_INVALID_CERTIFICATES: "true"
   # -- S3 access key for indexer (if not using IAM or default credentials).
   # INDEXER__CLIENT_ID: "your-access-key"
   # -- S3 secret key for indexer (if not using IAM or default credentials).
@@ -52,7 +52,7 @@ env: {}
   # -- Custom S3 endpoint URL for storage.
   # STORAGE__ENDPOINT: https://<url>:9021
   # -- Enable or disable TLS certificate verification for storage S3 connections.
-  # STORAGE__VERIFY_SSL: "False"
+  # STORAGE__ALLOW_INVALID_CERTIFICATES: "true"
   # -- S3 access key for storage (if not using IAM or default credentials).
   # STORAGE__CLIENT_ID: "your-access-key"
   # -- S3 secret key for storage (if not using IAM or default credentials).

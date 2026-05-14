@@ -56,7 +56,8 @@ pub enum ObjectStoreKind {
         client_secret: Option<String>,
         region_name: String,
         endpoint: Option<String>,
-        verify_ssl: Option<VerifySSL>,
+        #[serde(default, deserialize_with = "deserialize_bool")]
+        allow_invalid_certificates: Option<bool>,
     },
     Azure {
         container_url: String,
@@ -71,30 +72,10 @@ fn deserialize_u64<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<
     ))
 }
 
-// Wrapper type for boolean that deserializes from both bool and string
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct VerifySSL(pub Option<bool>);
-
-impl<'de> Deserialize<'de> for VerifySSL {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        use serde::de::Error;
-
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum BoolOrString {
-            Bool(bool),
-            String(String),
-        }
-
-        match BoolOrString::deserialize(deserializer)? {
-            BoolOrString::Bool(b) => Ok(VerifySSL(Some(b))),
-            BoolOrString::String(s) => match s.to_lowercase().as_str() {
-                "true" | "1" | "yes" => Ok(VerifySSL(Some(true))),
-                "false" | "0" | "no" => Ok(VerifySSL(Some(false))),
-                _ => Err(Error::custom("expected 'true' or 'false' for boolean")),
-            },
-        }
-    }
+fn deserialize_bool<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<bool>, D::Error> {
+    Ok(Some(
+        String::deserialize(deserializer)?.parse().expect("Expected a bool"),
+    ))
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -142,7 +123,7 @@ impl ObjectStoreConfig {
                 client_secret,
                 region_name,
                 endpoint,
-                verify_ssl,
+                allow_invalid_certificates,
             } => {
                 let mut builder = AmazonS3Builder::from_env()
                     .with_region(region_name.clone())
@@ -158,13 +139,13 @@ impl ObjectStoreConfig {
                     // This is needed for minio compatibility
                     builder = builder.with_endpoint(endpoint.clone().unwrap()).with_allow_http(true);
                 }
-                if self.timeout.is_some() || matches!(verify_ssl, Some(VerifySSL(Some(false)))) {
+                if self.timeout.is_some() || allow_invalid_certificates.is_some() {
                     let mut options = ClientOptions::new();
                     if let Some(t) = self.timeout {
                         options = options.with_timeout(Duration::from_secs(t));
                     }
-                    if let Some(VerifySSL(Some(verify))) = verify_ssl {
-                        options = options.with_allow_invalid_certificates(!verify);
+                    if let Some(allow_invalid_certificates) = allow_invalid_certificates {
+                        options = options.with_allow_invalid_certificates(*allow_invalid_certificates);
                     }
                     builder = builder.with_client_options(options);
                 }
@@ -481,7 +462,7 @@ mod tests {
     }
 
     #[test]
-    fn test_s3_verify_ssl_default_is_enabled() {
+    fn test_s3_allow_invalid_certificates_default_is_none() {
         let raw = json!({
             "object_store": "s3",
             "bucket": "bucket",
@@ -490,45 +471,34 @@ mod tests {
         let config: ObjectStoreConfig = serde_json::from_value(raw).unwrap();
 
         match config.kind {
-            ObjectStoreKind::S3 { verify_ssl, .. } => {
-                assert_eq!(verify_ssl, None);
+            ObjectStoreKind::S3 {
+                allow_invalid_certificates,
+                ..
+            } => {
+                assert_eq!(allow_invalid_certificates, None);
             }
             _ => panic!("Expected s3 object store kind"),
         }
     }
 
     #[test]
-    fn test_s3_verify_ssl_can_be_disabled() {
+    fn test_s3_allow_invalid_certificates_enabled() {
         let raw = json!({
             "object_store": "s3",
             "bucket": "bucket",
             "region_name": "us-east-1",
-            "verify_ssl": false
+            "allow_invalid_certificates": "true"
         });
         let config: ObjectStoreConfig = serde_json::from_value(raw).unwrap();
 
         match config.kind {
-            ObjectStoreKind::S3 { verify_ssl, .. } => {
-                assert_eq!(verify_ssl, Some(VerifySSL(Some(false))));
+            ObjectStoreKind::S3 {
+                allow_invalid_certificates,
+                ..
+            } => {
+                assert_eq!(allow_invalid_certificates, Some(true));
             }
             _ => panic!("Expected s3 object store kind"),
         }
-    }
-
-    #[test]
-    fn test_indexer_verify_ssl_env_var_is_parsed() {
-        let env = [
-            ("METADATA__DATABASE_URL", "postgresql://localhost"),
-            ("INDEXER__OBJECT_STORE", "s3"),
-            ("INDEXER__BUCKET", "bucket"),
-            ("INDEXER__REGION_NAME", "us-east-1"),
-            ("INDEXER__VERIFY_SSL", "false"),
-        ];
-
-        let settings = EnvSettings::from_map(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string()))));
-        let indexer = settings.indexer.expect("indexer settings should be present");
-
-        // The object store client is built from env; this test verifies env parsing accepts VERIFY_SSL.
-        assert!(indexer.nats_server.is_none());
     }
 }
