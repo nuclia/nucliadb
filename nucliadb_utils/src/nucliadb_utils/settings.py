@@ -96,6 +96,7 @@ class StorageSettings(BaseSettings):
     s3_client_secret: str | None = None
     s3_ssl: bool = True
     s3_verify_ssl: bool = True
+    s3_verify_ssl_certificate: str | None = None
     s3_max_pool_connections: int = 30
     s3_endpoint: str | None = None
     s3_region_name: str | None = None

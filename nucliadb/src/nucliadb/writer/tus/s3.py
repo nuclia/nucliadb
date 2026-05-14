@@ -189,7 +189,7 @@ class S3BlobStore(BlobStore):
         client_id: str | None,
         client_secret: str | None,
         ssl: bool,
-        verify_ssl: bool,
+        verify_ssl: bool | str,
         max_pool_connections: int,
         endpoint_url: str | None,
         region_name: str | None,

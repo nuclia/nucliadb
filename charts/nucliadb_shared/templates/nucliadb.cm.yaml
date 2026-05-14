@@ -34,6 +34,7 @@ data:
   S3_SSL: "True"
 {{- end }}
   S3_VERIFY_SSL: {{ .Values.storage.s3_verify_ssl | quote }}
+  S3_VERIFY_SSL_CERTIFICATE: {{ .Values.storage.s3_verify_ssl_certificate | quote }}
   S3_MAX_POOL_CONNECTIONS: {{ .Values.storage.s3_max_pool_connections | quote }}
   S3_REGION_NAME: {{ .Values.storage.s3_region_name }}
   S3_BUCKET: {{ .Values.storage.s3_bucket }}
