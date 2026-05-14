@@ -69,7 +69,7 @@ async def initialize():
             client_id=storage_settings.s3_client_id,
             client_secret=storage_settings.s3_client_secret,
             ssl=storage_settings.s3_ssl,
-            verify_ssl=storage_settings.s3_verify_ssl,
+            verify_ssl=storage_settings.s3_verify_ssl_certificate or storage_settings.s3_verify_ssl,
             max_pool_connections=storage_settings.s3_max_pool_connections,
             endpoint_url=storage_settings.s3_endpoint,
             region_name=storage_settings.s3_region_name,
