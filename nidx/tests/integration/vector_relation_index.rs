@@ -25,8 +25,9 @@ use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::{
-    GraphSearchRequest, IndexRelation, IndexRelations, Relation, RelationEdgeVector, RelationEdgeVectors, RelationNode,
-    RelationNodeVector, RelationNodeVectors, Resource, SearchRequest,
+    GraphSearchRequest, IndexFieldEdgeVectors, IndexFieldNodeVectors, IndexRelation, IndexRelations, Relation,
+    RelationEdgeVector, RelationEdgeVectors, RelationNode, RelationNodeVector, RelationNodeVectors, Resource,
+    SearchRequest,
 };
 
 use uuid::Uuid;
@@ -88,26 +89,38 @@ fn resource() -> Resource {
             },
         )]
         .into(),
-        relation_node_vectors: [(
-            "minivectors".to_string(),
-            RelationNodeVectors {
-                vectors: vec![
-                    node_vector("dog", vec![0.7, 0.7, 0.0, 0.0]),
-                    node_vector("fish", vec![0.0, 0.0, 0.7, 0.7]),
-                    node_vector("snail", vec![0.0, 0.7, 0.7, 0.0]),
-                    node_vector("lion", vec![0.58, 0.58, 0.0, 0.58]),
-                ],
+        field_node_vectors: [(
+            "f/file".to_string(),
+            IndexFieldNodeVectors {
+                node_vectors: [(
+                    "minivectors".to_string(),
+                    RelationNodeVectors {
+                        vectors: vec![
+                            node_vector("dog", vec![0.7, 0.7, 0.0, 0.0]),
+                            node_vector("fish", vec![0.0, 0.0, 0.7, 0.7]),
+                            node_vector("snail", vec![0.0, 0.7, 0.7, 0.0]),
+                            node_vector("lion", vec![0.58, 0.58, 0.0, 0.58]),
+                        ],
+                    },
+                )]
+                .into(),
             },
         )]
         .into(),
-        relation_edge_vectors: [(
-            "minivectors".to_string(),
-            RelationEdgeVectors {
-                vectors: vec![
-                    relation_vector("bigger than", vec![0.6, 0.6, 0.2, 0.0]),
-                    relation_vector("faster than", vec![0.7, 0.7, 0.0, 0.0]),
-                    relation_vector("eats", vec![0.0, 0.0, 0.8, 0.3]),
-                ],
+        field_edge_vectors: [(
+            "f/file".to_string(),
+            IndexFieldEdgeVectors {
+                edge_vectors: [(
+                    "minivectors".to_string(),
+                    RelationEdgeVectors {
+                        vectors: vec![
+                            relation_vector("bigger than", vec![0.6, 0.6, 0.2, 0.0]),
+                            relation_vector("faster than", vec![0.7, 0.7, 0.0, 0.0]),
+                            relation_vector("eats", vec![0.0, 0.0, 0.8, 0.3]),
+                        ],
+                    },
+                )]
+                .into(),
             },
         )]
         .into(),

@@ -18,7 +18,6 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 use crate::config::{VectorCardinality, VectorConfig};
-use crate::field_list_metadata::encode_field_list_metadata;
 use crate::multivector::extract_multi_vectors;
 use crate::segment::{self, Elem};
 use crate::utils::FieldKey;
@@ -152,13 +151,8 @@ pub fn index_resource(
     Ok(Some(segment.into_metadata()))
 }
 
-fn encode_metadata_field(rid: &str, fields: &HashSet<&String>) -> Vec<u8> {
-    let encoded_fields: Vec<_> = fields
-        .iter()
-        .map(|f| format!("{rid}/{f}"))
-        .filter_map(|f| FieldKey::from_field_id(&f))
-        .collect();
-    encode_field_list_metadata(&encoded_fields)
+fn encode_metadata_field(rid: &str, field: &str) -> Option<Vec<u8>> {
+    FieldKey::from_field_id(&format!("{rid}/{field}")).map(|k| k.bytes().to_vec())
 }
 
 pub fn index_relation_nodes(
@@ -169,50 +163,25 @@ pub fn index_relation_nodes(
 ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
     debug!("Creating elements for the main index");
 
-    let mut entity_fields = HashMap::new();
     let Some(resource_id) = &resource.resource else {
         return Err(anyhow!("resource_id required"));
     };
     let rid = &resource_id.uuid;
 
-    for (field, relations) in &resource.field_relations {
-        // Find all copies of each relation node
-        for relation in &relations.relations {
-            let Some(relation) = &relation.relation else {
-                return Err(anyhow!("relation required"));
-            };
-            let Some(source) = &relation.source else {
-                return Err(anyhow!("relation source node required"));
-            };
-            entity_fields
-                .entry(source.value.clone())
-                .or_insert_with(HashSet::new)
-                .insert(field);
-
-            let Some(to) = &relation.to else {
-                return Err(anyhow!("relation to node required"));
-            };
-            entity_fields
-                .entry(to.value.clone())
-                .or_insert_with(HashSet::new)
-                .insert(field);
-        }
-    }
-
-    // Index each vector
     let mut elems = Vec::new();
-    if let Some(vectorset) = &resource.relation_node_vectors.get(index_name) {
+    for (field_id, field_data) in &resource.field_node_vectors {
+        let Some(vectorset) = field_data.node_vectors.get(index_name) else {
+            continue;
+        };
+        let Some(metadata) = encode_metadata_field(rid, field_id) else {
+            continue;
+        };
         for node_vector in &vectorset.vectors {
-            let vector = node_vector.vector.clone();
-            let fields = entity_fields.get(&node_vector.node_value);
-            let Some(fields) = fields else {
-                continue;
-            };
             elems.push(Elem::new(
                 node_vector.node_value.clone(),
-                vector,
+                node_vector.vector.clone(),
                 vec![],
-                Some(encode_metadata_field(rid, fields)),
+                Some(metadata.clone()),
             ));
         }
     }
@@ -235,40 +204,25 @@ pub fn index_relation_edges(
 ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
     debug!("Creating elements for the main index");
 
-    let mut entity_fields = HashMap::new();
     let Some(resource_id) = &resource.resource else {
         return Err(anyhow!("resource_id required"));
     };
     let rid = &resource_id.uuid;
 
-    for (field, relations) in &resource.field_relations {
-        // Find all copies of each relation edge
-        for relation in &relations.relations {
-            let Some(relation) = &relation.relation else {
-                return Err(anyhow!("relation required"));
-            };
-
-            entity_fields
-                .entry(relation.relation_label.clone())
-                .or_insert_with(HashSet::new)
-                .insert(field);
-        }
-    }
-
-    // Index each vector
     let mut elems = Vec::new();
-    if let Some(vectorset) = &resource.relation_edge_vectors.get(index_name) {
+    for (field_id, field_data) in &resource.field_edge_vectors {
+        let Some(vectorset) = field_data.edge_vectors.get(index_name) else {
+            continue;
+        };
+        let Some(metadata) = encode_metadata_field(rid, field_id) else {
+            continue;
+        };
         for rel_vector in &vectorset.vectors {
-            let vector = rel_vector.vector.clone();
-            let fields = entity_fields.get(&rel_vector.relation_label);
-            let Some(fields) = fields else {
-                continue;
-            };
             elems.push(Elem::new(
                 rel_vector.relation_label.clone(),
-                vector,
+                rel_vector.vector.clone(),
                 vec![],
-                Some(encode_metadata_field(rid, fields)),
+                Some(metadata.clone()),
             ));
         }
     }

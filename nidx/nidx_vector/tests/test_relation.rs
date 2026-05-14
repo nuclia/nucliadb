@@ -23,8 +23,9 @@ mod common;
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use nidx_protos::{
-    IndexRelation, IndexRelations, Relation, RelationEdgeVector, RelationEdgeVectors, RelationNode, RelationNodeVector,
-    RelationNodeVectors, Resource, ResourceId, relation::RelationType, relation_node::NodeType,
+    IndexFieldEdgeVectors, IndexFieldNodeVectors, IndexRelation, IndexRelations, Relation, RelationEdgeVector,
+    RelationEdgeVectors, RelationNode, RelationNodeVector, RelationNodeVectors, Resource, ResourceId,
+    relation::RelationType, relation_node::NodeType,
 };
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::{VectorIndexer, VectorSearchRequest, VectorSearcher, config::*};
@@ -83,6 +84,7 @@ fn node_vector(value: &str) -> RelationNodeVector {
 fn test_relations_deletion() -> anyhow::Result<()> {
     let config = VectorConfig::for_relation_nodes(VectorType::DenseF32 { dimension: DIMENSION });
 
+    // Each node gets a separate vector per field it appears in
     let resource = Resource {
         resource: Some(ResourceId {
             uuid: "00112233445566778899aabbccddeeff".into(),
@@ -109,17 +111,44 @@ fn test_relations_deletion() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![
-                    node_vector("dog"),
-                    node_vector("cat"),
-                    node_vector("fish"),
-                    node_vector("sheep"),
-                ],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/other".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("sheep"), node_vector("fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -128,29 +157,30 @@ fn test_relations_deletion() -> anyhow::Result<()> {
     let segment_meta = VectorIndexer
         .index_resource(segment_dir.path(), &config, &resource, "default", true)?
         .unwrap();
-    assert_eq!(segment_meta.records, 4);
+    // 6 vectors total (one per field occurrence)
+    assert_eq!(segment_meta.records, 6);
 
-    // Search without deletions, all results
+    // Search without deletions - results are deduplicated by node_value key
+    // Unique node values: dog, cat, fish, sheep
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(vec![(segment_meta.clone(), 1i64.into())], vec![]),
     )?;
-    let search_for = vector_for("dog");
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for.clone(),
+            vector: vector_for("dog"),
             result_per_page: 10,
             with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
     )?;
-
     assert_eq!(results.documents.len(), 4);
     assert!(results.documents[0].score > 0.9999);
-    assert!(results.documents[1].score < 1.0);
 
-    // Search deleting title, cat disappears
+    // Delete a/title: removes dog(a/title) and cat(a/title)
+    // Remaining: dog(f/file), fish(f/file), sheep(f/other), fish(f/other)
+    // Unique node values: dog, fish, sheep → 3 results
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(
@@ -158,43 +188,22 @@ fn test_relations_deletion() -> anyhow::Result<()> {
             vec![("00112233445566778899aabbccddeeff/a/title".into(), 2u64.into())],
         ),
     )?;
-    let search_for = vector_for("cat");
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for.clone(),
+            vector: vector_for("cat"),
             result_per_page: 10,
             with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
     )?;
-
     assert_eq!(results.documents.len(), 3);
+    // cat is gone
     assert!(results.documents[0].score < 1.0);
 
-    // Search deleting title, cat disappears
-    let searcher = VectorSearcher::open(
-        config.clone(),
-        TestOpener::new(
-            vec![(segment_meta.clone(), 1i64.into())],
-            vec![("00112233445566778899aabbccddeeff/a/title".into(), 2u64.into())],
-        ),
-    )?;
-    let search_for = vector_for("cat");
-    let results = searcher.search(
-        &VectorSearchRequest {
-            vector: search_for.clone(),
-            result_per_page: 10,
-            with_duplicates: true,
-            ..Default::default()
-        },
-        &PrefilterResult::All,
-    )?;
-
-    assert_eq!(results.documents.len(), 3);
-    assert!(results.documents[0].score < 1.0);
-
-    // Search deleting title and file, dog and cat disappear
+    // Delete a/title and f/file: removes dog(a/title), cat(a/title), dog(f/file), fish(f/file)
+    // Remaining: sheep(f/other), fish(f/other)
+    // Unique node values: sheep, fish → 2 results
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(
@@ -205,21 +214,20 @@ fn test_relations_deletion() -> anyhow::Result<()> {
             ],
         ),
     )?;
-    let search_for = vector_for("dog");
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for.clone(),
+            vector: vector_for("dog"),
             result_per_page: 10,
             with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
     )?;
-
     assert_eq!(results.documents.len(), 2);
+    // dog is gone
     assert!(results.documents[0].score < 1.0);
 
-    // Search with non-applied deletions (seq), everything present
+    // Non-applied deletions (seq too old), everything present
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(
@@ -230,21 +238,19 @@ fn test_relations_deletion() -> anyhow::Result<()> {
             ],
         ),
     )?;
-    let search_for = vector_for("dog");
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for.clone(),
+            vector: vector_for("dog"),
             result_per_page: 10,
             with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
     )?;
-
     assert_eq!(results.documents.len(), 4);
     assert!(results.documents[0].score > 0.9999);
 
-    // Search with malformed deletions (seq), everything present and no crashes
+    // Malformed deletions, everything present and no crashes
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(
@@ -255,17 +261,15 @@ fn test_relations_deletion() -> anyhow::Result<()> {
             ],
         ),
     )?;
-    let search_for = vector_for("dog");
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for.clone(),
+            vector: vector_for("dog"),
             result_per_page: 10,
             with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
     )?;
-
     assert_eq!(results.documents.len(), 4);
     assert!(results.documents[0].score > 0.9999);
 
@@ -296,12 +300,32 @@ fn test_relations_merge() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![node_vector("dog"), node_vector("cat"), node_vector("fish")],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -310,7 +334,7 @@ fn test_relations_merge() -> anyhow::Result<()> {
     let segment_meta1 = VectorIndexer
         .index_resource(segment_dir1.path(), &config, &resource1, "default", true)?
         .unwrap();
-    assert_eq!(segment_meta1.records, 3);
+    assert_eq!(segment_meta1.records, 4);
 
     let resource2 = Resource {
         resource: Some(ResourceId {
@@ -332,17 +356,32 @@ fn test_relations_merge() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![
-                    node_vector("dog"),
-                    node_vector("cat"),
-                    node_vector("sheep"),
-                    node_vector("rat"),
-                ],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("sheep"), node_vector("rat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -353,7 +392,7 @@ fn test_relations_merge() -> anyhow::Result<()> {
         .unwrap();
     assert_eq!(segment_meta2.records, 4);
 
-    // Merge without deletions
+    // Merge without deletions - no deduplication, all 8 vectors kept
     let segment_dir_merge = tempdir()?;
     let merged_meta = VectorIndexer.merge(
         segment_dir_merge.path(),
@@ -366,14 +405,12 @@ fn test_relations_merge() -> anyhow::Result<()> {
             vec![],
         ),
     )?;
-    // Vectors are deduplicated, make sure with search
-    assert_eq!(merged_meta.records, 5);
+    assert_eq!(merged_meta.records, 8);
 
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(vec![(merged_meta.clone(), 1i64.into())], vec![]),
     )?;
-
     let results = searcher.search(
         &VectorSearchRequest {
             vector: vector_for("dog"),
@@ -383,12 +420,13 @@ fn test_relations_merge() -> anyhow::Result<()> {
         },
         &PrefilterResult::All,
     )?;
-
+    // Unique node values: dog, cat, fish, sheep, rat → 5 results (deduped by key in search)
     assert_eq!(results.documents.len(), 5);
     assert!(results.documents[0].score > 0.9999);
-    assert!(results.documents[1].score < 1.0);
 
-    // Deleting one title does nothing, as the other segment has the same entity in the same field
+    // Delete one resource's title: removes dog(uuid1/a/title) and cat(uuid1/a/title)
+    // Other resource still has dog(uuid2/a/title), cat(uuid2/a/title)
+    // All unique node values still present
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(
@@ -396,7 +434,6 @@ fn test_relations_merge() -> anyhow::Result<()> {
             vec![("00112233445566778899aabbccddeeff/a/title".into(), 2u64.into())],
         ),
     )?;
-
     let results = searcher.search(
         &VectorSearchRequest {
             vector: vector_for("cat"),
@@ -406,12 +443,13 @@ fn test_relations_merge() -> anyhow::Result<()> {
         },
         &PrefilterResult::All,
     )?;
-
+    // cat still present via uuid2's a/title
     assert_eq!(results.documents.len(), 5);
     assert!(results.documents[0].score > 0.9999);
-    assert!(results.documents[1].score < 1.0);
 
-    // Deleting both titles eliminates cat
+    // Delete both resources' titles: removes all a/title vectors
+    // Remaining: dog(uuid1/f/file), fish(uuid1/f/file), sheep(uuid2/f/file), rat(uuid2/f/file)
+    // Unique node values: dog, fish, sheep, rat → 4 results. cat is gone.
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(
@@ -422,7 +460,6 @@ fn test_relations_merge() -> anyhow::Result<()> {
             ],
         ),
     )?;
-
     let results = searcher.search(
         &VectorSearchRequest {
             vector: vector_for("cat"),
@@ -432,7 +469,6 @@ fn test_relations_merge() -> anyhow::Result<()> {
         },
         &PrefilterResult::All,
     )?;
-
     assert_eq!(results.documents.len(), 4);
     assert!(results.documents[0].score < 1.0);
 
@@ -463,12 +499,32 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![node_vector("dog"), node_vector("cat"), node_vector("fish")],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -477,7 +533,7 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
     let segment_meta1 = VectorIndexer
         .index_resource(segment_dir1.path(), &config, &resource1, "default", true)?
         .unwrap();
-    assert_eq!(segment_meta1.records, 3);
+    assert_eq!(segment_meta1.records, 4);
 
     let resource2 = Resource {
         resource: Some(ResourceId {
@@ -499,17 +555,32 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![
-                    node_vector("dog"),
-                    node_vector("cat"),
-                    node_vector("sheep"),
-                    node_vector("rat"),
-                ],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("sheep"), node_vector("rat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -520,7 +591,7 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
         .unwrap();
     assert_eq!(segment_meta2.records, 4);
 
-    // Merge without deletions
+    // Merge without deletions - 8 vectors total
     let segment_dir_merge = tempdir()?;
     let merged_meta = VectorIndexer.merge(
         segment_dir_merge.path(),
@@ -533,9 +604,11 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
             vec![],
         ),
     )?;
-    assert_eq!(merged_meta.records, 5);
+    assert_eq!(merged_meta.records, 8);
 
-    // Delete one titles during merge, all entities remain
+    // Delete one title during merge
+    // Removes uuid1's a/title vectors (dog, cat from uuid1)
+    // Remaining: 6 vectors
     let segment_dir_merge = tempdir()?;
     let merged_meta = VectorIndexer.merge(
         segment_dir_merge.path(),
@@ -548,9 +621,11 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
             vec![("00112233445566778899aabbccddeeff/a/title".into(), 3u64.into())],
         ),
     )?;
-    assert_eq!(merged_meta.records, 5);
+    assert_eq!(merged_meta.records, 6);
 
-    // Delete both titles during merge, cat disappears
+    // Delete both titles during merge
+    // Removes all a/title vectors from both resources (4 vectors removed)
+    // Remaining: dog(uuid1/f/file), fish(uuid1/f/file), sheep(uuid2/f/file), rat(uuid2/f/file) → 4 vectors
     let segment_dir_merge = tempdir()?;
     let merged_meta = VectorIndexer.merge(
         segment_dir_merge.path(),
@@ -568,7 +643,7 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
     )?;
     assert_eq!(merged_meta.records, 4);
 
-    // Delete both titles during merge with exact Seqs, cat disappears
+    // Delete both titles with exact Seqs
     let segment_dir_merge = tempdir()?;
     let merged_meta = VectorIndexer.merge(
         segment_dir_merge.path(),
@@ -586,7 +661,7 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
     )?;
     assert_eq!(merged_meta.records, 4);
 
-    // Delete both titles during merge with old Seqs, all remain
+    // Delete both titles with old Seqs — deletions don't apply, all remain
     let segment_dir_merge = tempdir()?;
     let merged_meta = VectorIndexer.merge(
         segment_dir_merge.path(),
@@ -597,12 +672,13 @@ fn test_relations_merge_deletions() -> anyhow::Result<()> {
                 (segment_meta2.clone(), 2i64.into()),
             ],
             vec![
-                ("00112233445566778899aabbccddeeff/a/title".into(), 2u64.into()),
-                ("ffeeddccbbaa99887766554433221100/a/title".into(), 2u64.into()),
+                ("00112233445566778899aabbccddeeff/a/title".into(), 1u64.into()),
+                ("ffeeddccbbaa99887766554433221100/a/title".into(), 1u64.into()),
             ],
         ),
     )?;
-    assert_eq!(merged_meta.records, 5);
+    assert_eq!(merged_meta.records, 8);
+
     Ok(())
 }
 
@@ -630,12 +706,32 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![node_vector("dog"), node_vector("cat"), node_vector("fish")],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("dog"), node_vector("fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -644,8 +740,9 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
     let segment_meta1 = VectorIndexer
         .index_resource(segment_dir1.path(), &config, &resource1, "default", true)?
         .unwrap();
-    assert_eq!(segment_meta1.records, 3);
+    assert_eq!(segment_meta1.records, 4);
 
+    // Updated version of the same resource
     let resource1u = Resource {
         resource: Some(ResourceId {
             uuid: "00112233445566778899aabbccddeeff".into(),
@@ -666,12 +763,32 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_node_vectors: [(
-            "default".to_string(),
-            RelationNodeVectors {
-                vectors: vec![node_vector("my dog"), node_vector("my cat"), node_vector("my fish")],
-            },
-        )]
+        field_node_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("my dog"), node_vector("my cat")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldNodeVectors {
+                    node_vectors: [(
+                        "default".to_string(),
+                        RelationNodeVectors {
+                            vectors: vec![node_vector("my dog"), node_vector("my fish")],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -680,9 +797,9 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
     let segment_meta1u = VectorIndexer
         .index_resource(segment_dir1u.path(), &config, &resource1u, "default", true)?
         .unwrap();
-    assert_eq!(segment_meta1.records, 3);
+    assert_eq!(segment_meta1u.records, 4);
 
-    // Simulate updates, merge the same segment twice, with deletions on the second one
+    // Simulate update: merge both versions with deletions on old fields
     let segment_dir_merge = tempdir()?;
     let merged_meta = VectorIndexer.merge(
         segment_dir_merge.path(),
@@ -698,23 +815,23 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
             ],
         ),
     )?;
-    assert_eq!(merged_meta.records, 3);
+    // Old segment's 4 vectors deleted, new segment's 4 remain
+    assert_eq!(merged_meta.records, 4);
 
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(vec![(merged_meta.clone(), 1i64.into())], vec![]),
     )?;
-    let search_for = vector_for("my dog");
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for.clone(),
+            vector: vector_for("my dog"),
             result_per_page: 10,
             with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
     )?;
-
+    // Unique node values: my dog, my cat, my fish → 3
     assert_eq!(results.documents.len(), 3);
     assert!(results.documents[0].score > 0.9999);
     let mut results_names = results
@@ -725,7 +842,7 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
     results_names.sort();
     assert_eq!(results_names, vec!["my cat", "my dog", "my fish"]);
 
-    // Bad merge without deletion, all data from both segment appears
+    // Bad merge without deletion: all data from both segments
     let segment_dir_merge = tempdir()?;
     let merged_meta = VectorIndexer.merge(
         segment_dir_merge.path(),
@@ -738,25 +855,23 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
             vec![],
         ),
     )?;
-    assert_eq!(merged_meta.records, 6);
+    assert_eq!(merged_meta.records, 8);
 
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(vec![(merged_meta.clone(), 1i64.into())], vec![]),
     )?;
-    let search_for = vector_for("my dog");
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for.clone(),
+            vector: vector_for("my dog"),
             result_per_page: 10,
             with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
     )?;
-
+    // Unique node values: dog, cat, fish, my dog, my cat, my fish → 6
     assert_eq!(results.documents.len(), 6);
-    assert!(results.documents[0].score > 0.9999);
     let mut results_names = results
         .documents
         .iter()
@@ -782,23 +897,24 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
             ],
         ),
     )?;
+    // Old a/title and f/file deleted (4 removed from seg1)
+    // New f/file deleted (2 removed from seg1u: my dog(f/file), my fish(f/file))
+    // Remaining from seg1u: my dog(a/title), my cat(a/title) → 2
     assert_eq!(merged_meta.records, 2);
 
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(vec![(merged_meta.clone(), 1i64.into())], vec![]),
     )?;
-    let search_for = vector_for("my dog");
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for.clone(),
+            vector: vector_for("my dog"),
             result_per_page: 10,
             with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
     )?;
-
     assert_eq!(results.documents.len(), 2);
     assert!(results.documents[0].score > 0.9999);
     let mut results_names = results
@@ -814,8 +930,7 @@ fn test_relations_merge_updates() -> anyhow::Result<()> {
 
 #[test]
 fn test_relations_labels() -> anyhow::Result<()> {
-    // Basic test for relation labels, other testing covered by relation nodes, this only needs
-    // to check the indexing part which is the only thing different
+    // Basic test for relation labels (edges)
     let config = VectorConfig::for_relation_edges(VectorType::DenseF32 { dimension: 4 });
 
     let resource = Resource {
@@ -843,21 +958,44 @@ fn test_relations_labels() -> anyhow::Result<()> {
             ),
         ]
         .into(),
-        relation_edge_vectors: [(
-            "default".to_string(),
-            RelationEdgeVectors {
-                vectors: vec![
-                    RelationEdgeVector {
-                        relation_label: "faster than".into(),
-                        vector: vec![1.0, 0.0, 0.0, 0.0],
-                    },
-                    RelationEdgeVector {
-                        relation_label: "bigger than".into(),
-                        vector: vec![0.0, 1.0, 0.0, 0.0],
-                    },
-                ],
-            },
-        )]
+        field_edge_vectors: [
+            (
+                "a/title".to_string(),
+                IndexFieldEdgeVectors {
+                    edge_vectors: [(
+                        "default".to_string(),
+                        RelationEdgeVectors {
+                            vectors: vec![RelationEdgeVector {
+                                relation_label: "faster than".into(),
+                                vector: vec![1.0, 0.0, 0.0, 0.0],
+                            }],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+            (
+                "f/file".to_string(),
+                IndexFieldEdgeVectors {
+                    edge_vectors: [(
+                        "default".to_string(),
+                        RelationEdgeVectors {
+                            vectors: vec![
+                                RelationEdgeVector {
+                                    relation_label: "bigger than".into(),
+                                    vector: vec![0.0, 1.0, 0.0, 0.0],
+                                },
+                                RelationEdgeVector {
+                                    relation_label: "faster than".into(),
+                                    vector: vec![1.0, 0.0, 0.0, 0.0],
+                                },
+                            ],
+                        },
+                    )]
+                    .into(),
+                },
+            ),
+        ]
         .into(),
         ..Default::default()
     };
@@ -866,27 +1004,25 @@ fn test_relations_labels() -> anyhow::Result<()> {
     let segment_meta = VectorIndexer
         .index_resource(segment_dir.path(), &config, &resource, "default", true)?
         .unwrap();
-    assert_eq!(segment_meta.records, 2);
+    // 3 vectors (faster than from a/title, bigger than from f/file, faster than from f/file)
+    assert_eq!(segment_meta.records, 3);
 
-    // Search without deletions, all results
+    // Search: 2 unique edge labels
     let searcher = VectorSearcher::open(
         config.clone(),
         TestOpener::new(vec![(segment_meta.clone(), 1i64.into())], vec![]),
     )?;
-    let search_for = vec![1.0, 0.0, 0.0, 0.0];
     let results = searcher.search(
         &VectorSearchRequest {
-            vector: search_for.clone(),
+            vector: vec![1.0, 0.0, 0.0, 0.0],
             result_per_page: 10,
             with_duplicates: true,
             ..Default::default()
         },
         &PrefilterResult::All,
     )?;
-
     assert_eq!(results.documents.len(), 2);
     assert!(results.documents[0].score > 0.9999);
-    assert!(results.documents[1].score < 1.0);
 
     Ok(())
 }

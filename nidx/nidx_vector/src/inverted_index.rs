@@ -66,7 +66,7 @@ impl IndexBuilder {
 
 /// Build indexes from a DataStore.
 pub fn build_indexes(work_path: &Path, config: &VectorConfig, data_store: &impl DataStore) -> VectorR<()> {
-    if config.deduplicate_keys() {
+    if config.uses_relation_inverted_index() {
         RelationInvertedIndexes::build(work_path, data_store)
     } else {
         ParagraphInvertedIndexes::build(work_path, data_store)
@@ -84,7 +84,7 @@ pub enum InvertedIndexes {
 
 impl InvertedIndexes {
     pub fn open(config: &VectorConfig, work_path: &Path, records: usize, options: OpenOptions) -> VectorR<Self> {
-        if config.deduplicate_keys() {
+        if config.uses_relation_inverted_index() {
             Ok(InvertedIndexes::Relation(RelationInvertedIndexes::open(
                 work_path, options,
             )?))

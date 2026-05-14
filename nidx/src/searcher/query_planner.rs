@@ -45,6 +45,10 @@ pub struct GraphIndexQueries {
     pub vector_edge_requests: HashMap<String, VectorSearchRequest>,
 }
 
+// Each relation node or edge may have multiple vectors (one per field occurrence).
+// We request more results than asked for so that duplicates don't crowd out unique nodes.
+const GRAPH_VECTOR_OVERREQUEST_FACTOR: u32 = 4;
+
 impl GraphIndexQueries {
     pub fn build(request: GraphSearchRequest) -> Self {
         let mut vector_node_requests = HashMap::new();
@@ -56,7 +60,7 @@ impl GraphIndexQueries {
                 path_query,
                 &mut vector_node_requests,
                 &mut vector_edge_requests,
-                request.top_k,
+                request.top_k * GRAPH_VECTOR_OVERREQUEST_FACTOR,
             );
         }
 

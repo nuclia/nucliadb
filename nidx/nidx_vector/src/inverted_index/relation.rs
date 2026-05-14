@@ -27,7 +27,6 @@ use super::{
 use crate::{
     ParagraphAddr, VectorR,
     data_store::{DataStore, iter_paragraphs},
-    field_list_metadata::decode_field_list_metadata,
     utils::FieldKey,
 };
 
@@ -62,11 +61,8 @@ impl RelationInvertedIndexes {
 
         for paragraph_addr in iter_paragraphs(data_store) {
             let paragraph = data_store.get_paragraph(paragraph_addr);
-            let fields = decode_field_list_metadata(paragraph.metadata());
-
-            for field_key in fields {
-                field_builder.insert(field_key.bytes().to_vec(), paragraph_addr);
-            }
+            let field_key = FieldKey::from_bytes(paragraph.metadata());
+            field_builder.insert(field_key.bytes().to_vec(), paragraph_addr);
         }
 
         let mut map = InvertedMapWriter::new(&work_path.join(file::INDEX_MAP))?;
