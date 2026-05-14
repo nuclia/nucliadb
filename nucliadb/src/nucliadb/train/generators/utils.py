@@ -23,7 +23,6 @@ from typing import Any
 
 from nucliadb.common.cache import get_resource_cache
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.models_utils import to_proto
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.train import SERVICE_NAME, logger
@@ -64,11 +63,10 @@ async def get_paragraph(kbid: str, paragraph_id: str) -> str:
         logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return ""
 
-    field_type_int = to_proto.field_type(field_type)
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+    field_obj = await orm_resource.get_field(field, field_type, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:
-        logger.warning(f"{rid} {field} {field_type_int} extracted_text does not exist on DB")
+        logger.warning(f"{rid} {field} {field_type} extracted_text does not exist on DB")
         return ""
 
     if split is not None:

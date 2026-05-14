@@ -22,7 +22,6 @@ from collections.abc import AsyncGenerator
 
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.models_utils import to_proto
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
@@ -86,11 +85,10 @@ async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> st
         logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
         return ""
 
-    field_type_int = to_proto.field_type(field_type)
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+    field_obj = await orm_resource.get_field(field, field_type, load=False)
     extracted_text = await field_obj.get_extracted_text()
     if extracted_text is None:
-        logger.warning(f"{rid} {field} {field_type_int} extracted_text does not exist on DB")
+        logger.warning(f"{rid} {field} {field_type} extracted_text does not exist on DB")
         return ""
 
     text = ""

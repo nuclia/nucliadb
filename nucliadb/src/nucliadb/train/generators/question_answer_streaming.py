@@ -22,7 +22,7 @@ from collections.abc import AsyncGenerator
 
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.models_utils import from_proto, to_proto
+from nucliadb.common.models_utils import from_proto
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import (
@@ -86,8 +86,7 @@ async def generate_question_answer_streaming_payloads(
                         item.cancelled_by_user = qa_annotation_pb.cancelled_by_user
                         yield item
 
-        field_type_int = to_proto.field_type(field_type)
-        field_obj = await orm_resource.get_field(field, field_type_int, load=False)
+        field_obj = await orm_resource.get_field(field, field_type, load=False)
 
         question_answers_pb = await field_obj.get_question_answers()
         if question_answers_pb is not None:

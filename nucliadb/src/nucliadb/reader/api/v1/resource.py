@@ -26,7 +26,7 @@ from fastapi_versioning import version
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.models_utils import from_proto, to_proto
+from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as ORMKnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
@@ -387,7 +387,6 @@ async def _get_resource_field(
 ) -> Response:
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
-    pb_field_id = to_proto.field_type(field_type)
     async with driver.ro_transaction() as txn:
         kb = ORMKnowledgeBox(txn, storage, kbid)
 
@@ -398,7 +397,7 @@ async def _get_resource_field(
                 raise HTTPException(status_code=404, detail="Resource does not exist")
 
         resource = ORMResource(txn, storage, kbid, rid)
-        field = await resource.get_field(field_id, pb_field_id, load=True)
+        field = await resource.get_field(field_id, field_type, load=True)
         if not await resource.field_exists(field_type, field_id):
             raise HTTPException(status_code=404, detail="Field does not exist")
 
