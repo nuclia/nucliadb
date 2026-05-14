@@ -28,6 +28,7 @@ PRODUCT_SCHEMA = {
         {"key": "price", "type": "float", "required": True},
         {"key": "in_stock", "type": "boolean", "required": False},
         {"key": "quantity", "type": "integer", "required": False},
+        {"key": "launched_at", "type": "date", "required": False},
     ],
 }
 
@@ -38,6 +39,7 @@ VALID_PRODUCT_DATA = {
         "price": 12.5,
         "in_stock": True,
         "quantity": 3,
+        "launched_at": "2024-01-15T00:00:00Z",
     },
 }
 
@@ -84,6 +86,7 @@ async def test_kv_field_crud(
     assert value["price"] == 12.5
     assert value["in_stock"] is True
     assert value["quantity"] == 3
+    assert value["launched_at"] == "2024-01-15T00:00:00Z"
 
     # --- Update resource via PATCH ---
     resp = await nucliadb_writer.patch(
@@ -118,6 +121,7 @@ async def test_kv_field_crud(
     assert value["price"] == 12.5
     assert value["in_stock"] is True
     assert value["quantity"] == 3
+    assert value["launched_at"] == "2024-01-15T00:00:00Z"
 
     # --- Update field: only required keys; optional keys disappear ---
     resp = await nucliadb_writer.put(
@@ -205,6 +209,23 @@ async def test_kv_field_validation(
     )
     assert resp.status_code == 422, resp.text
 
+    # Wrong type: launched_at should be ISO date string, not an integer timestamp
+    resp = await nucliadb_writer.put(
+        f"{base_url}/product",
+        json={"schema_id": "product", "data": {"color": "red", "price": 1.0, "launched_at": 1234567890}},
+    )
+    assert resp.status_code == 422, resp.text
+
+    # Wrong type: launched_at must be a valid ISO string, not free text
+    resp = await nucliadb_writer.put(
+        f"{base_url}/product",
+        json={
+            "schema_id": "product",
+            "data": {"color": "red", "price": 1.0, "launched_at": "not-a-date"},
+        },
+    )
+    assert resp.status_code == 422, resp.text
+
     # Field name in URL must match schema_id in body
     resp = await nucliadb_writer.put(
         f"{base_url}/product",
@@ -243,6 +264,7 @@ async def test_kv_field_filter(
                         "price": 12.5,
                         "in_stock": True,
                         "quantity": 3,
+                        "launched_at": "2023-06-01T00:00:00Z",
                     },
                 }
             },
@@ -265,6 +287,7 @@ async def test_kv_field_filter(
                         "price": 5.0,
                         "in_stock": False,
                         "quantity": 10,
+                        "launched_at": "2024-06-01T00:00:00Z",
                     },
                 }
             },
@@ -379,6 +402,34 @@ async def test_kv_field_filter(
     assert rid1 in rids, f"Expected rid1 in results for color=red AND in_stock=True, got {rids}"
     assert rid2 not in rids, f"Expected rid2 NOT in results for color=red AND in_stock=True, got {rids}"
 
+    # --- Date range: launched_at >= 2024-01-01 → finds resource 2 only ---
+    rids = await find_with_filter(
+        {
+            "key_value": {
+                "op": "date_range",
+                "field_id": "product",
+                "key": "launched_at",
+                "gte": "2024-01-01T00:00:00Z",
+            }
+        }
+    )
+    assert rid2 in rids, f"Expected rid2 in results for launched_at>=2024, got {rids}"
+    assert rid1 not in rids, f"Expected rid1 NOT in results for launched_at>=2024, got {rids}"
+
+    # --- Date range: launched_at <= 2023-12-31 → finds resource 1 only ---
+    rids = await find_with_filter(
+        {
+            "key_value": {
+                "op": "date_range",
+                "field_id": "product",
+                "key": "launched_at",
+                "lte": "2023-12-31T23:59:59Z",
+            }
+        }
+    )
+    assert rid1 in rids, f"Expected rid1 in results for launched_at<=2023, got {rids}"
+    assert rid2 not in rids, f"Expected rid2 NOT in results for launched_at<=2023, got {rids}"
+
 
 @pytest.mark.deploy_modes("standalone")
 async def test_kv_filter_schema_validation(
@@ -459,7 +510,7 @@ async def test_kv_filter_schema_validation(
     )
     assert status == 412, f"Expected 412 for bool_match on text field, got {status}"
 
-    # --- Wrong predicate type: range on a text field → 422 ---
+    # --- Wrong predicate type: range on a text field → 412 ---
     status = await find_with_filter(
         {
             "key_value": {
@@ -471,3 +522,16 @@ async def test_kv_filter_schema_validation(
         }
     )
     assert status == 412, f"Expected 412 for range on text field, got {status}"
+
+    # --- Wrong predicate type: date_range on a text field → 412 ---
+    status = await find_with_filter(
+        {
+            "key_value": {
+                "op": "date_range",
+                "field_id": "product",
+                "key": "color",
+                "gte": "2024-01-01T00:00:00Z",
+            }
+        }
+    )
+    assert status == 412, f"Expected 412 for date_range on text field, got {status}"

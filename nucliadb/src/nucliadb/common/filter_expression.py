@@ -39,6 +39,7 @@ from nucliadb_models.filters import (
     Keyword,
     Kind,
     KVBoolMatch,
+    KVDateRange,
     KVExactMatch,
     KVFilterExpression,
     KVRange,
@@ -180,6 +181,16 @@ def parse_kv_filter_expression(
         )
         path.boolean = expr.value
         return nodereader_pb2.JsonFilterExpression(path=path)
+    elif isinstance(expr, KVDateRange):
+        path = nodereader_pb2.JsonFieldPathFilter(
+            field_id=f"k/{expr.field_id}",
+            json_path=expr.key,
+        )
+        if expr.gte is not None:
+            path.date_range.lower.FromDatetime(expr.gte)
+        if expr.lte is not None:
+            path.date_range.upper.FromDatetime(expr.lte)
+        return nodereader_pb2.JsonFilterExpression(path=path)
     else:
         assert_never(expr)
 
@@ -206,7 +217,7 @@ def _parse_kv_filter_expression(
         result = nodereader_pb2.JsonFilterExpression()
         result.bool_not.CopyFrom(_parse_kv_filter_expression(expr.operand, all_schemas, kbid))
         return result
-    elif isinstance(expr, (KVExactMatch, KVRange, KVBoolMatch)):
+    elif isinstance(expr, (KVExactMatch, KVRange, KVBoolMatch, KVDateRange)):
         schema = all_schemas.schemas.get(expr.field_id)
         if schema is None:
             raise InvalidQueryError("key_value", f"Unknown key-value schema: '{expr.field_id}'")
@@ -234,6 +245,12 @@ def _parse_kv_filter_expression(
                 "key_value",
                 f"Key '{expr.key}' in schema '{expr.field_id}' is of type '{schema_field.type}', "
                 f"but 'bool_match' requires type 'boolean'",
+            )
+        elif isinstance(expr, KVDateRange) and schema_field.type != "date":
+            raise InvalidQueryError(
+                "key_value",
+                f"Key '{expr.key}' in schema '{expr.field_id}' is of type '{schema_field.type}', "
+                f"but 'date_range' requires type 'date'",
             )
         return parse_kv_filter_expression(expr)
     else:

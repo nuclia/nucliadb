@@ -41,13 +41,11 @@ pub fn index_json_fields(
     let resource_uuid = Uuid::parse_str(resource_id)?;
     let encoded = encode_rid(resource_uuid);
 
-    let json_field_type = schema.schema.get_field_entry(schema.json).field_type().clone();
-
     // Build a single nested object per resource: { "field_id": <json> }
     let mut nested: Vec<(String, OwnedValue)> = Vec::with_capacity(resource.json_fields.len());
     for (field_key, json_info) in resource.json_fields.iter() {
         let parsed: serde_json::Value = serde_json::from_str(&json_info.value)?;
-        let owned = json_field_type.value_from_json(parsed)?;
+        let owned = OwnedValue::from(parsed);
         nested.push((field_key.clone(), owned));
     }
 
