@@ -126,7 +126,7 @@ async def get_text_sentence(
     start = start - 1
     if start < 0:
         start = 0
-    if split not in (None, ""):
+    if split is not None and split != "":
         text = extracted_text.split_text[split]
         splitted_text = text[start:end]
     else:

@@ -71,9 +71,9 @@ async def generate_paragraph_streaming_payloads(
 
         extracted_text = await field_obj.get_extracted_text()
         field_metadata = await field_obj.get_field_metadata()
-        if field_metadata is None:
+        if field_metadata is None or extracted_text is None:
             logger.warning(
-                "Field metadata not found on DB",
+                "Field metadata or extracted text not found on DB",
                 extra={"kbid": kbid, "rid": rid, "field": field, "field_type": field_type},
             )
             continue

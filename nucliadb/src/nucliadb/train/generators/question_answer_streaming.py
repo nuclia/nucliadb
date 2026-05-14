@@ -94,8 +94,8 @@ async def generate_question_answer_streaming_payloads(
             for question_answer_pb in question_answers_pb.question_answers.question_answer:
                 async for item in iter_stream_items(kbid, question_answer_pb):
                     yield item
-            for question_answer_pb in question_answers_pb.split_question_answers.values():
-                for split_question_answer_pb in question_answer_pb.question_answer:
+            for split_question_answers_pb in question_answers_pb.split_question_answers.values():
+                for split_question_answer_pb in split_question_answers_pb.question_answer:
                     async for item in iter_stream_items(kbid, split_question_answer_pb):
                         yield item
 

@@ -91,8 +91,7 @@ async def generate_sentence_classification_payloads(
 
 async def get_sentences(kbid: str, result: str) -> list[str]:
     if result.count("/") == 4:
-        rid, field_type, field, split_str, _ = result.split("/")
-        split = int(split_str)
+        rid, field_type, field, split, _ = result.split("/")
     else:
         rid, field_type, field, _ = result.split("/")
         split = None
@@ -107,7 +106,7 @@ async def get_sentences(kbid: str, result: str) -> list[str]:
     field_obj = await orm_resource.get_field(field, field_type_int, load=False)
     extracted_text = await field_obj.get_extracted_text()
     field_metadata = await field_obj.get_field_metadata()
-    if extracted_text is None:
+    if extracted_text is None or field_metadata is None:
         logger.warning(f"{rid} {field} {field_type_int} extracted_text does not exist on DB")
         return []
 

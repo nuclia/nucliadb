@@ -237,6 +237,7 @@ async def test_ingest_error_message(kbid: str, storage: Storage, processor, main
         assert r is not None
         field_obj = await r.get_text_field("wikipedia_ml")
         ext1 = await field_obj.get_extracted_text()
+        assert ext1 is not None
         lfm1 = await field_obj.get_large_field_metadata()
         fm1 = await field_obj.get_field_metadata()
         basic = await r.get_basic()

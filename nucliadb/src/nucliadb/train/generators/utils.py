@@ -49,8 +49,7 @@ async def _get_resource_from_db(kbid: str, uuid: str) -> ResourceORM | None:
 
 async def get_paragraph(kbid: str, paragraph_id: str) -> str:
     if paragraph_id.count("/") == 5:
-        rid, field_type, field, split_str, start_end = paragraph_id.split("/")
-        split = int(split_str)
+        rid, field_type, field, split, start_end = paragraph_id.split("/")
         start_str, end_str = start_end.split("-")
     else:
         rid, field_type, field, start_end = paragraph_id.split("/")

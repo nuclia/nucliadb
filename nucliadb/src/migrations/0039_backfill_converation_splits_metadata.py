@@ -31,11 +31,9 @@ from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.ingest.fields.conversation import (
     CONVERSATION_SPLITS_METADATA,
-    Conversation,
 )
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import SplitsMetadata
 from nucliadb_utils.storages.storage import Storage
 
@@ -93,9 +91,7 @@ async def build_splits_metadata(
     resource_obj = await kb_orm.get(rid)
     if resource_obj is None:
         return splits_metadata
-    field_obj: Conversation = await resource_obj.get_field(
-        field_id, resources_pb2.FieldType.CONVERSATION, load=False
-    )
+    field_obj = await resource_obj.get_conversation_field(field_id, load=False)
     conv_metadata = await field_obj.get_metadata()
     for i in range(1, conv_metadata.pages + 1):
         page = await field_obj.get_value(page=i)
