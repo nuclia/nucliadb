@@ -801,13 +801,12 @@ class Resource:
 
     async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
         assert self.basic is not None
-        field_file = await self.get_field(
+        field_file = await self.get_file_field(
             file_extracted_data.field,
-            FieldType.FILE,
             load=False,
         )
         # uri can change after extraction
-        await cast(File, field_file).set_file_extracted_data(file_extracted_data)
+        await field_file.set_file_extracted_data(file_extracted_data)
         maybe_update_basic_icon(self.basic, file_extracted_data.icon)
         maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail, self.kbid)
         self.modified = True
