@@ -23,6 +23,7 @@ import pytest
 from httpx import AsyncClient
 from pydantic import ValidationError
 
+from nucliadb.common.ids import ParagraphId
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.query_parser.parsers.retrieve import parse_retrieve
@@ -41,7 +42,7 @@ from nucliadb_models.retrieval import (
 from nucliadb_models.search import Image, PredictReranker, RerankerName
 from nucliadb_protos import knowledgebox_pb2
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.ndbfixtures.resources import smb_wonder_resource
+from tests.ndbfixtures.resources import clothing_store_resources, smb_wonder_resource
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -444,3 +445,58 @@ async def test_retrieve_query_parsing() -> None:
             ),
         )
         assert Fetcher.call_args.kwargs["query_image"] == img
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_retrieve_with_kv_field_filter(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+    clothing_store = await clothing_store_resources(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+    product_name_by_rid = {product_name: rid for rid, product_name in clothing_store.items()}
+
+    async def retrieve_with_kv_filter(filter: dict) -> set:
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/retrieve",
+            json={
+                "query": {"keyword": {"query": ""}},
+                "filters": {
+                    "filter_expression": {
+                        "key_value": filter,
+                    },
+                },
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        body = RetrievalResponse.model_validate_json(resp.text)
+
+        products = set()
+        for match in body.matches:
+            paragraph_id = ParagraphId.from_string(match.id)
+            rid = paragraph_id.rid
+            product_name = product_name_by_rid[rid]
+            products.add(product_name)
+        return products
+
+    products = await retrieve_with_kv_filter(
+        {
+            "field_id": "product",
+            "key": "color",
+            "op": "exact_match",
+            "value": "white",
+        }
+    )
+    assert products == {"floral-skirt", "white-t-shirt"}
+
+    products = await retrieve_with_kv_filter(
+        {"field_id": "product", "key": "price", "op": "range", "gte": 20.0}
+    )
+    assert products == {"floral-skirt"}
+
+    products = await retrieve_with_kv_filter(
+        {"field_id": "product", "key": "price", "op": "range", "lte": 20.0}
+    )
+    assert products == {"white-t-shirt"}

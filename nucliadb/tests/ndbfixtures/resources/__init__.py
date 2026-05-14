@@ -20,6 +20,7 @@
 
 # ruff: noqa: F401
 
+from .clothing_store import clothing_store_resources
 from .cookie_tale import cookie_tale_resource
 from .datafusion import datafusion_resource
 from .full import full_resource
