@@ -22,12 +22,10 @@
 import asyncio
 import json
 from collections.abc import Sequence
-from typing import cast
 
 from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 
 from nucliadb.common import datamanagers
-from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.key_value import KeyValue
@@ -444,8 +442,7 @@ async def get_stored_split_ids(
     resource: Resource,
 ) -> set[str]:
     fid = conversation_field_id
-    conv = await resource.get_field(fid.field, fid.field_type, load=False)
-    conv = cast(Conversation, conv)
+    conv = await resource.get_conversation_field(fid.field, load=False)
     splits_metadata = await conv.get_splits_metadata()
     return set(splits_metadata.metadata)
 
