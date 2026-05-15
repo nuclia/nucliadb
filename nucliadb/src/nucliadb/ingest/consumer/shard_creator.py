@@ -109,7 +109,7 @@ class ShardCreatorHandler:
                 shard: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
                     nodereader_pb2.GetShardRequest(
                         shard_id=noderesources_pb2.ShardId(id=current_shard.nidx_shard_id)
-                    )  # type: ignore
+                    )
                 )
             except AioRpcError as exc:  # pragma: no cover
                 if exc.code() == StatusCode.NOT_FOUND:

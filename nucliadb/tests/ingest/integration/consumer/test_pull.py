@@ -28,8 +28,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi import FastAPI
 from starlette.responses import Response
-from uvicorn.config import Config  # type: ignore
-from uvicorn.server import Server  # type: ignore
+from uvicorn.config import Config
+from uvicorn.server import Server
 
 from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
 from nucliadb.common.back_pressure.settings import BackPressureSettings

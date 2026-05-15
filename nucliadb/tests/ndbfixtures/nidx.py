@@ -29,8 +29,8 @@ import nats
 import pytest
 from nats.js.api import ConsumerConfig
 from pytest import FixtureRequest
-from pytest_docker_fixtures import images  # type: ignore
-from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore
+from pytest_docker_fixtures import images
+from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore[import-untyped]
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.nidx import NidxUtility

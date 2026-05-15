@@ -148,12 +148,12 @@ async def test_ask_graph_strategy(
     )
 
     # Run the same query but with query_entity_detection set to "predict"
-    data["rag_strategies"][0]["query_entity_detection"] = "predict"  # type: ignore
+    data["rag_strategies"][0]["query_entity_detection"] = "predict"  # type: ignore[index]
 
     await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
 
     # Now test with relation_text_as_paragraphs
-    data["rag_strategies"][0]["relation_text_as_paragraphs"] = True  # type: ignore
+    data["rag_strategies"][0]["relation_text_as_paragraphs"] = True  # type: ignore[index]
     expected_paragraphs_text = {
         "/t/inception2": "- Leonardo DiCaprio starred Inception",
         "/t/leo": "- Leonardo DiCaprio analogy DiCaprio",
@@ -163,8 +163,8 @@ async def test_ask_graph_strategy(
     await assert_ask(data, expected_paragraphs_text, expected_paragraphs_relations)
 
     # Now with agentic graph only
-    data["rag_strategies"][0]["agentic_graph_only"] = True  # type: ignore
-    data["rag_strategies"][0]["relation_text_as_paragraphs"] = False  # type: ignore
+    data["rag_strategies"][0]["agentic_graph_only"] = True  # type: ignore[index]
+    data["rag_strategies"][0]["relation_text_as_paragraphs"] = False  # type: ignore[index]
     expected_paragraphs_text = {
         "/t/inception2": "Leonardo DiCaprio starred in Inception.",
         "/t/leo": "Leonardo DiCaprio is a great actor. DiCaprio started acting in 1989.",

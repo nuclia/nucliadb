@@ -151,7 +151,7 @@ class KBShardManager:
         shard = writer_pb2.ShardObject(shard=shard_uuid, read_only=False)
         try:
             nidx_api = get_nidx_api_client()
-            resp = await nidx_api.NewShard(req)  # type: ignore
+            resp = await nidx_api.NewShard(req)
             shard.nidx_shard_id = resp.id
 
         except Exception as exc:

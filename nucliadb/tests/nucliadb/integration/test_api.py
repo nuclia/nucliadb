@@ -1784,9 +1784,9 @@ async def test_deletions_on_text_index(
     await wait_for_sync()
 
     results = await kb_search(query="Alfredo")
-    assert results.resources[rid].data.texts["alfredo"] is not None  # type: ignore
+    assert results.resources[rid].data.texts["alfredo"] is not None
     results = await kb_search(query="Salvatore")
-    assert results.resources[rid].data.texts["salvatore"] is not None  # type: ignore
+    assert results.resources[rid].data.texts["salvatore"] is not None
     counters = await kb_counters(kbid)
     assert counters.resources == 1
     assert counters.fields == 3  # the two fields plus the title
@@ -1801,8 +1801,8 @@ async def test_deletions_on_text_index(
 
     results = await kb_search(query="My name is")
     assert results.fulltext.total == 1
-    assert "alfredo" not in results.resources[rid].data.texts  # type: ignore
-    assert "salvatore" in results.resources[rid].data.texts  # type: ignore
+    assert "alfredo" not in results.resources[rid].data.texts
+    assert "salvatore" in results.resources[rid].data.texts
     counters = await kb_counters(kbid)
     assert counters.resources == 1
     assert counters.fields == 2  # the one field plus the title
@@ -1824,9 +1824,9 @@ async def test_deletions_on_text_index(
 
     results = await kb_search(query="My name is")
     assert results.fulltext.total == 2
-    assert len(results.resources[rid].data.texts) == 2  # type: ignore
-    assert results.resources[rid].data.texts["salvatore"] is not None  # type: ignore
-    assert results.resources[rid].data.texts["popeye"] is not None  # type: ignore
+    assert len(results.resources[rid].data.texts) == 2
+    assert results.resources[rid].data.texts["salvatore"] is not None
+    assert results.resources[rid].data.texts["popeye"] is not None
 
     counters = await kb_counters(kbid)
     assert counters.resources == 1
@@ -1842,9 +1842,9 @@ async def test_deletions_on_text_index(
     await wait_for_sync()
 
     results = await kb_search(query="My name is", filters=["/classification.labels/foo/bar"])
-    assert len(results.resources[rid].data.texts) == 2  # type: ignore
-    assert results.resources[rid].data.texts["salvatore"] is not None  # type: ignore
-    assert results.resources[rid].data.texts["popeye"] is not None  # type: ignore
+    assert len(results.resources[rid].data.texts) == 2
+    assert results.resources[rid].data.texts["salvatore"] is not None
+    assert results.resources[rid].data.texts["popeye"] is not None
     counters = await kb_counters(kbid)
     assert counters.resources == 1
     assert counters.fields == 3  # the two fields plus the title

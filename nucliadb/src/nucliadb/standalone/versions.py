@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 CACHE_TTL_SECONDS = 30 * 60  # 30 minutes
-CACHE = TTLCache(maxsize=128, ttl=CACHE_TTL_SECONDS)  # type: ignore
+CACHE = TTLCache(maxsize=128, ttl=CACHE_TTL_SECONDS)  # type: ignore[var-annotated]
 
 
 class StandalonePackages(enum.Enum):

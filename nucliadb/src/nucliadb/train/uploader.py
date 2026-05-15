@@ -69,9 +69,7 @@ class UploadServicer:
         for resource in self.proc.kb_resources(request):
             yield resource
 
-    async def GetEntities(  # type: ignore
-        self, request: GetEntitiesRequest, context=None
-    ) -> GetEntitiesResponse:
+    async def GetEntities(self, request: GetEntitiesRequest, context=None) -> GetEntitiesResponse:
         kbid = request.kb.uuid
         response = GetEntitiesResponse()
         async with self.proc.driver.ro_transaction() as txn:
@@ -86,9 +84,7 @@ class UploadServicer:
             response.status = GetEntitiesResponse.Status.OK
         return response
 
-    async def GetOntology(  # type: ignore
-        self, request: GetLabelsRequest, context=None
-    ) -> GetLabelsResponse:
+    async def GetOntology(self, request: GetLabelsRequest, context=None) -> GetLabelsResponse:
         kbid = request.kb.uuid
         response = GetLabelsResponse()
         kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)

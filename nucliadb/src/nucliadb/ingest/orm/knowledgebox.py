@@ -169,7 +169,7 @@ class KnowledgeBox:
 
                 vs_external_indexes = []
 
-                for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
+                for vectorset_id, semantic_model in semantic_models.items():
                     # if this KB uses a matryoshka model, we can choose a different
                     # dimension
                     if len(semantic_model.matryoshka_dimensions) > 0:

@@ -23,11 +23,11 @@ import base64
 import uuid
 from contextlib import AsyncExitStack
 
-import aiobotocore  # type: ignore
+import aiobotocore  # type: ignore[import-untyped]
 import aiohttp
 import backoff
-import botocore  # type: ignore
-from aiobotocore.session import AioSession  # type: ignore
+import botocore  # type: ignore[import-untyped]
+from aiobotocore.session import AioSession  # type: ignore[import-untyped]
 
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager

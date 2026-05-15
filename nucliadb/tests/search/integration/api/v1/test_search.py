@@ -109,7 +109,7 @@ async def test_search_resource_all(
             request.vector.extend(Q)
             request.min_score_semantic = -1.0
 
-            response = await get_nidx_searcher_client().Search(request)  # type: ignore
+            response = await get_nidx_searcher_client().Search(request)
             paragraphs = response.paragraph
             documents = response.document
             vectors = response.vector

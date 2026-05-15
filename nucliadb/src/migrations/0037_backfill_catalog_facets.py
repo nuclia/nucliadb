@@ -63,7 +63,7 @@ async def migrate(context: ExecutionContext) -> None:
                 )
 
                 # Set the key for next iteration
-                results = await cur.fetchone()  # type: ignore
+                results = await cur.fetchone()
                 if results is None:
                     break
                 (start_kbid, start_rid) = results

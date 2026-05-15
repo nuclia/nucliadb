@@ -64,5 +64,5 @@ async def test_suggest_resource_all(nucliadb_search: AsyncClient, test_search_re
             )
             prequest.shard = shard_id
             prequest.body = "Ramon"
-            suggest = await get_nidx_searcher_client().Suggest(prequest)  # type: ignore
+            suggest = await get_nidx_searcher_client().Suggest(prequest)
             assert suggest.total == 1, f"Request:\n{prequest}\nResponse:\n{suggest}"

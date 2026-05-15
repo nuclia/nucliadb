@@ -71,7 +71,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         async for resource in self.proc.kb_resources(request):
             yield resource
 
-    async def GetInfo(self, request: GetInfoRequest, context=None):  # type: ignore
+    async def GetInfo(self, request: GetInfoRequest, context=None):
         result = TrainInfo()
         url = settings.internal_counter_api.format(kbid=request.kb.uuid)
         headers = {"X-NUCLIADB-ROLES": "READER"}
@@ -84,9 +84,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         result.sentences = data["sentences"]
         return result
 
-    async def GetEntities(  # type: ignore
-        self, request: GetEntitiesRequest, context=None
-    ) -> GetEntitiesResponse:
+    async def GetEntities(self, request: GetEntitiesRequest, context=None) -> GetEntitiesResponse:
         kbid = request.kb.uuid
         response = GetEntitiesResponse()
         async with self.proc.driver.ro_transaction() as txn:
@@ -107,9 +105,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
                 response.status = GetEntitiesResponse.Status.OK
         return response
 
-    async def GetOntology(  # type: ignore
-        self, request: GetLabelsRequest, context=None
-    ) -> GetLabelsResponse:
+    async def GetOntology(self, request: GetLabelsRequest, context=None) -> GetLabelsResponse:
         response = GetLabelsResponse()
         kbid = request.kb.uuid
         labels = await datamanagers.atomic.labelset.get_all(kbid=kbid)
@@ -121,9 +117,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
             response.status = GetLabelsResponse.Status.NOTFOUND
         return response
 
-    async def GetOntologyCount(  # type: ignore
-        self, request: GetLabelsetsCountRequest, context=None
-    ) -> LabelsetsCount:
+    async def GetOntologyCount(self, request: GetLabelsetsCountRequest, context=None) -> LabelsetsCount:
         url = settings.internal_search_api.format(kbid=request.kb.uuid)
         facets = [f"faceted=/p/{labelset}" for labelset in request.paragraph_labelsets]
         facets.extend([f"faceted=/l/{labelset}" for labelset in request.resource_labelsets])

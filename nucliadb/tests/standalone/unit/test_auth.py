@@ -22,7 +22,7 @@ from unittest.mock import Mock
 
 import orjson
 import pytest
-from jwcrypto import jwe, jwk  # type: ignore
+from jwcrypto import jwe, jwk  # type: ignore[import-untyped]
 
 from nucliadb.standalone import auth
 from nucliadb.standalone.settings import AuthPolicy, NucliaDBRoles, Settings
