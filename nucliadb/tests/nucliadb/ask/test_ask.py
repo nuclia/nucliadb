@@ -776,7 +776,7 @@ async def test_ask_handles_stream_errors_on_predict(
     predict.ndjson_answer.pop(-1)
     error_status = StatusGenerativeResponse(code="-1", details="unexpected LLM error")
     status_chunk = GenerativeChunk(chunk=error_status)
-    predict.ndjson_answer.append(status_chunk.model_dump_json() + "\n")
+    predict.ndjson_answer.append((status_chunk.model_dump_json() + "\n").encode())
 
     # Sync ask
     resp = await nucliadb_reader.post(

@@ -61,7 +61,10 @@ async def test_auth_header_backend(http_request):
     )
 
     http_request.headers["X-User"] = "test"
-    auth_creds, nuclia_user = await backend.authenticate(http_request)
+    result = await backend.authenticate(http_request)
+
+    assert result
+    auth_creds, nuclia_user = result
 
     assert nuclia_user.display_name == "test"
     assert auth_creds.scopes == [NucliaDBRoles.READER.value]
@@ -82,7 +85,10 @@ async def test_oauth2_backend(http_request):
     http_request.headers["Authorization"] = (
         "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
     )
-    auth_creds, nuclia_user = await backend.authenticate(http_request)
+    result = await backend.authenticate(http_request)
+
+    assert result
+    auth_creds, nuclia_user = result
 
     assert nuclia_user.display_name == "1234567890"
     assert auth_creds.scopes == [NucliaDBRoles.READER.value]
@@ -112,7 +118,10 @@ async def test_basic_backend(http_request):
     )
 
     http_request.headers["Authorization"] = "Basic am9obkBkb2UuY29tOmxzZGZramxrc2RqZmw="
-    auth_creds, nuclia_user = await backend.authenticate(http_request)
+    result = await backend.authenticate(http_request)
+
+    assert result
+    auth_creds, nuclia_user = result
 
     assert nuclia_user.display_name == "john@doe.com"
     assert auth_creds.scopes == [NucliaDBRoles.READER.value]
@@ -148,7 +157,10 @@ async def test_auth_token_backend(http_request):
     token = jwetoken.serialize(compact=True)
 
     http_request.query_params["eph-token"] = token
-    auth_creds, nuclia_user = await backend.authenticate(http_request)
+    result = await backend.authenticate(http_request)
+
+    assert result
+    auth_creds, nuclia_user = result
 
     assert nuclia_user.display_name == "display_name"
     assert auth_creds.scopes == [NucliaDBRoles.READER.value]

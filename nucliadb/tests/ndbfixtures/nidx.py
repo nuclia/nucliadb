@@ -23,6 +23,7 @@ import os
 import platform
 import sys
 from collections.abc import Iterator
+from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -73,6 +74,7 @@ def get_platform():
         raise ValueError(f"Unsupported platform: {sys.platform}")
 
 
+images.settings = cast(dict[str, Any], images.settings)
 images.settings["nidx"] = {
     "image": get_image().name,
     "version": get_image().version,
@@ -184,7 +186,8 @@ async def nidx(natsd: str, pg, nidx_storage: dict[str, str]):
 
     # Run nidx
     natsd_url = natsd.replace("localhost", "172.17.0.1").replace("127.0.0.1", "172.17.0.1")
-    images.settings["nidx"].setdefault("env", {}).update(
+    nidx_image_settings: dict[str, Any] = images.settings["nidx"]
+    nidx_image_settings.setdefault("env", {}).update(
         {
             "RUST_LOG": "info",
             "METADATA__DATABASE_URL": f"postgresql://postgres:postgres@172.17.0.1:{pg[1]}/postgres",

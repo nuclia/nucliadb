@@ -119,10 +119,12 @@ async def test_resource_hydration(
     assert hydrated.resources[rid].slug == slug
     assert hydrated.resources[rid].title == "A tale of cookies"
     assert hydrated.resources[rid].summary == "Once upon a time, cookies were made..."
-    assert hydrated.resources[rid].origin is not None
-    assert hydrated.resources[rid].origin.url == "my://url"  # type: ignore[union-attr]
-    assert hydrated.resources[rid].security is not None
-    assert set(hydrated.resources[rid].security.access_groups) == {"developers", "testers"}  # type: ignore[union-attr]
+    origin = hydrated.resources[rid].origin
+    assert origin is not None
+    assert origin.url == "my://url"
+    security = hydrated.resources[rid].security
+    assert security is not None
+    assert set(security.access_groups) == {"developers", "testers"}
 
     assert hydrated.fields[f"{rid}/t/cookie-tale"].id == f"{rid}/t/cookie-tale"
     assert hydrated.fields[f"{rid}/t/cookie-tale"].resource == rid
@@ -190,11 +192,13 @@ async def test_hydration_related_paragraphs(
     assert hydrated.paragraphs[f"{rid}/t/cookie-tale/214-281"].related is None
 
     # the requested paragraph has pointers to the other paragraphs
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.neighbours is not None  # type: ignore[union-attr]
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.neighbours.before == [  # type: ignore[union-attr]
+    related = hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related
+    assert related
+    assert related.neighbours is not None  # type: ignore[union-attr]
+    assert related.neighbours.before == [  # type: ignore[union-attr]
         f"{rid}/t/cookie-tale/0-63"
     ]
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.neighbours.after == [  # type: ignore[union-attr]
+    assert related.neighbours.after == [  # type: ignore[union-attr]
         f"{rid}/t/cookie-tale/151-214",
         f"{rid}/t/cookie-tale/214-281",
     ]
@@ -234,8 +238,13 @@ async def test_hydration_related_paragraphs(
     body = resp.json()
     hydrated = Hydrated.model_validate(body)
 
-    assert len(hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.neighbours.before) == 0  # type: ignore[union-attr,arg-type]
-    assert len(hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.neighbours.after) == 1  # type: ignore[union-attr,arg-type]
+    related = hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related
+    assert related
+    assert related.neighbours
+    assert related.neighbours.before
+    assert len(related.neighbours.before) == 0
+    assert related.neighbours.after
+    assert len(related.neighbours.after) == 1
 
     assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].text is None
     assert hydrated.paragraphs[f"{rid}/t/cookie-tale/151-214"].text is None
@@ -259,10 +268,11 @@ async def test_hydration_related_paragraphs(
     body = resp.json()
     hydrated = Hydrated.model_validate(body)
 
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related is not None
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.parents is not None  # type: ignore[union-attr,arg-type]
-    assert len(hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.parents) == 1  # type: ignore[union-attr,arg-type]
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.parents == [f"{rid}/a/title/0-17"]  # type: ignore[union-attr,arg-type]
+    related = hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related
+    assert related
+    assert related.parents is not None
+    assert len(related.parents) == 1
+    assert related.parents == [f"{rid}/a/title/0-17"]
     assert f"{rid}/a/title/0-17" in hydrated.paragraphs
 
     # TEST: hydrate related siblings
@@ -284,12 +294,11 @@ async def test_hydration_related_paragraphs(
     body = resp.json()
     hydrated = Hydrated.model_validate(body)
 
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related is not None
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.siblings is not None  # type: ignore[union-attr,arg-type]
-    assert len(hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.siblings) == 1  # type: ignore[union-attr,arg-type]
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.siblings == [  # type: ignore[union-attr,arg-type]
-        f"{rid}/t/cookie-tale/0-63",
-    ]
+    related = hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related
+    assert related
+    assert related.siblings is not None
+    assert len(related.siblings) == 1
+    assert related.siblings == [f"{rid}/t/cookie-tale/0-63"]
     assert f"{rid}/t/cookie-tale/0-63" in hydrated.paragraphs
 
     # TEST: hydrate related replacements
@@ -311,10 +320,12 @@ async def test_hydration_related_paragraphs(
     body = resp.json()
     hydrated = Hydrated.model_validate(body)
 
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related is not None
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.replacements is not None  # type: ignore[union-attr,arg-type]
-    assert len(hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.replacements) == 2  # type: ignore[union-attr,arg-type]
-    assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related.replacements == [  # type: ignore[union-attr,arg-type]
+    related = hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related
+    assert related
+    assert related is not None
+    assert related.replacements is not None
+    assert len(related.replacements) == 2
+    assert related.replacements == [
         f"{rid}/t/cookie-tale/151-214",
         f"{rid}/t/cookie-tale/214-281",
     ]
@@ -354,14 +365,11 @@ async def test_hydration_paragraph_source_image(
     body = resp.json()
     hydrated = Hydrated.model_validate(body)
 
-    assert (
-        hydrated.paragraphs[f"{rid}/f/cookie-recipie/0-29"].image.source_image.content_type  # type: ignore[union-attr]
-        == "image/png"
-    )
-    assert (
-        hydrated.paragraphs[f"{rid}/f/cookie-recipie/0-29"].image.source_image.b64encoded  # type: ignore[union-attr]
-        == base64.b64encode(b"delicious cookies image").decode()
-    )
+    image = hydrated.paragraphs[f"{rid}/f/cookie-recipie/0-29"].image
+    assert image
+    assert image.source_image
+    assert image.source_image.content_type == "image/png"
+    assert image.source_image.b64encoded == base64.b64encode(b"delicious cookies image").decode()
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -400,12 +408,15 @@ async def test_hydration_paragraph_table_page_preview(
     hydrated = Hydrated.model_validate(body)
 
     assert hydrated.paragraphs[f"{rid}/f/cookie-recipie/29-75"].image is None
-    assert hydrated.paragraphs[f"{rid}/f/cookie-recipie/29-75"].table.page_preview_ref == "1"  # type: ignore[union-attr,index]
+    table = hydrated.paragraphs[f"{rid}/f/cookie-recipie/29-75"].table
+    assert table
+    assert table.page_preview_ref == "1"
 
-    assert hydrated.fields[f"{rid}/f/cookie-recipie"].previews is not None  # type: ignore[union-attr]
-    assert hydrated.fields[f"{rid}/f/cookie-recipie"].previews["1"].content_type == "image/png"  # type: ignore[union-attr,index]
+    previews = hydrated.fields[f"{rid}/f/cookie-recipie"].previews  # type:ignore[union-attr,ty:unresolved-attribute]
+    assert previews is not None
+    assert previews["1"].content_type == "image/png"
     assert (
-        hydrated.fields[f"{rid}/f/cookie-recipie"].previews["1"].b64encoded  # type: ignore[union-attr,index]
+        previews["1"].b64encoded
         == base64.b64encode(b"A page with a table with ingredients and quantities").decode()
     )
 
@@ -442,13 +453,15 @@ async def test_hydration_paragraph_page_preview(
     body = resp.json()
     hydrated = Hydrated.model_validate(body)
 
-    assert hydrated.paragraphs[f"{rid}/f/cookie-recipie/75-125"].page is not None
-    assert hydrated.paragraphs[f"{rid}/f/cookie-recipie/75-125"].page.page_preview_ref == "1"  # type: ignore[union-attr]
+    page = hydrated.paragraphs[f"{rid}/f/cookie-recipie/75-125"].page
+    assert page is not None
+    assert page.page_preview_ref == "1"
 
-    assert hydrated.fields[f"{rid}/f/cookie-recipie"].previews is not None  # type: ignore[union-attr]
-    assert hydrated.fields[f"{rid}/f/cookie-recipie"].previews["1"].content_type == "image/png"  # type: ignore[union-attr,index]
+    previews = hydrated.fields[f"{rid}/f/cookie-recipie"].previews  # type:ignore[union-attr,ty:unresolved-attribute]
+    assert previews is not None
+    assert previews["1"].content_type == "image/png"
     assert (
-        hydrated.fields[f"{rid}/f/cookie-recipie"].previews["1"].b64encoded  # type: ignore[union-attr,index]
+        previews["1"].b64encoded
         == base64.b64encode(b"A page with a table with ingredients and quantities").decode()
     )
 

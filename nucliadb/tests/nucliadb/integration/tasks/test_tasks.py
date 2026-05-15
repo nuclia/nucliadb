@@ -245,6 +245,7 @@ async def test_task_retry_handler_ok(context):
     assert result == 100
 
     metadata = await trh.get_metadata()
+    assert metadata
     assert metadata.status == TaskMetadata.Status.COMPLETED
     assert metadata.task_id == task_id
     assert metadata.retries == 0
@@ -265,6 +266,7 @@ async def test_task_retry_handler_errors_are_retried(context):
     callback.assert_called_once_with("foo", bar="baz")
 
     metadata = await trh.get_metadata()
+    assert metadata
     assert metadata.status == TaskMetadata.Status.RUNNING
     assert metadata.retries == 1
     assert "foo" in metadata.error_messages[0]
@@ -275,6 +277,7 @@ async def test_task_retry_handler_errors_are_retried(context):
     assert result == 100
 
     metadata = await trh.get_metadata()
+    assert metadata
     assert metadata.status == TaskMetadata.Status.COMPLETED
     assert metadata.retries == 1
 
@@ -324,6 +327,7 @@ async def test_task_retry_handler_max_retries(context):
     callback.assert_not_called()
 
     metadata = await trh.get_metadata()
+    assert metadata
     assert metadata.status == TaskMetadata.Status.FAILED
     assert "Max retries reached" in metadata.error_messages[-1]
 

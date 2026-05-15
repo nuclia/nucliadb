@@ -19,6 +19,7 @@
 #
 import random
 from datetime import datetime
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -386,7 +387,7 @@ async def test_conversation_field_indexing(
         top_k: int = 5,
         min_score: float | None = None,
     ) -> KnowledgeboxFindResults:
-        payload = {"top_k": top_k, "reranker": "noop"}
+        payload: dict[str, Any] = {"top_k": top_k, "reranker": "noop"}
         features = []
         if min_score is not None:
             payload["min_score"] = min_score

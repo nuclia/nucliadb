@@ -25,7 +25,7 @@ from nucliadb.search.search.merge import ResourceSearchResults, merge_paragraphs
 async def test_str_model():
     # make sure __str__ works as advertised
     res = await merge_paragraphs_results([], 1, "kbid", False, 1)
-    assert str(res) == res.json()
+    assert str(res) == res.model_dump_json()
 
 
 async def test_str_model_fallback():

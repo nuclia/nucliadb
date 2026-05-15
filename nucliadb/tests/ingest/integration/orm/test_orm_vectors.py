@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from os.path import dirname, getsize
+from typing import Any
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -200,7 +201,7 @@ async def test_create_resource_with_cloud_file_vectors(
     evw = ExtractedVectorsWrapper()
     evw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_id))
     evw.vectorset_id = vectorset_id
-    storage_map = {
+    storage_map: dict[Any, CloudFile.Source.ValueType] = {
         AzureStorage: CloudFile.Source.AZURE,
         GCSStorage: CloudFile.Source.GCS,
         LocalStorage: CloudFile.Source.LOCAL,
@@ -246,7 +247,7 @@ async def test_create_resource_with_cloud_file_vectors_already_moved(
     evw = ExtractedVectorsWrapper()
     evw.field.CopyFrom(FieldID(field_type=FieldType.TEXT, field=field_id))
     evw.vectorset_id = vectorset_id
-    storage_map = {
+    storage_map: dict[Any, CloudFile.Source.ValueType] = {
         AzureStorage: CloudFile.Source.AZURE,
         GCSStorage: CloudFile.Source.GCS,
         LocalStorage: CloudFile.Source.LOCAL,

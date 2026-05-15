@@ -22,10 +22,10 @@ from nucliadb.search import app
 
 
 async def test_alive():
-    resp = await app.alive(None)
+    resp = await app.alive(None)  # ty:ignore[invalid-argument-type]
     assert resp.status_code == 200
 
 
 async def test_ready():
-    resp = await app.ready(None)
+    resp = await app.ready(None)  # ty:ignore[invalid-argument-type]
     assert resp.status_code == 200

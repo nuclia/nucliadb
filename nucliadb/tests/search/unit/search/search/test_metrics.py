@@ -59,4 +59,5 @@ def test_ask_metrics():
     assert metrics.id == "ask"
     assert metrics.get_first_chunk_time() is None
     metrics.record_first_chunk_yielded()
-    assert metrics.get_first_chunk_time() > 0
+    t = metrics.get_first_chunk_time()
+    assert t and t > 0

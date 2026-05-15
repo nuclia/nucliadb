@@ -103,7 +103,7 @@ async def update_resource_metrics(context: ApplicationContext):
         RESOURCES_COUNT.set(count)
 
 
-async def run_exporter_task(context: ApplicationContext, exporter_task: Callable, interval: int):
+async def run_exporter_task(context: ApplicationContext, exporter_task: Callable, interval: float):
     """
     Run coroutine infinitely, catching exceptions and logging them.
     It will wait for the interval before running again.
