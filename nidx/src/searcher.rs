@@ -76,7 +76,7 @@ async fn refresher_task(mut rx: Receiver<(IndexId, bool)>, index_cache: Arc<Inde
         }
 
         let mut unique_indexes = HashMap::new();
-        for (index_id, force) in try_later.drain(std::ops::RangeFull).chain(recv_buf.into_iter()) {
+        for (index_id, force) in try_later.drain(std::ops::RangeFull).chain(recv_buf) {
             unique_indexes
                 .entry(index_id)
                 .and_modify(|f| *f = *f || force)

@@ -207,11 +207,7 @@ impl<'a, DR: DataRetriever> HnswSearcher<'a, DR> {
 
         let mut preloaded = 0;
 
-        loop {
-            let Some(Cnx(candidate, candidate_similarity)) = candidates.pop() else {
-                break;
-            };
-
+        while let Some(Cnx(candidate, candidate_similarity)) = candidates.pop() {
             if candidate_similarity < self.retriever.min_score() {
                 break;
             }
