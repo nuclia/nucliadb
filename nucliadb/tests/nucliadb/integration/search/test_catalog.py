@@ -35,7 +35,7 @@ async def create_resource_with_all_status(standalone_knowledgebox, nucliadb_inge
 
     for status_name, status_value in wpb.FieldStatus.Status.items():
         bm = broker_resource(standalone_knowledgebox)
-        bm.basic.metadata.status = status_value
+        bm.basic.metadata.status = status_value  # ty:ignore[invalid-assignment] Horrible conversion from field status to basic status
         bm.texts["my_text"].CopyFrom(rpb.FieldText(body="Hi!", format=rpb.FieldText.Format.PLAIN))
         bm.field_statuses.append(
             wpb.FieldIDStatus(

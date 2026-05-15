@@ -56,8 +56,8 @@ class BackPressureMaterializer:
     def __init__(
         self,
         nats_manager: NatsConnectionManager,
-        indexing_check_interval: int = 30,
-        ingest_check_interval: int = 30,
+        indexing_check_interval: float = 30,
+        ingest_check_interval: float = 30,
     ):
         self.nats_manager = nats_manager
         self.processing_http_client = ProcessingHTTPClient()

@@ -33,5 +33,5 @@ async def test_try_delete_from_storage():
     await dm.try_delete_from_storage("export", "kbid", "foo")
     await dm.try_delete_from_storage("import", "kbid", "foo")
 
-    dm.delete_export.assert_called()
-    dm.delete_import.assert_called()
+    dm.delete_export.assert_called()  # ty:ignore[unresolved-attribute]
+    dm.delete_import.assert_called()  # ty:ignore[unresolved-attribute]

@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import unittest
+import unittest.mock
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -198,24 +199,27 @@ def file_md5_mock():
 
 async def test_get_fields_ids_caches_keys(txn, storage, kb):
     resource = Resource(txn, storage, kb, "rid")
-    cached_field_keys = [(0, "foo"), (1, "bar")]
-    new_field_keys = [(2, "baz")]
+    cached_field_keys: list[tuple[FieldType.ValueType, str]] = [
+        (FieldType.FILE, "foo"),
+        (FieldType.TEXT, "bar"),
+    ]
+    new_field_keys: list[tuple[FieldType.ValueType, str]] = [(FieldType.LINK, "baz")]
     resource._inner_get_fields_ids = AsyncMock(return_value=new_field_keys)  # type: ignore
     resource.all_fields_keys = cached_field_keys
 
     assert await resource.get_fields_ids() == cached_field_keys
-    resource._inner_get_fields_ids.assert_not_awaited()
+    resource._inner_get_fields_ids.assert_not_awaited()  # type: ignore[ty:unresolved-attribute]
 
     assert await resource.get_fields_ids(force=True) == new_field_keys
-    resource._inner_get_fields_ids.assert_awaited_once()
+    resource._inner_get_fields_ids.assert_awaited_once()  # type: ignore[ty:unresolved-attribute]
     assert resource.all_fields_keys == new_field_keys
 
     # If the all_field_keys is an empty list,
     # we should not be calling the inner_get_fields_ids
     resource.all_fields_keys = []
-    resource._inner_get_fields_ids.reset_mock()
+    resource._inner_get_fields_ids.reset_mock()  # type: ignore[ty:unresolved-attribute]
     assert await resource.get_fields_ids() == []
-    resource._inner_get_fields_ids.assert_not_awaited()
+    resource._inner_get_fields_ids.assert_not_awaited()  # type: ignore[ty:unresolved-attribute]
 
 
 async def test_get_set_all_field_ids(txn, storage, kb):
@@ -243,7 +247,7 @@ async def test_update_all_fields_key(txn, storage, kb):
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text1"))
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text2"))
 
-    await resource.update_all_field_ids(updated=all_fields.fields)
+    await resource.update_all_field_ids(updated=list(all_fields.fields))
 
     # Check updates
     assert await resource.get_all_field_ids(for_update=False) == all_fields
@@ -252,6 +256,7 @@ async def test_update_all_fields_key(txn, storage, kb):
     await resource.update_all_field_ids(updated=[file_field])
 
     result = await resource.get_all_field_ids(for_update=False)
+    assert result is not None
     assert list(result.fields) == [*list(all_fields.fields), file_field]
 
     # Check deletes
@@ -272,17 +277,17 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
     bm.conversations = {"conversation": MagicMock()}
     bm.delete_fields.append(FieldID(field_type=FieldType.CONVERSATION, field="to_delete"))
 
-    await resource.apply_fields(bm)
+    await resource.apply_fields(bm)  # ty:ignore[invalid-argument-type]
 
-    resource.update_all_field_ids.assert_awaited_once()
+    resource.update_all_field_ids.assert_awaited_once()  # type: ignore[ty:unresolved-attribute]
 
-    resource.update_all_field_ids.call_args[1]["updated"] == [
+    resource.update_all_field_ids.call_args[1]["updated"] == [  # ty:ignore[unresolved-attribute]
         FieldID(field_type=FieldType.TEXT, field="text"),
         FieldID(field_type=FieldType.LINK, field="link"),
         FieldID(field_type=FieldType.FILE, field="file"),
         FieldID(field_type=FieldType.CONVERSATION, field="conversation"),
     ]
-    resource.update_all_field_ids.call_args[1]["deleted"] == [
+    resource.update_all_field_ids.call_args[1]["deleted"] == [  # ty:ignore[unresolved-attribute]
         FieldID(field_type=FieldType.CONVERSATION, field="to_delete"),
     ]
 

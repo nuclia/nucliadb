@@ -35,7 +35,7 @@ def storage():
 
 @pytest.fixture()
 def consumer(storage):
-    yield IngestConsumer(None, "partition", storage, None)
+    yield IngestConsumer(None, "partition", storage, None)  # ty:ignore[invalid-argument-type]
 
 
 async def test_get_broker_message(consumer: IngestConsumer, storage):

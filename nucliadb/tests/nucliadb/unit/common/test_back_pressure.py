@@ -140,28 +140,28 @@ async def test_check_processing_behind(settings, cache, nats_conn):
     settings.max_processing_pending = 5
 
     materializer = BackPressureMaterializer(nats_conn)
-    materializer.get_processing_pending = mock.AsyncMock(return_value=1)
+    materializer.get_processing_pending = mock.AsyncMock(return_value=1)  # ty:ignore[invalid-assignment]
 
     # Check that it runs and does not raise an exception if the pending is low
     await materializer.check_processing("kbid")
-    materializer.get_processing_pending.assert_awaited_once_with("kbid")
+    materializer.get_processing_pending.assert_awaited_once_with("kbid")  # ty:ignore[unresolved-attribute]
 
     # Check that it raises an exception if the pending is too high
-    materializer.get_processing_pending.reset_mock()
-    materializer.get_processing_pending.return_value = 10
+    materializer.get_processing_pending.reset_mock()  # ty:ignore[unresolved-attribute]
+    materializer.get_processing_pending.return_value = 10  # ty:ignore[unresolved-attribute]
     with pytest.raises(BackPressureException):
         await materializer.check_processing("kbid")
-    materializer.get_processing_pending.assert_awaited_once_with("kbid")
+    materializer.get_processing_pending.assert_awaited_once_with("kbid")  # ty:ignore[unresolved-attribute]
 
 
 async def test_check_processing_behind_does_not_run_if_configured_max_is_zero(settings, cache):
     settings.max_processing_pending = 0
     materializer = BackPressureMaterializer(mock.Mock())
-    materializer.get_processing_pending = mock.AsyncMock(return_value=100)
+    materializer.get_processing_pending = mock.AsyncMock(return_value=100)  # ty:ignore[invalid-assignment]
 
     await materializer.check_processing("kbid")
 
-    materializer.get_processing_pending.assert_not_called()
+    materializer.get_processing_pending.assert_not_called()  # ty:ignore[unresolved-attribute]
 
 
 async def test_check_ingest_behind(settings, cache):

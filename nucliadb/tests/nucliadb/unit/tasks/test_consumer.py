@@ -35,7 +35,7 @@ nconsumer = NatsConsumer(subject="stream.subject", group="group")
 
 
 def test_create_consumer():
-    async def callback(): ...
+    async def callback(_context, _msg): ...
 
     consumer = create_consumer(
         "foo",

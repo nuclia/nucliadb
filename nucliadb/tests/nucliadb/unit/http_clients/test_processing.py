@@ -20,26 +20,37 @@
 from unittest import mock
 
 import pytest
-from aiohttp.web import Response
+from aiohttp import ClientResponse
 
 from nucliadb.common.http_clients import exceptions, processing
 from nucliadb_utils.settings import nuclia_settings
 
 
+class FakeClientResponse(ClientResponse):
+    """Minimal ClientResponse subclass for testing check_status."""
+
+    def __init__(self, status: int):
+        self._status = status
+
+    @property
+    def status(self) -> int:  # type: ignore[override]
+        return self._status
+
+
 def test_check_status():
-    processing.check_status(Response(status=200), "ok")
+    processing.check_status(FakeClientResponse(200), "ok")
     with pytest.raises(exceptions.AccountLimitException):
-        processing.check_status(Response(status=402), "account limit")
+        processing.check_status(FakeClientResponse(402), "account limit")
     with pytest.raises(exceptions.AuthorizationException):
-        processing.check_status(Response(status=403), "auth")
+        processing.check_status(FakeClientResponse(403), "auth")
     with pytest.raises(exceptions.NotFoundException):
-        processing.check_status(Response(status=404), "notfound")
+        processing.check_status(FakeClientResponse(404), "notfound")
     with pytest.raises(exceptions.RateLimitException):
-        processing.check_status(Response(status=429), "rate")
+        processing.check_status(FakeClientResponse(429), "rate")
     with pytest.raises(exceptions.ServiceUnavailableException):
-        processing.check_status(Response(status=503), "service unavailable")
+        processing.check_status(FakeClientResponse(503), "service unavailable")
     with pytest.raises(exceptions.ClientException):
-        processing.check_status(Response(status=500), "unk")
+        processing.check_status(FakeClientResponse(500), "unk")
 
 
 def test_get_processing_api_url():
