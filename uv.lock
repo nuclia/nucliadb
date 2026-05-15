@@ -2249,7 +2249,6 @@ all = [
     { name = "grpcio-tools" },
     { name = "nats-py", extra = ["nkeys"] },
     { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-jaeger-thrift" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-instrumentation-aiohttp-client" },
     { name = "opentelemetry-instrumentation-fastapi" },
@@ -2263,7 +2262,6 @@ all = [
 fastapi = [
     { name = "fastapi" },
     { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-jaeger-thrift" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-instrumentation-aiohttp-client" },
     { name = "opentelemetry-instrumentation-fastapi" },
@@ -2282,7 +2280,6 @@ grpc = [
     { name = "grpcio-testing" },
     { name = "grpcio-tools" },
     { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-jaeger-thrift" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-instrumentation-aiohttp-client" },
     { name = "opentelemetry-instrumentation-fastapi" },
@@ -2295,7 +2292,6 @@ grpc = [
 nats = [
     { name = "nats-py", extra = ["nkeys"] },
     { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-jaeger-thrift" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-instrumentation-aiohttp-client" },
     { name = "opentelemetry-instrumentation-fastapi" },
@@ -2308,7 +2304,6 @@ nats = [
 ]
 otel = [
     { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-jaeger-thrift" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-instrumentation-aiohttp-client" },
     { name = "opentelemetry-instrumentation-fastapi" },
@@ -2339,16 +2334,11 @@ requires-dist = [
     { name = "grpcio-tools", marker = "extra == 'grpc'", specifier = ">=1.71.0" },
     { name = "nats-py", extras = ["nkeys"], marker = "extra == 'all'", specifier = ">=2.5.0" },
     { name = "nats-py", extras = ["nkeys"], marker = "extra == 'nats'", specifier = ">=2.5.0" },
-    { name = "opentelemetry-api", marker = "extra == 'all'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-api", marker = "extra == 'fastapi'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-api", marker = "extra == 'grpc'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-api", marker = "extra == 'nats'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-exporter-jaeger-thrift", marker = "extra == 'all'", specifier = ">=1.21.0" },
-    { name = "opentelemetry-exporter-jaeger-thrift", marker = "extra == 'fastapi'", specifier = ">=1.21.0" },
-    { name = "opentelemetry-exporter-jaeger-thrift", marker = "extra == 'grpc'", specifier = ">=1.21.0" },
-    { name = "opentelemetry-exporter-jaeger-thrift", marker = "extra == 'nats'", specifier = ">=1.21.0" },
-    { name = "opentelemetry-exporter-jaeger-thrift", marker = "extra == 'otel'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-api", marker = "extra == 'all'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-api", marker = "extra == 'fastapi'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-api", marker = "extra == 'grpc'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-api", marker = "extra == 'nats'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-api", marker = "extra == 'otel'", specifier = ">=1.21.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'all'", specifier = ">=1.21.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'fastapi'", specifier = ">=1.21.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", marker = "extra == 'grpc'", specifier = ">=1.21.0" },
@@ -2374,16 +2364,16 @@ requires-dist = [
     { name = "opentelemetry-propagator-b3", marker = "extra == 'grpc'", specifier = ">=1.21.0" },
     { name = "opentelemetry-propagator-b3", marker = "extra == 'nats'", specifier = ">=1.21.0" },
     { name = "opentelemetry-propagator-b3", marker = "extra == 'otel'", specifier = ">=1.21.0" },
-    { name = "opentelemetry-proto", marker = "extra == 'all'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-proto", marker = "extra == 'fastapi'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-proto", marker = "extra == 'grpc'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-proto", marker = "extra == 'nats'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-proto", marker = "extra == 'otel'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-sdk", marker = "extra == 'all'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-sdk", marker = "extra == 'fastapi'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-sdk", marker = "extra == 'grpc'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-sdk", marker = "extra == 'nats'", specifier = ">=1.21.0,<1.40" },
-    { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.21.0,<1.40" },
+    { name = "opentelemetry-proto", marker = "extra == 'all'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-proto", marker = "extra == 'fastapi'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-proto", marker = "extra == 'grpc'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-proto", marker = "extra == 'nats'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-proto", marker = "extra == 'otel'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'all'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'fastapi'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'grpc'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'nats'", specifier = ">=1.21.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'otel'", specifier = ">=1.21.0" },
     { name = "opentelemetry-semantic-conventions", marker = "extra == 'all'", specifier = ">=0.42b0" },
     { name = "opentelemetry-semantic-conventions", marker = "extra == 'fastapi'", specifier = ">=0.42b0" },
     { name = "opentelemetry-semantic-conventions", marker = "extra == 'grpc'", specifier = ">=0.42b0" },
@@ -2595,20 +2585,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/08/d8/0f354c375628e048bd0570645b310797299754730079853095bf000fba69/opentelemetry_api-1.38.0.tar.gz", hash = "sha256:f4c193b5e8acb0912b06ac5b16321908dd0843d75049c091487322284a3eea12", size = 65242, upload-time = "2025-10-16T08:35:50.25Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ae/a2/d86e01c28300bd41bab8f18afd613676e2bd63515417b77636fc1add426f/opentelemetry_api-1.38.0-py3-none-any.whl", hash = "sha256:2891b0197f47124454ab9f0cf58f3be33faca394457ac3e09daba13ff50aa582", size = 65947, upload-time = "2025-10-16T08:35:30.23Z" },
-]
-
-[[package]]
-name = "opentelemetry-exporter-jaeger-thrift"
-version = "1.21.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-sdk" },
-    { name = "thrift" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c7/ff/560d975ce09ec123dce1b7a97877bad1a5b2424c5c8e31e55169d4cd85e6/opentelemetry_exporter_jaeger_thrift-1.21.0.tar.gz", hash = "sha256:41119bc7e5602cec83dd7d7060f061ecbc91de231272e8f515b07ef9a4b6e41c", size = 27722, upload-time = "2023-11-07T23:16:26.522Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/81/2b/c6ff9604f5b8469e1fabe2b6ee50c36dadf0f572a430494d8dd5ce37d99f/opentelemetry_exporter_jaeger_thrift-1.21.0-py3-none-any.whl", hash = "sha256:4364b8dfa6965707c72c43d85942b1491982b7d44f0123d593513e8bedafa9e2", size = 35929, upload-time = "2023-11-07T23:15:52.341Z" },
 ]
 
 [[package]]
@@ -4163,15 +4139,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/1b/3f/507c21db33b66fb02
 wheels = [
     { url = "https://files.pythonhosted.org/packages/51/da/545b75d420bb23b5d494b0517757b351963e974e79933f01e05c929f20a6/starlette-0.49.1-py3-none-any.whl", hash = "sha256:d92ce9f07e4a3caa3ac13a79523bd18e3bc0042bb8ff2d759a8e7dd0e1859875", size = 74175, upload-time = "2025-10-28T17:34:09.13Z" },
 ]
-
-[[package]]
-name = "thrift"
-version = "0.21.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "six" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/33/1c/418058b4750176b638ab60b4d5a554a2969dcd2363ae458519d0f747adff/thrift-0.21.0.tar.gz", hash = "sha256:5e6f7c50f936ebfa23e924229afc95eb219f8c8e5a83202dd4a391244803e402", size = 62509, upload-time = "2024-09-21T13:14:19.273Z" }
 
 [[package]]
 name = "tomli"
