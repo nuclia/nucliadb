@@ -65,29 +65,26 @@ impl<'a> ResourceWrapper<'a> {
 
     pub fn fields(&self) -> impl Iterator<Item = (&String, impl Iterator<Item = ParagraphVectors<'_>>)> {
         self.resource.paragraphs.iter().map(|(field_id, paragraphs_wrapper)| {
-            let sentences_iterator = paragraphs_wrapper
-                .paragraphs
-                .iter()
-                .filter_map(|(_paragraph_id, paragraph)| {
-                    let sentences = if let Some(vectorset) = &self.vectorset {
-                        // indexing a vectorset, we should return only paragraphs from this vectorset.
-                        // If vectorset is not found, we'll skip this paragraph
-                        if let Some(vectorset_sentences) = paragraph.vectorsets_sentences.get(vectorset) {
-                            Some(&vectorset_sentences.sentences)
-                        } else if self.fallback_to_default_vectorset {
-                            Some(&paragraph.sentences)
-                        } else {
-                            None
-                        }
-                    } else {
-                        // Default vectors index (no vectorset)
+            let sentences_iterator = paragraphs_wrapper.paragraphs.values().filter_map(|paragraph| {
+                let sentences = if let Some(vectorset) = &self.vectorset {
+                    // indexing a vectorset, we should return only paragraphs from this vectorset.
+                    // If vectorset is not found, we'll skip this paragraph
+                    if let Some(vectorset_sentences) = paragraph.vectorsets_sentences.get(vectorset) {
+                        Some(&vectorset_sentences.sentences)
+                    } else if self.fallback_to_default_vectorset {
                         Some(&paragraph.sentences)
-                    };
-                    sentences.map(|s| ParagraphVectors {
-                        vectors: s,
-                        labels: &paragraph.labels,
-                    })
-                });
+                    } else {
+                        None
+                    }
+                } else {
+                    // Default vectors index (no vectorset)
+                    Some(&paragraph.sentences)
+                };
+                sentences.map(|s| ParagraphVectors {
+                    vectors: s,
+                    labels: &paragraph.labels,
+                })
+            });
             (field_id, sentences_iterator)
         })
     }

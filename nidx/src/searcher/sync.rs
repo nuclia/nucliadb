@@ -114,7 +114,7 @@ pub async fn run_sync(
 
             // Remove deleted indexes
             let deleted = Index::marked_to_delete(&meta.pool).await?;
-            for (shard_id, index_id) in deleted.into_iter().map(|i| (i.shard_id, i.id)).chain(indexes_to_delete.into_iter()) {
+            for (shard_id, index_id) in deleted.into_iter().map(|i| (i.shard_id, i.id)).chain(indexes_to_delete) {
                 if shutdown.is_cancelled() {
                     break;
                 }
@@ -140,7 +140,7 @@ pub async fn run_sync(
 
             let sync_semaphore = Arc::new(Semaphore::new(settings.parallel_index_syncs));
             let mut tasks = JoinSet::new();
-            for index in indexes.into_iter().chain(retry_indexes.into_iter()).chain(indexes_to_sync.into_iter()) {
+            for index in indexes.into_iter().chain(retry_indexes).chain(indexes_to_sync) {
                 let index_id = index.id;
                 let meta2 = meta.clone();
                 let index_metadata2 = Arc::clone(&index_metadata);

@@ -65,7 +65,7 @@ impl DataStoreV2 {
             None
         };
 
-        for (idx, elem) in (0..).zip(entries.into_iter()) {
+        for (idx, elem) in (0..).zip(entries) {
             let (first_vector, _) = vectors.write(idx, elem.vectors.iter().map(|v| config.vector_type.encode(v)))?;
             if let Some(quantized) = &mut quantized {
                 for v in &elem.vectors {

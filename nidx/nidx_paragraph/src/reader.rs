@@ -26,8 +26,8 @@ use nidx_protos::{OrderBy, ParagraphItem, ParagraphSearchResponse, StreamRequest
 use nidx_types::prefilter::PrefilterResult;
 use tantivy::collector::{Collector, Count, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query};
-use tantivy::{DateTime, Order, schema::*};
-use tantivy::{DocAddress, Index, IndexReader};
+use tantivy::schema::{Facet, Field, Value};
+use tantivy::{DateTime, DocAddress, Index, IndexReader, Order, TantivyDocument};
 use tracing::*;
 
 use super::schema::ParagraphSchema;

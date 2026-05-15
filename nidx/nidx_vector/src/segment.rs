@@ -823,7 +823,7 @@ mod test {
         let path_merged = tempdir()?;
         let merged_dp = merge(path_merged.path(), work, &config)?;
 
-        for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2.into_iter()).enumerate() {
+        for (i, (elem, mut labels)) in elems1.into_iter().chain(elems2).enumerate() {
             let vector = merged_dp.data_store.get_vector(VectorAddr(i as u32));
             assert_eq!(config.vector_type.encode(&elem.vectors[0]), vector.vector());
 
