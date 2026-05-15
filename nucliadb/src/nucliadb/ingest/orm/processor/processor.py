@@ -344,9 +344,8 @@ class Processor:
                 else:  # pragma: no cover
                     raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
 
-                # apply changes from the broker message to the resource
+                # apply changes from the broker message to the
                 await self.apply_resource(message, resource, update=(not created))
-
                 # index message
                 if resource.modified:
                     index_message = await self.generate_index_message(resource, message, created)

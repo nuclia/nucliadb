@@ -76,6 +76,7 @@ class IndexMessageBuilder:
         replace: bool = True,
         vectorset_configs: list[VectorSetConfig] | None = None,
         append_splits: set[str] | None = None,
+        deleted_splits: set[str] | None = None,
     ):
         field = await self.resource.get_field(fieldid.field, fieldid.field_type)
         extracted_text = await field.get_extracted_text()
@@ -104,6 +105,7 @@ class IndexMessageBuilder:
                     field_author,
                     replace_field=replace_texts,
                     skip_index=skip_texts_index,
+                    deleted_splits=deleted_splits,
                 )
         if paragraphs or vectors:
             # The paragraphs are needed to generate the vectors. However, we don't need to index them
@@ -128,6 +130,7 @@ class IndexMessageBuilder:
                     skip_paragraphs_index=skip_paragraphs_index,
                     skip_texts_index=skip_texts_index,
                     append_splits=append_splits,
+                    deleted_splits=deleted_splits,
                 )
         if vectors:
             assert vectorset_configs is not None
@@ -146,6 +149,7 @@ class IndexMessageBuilder:
                         replace_field=replace,
                         vector_dimension=dimension,
                         append_splits=append_splits,
+                        deleted_splits=deleted_splits,
                     )
 
         if relations:
@@ -207,6 +211,8 @@ class IndexMessageBuilder:
         Builds the index message for the broker message coming from the writer.
         The writer messages are not adding new vectors to the index.
         """
+        vectorsets_configs = None
+
         assert message.source == BrokerMessage.MessageSource.WRITER
 
         self._apply_field_deletions(self.brain, message.delete_fields)
@@ -226,6 +232,14 @@ class IndexMessageBuilder:
         for fieldid in fields_to_index:
             if fieldid in message.delete_fields:
                 continue
+            deleted_splits = None
+            if fieldid.field_type == FieldType.CONVERSATION:
+                _, deleted_splits = await get_stored_split_ids(fieldid, self.resource)
+
+            vectors_update = needs_vectors_update(fieldid, message)
+            if vectors_update and vectorsets_configs is None:
+                vectorsets_configs = await self.get_vectorsets_configs()
+
             await self._apply_field_index_data(
                 self.brain,
                 fieldid,
@@ -233,8 +247,10 @@ class IndexMessageBuilder:
                 texts=prefilter_update or needs_texts_update(fieldid, message),
                 paragraphs=needs_paragraphs_update(fieldid, message),
                 relations=False,  # Relations at the field level are not modified by the writer
-                vectors=False,  # Vectors are never added by the writer
+                vectors=vectors_update,
+                vectorset_configs=vectorsets_configs,
                 replace=not resource_created,
+                deleted_splits=deleted_splits,
             )
         return self.brain.brain
 
@@ -264,9 +280,10 @@ class IndexMessageBuilder:
             # All other fields are always replaced upon modification.
             replace_field = True
             modified_splits = None
+            deleted_splits = None
             if fieldid.field_type == FieldType.CONVERSATION:
                 modified_splits = await get_bm_modified_split_ids(fieldid, message, self.resource)
-                stored_splits = await get_stored_split_ids(fieldid, self.resource)
+                stored_splits, deleted_splits = await get_stored_split_ids(fieldid, self.resource)
                 is_append_messages_op = modified_splits.issubset(stored_splits) and 0 < len(
                     modified_splits
                 ) < len(stored_splits)
@@ -289,6 +306,7 @@ class IndexMessageBuilder:
                 replace=replace_field,
                 vectorset_configs=vectorsets_configs,
                 append_splits=modified_splits,
+                deleted_splits=deleted_splits,
             )
         return self.brain.brain
 
@@ -302,6 +320,9 @@ class IndexMessageBuilder:
         ]
         vectorsets_configs = await self.get_vectorsets_configs()
         for fieldid in fields_to_index:
+            deleted_splits = None
+            if fieldid.field_type == FieldType.CONVERSATION:
+                _, deleted_splits = await get_stored_split_ids(fieldid, self.resource)
             await self._apply_field_index_data(
                 self.brain,
                 fieldid,
@@ -312,6 +333,7 @@ class IndexMessageBuilder:
                 vectors=True,
                 replace=reindex,
                 vectorset_configs=vectorsets_configs,
+                deleted_splits=deleted_splits,
             )
         return self.brain.brain
 
@@ -353,6 +375,10 @@ def get_bm_modified_fields(message: BrokerMessage) -> list[FieldID]:
         if message.basic.summary != "":
             modified.add(("summary", FieldType.GENERIC))
 
+    # Deleted splits also need reindexing of the field
+    for ds in message.delete_splits:
+        modified.add((ds.field.field, ds.field.field_type))
+
     if message.source == BrokerMessage.MessageSource.PROCESSOR:
         # Messages with field metadata, extracted text or field vectors need indexing
         for fm in message.field_metadata:
@@ -380,6 +406,7 @@ def needs_paragraphs_update(field_id: FieldID, message: BrokerMessage) -> bool:
         has_paragraph_annotations(field_id, message)
         or has_new_extracted_text(field_id, message)
         or has_new_field_metadata(field_id, message)
+        or has_deleted_splits(field_id, message)
     )
 
 
@@ -407,18 +434,34 @@ def has_new_extracted_text(
     return any(extracted_text.field == field_id for extracted_text in message.extracted_text)
 
 
+def has_deleted_splits(
+    field_id: FieldID,
+    message: BrokerMessage,
+) -> bool:
+    return any(
+        delete_split.field == field_id and len(delete_split.splits) > 0
+        for delete_split in message.delete_splits
+    )
+
+
 def needs_texts_update(
     field_id: FieldID,
     message: BrokerMessage,
 ) -> bool:
-    return has_new_extracted_text(field_id, message) or has_new_field_metadata(field_id, message)
+    return (
+        has_new_extracted_text(field_id, message)
+        or has_new_field_metadata(field_id, message)
+        or has_deleted_splits(field_id, message)
+    )
 
 
 def needs_vectors_update(
     field_id: FieldID,
     message: BrokerMessage,
 ) -> bool:
-    return any(field_vectors.field == field_id for field_vectors in message.field_vectors)
+    return has_deleted_splits(field_id, message) or any(
+        field_vectors.field == field_id for field_vectors in message.field_vectors
+    )
 
 
 async def get_bm_modified_split_ids(
@@ -445,11 +488,13 @@ async def get_bm_modified_split_ids(
 async def get_stored_split_ids(
     conversation_field_id: FieldID,
     resource: Resource,
-) -> set[str]:
+) -> tuple[set[str], set[str]]:
     fid = conversation_field_id
     conv: Conversation = await resource.get_field(fid.field, fid.field_type, load=False)
     splits_metadata = await conv.get_splits_metadata()
-    return set(splits_metadata.metadata)
+    deleted_splits = set(splits_metadata.deleted_splits)
+    non_deleted_splits = set(splits_metadata.metadata.keys()) - deleted_splits
+    return non_deleted_splits, deleted_splits
 
 
 def needs_relations_update(
