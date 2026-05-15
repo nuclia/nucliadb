@@ -187,9 +187,6 @@ message FieldConversation {
     int32 total = 3;
     string extract_strategy = 4;
     string split_strategy = 5;
-
-    // Total number of deleted messages
-    int64 deleted_messages = 6;
 }
 
 message SplitMetadata {
