@@ -269,7 +269,7 @@ class KnowledgeBox:
                     await op()
                 except Exception:
                     if isinstance(op, partial):
-                        name: str = op.func.__name__
+                        name: str = getattr(op.func, "__name__", "unknown?")
                     else:
                         getattr(op, "__name__", "unknown?")
                     logger.exception(f"Unexpected error rolling back {name}. Keep rolling back")

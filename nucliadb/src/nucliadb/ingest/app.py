@@ -65,7 +65,7 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
 
     await start_audit_utility(SERVICE_NAME)
 
-    finalizers = [
+    finalizers: list[Callable[[], Awaitable[None]]] = [
         stop_partitioning_utility,
         stop_transaction_utility,
         stop_audit_utility,

@@ -23,6 +23,7 @@ import time
 
 import backoff
 import nats
+import nats.errors
 import nats.js.api
 from nats.aio.client import Msg
 from nats.js import JetStreamContext

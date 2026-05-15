@@ -23,6 +23,7 @@ from typing import cast
 from typing_extensions import assert_never
 
 import nucliadb_models
+import nucliadb_models.filters
 import nucliadb_models.resource
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR, FieldId, ParagraphId
@@ -112,21 +113,27 @@ class AugmentorOps:
     async def parse(self, augmentations: list[Augment]):
         for augmentation in augmentations:
             if augmentation.from_ == "resources":
+                augmentation = cast(ResourceAugment, augmentation)
                 self._parse_resource(augmentation)
 
             elif augmentation.from_ == "resources.deep":
+                augmentation = cast(DeepResourceAugment, augmentation)
                 self._parse_deep_resource(augmentation)
 
             elif augmentation.from_ == "fields":
+                augmentation = cast(FieldAugment, augmentation)
                 await self._parse_field(augmentation)
 
             elif augmentation.from_ == "files":
+                augmentation = cast(FileAugment, augmentation)
                 self._parse_file_field(augmentation)
 
             elif augmentation.from_ == "conversations":
+                augmentation = cast(ConversationAugment, augmentation)
                 self._parse_conversation_field(augmentation)
 
             elif augmentation.from_ == "paragraphs":
+                augmentation = cast(ParagraphAugment, augmentation)
                 self._parse_paragraph(augmentation)
 
             else:  # pragma: no cover

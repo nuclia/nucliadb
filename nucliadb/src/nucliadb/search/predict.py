@@ -124,7 +124,7 @@ predict_observer = metrics.Observer(
 )
 
 
-RETRIABLE_EXCEPTIONS = (aiohttp.client_exceptions.ClientConnectorError,)
+RETRIABLE_EXCEPTIONS = (aiohttp.ClientConnectorError,)
 MAX_TRIES = 2
 
 
@@ -259,7 +259,7 @@ class PredictEngine:
                 detail = data
         except (
             json.decoder.JSONDecodeError,
-            aiohttp.client_exceptions.ContentTypeError,
+            aiohttp.ContentTypeError,
         ):
             detail = await resp.text()
 

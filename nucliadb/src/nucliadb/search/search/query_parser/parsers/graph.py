@@ -20,6 +20,7 @@
 
 
 from dataclasses import dataclass
+from typing import cast
 
 from nidx_protos import nodereader_pb2
 from typing_extensions import assert_never
@@ -33,6 +34,11 @@ from nucliadb.search.search.utils import filter_hidden_resources, kb_security_en
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
 from nucliadb_models.graph import requests as graph_requests
+from nucliadb_models.graph.requests import (
+    GraphNodesQueryType,
+    GraphPathQueryType,
+    GraphRelationsQueryType,
+)
 from nucliadb_models.labels import LABEL_HIDDEN
 from nucliadb_protos import utils_pb2
 
@@ -140,7 +146,7 @@ async def _parse_security(kbid: str, item: AnyGraphRequest) -> utils_pb2.Securit
 
 
 def parse_path_query(
-    expr: graph_requests.GraphPathQuery,
+    expr: GraphPathQueryType,
     node_vectors: dict[str, list[float]],
     relation_vectors: dict[str, list[float]],
 ) -> nodereader_pb2.GraphQuery.PathQuery:
@@ -148,14 +154,20 @@ def parse_path_query(
 
     if isinstance(expr, graph_requests.And):
         for op in expr.operands:
-            pb.bool_and.operands.append(parse_path_query(op, node_vectors, relation_vectors))
+            pb.bool_and.operands.append(
+                parse_path_query(cast(GraphPathQueryType, op), node_vectors, relation_vectors)
+            )
 
     elif isinstance(expr, graph_requests.Or):
         for op in expr.operands:
-            pb.bool_or.operands.append(parse_path_query(op, node_vectors, relation_vectors))
+            pb.bool_or.operands.append(
+                parse_path_query(cast(GraphPathQueryType, op), node_vectors, relation_vectors)
+            )
 
     elif isinstance(expr, graph_requests.Not):
-        pb.bool_not.CopyFrom(parse_path_query(expr.operand, node_vectors, relation_vectors))
+        pb.bool_not.CopyFrom(
+            parse_path_query(cast(GraphPathQueryType, expr.operand), node_vectors, relation_vectors)
+        )
 
     elif isinstance(expr, graph_requests.GraphPath):
         if expr.source is not None:
@@ -192,20 +204,20 @@ def parse_path_query(
 
 
 def _parse_node_query(
-    expr: graph_requests.GraphNodesQuery, node_vectors: dict[str, list[float]]
+    expr: GraphNodesQueryType, node_vectors: dict[str, list[float]]
 ) -> nodereader_pb2.GraphQuery.PathQuery:
     pb = nodereader_pb2.GraphQuery.PathQuery()
 
     if isinstance(expr, graph_requests.And):
         for op in expr.operands:
-            pb.bool_and.operands.append(_parse_node_query(op, node_vectors))
+            pb.bool_and.operands.append(_parse_node_query(cast(GraphNodesQueryType, op), node_vectors))
 
     elif isinstance(expr, graph_requests.Or):
         for op in expr.operands:
-            pb.bool_or.operands.append(_parse_node_query(op, node_vectors))
+            pb.bool_or.operands.append(_parse_node_query(cast(GraphNodesQueryType, op), node_vectors))
 
     elif isinstance(expr, graph_requests.Not):
-        pb.bool_not.CopyFrom(_parse_node_query(expr.operand, node_vectors))
+        pb.bool_not.CopyFrom(_parse_node_query(cast(GraphNodesQueryType, expr.operand), node_vectors))
 
     elif isinstance(expr, graph_requests.AnyNode):
         _set_node_to_pb(expr, pb.path.source, node_vectors)
@@ -221,21 +233,27 @@ def _parse_node_query(
 
 
 def _parse_relation_query(
-    expr: graph_requests.GraphRelationsQuery,
+    expr: GraphRelationsQueryType,
     relation_vectors: dict[str, list[float]],
 ) -> nodereader_pb2.GraphQuery.PathQuery:
     pb = nodereader_pb2.GraphQuery.PathQuery()
 
     if isinstance(expr, graph_requests.And):
         for op in expr.operands:
-            pb.bool_and.operands.append(_parse_relation_query(op, relation_vectors))
+            pb.bool_and.operands.append(
+                _parse_relation_query(cast(GraphRelationsQueryType, op), relation_vectors)
+            )
 
     elif isinstance(expr, graph_requests.Or):
         for op in expr.operands:
-            pb.bool_or.operands.append(_parse_relation_query(op, relation_vectors))
+            pb.bool_or.operands.append(
+                _parse_relation_query(cast(GraphRelationsQueryType, op), relation_vectors)
+            )
 
     elif isinstance(expr, graph_requests.Not):
-        pb.bool_not.CopyFrom(_parse_relation_query(expr.operand, relation_vectors))
+        pb.bool_not.CopyFrom(
+            _parse_relation_query(cast(GraphRelationsQueryType, expr.operand), relation_vectors)
+        )
 
     elif isinstance(expr, graph_requests.Relation):
         _set_relation_to_pb(expr, pb.path.relation, relation_vectors)
@@ -360,21 +378,29 @@ async def _calculate_graph_vectors(
 
 
 def _extract_semantic_terms(
-    query: graph_requests.GraphPathQuery
-    | graph_requests.GraphNodesQuery
-    | graph_requests.GraphRelationsQuery
+    query: GraphPathQueryType
+    | GraphNodesQueryType
+    | GraphRelationsQueryType
     | graph_requests.GraphNode
     | graph_requests.GraphRelation
     | None,
     nodes: set[str],
     relations: set[str],
 ):
+    _QueryType = (
+        GraphPathQueryType
+        | GraphNodesQueryType
+        | GraphRelationsQueryType
+        | graph_requests.GraphNode
+        | graph_requests.GraphRelation
+        | None
+    )
     match query:
         case filters.And() | filters.Or():
             for op in query.operands:
-                _extract_semantic_terms(op, nodes, relations)
+                _extract_semantic_terms(cast(_QueryType, op), nodes, relations)
         case filters.Not():
-            _extract_semantic_terms(query.operand, nodes, relations)
+            _extract_semantic_terms(cast(_QueryType, query.operand), nodes, relations)
         case graph_requests.GraphPath():
             _extract_semantic_terms(query.source, nodes, relations)
             _extract_semantic_terms(query.relation, nodes, relations)

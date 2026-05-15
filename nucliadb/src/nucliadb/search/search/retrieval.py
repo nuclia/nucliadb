@@ -78,13 +78,12 @@ async def text_block_search(
     graph_results = graph_results_to_text_block_matches(shards_response.graph)
 
     rank_fusion = get_rank_fusion(retrieval.rank_fusion)
-    merged_text_blocks = rank_fusion.fuse(
-        {
-            IndexSource.KEYWORD: keyword_results,
-            IndexSource.SEMANTIC: semantic_results,
-            IndexSource.GRAPH: graph_results,
-        }
-    )
+    sources: dict[str, list[TextBlockMatch]] = {
+        IndexSource.KEYWORD: keyword_results,
+        IndexSource.SEMANTIC: semantic_results,
+        IndexSource.GRAPH: graph_results,
+    }
+    merged_text_blocks = rank_fusion.fuse(sources)
 
     # cut to the rank fusion window. As we ask each shard and index this window,
     # we'll normally have extra results

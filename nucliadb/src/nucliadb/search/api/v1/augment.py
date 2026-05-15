@@ -193,7 +193,7 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
             if resource_select:
                 augmentations.append(
                     ResourceAugment(
-                        given=resource_augment.given,  # type: ignore[arg-type]
+                        given=cast(list[str | FieldId | ParagraphId], resource_augment.given),
                         select=resource_select,
                     )
                 )

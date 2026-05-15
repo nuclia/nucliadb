@@ -129,11 +129,13 @@ async def start_auditor() -> Callable[[], Awaitable[None]]:
     await index_auditor.initialize()
     await resource_writes_auditor.initialize()
 
-    return partial(  # type: ignore[return-value]
-        asyncio.gather,
-        index_auditor.finalize(),
-        resource_writes_auditor.finalize(),
-    )
+    async def _finalize() -> None:
+        await asyncio.gather(
+            index_auditor.finalize(),
+            resource_writes_auditor.finalize(),
+        )
+
+    return _finalize
 
 
 async def start_shard_creator() -> Callable[[], Awaitable[None]]:

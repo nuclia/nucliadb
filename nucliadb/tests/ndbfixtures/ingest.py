@@ -28,6 +28,8 @@ from os.path import dirname, getsize
 from unittest.mock import AsyncMock, patch
 
 import nats
+import nats.js
+import nats.js.errors
 import pytest
 from grpc import aio
 

@@ -27,6 +27,8 @@ Backfill the data into the PG catalog
 import logging
 from typing import cast
 
+from psycopg import sql
+
 from nucliadb.common.catalog import catalog_update, get_catalog
 from nucliadb.common.catalog.pg import PGCatalog
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
@@ -50,20 +52,20 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     BATCH_SIZE = 100
     async with context.kv_driver.rw_transaction() as txn:
         txn = cast(PGTransaction, txn)
-        continue_sql = ""
+        continue_clause: sql.Composable = sql.SQL("")
         while True:
             async with txn.connection.cursor() as cur:
                 # Get list of resources except those already in the catalog
                 await cur.execute(
-                    f"""
+                    sql.SQL("""
                     SELECT SPLIT_PART(key, '/', 5)::UUID FROM resources
                     LEFT JOIN catalog ON kbid = %s AND SPLIT_PART(key, '/', 5)::UUID = rid
                     WHERE key SIMILAR TO %s
                     AND rid IS NULL
-                    {continue_sql}
+                    {continue_clause}
                     ORDER BY key
                     LIMIT %s
-                    """,
+                    """).format(continue_clause=continue_clause),
                     (kbid, f"/kbs/{kbid}/r/[a-f0-9]*", BATCH_SIZE),
                 )
                 resources_to_index = [r[0] for r in await cur.fetchall()]
@@ -82,4 +84,4 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                     await catalog_update(txn, kbid, resource, index_message)
 
                 await txn.commit()
-                continue_sql = f"AND key > '/kbs/{kbid}/r/{rid}'"
+                continue_clause = sql.SQL("AND key > {}").format(sql.Literal(f"/kbs/{kbid}/r/{rid}"))

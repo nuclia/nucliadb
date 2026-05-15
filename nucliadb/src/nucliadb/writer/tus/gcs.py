@@ -108,6 +108,7 @@ class GCloudBlobStore(BlobStore):
 
             return self._credentials.token
         else:
+            assert self._credentials
             access_token = self._credentials.get_access_token()
             return access_token.access_token
 
