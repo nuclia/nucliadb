@@ -165,7 +165,6 @@ message Message {
         ANSWER = 2;
     }
     MessageType type = 6;
-    bool deleted = 7;
 }
 
 message Conversation {
