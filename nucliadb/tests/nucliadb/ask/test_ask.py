@@ -225,7 +225,7 @@ async def test_ask_status_code_no_retrieval_data(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_ask_with_citations(nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resource):
-    citations = {"foo": [], "bar": []}  # type: ignore
+    citations = {"foo": [], "bar": []}  # type: ignore[var-annotated]
     citations_gen = CitationsGenerativeResponse(citations=citations)
     citations_chunk = GenerativeChunk(chunk=citations_gen)
 
@@ -1262,11 +1262,11 @@ async def test_all_rag_strategies_combinations(
     valid_combinations = []
     for i in range(1, len(rag_strategies) + 1):
         for combination in combinations(rag_strategies, i):
-            if valid_combination(list(combination)):  # type: ignore
+            if valid_combination(list(combination)):  # type: ignore[arg-type]
                 valid_combinations.append(list(combination))
 
     assert len(valid_combinations) == 19
-    for combination in valid_combinations:  # type: ignore
+    for combination in valid_combinations:  # type: ignore[assignment]
         resp = await nucliadb_reader.post(
             f"/kb/{standalone_knowledgebox}/ask",
             headers={"X-Synchronous": "True"},

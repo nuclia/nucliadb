@@ -129,10 +129,10 @@ async def start_auditor() -> Callable[[], Awaitable[None]]:
     await index_auditor.initialize()
     await resource_writes_auditor.initialize()
 
-    return partial(
+    return partial(  # type: ignore[return-value]
         asyncio.gather,
         index_auditor.finalize(),
-        resource_writes_auditor.finalize(),  # type: ignore
+        resource_writes_auditor.finalize(),
     )
 
 

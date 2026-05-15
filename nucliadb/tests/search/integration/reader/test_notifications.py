@@ -115,13 +115,13 @@ async def test_notification_stream(nucliadb_stream_reader, knowledgebox, process
                 ]
 
                 if notification_type == "resource_indexed":
-                    notif = ResourceIndexedNotification.model_validate_json(line)  # type: ignore
+                    notif = ResourceIndexedNotification.model_validate_json(line)
 
                 elif notification_type == "resource_written":
                     notif = ResourceWrittenNotification.model_validate_json(line)
 
                 elif notification_type == "resource_processed":
-                    notif = ResourceProcessedNotification.model_validate_json(line)  # type: ignore
+                    notif = ResourceProcessedNotification.model_validate_json(line)
 
                 else:
                     assert False, "Unexpected notification type"

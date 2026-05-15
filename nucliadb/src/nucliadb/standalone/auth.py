@@ -21,7 +21,7 @@ import logging
 import time
 
 import orjson
-from jwcrypto import jwe, jwk  # type: ignore
+from jwcrypto import jwe, jwk  # type: ignore[import-untyped]
 from starlette.authentication import AuthCredentials, AuthenticationBackend
 from starlette.requests import HTTPConnection
 

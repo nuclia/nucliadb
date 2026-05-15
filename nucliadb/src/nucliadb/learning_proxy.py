@@ -350,7 +350,7 @@ async def service_client(
         client = DummyClient(base_url=base_url, headers=headers)
         logger.warning("Using dummy client. If you see this in production, something is wrong.")
     else:
-        client = httpx.AsyncClient(base_url=base_url, headers=headers)  # type: ignore
+        client = httpx.AsyncClient(base_url=base_url, headers=headers)  # type: ignore[assignment]
     try:
         yield client
     finally:
@@ -423,7 +423,7 @@ class DummyClient(httpx.AsyncClient):
         # simulate patch that returns the updated config
         return self.get_config(*args, **kwargs)
 
-    async def request(  # type: ignore
+    async def request(  # type: ignore[override]
         self, method: str, url: str, params=None, content=None, headers=None, *args, **kwargs
     ) -> httpx.Response:
         return self._handle_request(method, url, params=params, content=content, headers=headers)

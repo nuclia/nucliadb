@@ -441,9 +441,7 @@ def field_file(message: resources_pb2.FieldFile) -> FieldFile:
             always_print_fields_with_no_presence=True,
         )
     )
-    instance.external = (  # type: ignore
-        message.file.source == resources_pb2.CloudFile.Source.EXTERNAL
-    )
+    instance.external = message.file.source == resources_pb2.CloudFile.Source.EXTERNAL
     return instance
 
 

@@ -160,7 +160,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             logger.info("KB created successfully", extra={"kbid": kbid})
             return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.OK)
 
-    async def UpdateKnowledgeBox(  # type: ignore
+    async def UpdateKnowledgeBox(
         self, request: KnowledgeBoxUpdate, context=None
     ) -> UpdateKnowledgeBoxResponse:
         if is_onprem_nucliadb():
@@ -191,7 +191,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
         return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK, uuid=kbid)
 
-    async def DeleteKnowledgeBox(  # type: ignore
+    async def DeleteKnowledgeBox(
         self, request: KnowledgeBoxID, context=None
     ) -> DeleteKnowledgeBoxResponse:
         if is_onprem_nucliadb():
@@ -230,9 +230,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             logger.info(f"Processed {message.uuid}")
         return response
 
-    async def GetEntities(  # type: ignore
-        self, request: GetEntitiesRequest, context=None
-    ) -> GetEntitiesResponse:
+    async def GetEntities(self, request: GetEntitiesRequest, context=None) -> GetEntitiesResponse:
         response = GetEntitiesResponse()
         async with self.driver.ro_transaction() as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
@@ -252,7 +250,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 response.status = GetEntitiesResponse.Status.OK
             return response
 
-    async def ListEntitiesGroups(  # type: ignore
+    async def ListEntitiesGroups(
         self, request: ListEntitiesGroupsRequest, context=None
     ) -> ListEntitiesGroupsResponse:
         response = ListEntitiesGroupsResponse()
@@ -276,7 +274,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             return response
 
-    async def GetEntitiesGroup(  # type: ignore
+    async def GetEntitiesGroup(
         self, request: GetEntitiesGroupRequest, context=None
     ) -> GetEntitiesGroupResponse:
         response = GetEntitiesGroupResponse()
@@ -303,9 +301,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             return response
 
-    async def Status(  # type: ignore
-        self, request: WriterStatusRequest, context=None
-    ) -> WriterStatusResponse:
+    async def Status(self, request: WriterStatusRequest, context=None) -> WriterStatusResponse:
         logger.info("Status Call")
         response = WriterStatusResponse()
         async with self.driver.ro_transaction() as txn:
@@ -319,7 +315,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
             return response
 
-    async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:  # type: ignore
+    async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:
         try:
             kbid = request.kbid
             rid = request.rid

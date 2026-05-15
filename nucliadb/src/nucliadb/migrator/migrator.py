@@ -249,8 +249,8 @@ async def run(context: ExecutionContext, target_version: int | None = None) -> N
         global_info = await context.data_manager.get_global_info()
 
         if target_version is None and global_info.target_version not in (None, 0):
-            await run_all_kb_migrations(context, global_info.target_version)  # type: ignore
-            await run_global_migrations(context, global_info.target_version)  # type: ignore
+            await run_all_kb_migrations(context, global_info.target_version)  # type: ignore[arg-type]
+            await run_global_migrations(context, global_info.target_version)  # type: ignore[arg-type]
             global_info = await context.data_manager.get_global_info()
 
         migrations = get_migrations(global_info.current_version)

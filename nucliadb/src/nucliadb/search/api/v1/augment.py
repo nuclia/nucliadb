@@ -461,7 +461,7 @@ def build_augment_response(item: AugmentRequest, augmented: Augmented) -> Augmen
         elif field_id.type == FieldTypeName.FILE.abbreviation():
             field = cast(internal_augment.AugmentedFileField, field)
             response.fields[field_id.full()] = AugmentedFileField(
-                text=field.text,  # type: ignore # field is instance of any of the above and has the text property
+                text=field.text,  # field is instance of any of the above and has the text property
                 classification_labels=classification_labels,
                 entities=entities,
                 thumbnail_image=field.thumbnail_path,

@@ -121,7 +121,7 @@ class NidxBindingUtility(NidxUtility):
         }
 
     async def initialize(self):
-        import nidx_binding  # type: ignore
+        import nidx_binding  # type: ignore[import-untyped]
 
         self.binding = nidx_binding.NidxBinding(self.config)
         self.api_client = NidxApiStub(

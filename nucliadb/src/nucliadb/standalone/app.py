@@ -30,7 +30,7 @@ from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
-import nucliadb_admin_assets  # type: ignore
+import nucliadb_admin_assets  # type: ignore[import-untyped]
 from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware, ProcessTimeHeaderMiddleware
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1

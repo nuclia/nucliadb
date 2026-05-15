@@ -178,7 +178,7 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
 
     try:
         results: list[Shard] | None = await asyncio.wait_for(
-            asyncio.gather(*ops, return_exceptions=True),  # type: ignore
+            asyncio.gather(*ops, return_exceptions=True),  # type: ignore[arg-type]
             timeout=settings.search_timeout,
         )
     except asyncio.TimeoutError as exc:

@@ -32,11 +32,11 @@ from urllib.parse import quote_plus
 
 import aiohttp
 import backoff
-import google.auth.compute_engine.credentials  # type: ignore
-import google.auth.transport.requests  # type: ignore
-import google.oauth2.credentials  # type: ignore
-from google.auth.exceptions import DefaultCredentialsError  # type: ignore
-from oauth2client.service_account import ServiceAccountCredentials  # type: ignore
+import google.auth.compute_engine.credentials
+import google.auth.transport.requests
+import google.oauth2.credentials
+from google.auth.exceptions import DefaultCredentialsError
+from oauth2client.service_account import ServiceAccountCredentials  # type: ignore[import-untyped]
 
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
