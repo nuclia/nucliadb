@@ -23,7 +23,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
@@ -362,6 +362,14 @@ class Resource:
                 self.all_fields_keys.remove(field)
         await field_obj.delete()
 
+    async def delete_splits(self, payload: writer_pb2.DeleteSplits) -> None:
+        if payload.field.field_type != FieldType.CONVERSATION:
+            raise ValueError("delete_splits can only be applied to conversation fields")
+        field = await self.get_field(payload.field.field, FieldType.CONVERSATION)
+        conv = cast(Conversation, field)
+        await conv.delete_messages(payload.splits)
+        self.modified = True
+
     async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
         """Return whether this resource has this field or not."""
         all_fields_ids = await self.get_fields_ids()
@@ -449,6 +457,9 @@ class Resource:
             await self.delete_field(fieldid.field_type, fieldid.field)
             if fieldid.field_type == FieldType.FILE:
                 await self.delete_file_field_md5(fieldid.field)
+
+        for delete_splits in message.delete_splits:
+            await self.delete_splits(delete_splits)
 
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
             await self.update_all_field_ids(
