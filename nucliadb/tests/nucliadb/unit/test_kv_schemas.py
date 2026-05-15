@@ -33,6 +33,15 @@ SCHEMA = KVSchema(
     ],
 )
 
+DATE_SCHEMA = KVSchema(
+    name="event",
+    fields=[
+        KVSchemaField(key="name", type=KVFieldType.TEXT, required=True),
+        KVSchemaField(key="ts", type=KVFieldType.DATE, required=True),
+        KVSchemaField(key="end_ts", type=KVFieldType.DATE, required=False),
+    ],
+)
+
 
 class TestValidateKvData:
     def test_valid_data_all_fields(self):
@@ -56,6 +65,23 @@ class TestValidateKvData:
     def test_wrong_type_text_field(self):
         with pytest.raises(ValueError, match="expects type 'text'"):
             validate_kv_data({"color": 123, "price": 1.0}, SCHEMA)
+
+    def test_date_string_rejected_in_text_field(self):
+        # Rejected: Tantivy would auto-detect these as DateTime (RFC 3339 with timezone).
+        with pytest.raises(ValueError, match="looks like a date"):
+            validate_kv_data({"color": "2024-01-15T00:00:00Z", "price": 1.0}, SCHEMA)
+
+    def test_date_string_with_offset_rejected_in_text_field(self):
+        with pytest.raises(ValueError, match="looks like a date"):
+            validate_kv_data({"color": "2024-01-15T00:00:00+02:00", "price": 1.0}, SCHEMA)
+
+    def test_date_only_string_allowed_in_text_field(self):
+        # Allowed: Tantivy keeps date-only strings as Str (not RFC 3339).
+        validate_kv_data({"color": "2024-01-15", "price": 1.0}, SCHEMA)
+
+    def test_naive_datetime_string_allowed_in_text_field(self):
+        # Allowed: no timezone → Tantivy keeps as Str (not RFC 3339).
+        validate_kv_data({"color": "2024-01-15T00:00:00", "price": 1.0}, SCHEMA)
 
     def test_wrong_type_float_field(self):
         with pytest.raises(ValueError, match="expects type 'float'"):
@@ -84,6 +110,32 @@ class TestValidateKvData:
     def test_integer_accepted_as_float(self):
         # Integers are acceptable for float fields
         validate_kv_data({"color": "red", "price": 10}, SCHEMA)
+
+    def test_valid_date_iso_datetime_string(self):
+        validate_kv_data({"name": "launch", "ts": "2024-01-15T00:00:00Z"}, DATE_SCHEMA)
+
+    def test_valid_date_iso_date_only_string(self):
+        # Date-only ISO strings are valid (no time component)
+        validate_kv_data({"name": "launch", "ts": "2024-01-15"}, DATE_SCHEMA)
+
+    def test_valid_date_with_optional_end(self):
+        validate_kv_data(
+            {"name": "launch", "ts": "2024-01-15T00:00:00Z", "end_ts": "2024-01-20T00:00:00Z"},
+            DATE_SCHEMA,
+        )
+
+    def test_invalid_date_string_rejected(self):
+        with pytest.raises(ValueError, match="expects type 'date'"):
+            validate_kv_data({"name": "launch", "ts": "not-a-date"}, DATE_SCHEMA)
+
+    def test_non_string_rejected_for_date_field(self):
+        # Timestamps as integers are not accepted; must be ISO strings
+        with pytest.raises(ValueError, match="expects type 'date'"):
+            validate_kv_data({"name": "launch", "ts": 1234567890}, DATE_SCHEMA)
+
+    def test_bool_not_accepted_as_date(self):
+        with pytest.raises(ValueError, match="expects type 'date'"):
+            validate_kv_data({"name": "launch", "ts": True}, DATE_SCHEMA)
 
 
 class TestKVSchemaModel:

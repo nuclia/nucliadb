@@ -30,6 +30,7 @@ PRODUCT_SCHEMA = {
         {"key": "price", "type": "float", "description": "Product price", "required": True},
         {"key": "in_stock", "type": "boolean", "required": False},
         {"key": "quantity", "type": "integer", "required": False},
+        {"key": "launched_at", "type": "date", "required": False},
     ],
 }
 
@@ -70,7 +71,7 @@ async def test_kv_schema_create(
     data = resp.json()
     assert data["name"] == "product"
     assert data["description"] == "A product schema"
-    assert len(data["fields"]) == 4
+    assert len(data["fields"]) == 5
 
     # Read it back
     resp = await nucliadb_reader.get(f"/kb/{kbid}/kv-schemas/product")
@@ -82,6 +83,9 @@ async def test_kv_schema_create(
     assert data["fields"][0]["required"] is True
     assert data["fields"][2]["key"] == "in_stock"
     assert data["fields"][2]["required"] is False
+    assert data["fields"][4]["key"] == "launched_at"
+    assert data["fields"][4]["type"] == "date"
+    assert data["fields"][4]["required"] is False
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -180,7 +184,7 @@ async def test_kv_schema_update(
     data = resp.json()
     assert data["description"] == "Updated description"
     # Fields unchanged
-    assert len(data["fields"]) == 4
+    assert len(data["fields"]) == 5
 
     # Update fields only
     new_fields = [

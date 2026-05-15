@@ -342,6 +342,28 @@ class KVBoolMatch(BaseModel, extra="forbid"):
     value: bool = pydantic.Field(description="The boolean value to match")
 
 
+class KVDateRange(BaseModel, extra="forbid"):
+    """Matches a key-value field where the given date key falls within a date/time range"""
+
+    op: Literal["date_range"] = "date_range"
+    field_id: str = pydantic.Field(description="The KV field/schema name, e.g. 'event'")
+    key: str = pydantic.Field(description="The key within the KV data, e.g. 'ts'")
+    gte: DateTime | None = pydantic.Field(
+        default=None, description="Greater than or equal to (inclusive lower bound)"
+    )
+    lte: DateTime | None = pydantic.Field(
+        default=None, description="Less than or equal to (inclusive upper bound)"
+    )
+
+    @model_validator(mode="after")
+    def check_bounds(self) -> "KVDateRange":
+        if self.gte is None and self.lte is None:
+            raise ValueError("KVDateRange requires at least one bound (gte or lte)")
+        if self.gte is not None and self.lte is not None and self.lte < self.gte:
+            raise ValueError(f"KVDateRange lte ({self.lte}) must be >= gte ({self.gte})")
+        return self
+
+
 def kv_discriminator(v: Any) -> str | None:
     if isinstance(v, dict):
         if "and" in v:
@@ -369,7 +391,8 @@ KVFilterExpression = Annotated[
     | Annotated[Not["KVFilterExpression"], Tag("not")]
     | Annotated[KVExactMatch, Tag("exact_match")]
     | Annotated[KVRange, Tag("range")]
-    | Annotated[KVBoolMatch, Tag("bool_match")],
+    | Annotated[KVBoolMatch, Tag("bool_match")]
+    | Annotated[KVDateRange, Tag("date_range")],
     Discriminator(kv_discriminator),
 ]
 

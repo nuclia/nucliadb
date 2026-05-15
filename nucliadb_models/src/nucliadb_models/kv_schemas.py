@@ -31,12 +31,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, model_validator
 
 # Type alias for valid KV field values
-KVValue = str | int | float | bool
+KVValue = str | int | float | bool | datetime
 
 MAX_KV_SCHEMAS = 20
 MAX_KV_SCHEMA_FIELDS = 50
@@ -47,6 +48,7 @@ class KVFieldType(str, Enum):
     INTEGER = "integer"
     FLOAT = "float"
     BOOLEAN = "boolean"
+    DATE = "date"
 
 
 class KVSchemaField(BaseModel):
