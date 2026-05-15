@@ -19,7 +19,7 @@
 #
 
 from datetime import datetime
-from typing import Type
+from typing import Type, cast
 
 from nidx_protos import nodereader_pb2
 from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
@@ -36,7 +36,7 @@ from nucliadb_models.filters import (
     Entity,
     Eq,
     Field,
-    FieldFilterExpression,
+    FieldFilterExpressionType,
     FieldMimetype,
     Generated,
     Inequalities,
@@ -52,7 +52,7 @@ from nucliadb_models.filters import (
     OriginPath,
     OriginSource,
     OriginTag,
-    ParagraphFilterExpression,
+    ParagraphFilterExpressionType,
     Resource,
     ResourceMimetype,
     Status,
@@ -79,19 +79,20 @@ FacetFilter = (
 
 
 async def parse_expression(
-    expr: FieldFilterExpression | ParagraphFilterExpression,
+    expr: FieldFilterExpressionType | ParagraphFilterExpressionType,
     kbid: str,
 ) -> PBFilterExpression:
     f = PBFilterExpression()
 
+    _ExprType = FieldFilterExpressionType | ParagraphFilterExpressionType
     if isinstance(expr, And):
         for op in expr.operands:
-            f.bool_and.operands.append(await parse_expression(op, kbid))
+            f.bool_and.operands.append(await parse_expression(cast(_ExprType, op), kbid))
     elif isinstance(expr, Or):
         for op in expr.operands:
-            f.bool_or.operands.append(await parse_expression(op, kbid))
+            f.bool_or.operands.append(await parse_expression(cast(_ExprType, op), kbid))
     elif isinstance(expr, Not):
-        f.bool_not.CopyFrom(await parse_expression(expr.operand, kbid))
+        f.bool_not.CopyFrom(await parse_expression(cast(_ExprType, expr.operand), kbid))
     elif isinstance(expr, Resource):
         if expr.id:
             f.resource.resource_id = expr.id

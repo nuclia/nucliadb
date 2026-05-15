@@ -113,7 +113,9 @@ async def run_exporter_task(context: ApplicationContext, exporter_task: Callable
             try:
                 await exporter_task(context)
             except Exception:
-                logger.error(f"Error on exporter task {exporter_task.__name__}", exc_info=True)
+                logger.error(
+                    f"Error on exporter task {getattr(exporter_task, '__name__')}", exc_info=True
+                )
             await asyncio.sleep(interval)
     except asyncio.CancelledError:
         pass

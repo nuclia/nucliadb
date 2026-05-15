@@ -72,16 +72,19 @@ class FileDataManager:
 
     async def start(self, request):
         self.protect(request)
+        assert self._data
         self._data.clear()
 
     async def save(self):
         if self.key is None:
             raise Exception("Not initialized")
+        assert self._data
         self._data["last_activity"] = time.time()
         value = orjson.dumps(self._data)
         DATA[self.key] = value
 
     async def update(self, **kwargs):
+        assert self._data
         self._data.update(kwargs)
 
     async def finish(self, values=None):
@@ -96,6 +99,7 @@ class FileDataManager:
 
     @property
     def metadata(self):
+        assert self._data
         return self._data.get("metadata", {})
 
     @property
@@ -114,6 +118,7 @@ class FileDataManager:
 
     @property
     def offset(self):
+        assert self._data
         return self._data.get("offset", 0)
 
     @property
@@ -169,6 +174,7 @@ class RedisFileDataManager(FileDataManager):
     async def save(self):
         if self.key is None:
             raise Exception("Not initialized")
+        assert self._data
         self._data["last_activity"] = time.time()
         value = orjson.dumps(self._data)
         await self.redis.set(self.key, value, ex=self._ttl)

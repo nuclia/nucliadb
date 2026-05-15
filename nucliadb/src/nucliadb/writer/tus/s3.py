@@ -24,9 +24,11 @@ import uuid
 from contextlib import AsyncExitStack
 
 import aiobotocore  # type: ignore[import-untyped]
+import aiobotocore.config  # type: ignore[import-untyped]
 import aiohttp
 import backoff
 import botocore  # type: ignore[import-untyped]
+import botocore.exceptions  # type: ignore[import-untyped]
 from aiobotocore.session import AioSession  # type: ignore[import-untyped]
 
 from nucliadb.writer import logger
@@ -43,7 +45,7 @@ from nucliadb_utils.storages.s3 import (
 
 RETRIABLE_EXCEPTIONS = (
     botocore.exceptions.ClientError,
-    aiohttp.client_exceptions.ClientPayloadError,
+    aiohttp.ClientPayloadError,
     botocore.exceptions.BotoCoreError,
 )
 
@@ -173,11 +175,11 @@ class S3BlobStore(BlobStore):
         else:
             return bucket_name
 
-    async def create_bucket(self, bucket):
-        exists = await self.check_exists(bucket)
+    async def create_bucket(self, bucket_name):
+        exists = await self.check_exists(bucket_name)
         if not exists:
             await create_bucket(
-                self._s3aioclient, bucket, self.bucket_tags, self.region_name, self.kms_key_id
+                self._s3aioclient, bucket_name, self.bucket_tags, self.region_name, self.kms_key_id
             )
         return exists
 

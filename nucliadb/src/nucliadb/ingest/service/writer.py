@@ -214,10 +214,10 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK)
 
     async def ProcessMessage(
-        self, request_stream: AsyncIterator[BrokerMessage], context=None
+        self, request_iterator: AsyncIterator[BrokerMessage], context=None
     ) -> OpStatusWriter:
         response = OpStatusWriter()
-        async for message in request_stream:
+        async for message in request_iterator:
             try:
                 await self.proc.process(
                     message, -1, partition=self.partitions[0], transaction_check=False
@@ -331,7 +331,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 external_index_manager = await get_external_index_manager(kbid=kbid)
                 if external_index_manager is not None:
                     await self.proc.external_index_add_resource(
-                        kbid,
+                        external_index_manager,
                         rid,
                         index_message,
                     )

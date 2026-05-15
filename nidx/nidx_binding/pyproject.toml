@@ -21,3 +21,4 @@ Repository = "https://github.com/nuclia/nucliadb"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
+module-name = "nidx_binding"

@@ -89,7 +89,7 @@ class KBShardManager:
             if isinstance(result, Exception):
                 errors.capture_exception(result)
                 raise NodeError(
-                    f"Error while applying {aw.__name__} for all shards. Other similar errors may have been shadowed.\n"
+                    f"Error while applying {getattr(aw, '__name__', '<callable>')} for all shards. Other similar errors may have been shadowed.\n"
                     f"{type(result).__name__}: {result}"
                 ) from result
 

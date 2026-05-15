@@ -80,15 +80,15 @@ class AuthHeaderAuthenticationBackend(NucliaCloudAuthenticationBackend):
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    async def authenticate(self, request: HTTPConnection) -> tuple[AuthCredentials, NucliaUser] | None:
-        token_resp = await authenticate_auth_token(self.settings, request)
+    async def authenticate(self, conn: HTTPConnection) -> tuple[AuthCredentials, NucliaUser] | None:
+        token_resp = await authenticate_auth_token(self.settings, conn)
         if token_resp is not None:
             return token_resp
 
-        if self.settings.auth_policy_user_header not in request.headers:
+        if self.settings.auth_policy_user_header not in conn.headers:
             return None
 
-        user = request.headers[self.settings.auth_policy_user_header]
+        user = conn.headers[self.settings.auth_policy_user_header]
         nuclia_user = NucliaUser(username=user)
 
         auth_creds = AuthCredentials(get_mapped_roles(settings=self.settings, data={"user": user}))
@@ -108,15 +108,15 @@ class OAuth2AuthenticationBackend(NucliaCloudAuthenticationBackend):
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    async def authenticate(self, request: HTTPConnection) -> tuple[AuthCredentials, NucliaUser] | None:
-        token_resp = await authenticate_auth_token(self.settings, request)
+    async def authenticate(self, conn: HTTPConnection) -> tuple[AuthCredentials, NucliaUser] | None:
+        token_resp = await authenticate_auth_token(self.settings, conn)
         if token_resp is not None:
             return token_resp
 
-        if _AUTHORIZATION_HEADER not in request.headers:
+        if _AUTHORIZATION_HEADER not in conn.headers:
             return None
 
-        token = request.headers[_AUTHORIZATION_HEADER].split(" ")[-1]
+        token = conn.headers[_AUTHORIZATION_HEADER].split(" ")[-1]
         token_split = token.split(".")
         if len(token_split) != 3:
             logger.info("Invalid token, expected valid JWT bearer")
@@ -159,15 +159,15 @@ class BasicAuthAuthenticationBackend(NucliaCloudAuthenticationBackend):
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
 
-    async def authenticate(self, request: HTTPConnection) -> tuple[AuthCredentials, NucliaUser] | None:
-        token_resp = await authenticate_auth_token(self.settings, request)
+    async def authenticate(self, conn: HTTPConnection) -> tuple[AuthCredentials, NucliaUser] | None:
+        token_resp = await authenticate_auth_token(self.settings, conn)
         if token_resp is not None:
             return token_resp
 
-        if _AUTHORIZATION_HEADER not in request.headers:
+        if _AUTHORIZATION_HEADER not in conn.headers:
             return None
 
-        auth_type, _, auth_data = request.headers[_AUTHORIZATION_HEADER].partition(" ")
+        auth_type, _, auth_data = conn.headers[_AUTHORIZATION_HEADER].partition(" ")
         if auth_type.lower() != "basic":
             return None
 
@@ -188,12 +188,12 @@ class UpstreamNaiveAuthenticationBackend(NucliaCloudAuthenticationBackend):
             user_header=settings.auth_policy_user_header,
         )
 
-    async def authenticate(self, request: HTTPConnection) -> tuple[AuthCredentials, NucliaUser] | None:
-        token_resp = await authenticate_auth_token(self.settings, request)
+    async def authenticate(self, conn: HTTPConnection) -> tuple[AuthCredentials, NucliaUser] | None:
+        token_resp = await authenticate_auth_token(self.settings, conn)
         if token_resp is not None:
             return token_resp
 
-        return await super().authenticate(request)
+        return await super().authenticate(conn)
 
 
 def get_auth_backend(settings: Settings) -> AuthenticationBackend:

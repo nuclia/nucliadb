@@ -111,6 +111,7 @@ class NidxBindingUtility(NidxUtility):
             raise ValueError("nidx_binding requires DRIVER=pg")
 
         self.service_name = service_name
+        assert ingest_settings.driver_pg_url, "DRIVER_PG_URL required"
         self.config = {
             "METADATA__DATABASE_URL": ingest_settings.driver_pg_url,
             "SEARCHER__METADATA_REFRESH_INTERVAL": str(
@@ -121,7 +122,7 @@ class NidxBindingUtility(NidxUtility):
         }
 
     async def initialize(self):
-        import nidx_binding  # type: ignore[import-untyped]
+        import nidx_binding
 
         self.binding = nidx_binding.NidxBinding(self.config)
         self.api_client = NidxApiStub(
@@ -201,6 +202,7 @@ class NidxServiceUtility(NidxUtility):
 
     async def initialize(self):
         await self.indexer.initialize()
+        assert settings.nidx_api_address and settings.nidx_searcher_address
         self.api_client = NidxApiStub(
             get_traced_grpc_channel(settings.nidx_api_address, self.service_name)
         )
@@ -211,8 +213,8 @@ class NidxServiceUtility(NidxUtility):
     async def finalize(self):
         await self.indexer.finalize()
 
-    async def index(self, writer: IndexMessage) -> int:
-        return await self.indexer.index(writer)
+    async def index(self, msg: IndexMessage) -> int:
+        return await self.indexer.index(msg)
 
 
 async def start_nidx_utility(service_name: str = "nucliadb.nidx") -> NidxUtility:
