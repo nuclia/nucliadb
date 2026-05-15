@@ -20,7 +20,6 @@ from httpx import AsyncClient
 
 from nucliadb_telemetry import grpc_metrics
 from nucliadb_telemetry.jetstream import msg_consume_time_histo
-from nucliadb_telemetry.settings import telemetry_settings
 from nucliadb_telemetry.tests.telemetry import Greeter
 
 
@@ -44,7 +43,7 @@ def debug_spans(spans):
     print(json.dumps(spans, indent=4))
 
 
-async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
+async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter, jaeger_server):
     resp = await http_service.get(
         "http://test/",
         headers={
@@ -72,7 +71,7 @@ async def test_telemetry_dict(http_service: AsyncClient, greeter: Greeter):
     client = AsyncClient()
     for _ in range(10):
         resp = await client.get(
-            f"http://localhost:{telemetry_settings.jaeger_query_port}/api/traces/f13dc5318bf3bef64a0a5ea607db93a1",
+            f"http://localhost:{jaeger_server.get_http_port()}/api/traces/f13dc5318bf3bef64a0a5ea607db93a1",
             headers={"Accept": "application/json"},
         )
         if resp.status_code != 200 or len(resp.json()["data"][0]["spans"]) < expected_spans:

@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup Ubuntu
         # see if this is affecting microk8s
@@ -32,14 +32,14 @@ jobs:
           sudo ufw disable
           sudo iptables -P FORWARD ACCEPT
 
-      - uses: balchua/microk8s-actions@v0.4.3
+      - uses: balchua/microk8s-actions@13f73436011eb4925c22526f64fb3ecdd81289a9 # v0.4.3
         with:
           channel: "1.33/stable"
           devMode: "true"
           addons: '["dns", "rbac", "hostpath-storage", "registry", "helm", "storage"]'
 
       - name: "Set up Helm"
-        uses: azure/setup-helm@v5
+        uses: azure/setup-helm@dda3372f752e03dde6b3237bc9431cdc2f7a02a2 # v5.0.0
 
       - name: Install PostgreSQL with Helm
         run: |
@@ -117,7 +117,7 @@ jobs:
             exit 1)
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: 3.14.2
           cache: "pip"

@@ -16,13 +16,13 @@ jobs:
       checks: write
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           fetch-depth: 0
 
       - name: Run Polaris PR Scan
         id: polaris-pr-scan
-        uses: blackduck-inc/black-duck-security-scan@v2
+        uses: blackduck-inc/black-duck-security-scan@659a0742e793a093377fab3117b0d90f23b04bfa # v2.9.0
         with:
             polaris_server_url: 'https://polaris.blackduck.com'
             polaris_access_token: ${{ secrets.POLARIS_ACCESS_TOKEN }}

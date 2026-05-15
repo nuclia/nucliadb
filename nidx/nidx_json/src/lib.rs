@@ -23,6 +23,8 @@ mod resource_indexer;
 mod schema;
 pub mod search;
 
+pub use tantivy::DateTime;
+
 use std::collections::HashSet;
 use std::path::Path;
 

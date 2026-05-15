@@ -339,11 +339,17 @@ message JsonFieldPathFilter {
         optional double upper = 2;
     }
 
+    message DateRangePredicate {
+        optional google.protobuf.Timestamp lower = 1;
+        optional google.protobuf.Timestamp upper = 2;
+    }
+
     oneof predicate {
         string text = 3;
         IntegerRangePredicate int_range   = 4;
         FloatRangePredicate float_range = 5;
         bool boolean = 6;
+        DateRangePredicate date_range = 7;
     }
 }
 

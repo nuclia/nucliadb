@@ -19,6 +19,8 @@
 #
 from __future__ import annotations
 
+from datetime import datetime
+
 from typing_extensions import assert_never
 
 from nucliadb.ingest.fields.base import Field
@@ -57,16 +59,41 @@ def _validate_keys(data: dict, schema: KVSchema) -> None:
 def check_kv_type(schema_name: str, key: str, value: object, expected: KVFieldType) -> None:
     ok = False
     if expected is KVFieldType.TEXT:
-        ok = isinstance(value, str)
+        if isinstance(value, str):
+            try:
+                dt = datetime.fromisoformat(value)
+                # Tantivy's JSON indexer auto-parses strings as DateTime only when
+                # they parse as RFC 3339, which requires both a time component and a
+                # timezone offset (Z or ±HH:MM).
+                ok = dt.tzinfo is None
+            except ValueError:
+                ok = True  # not parseable as a date at all, safe
+        else:
+            ok = False
     elif expected is KVFieldType.INTEGER:
         ok = isinstance(value, int) and not isinstance(value, bool)
     elif expected is KVFieldType.FLOAT:
         ok = isinstance(value, (int, float)) and not isinstance(value, bool)
     elif expected is KVFieldType.BOOLEAN:
         ok = isinstance(value, bool)
+    elif expected is KVFieldType.DATE:
+        # Dates must be stored as ISO-8601 strings (e.g. "2024-01-15T00:00:00Z")
+        if isinstance(value, str):
+            try:
+                datetime.fromisoformat(value)
+                ok = True
+            except ValueError:
+                ok = False
+        else:
+            ok = False
     else:
         assert_never(expected)
     if not ok:
+        if expected is KVFieldType.TEXT and isinstance(value, str):
+            raise ValueError(
+                f"Key {key!r} in schema {schema_name!r} expects type 'text', but the value looks like "
+                f"a date. Use a 'date' field type for date values."
+            )
         raise ValueError(
             f"Key {key!r} in schema {schema_name!r} expects type {expected.value!r}, got {type(value).__name__}"
         )
