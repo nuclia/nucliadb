@@ -96,13 +96,14 @@ async def parse_keyword_query(
 ) -> KeywordQuery:
     query = item.query
 
-    # If there was a rephrase with image, we should use the rephrased query for keyword search
-    rephrased_query = await fetcher.get_rephrased_query()
-    if item.query_image is not None and rephrased_query is not None:
-        query = rephrased_query
+    # only when a query image is used, we use the rephrased query for keyword
+    # search
+    if item.query_image is not None:
+        rephrased_query = await fetcher.get_rephrased_query()
+        if rephrased_query is not None:
+            query = rephrased_query
 
     is_synonyms_query = False
-
     if item.with_synonyms:
         synonyms_query = await query_with_synonyms(query, fetcher=fetcher)
         if synonyms_query is not None:
