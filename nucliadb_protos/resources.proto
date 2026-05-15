@@ -165,6 +165,7 @@ message Message {
         ANSWER = 2;
     }
     MessageType type = 6;
+    bool deleted = 7;
 }
 
 message Conversation {
@@ -187,12 +188,18 @@ message FieldConversation {
     int32 total = 3;
     string extract_strategy = 4;
     string split_strategy = 5;
+
+    // Total number of deleted messages
+    int64 deleted_messages = 6;
 }
 
-message SplitMetadata {}
+message SplitMetadata {
+    int32 page = 1;
+}
 
 message SplitsMetadata {
     map<string, SplitMetadata> metadata = 1;
+    repeated string deleted_splits = 2;
 }
 
 message NestedPosition {

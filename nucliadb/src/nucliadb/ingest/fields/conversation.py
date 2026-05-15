@@ -18,8 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from typing import Any
+from typing import Any, Iterable
 
+from nucliadb.ingest import logger
 from nucliadb.ingest.fields.base import Field
 from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation, SplitsMetadata
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
@@ -115,7 +116,14 @@ class Conversation(Field[PBConversation]):
         while True:
             # Fit the messages in the last page
             available_space = metadata.size - len(last_page.messages)
-            last_page.messages.extend(messages[:available_space])
+            page_messages = messages[:available_space]
+
+            # Add the page to the split metadata, so we can track in which page each message is for efficient deletion later.
+            for message in page_messages:
+                split_meta = self._splits_metadata.metadata.get_or_create(message.ident)
+                split_meta.page = metadata.pages
+
+            last_page.messages.extend(page_messages)
 
             # Save the last page
             await self.db_set_value(last_page, metadata.pages)
@@ -243,3 +251,84 @@ class Conversation(Field[PBConversation]):
         await self.resource.txn.set(key, payload.SerializeToString())
         self._split_metadata = payload
         self.resource.modified = True
+
+    async def delete_messages(self, message_idents: Iterable[str]) -> int:
+        """Delete messages by their ident from conversation pages.
+
+        Messages are removed in-place from their pages without restructuring
+        pages, so that page numbering stays stable.
+
+        Returns the number of messages actually deleted.
+
+        Processed metadata for the deleted messages (e.g: text, vectors, etc) is not deleted immediately.
+        """
+        total_deleted = 0
+
+        metadata = await self.get_metadata()
+        splits_metadata = await self.get_splits_metadata()
+        idents_to_delete = set(message_idents)
+
+        group_by_page: dict[int, set[str]] = {}
+        idents_without_page = set()
+        for ident in idents_to_delete:
+            split_meta = splits_metadata.metadata.get(ident)
+            if split_meta is not None:
+                group_by_page.setdefault(split_meta.page, set()).add(ident)
+            else:
+                idents_without_page.add(ident)
+
+        for page, idents in group_by_page.items():
+            some_deleted_in_page = False
+            page_obj = await self.db_get_value(page)
+            for message in page_obj.messages:
+                if (
+                    message.ident in idents or message.ident in idents_without_page
+                ) and not message.deleted:
+                    # TODO: store references of idents to be deleted somewhere else so that purge job can use them
+                    message.deleted = True
+                    message.content.text = ""
+                    total_deleted += 1
+                    some_deleted_in_page = True
+                    idents_to_delete.remove(message.ident)
+
+            if some_deleted_in_page:
+                # If we deleted a message in this page, we need to update it in the database.
+                await self.db_set_value(page_obj, page)
+
+        # The remaining messages may not have the page metadata yet, so we need to delete by iterating all the pages.
+        for remaining_ident in idents_without_page:
+            for page in range(1, metadata.pages + 1):
+                if page in group_by_page:
+                    # We already visited this page, so we know the message is not in it.
+                    continue
+                some_deleted_in_page = False
+                page_obj = await self.db_get_value(page)
+                for message in page_obj.messages:
+                    if message.ident == remaining_ident and not message.deleted:
+                        # TODO: store references of idents to be deleted somewhere else so that purge job can use them
+                        message.deleted = True
+                        message.content.text = ""
+                        total_deleted += 1
+                        some_deleted_in_page = True
+                        idents_to_delete.remove(message.ident)
+                        break
+
+                if some_deleted_in_page:
+                    # If we deleted a message in this page, we need to update it in the database.
+                    await self.db_set_value(page_obj, page)
+
+        if len(idents_to_delete) > 0:
+            logger.warning(
+                "Some message idents were not found in the conversation and could not be deleted",
+                extra={
+                    "kbid": self.kbid,
+                    "rid": self.rid,
+                    "idents": list(idents_to_delete),
+                },
+            )
+
+        if total_deleted > 0:
+            metadata.deleted_messages += total_deleted
+            await self.db_set_metadata(metadata)
+
+        return total_deleted
