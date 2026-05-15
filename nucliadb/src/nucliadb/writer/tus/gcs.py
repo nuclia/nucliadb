@@ -32,11 +32,11 @@ from urllib.parse import quote_plus
 
 import aiohttp
 import backoff
-import google.auth.compute_engine.credentials  # type: ignore
-import google.auth.transport.requests  # type: ignore
-import google.oauth2.credentials  # type: ignore
-from google.auth.exceptions import DefaultCredentialsError  # type: ignore
-from oauth2client.service_account import ServiceAccountCredentials  # type: ignore
+import google.auth.compute_engine.credentials
+import google.auth.transport.requests
+import google.oauth2.credentials
+from google.auth.exceptions import DefaultCredentialsError
+from oauth2client.service_account import ServiceAccountCredentials  # type: ignore[import-untyped]
 
 from nucliadb.writer import logger
 from nucliadb.writer.tus.dm import FileDataManager
@@ -81,7 +81,7 @@ class GCloudBlobStore(BlobStore):
     json_credentials: str | None
     bucket: str
     location: str
-    project: str
+    project: str | None
     executor = ThreadPoolExecutor(max_workers=5)
 
     @property
@@ -108,6 +108,7 @@ class GCloudBlobStore(BlobStore):
 
             return self._credentials.token
         else:
+            assert self._credentials
             access_token = self._credentials.get_access_token()
             return access_token.access_token
 
@@ -120,7 +121,7 @@ class GCloudBlobStore(BlobStore):
         self,
         bucket: str,
         location: str,
-        project: str,
+        project: str | None,
         bucket_labels,
         object_base_url: str,
         json_credentials: str | None,
@@ -167,7 +168,9 @@ class GCloudBlobStore(BlobStore):
 
     async def create_bucket(self, bucket_name: str):
         headers = await self.get_access_headers()
-        url = f"{self.object_base_url}?project={self.project}"
+        url = self.object_base_url
+        if self.project is not None:
+            url += f"?project={self.project}"
 
         found = False
         labels = deepcopy(self.bucket_labels)

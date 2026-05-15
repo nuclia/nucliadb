@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from io import BytesIO
 from unittest import mock
 
 import pytest
+from fastapi.responses import StreamingResponse
 
 from nucliadb.learning_proxy import (
     LearningConfiguration,
@@ -177,12 +177,14 @@ async def test_proxy_stream_response(async_client, config_stream_response):
         headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
     )
     response = await proxy(LearningService.CONFIG, request, "GET", "url")
+    assert isinstance(response, StreamingResponse)
 
     assert response.status_code == 200
-    data = BytesIO()
+    data = b""
     async for chunk in response.body_iterator:
-        data.write(chunk)
-    assert data.getvalue() == b"some data"
+        assert isinstance(chunk, bytes)
+        data += chunk
+    assert data == b"some data"
     assert response.headers["Transfer-Encoding"] == "chunked"
 
     async_client.request.assert_called_once_with(

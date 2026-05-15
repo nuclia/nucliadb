@@ -109,7 +109,7 @@ async def test_activity(kb_notifications, nucliadb_reader: AsyncClient, knowledg
             )
 
             if notification_type == "resource_indexed":
-                notif = ResourceIndexedNotification.model_validate_json(line)  # type: ignore
+                notif = ResourceIndexedNotification.model_validate_json(line)
                 assert notif.type == "resource_indexed"
                 assert notif.data.resource_uuid == "resource"
                 assert notif.data.resource_title == "Resource"
@@ -125,7 +125,7 @@ async def test_activity(kb_notifications, nucliadb_reader: AsyncClient, knowledg
                 assert notif.data.error is False
 
             elif notification_type == "resource_processed":
-                notif = ResourceProcessedNotification.model_validate_json(line)  # type: ignore
+                notif = ResourceProcessedNotification.model_validate_json(line)
                 assert notif.type == "resource_processed"
                 assert notif.data.resource_uuid == "resource"
                 assert notif.data.resource_title == "Resource"
@@ -162,7 +162,7 @@ async def test_processing_status(
     processing_client.requests = AsyncMock(
         return_value=processing.RequestsResults(
             results=[
-                processing.RequestsResult(  # type: ignore
+                processing.RequestsResult(  # type: ignore[call-arg]
                     processing_id="processing_id",
                     resource_id=resource_id,
                     kbid=kbid,

@@ -43,7 +43,7 @@ def driver(txn):
 
 @pytest.fixture()
 def processor(driver):
-    yield Processor(driver, None)
+    yield Processor(driver, None)  # ty:ignore[invalid-argument-type]
 
 
 @pytest.fixture()

@@ -127,14 +127,14 @@ def test_apply_field_vectors_append_splits():
     # If specified, append splits should be respected
     brain = ResourceBrain(rid=rid)
     brain.generate_vectors(
-        field_id, vectors, vector_dimension=1, vectorset=vectorset, append_splits=["foo"]
+        field_id, vectors, vector_dimension=1, vectorset=vectorset, append_splits={"foo"}
     )
     assert field_id not in brain.brain.paragraphs
 
     # If specified, append splits should be respected
     brain = ResourceBrain(rid=rid)
     brain.generate_vectors(
-        field_id, vectors, vector_dimension=1, vectorset=vectorset, append_splits=[split]
+        field_id, vectors, vector_dimension=1, vectorset=vectorset, append_splits={split}
     )
     vector = (
         brain.brain.paragraphs[field_id]

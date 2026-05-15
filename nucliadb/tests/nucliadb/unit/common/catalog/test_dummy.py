@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from datetime import datetime
+
 import pytest
 
 from nucliadb.common.catalog.dummy import DummyCatalog
@@ -31,19 +33,19 @@ async def test_dummy_catalog():
     catalog = DummyCatalog()
 
     await catalog.update(
-        None,
+        None,  # ty:ignore[invalid-argument-type]
         "kbid",
         "rid",
         CatalogResourceData(
             title="Test Title",
-            created_at="2021-01-01T00:00:00Z",
-            modified_at="2021-01-01T00:00:00Z",
+            created_at=datetime.fromisoformat("2021-01-01T00:00:00Z"),
+            modified_at=datetime.fromisoformat("2021-01-01T00:00:00Z"),
             labels=["/l/test"],
             slug="test-title",
         ),
     )
 
-    await catalog.delete(None, "kbid", "rid")
+    await catalog.delete(None, "kbid", "rid")  # ty:ignore[invalid-argument-type]
 
     results = await catalog.search(
         CatalogQuery(
@@ -52,7 +54,7 @@ async def test_dummy_catalog():
                 query="foo",
             ),
             filters=None,
-            sort=SortOptions(field=SortField.TITLE, limit=10),
+            sort=SortOptions(field=SortField.TITLE),
             faceted=[],
             page_size=10,
             page_number=0,

@@ -385,16 +385,17 @@ def kv_discriminator(v: Any) -> str | None:
         return getattr(v, "op", None)
 
 
-KVFilterExpression = Annotated[
+# Plain union for type narrowing (ty can't narrow recursive Annotated types)
+KVFilterExpressionType = (
     Annotated[And["KVFilterExpression"], Tag("and")]
     | Annotated[Or["KVFilterExpression"], Tag("or")]
     | Annotated[Not["KVFilterExpression"], Tag("not")]
     | Annotated[KVExactMatch, Tag("exact_match")]
     | Annotated[KVRange, Tag("range")]
     | Annotated[KVBoolMatch, Tag("bool_match")]
-    | Annotated[KVDateRange, Tag("date_range")],
-    Discriminator(kv_discriminator),
-]
+    | Annotated[KVDateRange, Tag("date_range")]
+)
+KVFilterExpression = Annotated[KVFilterExpressionType, Discriminator(kv_discriminator)]
 
 
 # The discriminator function is optional, everything works without it.
@@ -420,10 +421,11 @@ def filter_discriminator(v: Any) -> str | None:
         return getattr(v, "prop", None)
 
 
-FieldFilterExpression = Annotated[
-    Annotated[And["FieldFilterExpression"], Tag("and")]
-    | Annotated[Or["FieldFilterExpression"], Tag("or")]
-    | Annotated[Not["FieldFilterExpression"], Tag("not")]
+# Plain union for type narrowing (ty can't narrow recursive Annotated types)
+FieldFilterExpressionType = (
+    Annotated[And["FieldFilterExpressionType"], Tag("and")]
+    | Annotated[Or["FieldFilterExpressionType"], Tag("or")]
+    | Annotated[Not["FieldFilterExpressionType"], Tag("not")]
     | Annotated[Resource, Tag("resource")]
     | Annotated[Field, Tag("field")]
     | Annotated[Keyword, Tag("keyword")]
@@ -439,20 +441,22 @@ FieldFilterExpression = Annotated[
     | Annotated[OriginPath, Tag("origin_path")]
     | Annotated[OriginSource, Tag("origin_source")]
     | Annotated[OriginCollaborator, Tag("origin_collaborator")]
-    | Annotated[Generated, Tag("generated")],
-    Discriminator(filter_discriminator),
-]
+    | Annotated[Generated, Tag("generated")]
+)
+FieldFilterExpression = Annotated[FieldFilterExpressionType, Discriminator(filter_discriminator)]
 
-ParagraphFilterExpression = Annotated[
+# Plain union for type narrowing (ty can't narrow recursive Annotated types)
+ParagraphFilterExpressionType = (
     Annotated[And["ParagraphFilterExpression"], Tag("and")]
     | Annotated[Or["ParagraphFilterExpression"], Tag("or")]
     | Annotated[Not["ParagraphFilterExpression"], Tag("not")]
     | Annotated[Label, Tag("label")]
-    | Annotated[Kind, Tag("kind")],
-    Discriminator(filter_discriminator),
-]
+    | Annotated[Kind, Tag("kind")]
+)
+ParagraphFilterExpression = Annotated[ParagraphFilterExpressionType, Discriminator(filter_discriminator)]
 
-ResourceFilterExpression = Annotated[
+# Plain union for type narrowing (ty can't narrow recursive Annotated types)
+ResourceFilterExpressionType = (
     Annotated[And["ResourceFilterExpression"], Tag("and")]
     | Annotated[Or["ResourceFilterExpression"], Tag("or")]
     | Annotated[Not["ResourceFilterExpression"], Tag("not")]
@@ -467,9 +471,10 @@ ResourceFilterExpression = Annotated[
     | Annotated[OriginPath, Tag("origin_path")]
     | Annotated[OriginSource, Tag("origin_source")]
     | Annotated[OriginCollaborator, Tag("origin_collaborator")]
-    | Annotated[Status, Tag("status")],
-    Discriminator(filter_discriminator),
-]
+    | Annotated[Status, Tag("status")]
+)
+
+ResourceFilterExpression = Annotated[ResourceFilterExpressionType, Discriminator(filter_discriminator)]
 
 
 class FilterExpression(BaseModel, extra="forbid"):

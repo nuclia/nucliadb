@@ -142,8 +142,8 @@ class LocalBlobStore(BlobStore):
         path = self.get_bucket_path(bucket_name)
         return os.path.exists(path)
 
-    async def create_bucket(self, bucket: str):
-        path = self.get_bucket_path(bucket)
+    async def create_bucket(self, bucket_name: str):
+        path = self.get_bucket_path(bucket_name)
         exists = os.path.exists(path)
         os.makedirs(path, exist_ok=True)
         return exists

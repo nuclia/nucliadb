@@ -21,6 +21,7 @@ import asyncio
 import base64
 import io
 import os
+from typing import cast
 
 import pytest
 from httpx import AsyncClient
@@ -667,7 +668,7 @@ async def test_file_upload_by_slug(nucliadb_writer: AsyncClient, knowledgebox: s
 
 def test_maybe_b64decode():
     something = "something"
-    something_encoded = base64.b64encode(something.encode())
+    something_encoded = cast(str, base64.b64encode(something.encode()))
     assert maybe_b64decode(something_encoded) == something
     assert maybe_b64decode(something) == something
 

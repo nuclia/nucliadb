@@ -179,11 +179,14 @@ async def test_performance(driver: PGDriver):
             ]:
                 for batch_start in range(0, count, batch_size):
                     batch_end = min(batch_start + batch_size, count)
-                    values = ",".join(
-                        f"('{kb}', 'md5_{row_idx + i}', '{uuid.uuid4()}', 'f/field_{i % 10}')"
+                    rows = [
+                        (kb, f"md5_{row_idx + i}", str(uuid.uuid4()), f"f/field_{i % 10}")
                         for i in range(batch_end - batch_start)
+                    ]
+                    await cur.executemany(
+                        "INSERT INTO file_md5 (kbid, md5, rid, field_id) VALUES (%s, %s, %s, %s)",
+                        rows,
                     )
-                    await cur.execute(f"INSERT INTO file_md5 (kbid, md5, rid, field_id) VALUES {values}")
                     row_idx += batch_end - batch_start
 
     target_kb = large_kbs[0]

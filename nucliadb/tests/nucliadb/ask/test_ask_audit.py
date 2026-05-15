@@ -21,6 +21,9 @@
 import asyncio
 
 import nats
+import nats.errors
+import nats.js
+import nats.js.errors
 import pytest
 from httpx import AsyncClient
 from nats.aio.client import Client

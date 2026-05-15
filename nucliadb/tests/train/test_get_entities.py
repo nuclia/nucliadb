@@ -34,7 +34,7 @@ async def entities_manager_mock():
     original = nodes.EntitiesManager
 
     mock = Mock()
-    nodes.EntitiesManager = Mock(return_value=mock)
+    nodes.EntitiesManager = Mock(return_value=mock)  # ty:ignore[invalid-assignment]
 
     yield mock
 

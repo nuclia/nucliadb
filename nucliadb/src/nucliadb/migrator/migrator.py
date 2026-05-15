@@ -19,11 +19,12 @@
 #
 import asyncio
 import logging
+from typing import cast
 
 from nucliadb.common import locking
 from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.common.cluster.settings import in_standalone_mode
-from nucliadb.common.maindb.pg import PGDriver
+from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.utils import get_migrations, get_pg_migrations
 from nucliadb_telemetry import errors, metrics
@@ -210,7 +211,10 @@ async def run_pg_schema_migrations(driver: PGDriver):
 
     # The migration uses two transactions. The former is only used to get a lock (pg_advisory_lock)
     # without having to worry about correctly unlocking it (postgres unlocks it when the transaction ends)
-    async with driver.rw_transaction() as tx_lock, tx_lock.connection.cursor() as cur_lock:  # type: ignore[attr-defined]
+    async with (
+        driver.rw_transaction() as tx_lock,
+        cast(PGTransaction, tx_lock).connection.cursor() as cur_lock,
+    ):  # type: ignore[attr-defined]
         await cur_lock.execute(
             "CREATE TABLE IF NOT EXISTS migrations (version INT PRIMARY KEY, migrated_at TIMESTAMP NOT NULL DEFAULT NOW())"
         )
@@ -227,7 +231,7 @@ async def run_pg_schema_migrations(driver: PGDriver):
             logger.info(f"Running PG schema migration {version}: {migration.__name__}")
             # Gets a new transaction for each migration, so if they get interrupted we at least
             # save the state of the last finished transaction
-            async with driver.rw_transaction() as tx, tx.connection.cursor() as cur:  # type: ignore[attr-defined]
+            async with driver.rw_transaction() as tx, cast(PGTransaction, tx).connection.cursor() as cur:
                 await migration.migrate(tx)
                 await cur.execute("INSERT INTO migrations (version) VALUES (%s)", (version,))
                 await tx.commit()
@@ -249,8 +253,8 @@ async def run(context: ExecutionContext, target_version: int | None = None) -> N
         global_info = await context.data_manager.get_global_info()
 
         if target_version is None and global_info.target_version not in (None, 0):
-            await run_all_kb_migrations(context, global_info.target_version)  # type: ignore
-            await run_global_migrations(context, global_info.target_version)  # type: ignore
+            await run_all_kb_migrations(context, global_info.target_version)  # type: ignore[arg-type]
+            await run_global_migrations(context, global_info.target_version)  # type: ignore[arg-type]
             global_info = await context.data_manager.get_global_info()
 
         migrations = get_migrations(global_info.current_version)

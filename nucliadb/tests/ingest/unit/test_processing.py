@@ -52,10 +52,11 @@ async def test_dummy_processing_engine():
     engine = DummyProcessingEngine()
     await engine.initialize()
     await engine.finalize()
-    await engine.convert_filefield_to_str(None, [])
-    engine.convert_external_filefield_to_str(None)
-    await engine.convert_internal_filefield_to_str(None, None)
-    await engine.convert_internal_cf_to_str(None, None)
+    # Horrible mocking going on here, ignoring the typing errors
+    await engine.convert_filefield_to_str(None, [])  # ty:ignore[invalid-argument-type]
+    engine.convert_external_filefield_to_str(None)  # ty:ignore[invalid-argument-type]
+    await engine.convert_internal_filefield_to_str(None, None)  # ty:ignore[invalid-argument-type]
+    await engine.convert_internal_cf_to_str(None, None)  # ty:ignore[invalid-argument-type]
     await engine.send_to_process(Mock(kbid="foo"), 1)
 
 

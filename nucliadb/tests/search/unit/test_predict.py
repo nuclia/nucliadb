@@ -263,7 +263,7 @@ async def test_check_response_error():
     )
     response.status = 503
     response._body = b"some error"
-    response._headers = {"Content-Type": "text/plain; charset=utf-8"}
+    response._headers = {"Content-Type": "text/plain; charset=utf-8"}  # ty:ignore[invalid-assignment]
 
     with pytest.raises(ProxiedPredictAPIError) as ex:
         await PredictEngine().check_response("kbid", response, expected_status=200)
@@ -377,7 +377,7 @@ async def test_get_chat_ndjson_generator():
     async def _content():
         for element in streamed_elements:
             gen_chunk = GenerativeChunk(chunk=element)
-            yield gen_chunk.json() + "\n"
+            yield gen_chunk.model_dump_json() + "\n"
         # yield an unknown chunk, to make sure it is ignored
         yield '{"unknown": "chunk"}\n'
 
@@ -409,7 +409,7 @@ async def test_chat_query_ndjson():
     async def _content():
         for element in streamed_elements:
             gen_chunk = GenerativeChunk(chunk=element)
-            yield gen_chunk.json() + "\n"
+            yield gen_chunk.model_dump_json() + "\n"
 
     chat_query_response = Mock()
     chat_query_response.status = 200

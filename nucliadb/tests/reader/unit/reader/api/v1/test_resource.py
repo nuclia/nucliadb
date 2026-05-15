@@ -36,6 +36,7 @@ def test_serialize_conversation_field():
     pb.messages.append(m1)
     resource_field = ResourceField(field_id="conv", field_type=FieldTypeName.CONVERSATION)
     resource_field.value = from_proto.conversation(pb)
+    assert resource_field.value.messages
     assert resource_field.value.messages[0].content.attachments_fields[0].field_id == "mylink"
     assert (
         resource_field.value.messages[0].content.attachments_fields[0].field_type == FieldTypeName.LINK

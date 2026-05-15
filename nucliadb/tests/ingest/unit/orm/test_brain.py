@@ -260,7 +260,7 @@ def test_apply_field_paragraphs_append_splits():
         user_field_metadata=None,
         replace_field=False,
         skip_paragraphs=False,
-        append_splits=["foo"],
+        append_splits={"foo"},
     )
     assert len(br.brain.paragraphs[field_key].paragraphs) == 0
     assert br.brain.paragraphs_to_delete == []
@@ -274,7 +274,7 @@ def test_apply_field_paragraphs_append_splits():
         user_field_metadata=None,
         replace_field=False,
         skip_paragraphs=False,
-        append_splits=[split],
+        append_splits={split},
     )
     assert len(br.brain.paragraphs[field_key].paragraphs) == 1
     assert br.brain.paragraphs_to_delete == []
@@ -289,7 +289,7 @@ def test_apply_field_paragraphs_append_splits():
         user_field_metadata=None,
         replace_field=True,
         skip_paragraphs=False,
-        append_splits=["foo"],
+        append_splits={"foo"},
     )
     assert len(br.brain.paragraphs[field_key].paragraphs) == 1
     assert br.brain.paragraphs_to_delete == [f"rid/{field_key}"]

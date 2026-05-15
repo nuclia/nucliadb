@@ -67,7 +67,7 @@ async def teardown_cluster():
 
 
 def get_shard_manager() -> KBShardManager:
-    return get_utility(Utility.SHARD_MANAGER)  # type: ignore
+    return get_utility(Utility.SHARD_MANAGER)
 
 
 async def get_resource(kbid: str, resource_id: str) -> Resource | None:

@@ -27,6 +27,8 @@ from unittest.mock import DEFAULT, Mock, patch
 from uuid import uuid4
 
 import nats
+import nats.js
+import nats.js.errors
 import pytest
 from nats.aio.client import Client
 from nats.js import JetStreamContext
@@ -403,7 +405,6 @@ async def test_ingest_audit_stream_files_only(
 
         # Minimal assert to make sure we get the information from the node on the audit
         # gets from the sidecar to the audit report when adding or modifying a resource
-        # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
         assert auditreq.kbid == knowledgebox
         assert auditreq.rid == rid
@@ -435,7 +436,6 @@ async def test_ingest_audit_stream_files_only(
 
         # Minimal assert to make sure we get the information from the node on the audit
         # gets from the sidecar to the audit report when adding or modifying a resource
-        # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
         assert auditreq.kbid == knowledgebox
         assert auditreq.rid == rid
@@ -455,7 +455,6 @@ async def test_ingest_audit_stream_files_only(
 
         # Minimal assert to make sure we get the information from the node on the audit
         # gets from the sidecar to the audit report when adding or modifying a resource
-        # The values are hardcoded on nucliadb/src/nucliadb/ingest/orm/grpc_node_dummy.py
 
         assert auditreq.kbid == knowledgebox
         assert auditreq.rid == rid
@@ -847,7 +846,7 @@ async def test_pull_consumers(nats_manager, pg_maindb_driver, local_storage):
         driver=pg_maindb_driver,
         storage=local_storage,
         nats_connection_manager=nats_manager,
-        partition=1,
+        partition="1",
     )
 
     received_bms = []

@@ -120,7 +120,6 @@ async def test_default_prompt_context(kb):
     ):
         context = chat_prompt.CappedPromptContext(max_size=int(1e6))
         find_results = KnowledgeboxFindResults(
-            facets={},
             resources={
                 "bmid": _create_find_result(
                     FindParagraph(
@@ -170,7 +169,6 @@ async def test_default_prompt_context(kb):
 @pytest.fixture(scope="function")
 def find_results():
     return KnowledgeboxFindResults(
-        facets={},
         resources={
             "resource1": _create_find_result(
                 FindParagraph(
@@ -383,7 +381,6 @@ async def test_extend_prompt_context_with_metadata(nucliadb_search: AsyncClient)
 async def test_prompt_context_image_context_builder():
     result_text = " ".join(["text"] * 10)
     find_results = KnowledgeboxFindResults(
-        facets={},
         resources={
             "bmid": _create_find_result(
                 FindParagraph(
@@ -470,7 +467,7 @@ async def test_prompt_context_image_context_builder():
 
 
 async def test_prompt_context_builder_with_extra_image_context():
-    image_content = base64.b64encode(b"my-image")
+    image_content = base64.b64encode(b"my-image").decode()
     user_image = Image(content_type="image/png", b64encoded=image_content)
 
     builder = chat_prompt.PromptContextBuilder(

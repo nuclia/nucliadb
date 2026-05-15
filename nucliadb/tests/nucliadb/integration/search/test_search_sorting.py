@@ -270,4 +270,4 @@ async def test_list_all_resources_by_creation_and_modification_dates_with_empty_
             sort_fields = [
                 datetime.fromisoformat(resources[result["rid"]][sort_field]) for result in results
             ]
-            assert sort_fields == sort_function(sort_fields)  # type: ignore
+            assert sort_fields == sort_function(sort_fields)  # type: ignore[operator]

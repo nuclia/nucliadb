@@ -45,7 +45,7 @@ class TestWriterServicer:
         servicer.proc = AsyncMock()
         servicer.proc.driver = servicer.driver
         servicer.storage = AsyncMock()
-        servicer.cache = AsyncMock()
+        servicer.cache = AsyncMock()  # type: ignore[ty:unresolved-attribute]
         yield servicer
 
     @pytest.fixture
@@ -57,7 +57,7 @@ class TestWriterServicer:
     def field(self, field_value):
         val = Text("id", Mock())
         val.value = field_value.SerializeToString()
-        val.set_vectors = AsyncMock()
+        val.set_vectors = AsyncMock()  # ty:ignore[invalid-assignment]
         yield val
 
     @pytest.fixture(scope="function")
@@ -286,7 +286,7 @@ class TestWriterServicer:
     async def test_GetEntities(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"))
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore[ty:unresolved-attribute]
 
         entities_manager = AsyncMock()
         with patch(
@@ -300,7 +300,7 @@ class TestWriterServicer:
 
     async def test_GetEntities_missing(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"))
-        writer.proc.get_kb_obj.return_value = None
+        writer.proc.get_kb_obj.return_value = None  # type: ignore[ty:unresolved-attribute]
 
         resp = await writer.GetEntities(request)
 
@@ -309,7 +309,7 @@ class TestWriterServicer:
     async def test_GetEntities_handle_error(self, writer: WriterServicer):
         request = writer_pb2.GetEntitiesRequest(kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"))
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore[ty:unresolved-attribute]
 
         entities_manager = AsyncMock()
         with patch(
@@ -326,7 +326,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore[ty:unresolved-attribute]
 
         entities_manager = AsyncMock()
         entities_manager.list_entities_groups.return_value = {
@@ -345,7 +345,7 @@ class TestWriterServicer:
         request = writer_pb2.ListEntitiesGroupsRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
         )
-        writer.proc.get_kb_obj.return_value = None
+        writer.proc.get_kb_obj.return_value = None  # type: ignore[ty:unresolved-attribute]
 
         resp = await writer.ListEntitiesGroups(request)
 
@@ -356,7 +356,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid")
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore[ty:unresolved-attribute]
 
         entities_manager = AsyncMock()
         entities_manager.list_entities_groups.side_effect = Exception("error")
@@ -373,7 +373,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore[ty:unresolved-attribute]
 
         entities_manager = AsyncMock()
         entities_manager.get_entities_group.return_value = writer_pb2.EntitiesGroup(title="group")
@@ -390,7 +390,7 @@ class TestWriterServicer:
         request = writer_pb2.GetEntitiesGroupRequest(
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
-        writer.proc.get_kb_obj.return_value = None
+        writer.proc.get_kb_obj.return_value = None  # type: ignore[ty:unresolved-attribute]
 
         resp = await writer.GetEntitiesGroup(request)
 
@@ -401,7 +401,7 @@ class TestWriterServicer:
             kb=writer_pb2.KnowledgeBoxID(slug="slug", uuid="uuid"), group="group"
         )
 
-        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")
+        writer.proc.get_kb_obj.return_value = AsyncMock(kbid="kbid")  # type: ignore[ty:unresolved-attribute]
 
         entities_manager = AsyncMock()
         entities_manager.get_entities_group.side_effect = Exception("error")

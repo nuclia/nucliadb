@@ -20,7 +20,7 @@
 import time
 
 import pytest
-from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore
+from pytest_benchmark.fixture import BenchmarkFixture  # type: ignore[import-untyped]
 
 from nucliadb.search.search.paragraphs import highlight_paragraph as highlight
 

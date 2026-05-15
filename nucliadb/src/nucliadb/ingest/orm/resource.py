@@ -118,7 +118,7 @@ class Resource:
         self.modified: bool = False
         self._modified_extracted_text: list[FieldID] = []
 
-        self.txn = txn
+        self.txn: Transaction = txn
         self.storage = storage
         self.kbid = kbid
         self.uuid = uuid
@@ -185,7 +185,7 @@ class Resource:
                 # Immutable basic fields that are already set are cleared
                 # from the payload so that they are not overwritten
                 if getattr(self.basic, field, "") != "":
-                    payload.ClearField(field)  # type: ignore
+                    payload.ClearField(field)  # type: ignore[arg-type]
 
             self.basic.MergeFrom(payload)
 
@@ -536,6 +536,7 @@ class Resource:
             self.modified = True
 
     async def update_status(self):
+        assert self.basic
         field_ids = await self.get_all_field_ids(for_update=False)
         if field_ids is None:
             # No fields, it is processed
@@ -965,7 +966,10 @@ class Resource:
         return f"{FIELD_TYPE_PB_TO_STR[field.field_type]}/{field.field}"
 
     def clean(self):
-        self.txn = None
+        # This intentionally unsets the transaction to release it
+        # We set a type-checker exception here rather than asserting
+        # that transaction is set all through the code
+        self.txn = None  # type: ignore[ty:invalid-assignment]
 
 
 async def get_file_page_positions(field: File) -> FilePagePositions:

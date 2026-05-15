@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import unittest
+import unittest.mock
 
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
 

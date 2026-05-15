@@ -173,7 +173,8 @@ graph_query_discriminator = filter_discriminator
 
 # Paths search
 
-GraphPathQuery = Annotated[
+# Plain union for type narrowing (ty can't narrow recursive Annotated types)
+GraphPathQueryType = (
     Annotated[And["GraphPathQuery"], Tag("and")]
     | Annotated[Or["GraphPathQuery"], Tag("or")]
     | Annotated[Not["GraphPathQuery"], Tag("not")]
@@ -182,9 +183,10 @@ GraphPathQuery = Annotated[
     | Annotated[DestinationNode, Tag("destination_node")]
     | Annotated[AnyNode, Tag("node")]
     | Annotated[Relation, Tag("relation")]
-    | Annotated[Generated, Tag("generated")],
-    Discriminator(graph_query_discriminator),
-]
+    | Annotated[Generated, Tag("generated")]
+)
+
+GraphPathQuery = Annotated[GraphPathQueryType, Discriminator(graph_query_discriminator)]
 
 
 class GraphSearchRequest(BaseGraphSearchRequest):
@@ -193,14 +195,16 @@ class GraphSearchRequest(BaseGraphSearchRequest):
 
 # Nodes search
 
-GraphNodesQuery = Annotated[
+# Plain union for type narrowing (ty can't narrow recursive Annotated types)
+GraphNodesQueryType = (
     Annotated[And["GraphNodesQuery"], Tag("and")]
     | Annotated[Or["GraphNodesQuery"], Tag("or")]
     | Annotated[Not["GraphNodesQuery"], Tag("not")]
     | Annotated[AnyNode, Tag("node")]
-    | Annotated[Generated, Tag("generated")],
-    Discriminator(graph_query_discriminator),
-]
+    | Annotated[Generated, Tag("generated")]
+)
+
+GraphNodesQuery = Annotated[GraphNodesQueryType, Discriminator(graph_query_discriminator)]
 
 
 class GraphNodesSearchRequest(BaseGraphSearchRequest):
@@ -209,14 +213,16 @@ class GraphNodesSearchRequest(BaseGraphSearchRequest):
 
 # Relations search
 
-GraphRelationsQuery = Annotated[
+# Plain union for type narrowing (ty can't narrow recursive Annotated types)
+GraphRelationsQueryType = (
     Annotated[And["GraphRelationsQuery"], Tag("and")]
     | Annotated[Or["GraphRelationsQuery"], Tag("or")]
     | Annotated[Not["GraphRelationsQuery"], Tag("not")]
     | Annotated[Relation, Tag("relation")]
-    | Annotated[Generated, Tag("generated")],
-    Discriminator(graph_query_discriminator),
-]
+    | Annotated[Generated, Tag("generated")]
+)
+
+GraphRelationsQuery = Annotated[GraphRelationsQueryType, Discriminator(graph_query_discriminator)]
 
 
 class GraphRelationsSearchRequest(BaseGraphSearchRequest):

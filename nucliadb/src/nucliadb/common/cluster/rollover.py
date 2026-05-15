@@ -507,9 +507,9 @@ async def validate_indexed_data(
                 continue
         else:
             async with datamanagers.with_transaction() as txn:
-                shard_id = await datamanagers.resources.get_resource_shard_id(
+                shard_id = await datamanagers.resources.get_resource_shard_id(  # type: ignore[assignment]
                     txn, kbid=kbid, rid=resource_id
-                )  # type: ignore
+                )
             if shard_id is None:
                 logger.error(
                     "Shard id not found for resource",

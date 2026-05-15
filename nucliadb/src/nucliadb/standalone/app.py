@@ -19,6 +19,7 @@
 #
 import logging
 import os
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
@@ -30,7 +31,7 @@ from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
-import nucliadb_admin_assets  # type: ignore
+import nucliadb_admin_assets  # type: ignore[import-untyped]
 from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware, ProcessTimeHeaderMiddleware
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
@@ -100,7 +101,7 @@ def application_factory(settings: Settings) -> FastAPI:
     if running_settings.debug:
         middleware.append(Middleware(ProcessTimeHeaderMiddleware))
 
-    fastapi_settings = dict(
+    fastapi_settings: dict[str, Any] = dict(
         debug=running_settings.debug,
         lifespan=lifespan,
         exception_handlers={
@@ -109,7 +110,7 @@ def application_factory(settings: Settings) -> FastAPI:
         },
     )
 
-    base_app = FastAPI(title="NucliaDB API", **fastapi_settings)  # type: ignore
+    base_app = FastAPI(title="NucliaDB API", **fastapi_settings)
     base_app.include_router(api_writer_v1)
     base_app.include_router(api_reader_v1)
     base_app.include_router(api_search_v1)

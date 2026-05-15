@@ -47,6 +47,9 @@ async def initialize():
 
         storage_backend = GCloudBlobStore()
 
+        assert storage_settings.gcs_bucket, "GCS_BUCKET required"
+        assert storage_settings.gcs_location, "GCS_LOCATION required"
+
         await storage_backend.initialize(
             json_credentials=storage_settings.gcs_base64_creds,
             bucket=storage_settings.gcs_bucket,
@@ -64,6 +67,7 @@ async def initialize():
         from nucliadb.writer.tus.s3 import S3BlobStore, S3FileStorageManager
 
         storage_backend = S3BlobStore()
+        assert storage_settings.s3_bucket, "S3_BUCKET required"
 
         await storage_backend.initialize(
             client_id=storage_settings.s3_client_id,
@@ -87,6 +91,7 @@ async def initialize():
     elif storage_settings.file_backend == FileBackendConfig.LOCAL:
         from nucliadb.writer.tus.local import LocalBlobStore, LocalFileStorageManager
 
+        assert storage_settings.local_files, "LOCAL_FILES required"
         storage_backend = LocalBlobStore(storage_settings.local_files)
 
         await storage_backend.initialize()

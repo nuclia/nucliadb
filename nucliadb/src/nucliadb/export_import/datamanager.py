@@ -25,7 +25,7 @@ from typing import Type, cast
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.export_import import logger
 from nucliadb.export_import.exceptions import MetadataNotFound
-from nucliadb.export_import.models import ExportMetadata, ImportMetadata
+from nucliadb.export_import.models import ExportMetadata, ImportMetadata, Metadata
 from nucliadb_protos import resources_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils.storages.storage import Storage, StorageField
@@ -34,8 +34,6 @@ MAINDB_EXPORT_KEY = "/kbs/{kbid}/exports/{id}"
 MAINDB_IMPORT_KEY = "/kbs/{kbid}/imports/{id}"
 STORAGE_EXPORT_KEY = "exports/{export_id}"
 STORAGE_IMPORT_KEY = "imports/{import_id}"
-
-Metadata = ExportMetadata | ImportMetadata
 
 
 class ExportImportDataManager:

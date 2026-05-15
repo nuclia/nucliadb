@@ -78,10 +78,10 @@ async def test_materialize_kb_data(
         assert await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox) == count
 
     await mz.finalize()
-    assert audit_storage.js.publish.call_count == 1
-    assert audit_storage.js.publish.call_args[0][0] == "kb-usage.nuclia_db"
+    assert audit_storage.js.publish.call_count == 1  # type: ignore[ty:unresolved-attribute]
+    assert audit_storage.js.publish.call_args[0][0] == "kb-usage.nuclia_db"  # type: ignore[ty:unresolved-attribute]
     pb = KbUsage()
-    pb.ParseFromString(audit_storage.js.publish.call_args[0][1])
+    pb.ParseFromString(audit_storage.js.publish.call_args[0][1])  # type: ignore[ty:unresolved-attribute]
     assert pb.storage.resources == count
     assert pb.service == Service.NUCLIA_DB
     assert pb.kb_id == knowledgebox

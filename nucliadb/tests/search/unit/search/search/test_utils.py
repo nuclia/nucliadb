@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import unittest
+import unittest.mock
 
 from nucliadb.search.search.utils import (
     maybe_log_request_payload,

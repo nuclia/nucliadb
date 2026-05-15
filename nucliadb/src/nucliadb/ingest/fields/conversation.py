@@ -147,7 +147,7 @@ class Conversation(Field[PBConversation]):
         except PageNotFound:
             return None
 
-    async def get_full_conversation(self) -> PBConversation | None:
+    async def get_full_conversation(self) -> PBConversation:
         """
         Messages of a conversations may be stored across several pages.
         This method fetches them all and returns a single complete conversation.

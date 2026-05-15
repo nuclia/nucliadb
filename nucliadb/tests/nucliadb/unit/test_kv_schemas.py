@@ -141,24 +141,32 @@ class TestValidateKvData:
 class TestKVSchemaModel:
     def test_max_fields_limit(self):
         with pytest.raises(ValidationError):
-            KVSchema(
-                name="big",
-                fields=[{"key": f"f{i}", "type": "text"} for i in range(MAX_KV_SCHEMA_FIELDS + 1)],
+            KVSchema.model_validate(
+                {
+                    "name": "big",
+                    "fields": [
+                        {"key": f"f{i}", "type": "text"} for i in range(MAX_KV_SCHEMA_FIELDS + 1)
+                    ],
+                }
             )
 
     def test_at_max_fields_is_accepted(self):
-        schema = KVSchema(
-            name="full",
-            fields=[{"key": f"f{i}", "type": "text"} for i in range(MAX_KV_SCHEMA_FIELDS)],
+        schema = KVSchema.model_validate(
+            {
+                "name": "full",
+                "fields": [{"key": f"f{i}", "type": "text"} for i in range(MAX_KV_SCHEMA_FIELDS)],
+            }
         )
         assert len(schema.fields) == MAX_KV_SCHEMA_FIELDS
 
     def test_duplicate_field_keys_rejected(self):
         with pytest.raises(ValidationError, match="unique"):
-            KVSchema(
-                name="bad",
-                fields=[
-                    {"key": "color", "type": "text"},
-                    {"key": "color", "type": "float"},
-                ],
+            KVSchema.model_validate(
+                {
+                    "name": "bad",
+                    "fields": [
+                        {"key": "color", "type": "text"},
+                        {"key": "color", "type": "float"},
+                    ],
+                }
             )

@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -502,7 +503,7 @@ async def _check_search(
     vectorset: str | None = None,
 ):
     # check semantic search
-    payload = {
+    payload: dict[str, Any] = {
         "features": ["semantic"],
         "min_score": 0.9,
         "vector": vector,
