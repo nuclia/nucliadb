@@ -266,7 +266,7 @@ class Conversation(Field[PBConversation]):
 
         metadata = await self.get_metadata()
         splits_metadata = await self.get_splits_metadata()
-        idents_to_delete = set(message_idents)
+        idents_to_delete = set(message_idents) - set(splits_metadata.deleted_splits)
 
         group_by_page: dict[int, set[str]] = {}
         idents_without_page = set()
@@ -289,6 +289,7 @@ class Conversation(Field[PBConversation]):
                     message.content.text = ""
                     total_deleted += 1
                     some_deleted_in_page = True
+                    splits_metadata.deleted_splits.append(message.ident)
                     idents_to_delete.remove(message.ident)
 
             if some_deleted_in_page:
@@ -310,6 +311,7 @@ class Conversation(Field[PBConversation]):
                         message.content.text = ""
                         total_deleted += 1
                         some_deleted_in_page = True
+                        splits_metadata.deleted_splits.append(message.ident)
                         idents_to_delete.remove(message.ident)
                         break
 
@@ -330,5 +332,6 @@ class Conversation(Field[PBConversation]):
         if total_deleted > 0:
             metadata.deleted_messages += total_deleted
             await self.db_set_metadata(metadata)
+            await self.set_splits_metadata(splits_metadata)
 
         return total_deleted

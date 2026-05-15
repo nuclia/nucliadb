@@ -966,3 +966,130 @@ async def test_append_messages_to_non_existent_conversation_field_creates_it(
     assert conv_field.value is not None
     assert conv_field.value.total == 2
     assert conv_field.value.pages == 1
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_delete_conversation_message(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    """Test that deleting a message from a conversation field works correctly."""
+    kbid = standalone_knowledgebox
+
+    # Create a resource with a conversation field containing 3 messages
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": "test_delete_msg",
+            "title": "Test Delete Message",
+            "conversations": {
+                "chat": {
+                    "messages": [
+                        {
+                            "to": ["assistant"],
+                            "who": "user",
+                            "timestamp": datetime.now().isoformat(),
+                            "content": {"text": "Hello"},
+                            "ident": "msg1",
+                            "type": MessageType.QUESTION.value,
+                        },
+                        {
+                            "to": ["user"],
+                            "who": "assistant",
+                            "timestamp": datetime.now().isoformat(),
+                            "content": {"text": "Hi there!"},
+                            "ident": "msg2",
+                            "type": MessageType.ANSWER.value,
+                        },
+                        {
+                            "to": ["assistant"],
+                            "who": "user",
+                            "timestamp": datetime.now().isoformat(),
+                            "content": {"text": "How are you?"},
+                            "ident": "msg3",
+                            "type": MessageType.QUESTION.value,
+                        },
+                    ]
+                },
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    # Verify all 3 messages are present
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/conversation/chat",
+        params={"page": 1, "show": ["value"]},
+    )
+    assert resp.status_code == 200
+    field_resp = ResourceField.model_validate(resp.json())
+    msgs = field_resp.value["messages"]  # type: ignore
+    assert len(msgs) == 3
+    assert [m["ident"] for m in msgs] == ["msg1", "msg2", "msg3"]
+
+    # Delete the second message by rid
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/{rid}/conversation/chat/messages/msg2",
+    )
+    assert resp.status_code == 200
+
+    # Verify msg2 is gone but msg1 and msg3 remain
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/conversation/chat",
+        params={"page": 1, "show": ["value"]},
+    )
+    assert resp.status_code == 200
+    field_resp = ResourceField.model_validate(resp.json())
+    msgs = field_resp.value["messages"]  # type: ignore
+    assert [m["ident"] for m in msgs] == ["msg1", "msg3"]
+
+    # Delete the second message again -- should be a no-op (already deleted)
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/{rid}/conversation/chat/messages/msg2",
+    )
+    assert resp.status_code == 200
+
+    # Delete a non-existent message -- should be a no-op
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/{rid}/conversation/chat/messages/nonexistent",
+    )
+    assert resp.status_code == 200
+
+    # Delete using slug endpoint
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/slug/test_delete_msg/conversation/chat/messages/msg3",
+    )
+    assert resp.status_code == 200
+
+    # Verify only msg1 remains
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/conversation/chat",
+        params={"page": 1, "show": ["value"]},
+    )
+    assert resp.status_code == 200
+    field_resp = ResourceField.model_validate(resp.json())
+    msgs = field_resp.value["messages"]  # type: ignore
+    assert [m["ident"] for m in msgs] == ["msg1"]
+
+    # Verify error cases
+
+    # Non-existent resource
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/nonexistent-rid/conversation/chat/messages/msg1",
+    )
+    assert resp.status_code == 404
+
+    # Non-existent field
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/{rid}/conversation/nonexistent_field/messages/msg1",
+    )
+    assert resp.status_code == 404
+
+    # Message ident too long (> 128 chars)
+    long_ident = "a" * 129
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/{rid}/conversation/chat/messages/{long_ident}",
+    )
+    assert resp.status_code == 422
