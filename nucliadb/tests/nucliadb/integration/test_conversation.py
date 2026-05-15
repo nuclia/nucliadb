@@ -1209,3 +1209,20 @@ async def test_delete_conversation_message(
         f"/kb/{kbid}/resource/{rid}/conversation/chat/messages/{long_ident}",
     )
     assert resp.status_code == 422
+
+    # Verify that a deleted message ident cannot be reused
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/resource/{rid}/conversation/chat/messages",
+        json=[
+            {
+                "to": ["assistant"],
+                "who": "user",
+                "timestamp": datetime.now().isoformat(),
+                "content": {"text": "Trying to reuse deleted ident"},
+                "ident": "msg2",  # This was deleted earlier
+                "type": MessageType.QUESTION.value,
+            },
+        ],
+    )
+    assert resp.status_code == 422
+    assert "must be unique" in resp.json()["detail"]
