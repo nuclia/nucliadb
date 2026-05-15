@@ -322,7 +322,6 @@ class Conversation(Field[PBConversation]):
             )
 
         if total_deleted > 0:
-            metadata.deleted_messages += total_deleted
             await self.db_set_metadata(metadata)
             await self.set_splits_metadata(splits_metadata)
 
