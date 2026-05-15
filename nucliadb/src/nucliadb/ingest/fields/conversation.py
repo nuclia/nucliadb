@@ -267,46 +267,24 @@ class Conversation(Field[PBConversation]):
         metadata = await self.get_metadata()
         splits_metadata = await self.get_splits_metadata()
         idents_to_delete = set(message_idents) - set(splits_metadata.deleted_splits)
+        idents_to_delete = idents_to_delete & set(splits_metadata.metadata.keys())
 
-        group_by_page: dict[int, set[str]] = {}
-        idents_without_page = set()
+        page_idents: dict[int, set[str]] = {}
         for ident in idents_to_delete:
             split_meta = splits_metadata.metadata.get(ident)
             if split_meta is not None:
-                group_by_page.setdefault(split_meta.page, set()).add(ident)
-            else:
-                idents_without_page.add(ident)
+                page_idents.setdefault(split_meta.page, set()).add(ident)
 
-        for page, idents in group_by_page.items():
+        for page, idents in page_idents.items():
             some_deleted_in_page = False
             page_obj = await self.db_get_value(page)
             for message in page_obj.messages:
-                if message.ident in idents or message.ident in idents_without_page:
+                if message.ident in idents:
                     message.content.text = ""
                     total_deleted += 1
                     some_deleted_in_page = True
                     splits_metadata.deleted_splits.append(message.ident)
                     idents_to_delete.remove(message.ident)
-
-            if some_deleted_in_page:
-                # If we deleted a message in this page, we need to update it in the database.
-                await self.db_set_value(page_obj, page)
-
-        # The remaining messages may not have the page metadata yet, so we need to delete by iterating all the pages.
-        for page in range(1, metadata.pages + 1):
-            if page in group_by_page:
-                # We already visited this page, so we know the message is not in it.
-                continue
-            some_deleted_in_page = False
-            page_obj = await self.db_get_value(page)
-            for message in page_obj.messages:
-                if message.ident in idents_without_page:
-                    message.content.text = ""
-                    total_deleted += 1
-                    some_deleted_in_page = True
-                    splits_metadata.deleted_splits.append(message.ident)
-                    idents_to_delete.remove(message.ident)
-
             if some_deleted_in_page:
                 # If we deleted a message in this page, we need to update it in the database.
                 await self.db_set_value(page_obj, page)
