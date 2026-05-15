@@ -368,6 +368,7 @@ class Resource:
         field = await self.get_field(payload.field.field, FieldType.CONVERSATION)
         conv = cast(Conversation, field)
         await conv.delete_messages(payload.splits)
+        self.modified = True
 
     async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
         """Return whether this resource has this field or not."""
