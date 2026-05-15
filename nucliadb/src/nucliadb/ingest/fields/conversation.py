@@ -284,8 +284,6 @@ class Conversation(Field[PBConversation]):
                 if (
                     message.ident in idents or message.ident in idents_without_page
                 ) and not message.deleted:
-                    # TODO: store references of idents to be deleted somewhere else so that purge job can use them
-                    message.deleted = True
                     message.content.text = ""
                     total_deleted += 1
                     some_deleted_in_page = True
@@ -306,8 +304,6 @@ class Conversation(Field[PBConversation]):
                 page_obj = await self.db_get_value(page)
                 for message in page_obj.messages:
                     if message.ident == remaining_ident and not message.deleted:
-                        # TODO: store references of idents to be deleted somewhere else so that purge job can use them
-                        message.deleted = True
                         message.content.text = ""
                         total_deleted += 1
                         some_deleted_in_page = True
