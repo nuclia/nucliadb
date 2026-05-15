@@ -19,7 +19,7 @@ jobs:
       cancel-in-progress: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Calculate detect-args for BD SCA Scan
         id: calculate-detect-args
@@ -32,7 +32,7 @@ jobs:
 
       - name: Run Black Duck SCA PR Scan
         id: blackduck-pr-scan
-        uses: blackduck-inc/black-duck-security-scan@v2
+        uses: blackduck-inc/black-duck-security-scan@659a0742e793a093377fab3117b0d90f23b04bfa # v2.9.0
         env:
           DETECT_PROJECT_NAME: nuclia-nucliadb
           DETECT_PROJECT_GROUP_NAME: Nuclia

@@ -52,6 +52,12 @@
             "matchPackageNames": ["python"],
             "matchCurrentVersion": "3.10.19",
             "allowedVersions": "<3.11"
+        },
+        {
+            "matchDepTypes": [
+                "action"
+            ],
+            "pinDigests": true
         }
     ]
 }
