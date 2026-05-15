@@ -96,19 +96,8 @@ async def jaeger_server():
 
 @pytest.fixture(scope="function")
 async def set_telemetry_settings(jaeger_server: Jaeger):
-    if os.environ.get("TEST_JAEGER"):
-        telemetry_settings.jaeger_enabled = True
-        telemetry_settings.jaeger_agent_host = "127.0.0.1"
-        telemetry_settings.jaeger_agent_port = jaeger_server.get_port()
-        telemetry_settings.jaeger_query_port = jaeger_server.get_http_port()
-        print("Testing telemetry with Jaeger protocol (deprecated)")
-    else:
-        otlp_port = jaeger_server.get_port("4317/tcp")
-        telemetry_settings.otlp_collector_endpoint = f"127.0.0.1:{otlp_port}"
-
-        telemetry_settings.jaeger_agent_host = "127.0.0.1"
-        telemetry_settings.jaeger_query_port = jaeger_server.get_http_port()
-        print("Testing telemetry with OTLP protocol")
+    otlp_port = jaeger_server.get_port("4317/tcp")
+    telemetry_settings.otlp_collector_endpoint = f"127.0.0.1:{otlp_port}"
 
 
 @pytest.fixture(scope="function")

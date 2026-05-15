@@ -36,10 +36,9 @@ dependencies = [
 # dependencies but that can run into problems when installing editable
 # dependencies. Keeping the duplication for now.
 otel = [
-    "opentelemetry-sdk>=1.21.0,<1.40", # Restricted to <1.40 because jaeger exporter is not compatible with newer versions
-    "opentelemetry-api>=1.21.0,<1.40",
-    "opentelemetry-proto>=1.21.0,<1.40",
-    "opentelemetry-exporter-jaeger-thrift>=1.21.0",
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-proto>=1.21.0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.21.0",
     "opentelemetry-propagator-b3>=1.21.0",
     "opentelemetry-instrumentation-fastapi>=0.42b0",
@@ -57,10 +56,9 @@ grpc = [
     "grpcio-reflection>=1.71.0",
 
     # Include OpenTelemetry deps
-    "opentelemetry-sdk>=1.21.0,<1.40", # Restricted to <1.40 because jaeger exporter is not compatible with newer versions
-    "opentelemetry-api>=1.21.0,<1.40",
-    "opentelemetry-proto>=1.21.0,<1.40",
-    "opentelemetry-exporter-jaeger-thrift>=1.21.0",
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-proto>=1.21.0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.21.0",
     "opentelemetry-propagator-b3>=1.21.0",
     "opentelemetry-instrumentation-fastapi>=0.42b0",
@@ -73,10 +71,9 @@ nats = [
     "PyNaCl",
 
     # Include OpenTelemetry deps
-    "opentelemetry-sdk>=1.21.0,<1.40", # Restricted to <1.40 because jaeger exporter is not compatible with newer versions
-    "opentelemetry-api>=1.21.0,<1.40",
-    "opentelemetry-proto>=1.21.0,<1.40",
-    "opentelemetry-exporter-jaeger-thrift>=1.21.0",
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-proto>=1.21.0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.21.0",
     "opentelemetry-propagator-b3>=1.21.0",
     "opentelemetry-instrumentation-fastapi>=0.42b0",
@@ -88,10 +85,9 @@ fastapi = [
     "fastapi",
 
     # Include OpenTelemetry deps
-    "opentelemetry-sdk>=1.21.0,<1.40", # Restricted to <1.40 because jaeger exporter is not compatible with newer versions
-    "opentelemetry-api>=1.21.0,<1.40",
-    "opentelemetry-proto>=1.21.0,<1.40",
-    "opentelemetry-exporter-jaeger-thrift>=1.21.0",
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-proto>=1.21.0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.21.0",
     "opentelemetry-propagator-b3>=1.21.0",
     "opentelemetry-instrumentation-fastapi>=0.42b0",
@@ -101,10 +97,9 @@ fastapi = [
 ]
 all = [
     # Include everything
-    "opentelemetry-sdk>=1.21.0,<1.40", # Restricted to <1.40 because jaeger exporter is not compatible with newer versions
-    "opentelemetry-api>=1.21.0,<1.40",
-    "opentelemetry-proto>=1.21.0,<1.40",
-    "opentelemetry-exporter-jaeger-thrift>=1.21.0",
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-proto>=1.21.0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.21.0",
     "opentelemetry-propagator-b3>=1.21.0",
     "opentelemetry-instrumentation-fastapi>=0.42b0",

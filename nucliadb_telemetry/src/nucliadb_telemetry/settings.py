@@ -20,12 +20,6 @@ from pydantic_settings import BaseSettings
 
 
 class TelemetrySettings(BaseSettings):
-    jaeger_agent_host: str = "localhost"
-    jaeger_agent_port: int = 6831
-    jaeger_enabled: bool = False
-    jaeger_query_port: int = 16686
-    jaeger_query_host: str = "jaeger.observability.svc.cluster.local"
-
     otlp_collector_endpoint: str | None = None
 
     observe_garbage_collector: bool = pydantic.Field(
@@ -54,7 +48,7 @@ class TelemetrySettings(BaseSettings):
     )
 
     def tracing_enabled(self) -> bool:
-        return self.jaeger_enabled or self.otlp_collector_endpoint is not None
+        return self.otlp_collector_endpoint is not None
 
 
 telemetry_settings = TelemetrySettings()
