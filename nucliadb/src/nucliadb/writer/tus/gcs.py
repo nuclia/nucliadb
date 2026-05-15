@@ -81,7 +81,7 @@ class GCloudBlobStore(BlobStore):
     json_credentials: str | None
     bucket: str
     location: str
-    project: str
+    project: str | None
     executor = ThreadPoolExecutor(max_workers=5)
 
     @property
@@ -121,7 +121,7 @@ class GCloudBlobStore(BlobStore):
         self,
         bucket: str,
         location: str,
-        project: str,
+        project: str | None,
         bucket_labels,
         object_base_url: str,
         json_credentials: str | None,
@@ -168,7 +168,9 @@ class GCloudBlobStore(BlobStore):
 
     async def create_bucket(self, bucket_name: str):
         headers = await self.get_access_headers()
-        url = f"{self.object_base_url}?project={self.project}"
+        url = self.object_base_url
+        if self.project is not None:
+            url += f"?project={self.project}"
 
         found = False
         labels = deepcopy(self.bucket_labels)

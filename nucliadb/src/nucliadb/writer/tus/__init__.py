@@ -49,7 +49,6 @@ async def initialize():
 
         assert storage_settings.gcs_bucket, "GCS_BUCKET required"
         assert storage_settings.gcs_location, "GCS_LOCATION required"
-        assert storage_settings.gcs_project, "GCS_PROJECT required"
 
         await storage_backend.initialize(
             json_credentials=storage_settings.gcs_base64_creds,

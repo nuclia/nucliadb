@@ -23,11 +23,11 @@ import time
 import uuid
 
 import pytest
-from tests.ndbfixtures.utils import global_utility
 
 from nucliadb.common import file_md5
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb_utils.utilities import Utility
+from tests.ndbfixtures.utils import global_utility
 
 
 @pytest.fixture()
