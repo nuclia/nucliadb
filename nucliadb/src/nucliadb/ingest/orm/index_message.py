@@ -202,6 +202,7 @@ class IndexMessageBuilder:
         self,
         message: BrokerMessage,
         resource_created: bool,
+        field_deletions: list[FieldID],
     ) -> IndexMessage:
         """
         Builds the index message for the broker message coming from the writer.
@@ -209,7 +210,7 @@ class IndexMessageBuilder:
         """
         assert message.source == BrokerMessage.MessageSource.WRITER
 
-        self._apply_field_deletions(self.brain, message.delete_fields)
+        self._apply_field_deletions(self.brain, field_deletions)
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()
         prefilter_update = needs_prefilter_update(message)
@@ -224,7 +225,7 @@ class IndexMessageBuilder:
             # Simply process the fields that are in the message
             fields_to_index = get_bm_modified_fields(message)
         for fieldid in fields_to_index:
-            if fieldid in message.delete_fields:
+            if fieldid in field_deletions:
                 continue
             await self._apply_field_index_data(
                 self.brain,
@@ -242,13 +243,14 @@ class IndexMessageBuilder:
     async def for_processor_bm(
         self,
         message: BrokerMessage,
+        field_deletions: list[FieldID],
     ) -> IndexMessage:
         """
         Builds the index message for the broker messages coming from the processor.
         The processor can index new data to any index.
         """
         assert message.source == BrokerMessage.MessageSource.PROCESSOR
-        self._apply_field_deletions(self.brain, message.delete_fields)
+        self._apply_field_deletions(self.brain, field_deletions)
         await self._apply_resource_index_data(self.brain)
         basic = await self.get_basic()
         fields_to_index = get_bm_modified_fields(message)
@@ -257,7 +259,7 @@ class IndexMessageBuilder:
         )
         vectorsets_configs = await self.get_vectorsets_configs()
         for fieldid in fields_to_index:
-            if fieldid in message.delete_fields:
+            if fieldid in field_deletions:
                 continue
 
             # For conversation fields, we only replace the full field if it is not an append messages operation.

@@ -387,9 +387,9 @@ class Resource:
     async def update_all_field_ids(
         self,
         *,
-        updated: list[FieldID] | None = None,
-        deleted: list[FieldID] | None = None,
-        errors: list[writer_pb2.Error] | None = None,
+        updated: Sequence[FieldID] | None = None,
+        deleted: Sequence[FieldID] | None = None,
+        errors: Sequence[writer_pb2.Error] | None = None,
     ):
         needs_update = False
         all_fields = await self.get_all_field_ids(for_update=True)
@@ -417,7 +417,9 @@ class Resource:
             await self.set_all_field_ids(all_fields)
 
     @processor_observer.wrap({"type": "apply_fields"})
-    async def apply_fields(self, message: BrokerMessage):
+    async def apply_fields(self, message: BrokerMessage, fields_to_delete: list[FieldID] | None = None):
+        fields_to_delete = fields_to_delete or []
+
         message_updated_fields = []
         for field, text in message.texts.items():
             fid = FieldID(field_type=FieldType.TEXT, field=field)
@@ -445,16 +447,16 @@ class Resource:
             await self.set_field(fid.field_type, fid.field, kv)
             message_updated_fields.append(fid)
 
-        for fieldid in message.delete_fields:
+        for fieldid in fields_to_delete:
             await self.delete_field(fieldid.field_type, fieldid.field)
             if fieldid.field_type == FieldType.FILE:
                 await self.delete_file_field_md5(fieldid.field)
 
-        if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
+        if len(message_updated_fields) or len(fields_to_delete) or len(message.errors):
             await self.update_all_field_ids(
                 updated=message_updated_fields,
-                deleted=message.delete_fields,  # type: ignore
-                errors=message.errors,  # type: ignore
+                deleted=fields_to_delete,
+                errors=message.errors,
             )
             self.modified = True
 

@@ -345,11 +345,13 @@ class Processor:
                     raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
 
                 # apply changes from the broker message to the resource
-                await self.apply_resource(message, resource, update=(not created))
+                fields_to_delete = await self.apply_resource(message, resource, update=(not created))
 
                 # index message
                 if resource.modified:
-                    index_message = await self.generate_index_message(resource, message, created)
+                    index_message = await self.generate_index_message(
+                        resource, message, created, fields_to_delete
+                    )
                     try:
                         warnings = await self.index_resource(
                             index_message=index_message,
@@ -517,12 +519,13 @@ class Processor:
         resource: Resource,
         message: writer_pb2.BrokerMessage,
         resource_created: bool,
+        field_deletions: list[writer_pb2.FieldID],
     ) -> PBBrainResource:
         builder = IndexMessageBuilder(resource)
         if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
-            return await builder.for_writer_bm(message, resource_created)
+            return await builder.for_writer_bm(message, resource_created, field_deletions)
         elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
-            return await builder.for_processor_bm(message)
+            return await builder.for_processor_bm(message, field_deletions)
         else:  # pragma: no cover
             raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
 
@@ -591,8 +594,10 @@ class Processor:
         Apply broker message to resource object in the persistence layers (maindb and storage).
         DO NOT add any indexing logic here.
         """
+        fields_to_delete = await self.get_fields_to_delete(resource, message)
+
         if update:
-            await self.maybe_update_resource_basic(resource, message)
+            await self.maybe_update_resource_basic(resource, message, fields_to_delete)
 
         tasks = []
         if message.HasField("origin"):
@@ -607,23 +612,51 @@ class Processor:
         if message.HasField("user_relations"):
             tasks.append(resource.set_user_relations(message.user_relations))
 
-        tasks.append(resource.apply_fields(message))
+        tasks.append(resource.apply_fields(message, fields_to_delete))
         await asyncio.gather(*tasks)
 
         await resource.apply_extracted(message)
 
+        return fields_to_delete
+
     async def maybe_update_resource_basic(
-        self, resource: Resource, message: writer_pb2.BrokerMessage
+        self,
+        resource: Resource,
+        message: writer_pb2.BrokerMessage,
+        fields_to_delete: list[writer_pb2.FieldID],
     ) -> None:
         basic_field_updates = message.HasField("basic")
-        deleted_fields = len(message.delete_fields) > 0
-        if not (basic_field_updates or deleted_fields):
+        if not (basic_field_updates or len(fields_to_delete) > 0):
             return
 
-        await resource.set_basic(
-            message.basic,
-            deleted_fields=message.delete_fields,  # type: ignore
-        )
+        await resource.set_basic(message.basic, deleted_fields=fields_to_delete)
+
+    async def get_fields_to_delete(
+        self, resource: Resource, message: writer_pb2.BrokerMessage
+    ) -> list[writer_pb2.FieldID]:
+        """
+        Get the list of fields to delete in the current transaction.
+        This includes the fields explicitly marked for deletion and possibly their generated fields.
+        """
+        all_fields = await resource.get_fields()
+        to_delete = set(message.delete_fields)
+        for field_deletion in message.field_deletions:
+            to_delete.add(field_deletion.field)
+            if field_deletion.generated_fields:
+                # Get all fields that were generated off of this field and add them to the deletion list as well
+                generated = []
+                for (field_type, field_key), field_object in all_fields.items():
+                    has_da_prefix = field_key.startswith("da-")
+                    contains_suffix = (
+                        field_key.endswith(field_deletion.field.field)
+                        and field_deletion.field.field != field_key
+                    )
+                    if has_da_prefix and contains_suffix:
+                        generated_by = await field_object.generated_by()
+                        if generated_by.WhichOneof("author") == "data_augmentation":
+                            generated.append(writer_pb2.FieldID(field_type=field_type, field=field_key))
+                to_delete.update(generated)
+        return list(to_delete)
 
     async def get_extended_audit_data(self, message: writer_pb2.BrokerMessage) -> writer_pb2.Audit:
         message_audit = writer_pb2.Audit()

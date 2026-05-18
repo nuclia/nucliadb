@@ -66,7 +66,9 @@ async def test_for_writer_bm_with_prefilter_update(
             reindex=True,
         )
 
-        im = await IndexMessageBuilder(resource).for_writer_bm(writer_bm, resource_created=False)
+        im = await IndexMessageBuilder(resource).for_writer_bm(
+            writer_bm, resource_created=False, field_deletions=[]
+        )
 
         # title, summary, file, link, conv and text
         total_fields = 6

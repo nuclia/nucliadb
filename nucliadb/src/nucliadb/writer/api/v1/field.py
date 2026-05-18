@@ -29,6 +29,7 @@ from starlette.requests import Request
 import nucliadb_models as models
 from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.models_utils import to_proto
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.models.internal.processing import PushPayload, Source
 from nucliadb.writer import SERVICE_NAME
@@ -59,7 +60,7 @@ from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import KeyValueField, ResourceFieldAdded, ResourceUpdated
-from nucliadb_protos import resources_pb2
+from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import FieldID, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.authentication import requires
@@ -181,6 +182,7 @@ async def delete_resource_field(
     rid: str,
     field_type: models.FieldTypeName,
     field_id: FieldIdString,
+    delete_generated_fields: bool = False,
 ):
     await validate_rid_exists_or_raise_error(kbid, rid)
 
@@ -190,12 +192,14 @@ async def delete_resource_field(
 
     writer.kbid = kbid
     writer.uuid = rid
-
-    pb_field_id = FieldID()
-    pb_field_id.field_type = FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP[field_type]
-    pb_field_id.field = field_id
-
-    writer.delete_fields.append(pb_field_id)
+    deletion = writer_pb2.FieldDeletion(
+        field=FieldID(
+            field=field_id,
+            field_type=to_proto.field_type_name(field_type),
+        ),
+        generated_fields=delete_generated_fields,
+    )
+    writer.field_deletions.append(deletion)
     parse_audit(writer.audit, request)
     await transaction.commit(writer, partition)
     return Response(status_code=204)
@@ -207,6 +211,7 @@ async def delete_resource_field_by_slug(
     slug: str,
     field_type: models.FieldTypeName,
     field_id: FieldIdString,
+    delete_generated_fields: bool = False,
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, slug)
     return await delete_resource_field(
@@ -215,6 +220,7 @@ async def delete_resource_field_by_slug(
         rid,
         field_type,
         field_id,
+        delete_generated_fields=delete_generated_fields,
     )
 
 
@@ -556,6 +562,11 @@ async def append_messages_to_conversation_field_rid_prefix(
     return await add_field_to_resource(request, kbid, rid, field_id, field, replace_field=False)
 
 
+DELETE_GENERATED_FIELDS = Query(
+    default=False, description="If true, delete all generated fields off this field."
+)
+
+
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}",
     status_code=204,
@@ -571,8 +582,11 @@ async def delete_resource_field_rslug_prefix(
     rslug: str,
     field_type: models.FieldTypeName,
     field_id: FieldIdString,
+    delete_generated_fields: Annotated[bool, DELETE_GENERATED_FIELDS] = False,
 ):
-    return await delete_resource_field_by_slug(request, kbid, rslug, field_type, field_id)
+    return await delete_resource_field_by_slug(
+        request, kbid, rslug, field_type, field_id, delete_generated_fields=delete_generated_fields
+    )
 
 
 @api.delete(
@@ -590,8 +604,11 @@ async def delete_resource_field_rid_prefix(
     rid: str,
     field_type: models.FieldTypeName,
     field_id: FieldIdString,
+    delete_generated_fields: Annotated[bool, DELETE_GENERATED_FIELDS] = False,
 ):
-    return await delete_resource_field(request, kbid, rid, field_type, field_id)
+    return await delete_resource_field(
+        request, kbid, rid, field_type, field_id, delete_generated_fields=delete_generated_fields
+    )
 
 
 @api.post(

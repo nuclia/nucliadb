@@ -60,6 +60,11 @@ message Error {
 }
 
 
+message FieldDeletion {
+    resources.FieldID field = 1;
+    bool generated_fields = 2;
+}
+
 
 message BrokerMessage {
     reserved 2, 10, 12, 14, 15, 27, 46;
@@ -158,6 +163,8 @@ message BrokerMessage {
 
     // Field KeyValue
     map<string, resources.FieldKeyValue> key_value_fields = 47;
+
+    repeated FieldDeletion field_deletions = 48;
 }
 
 message BrokerMessageBlobReference {
