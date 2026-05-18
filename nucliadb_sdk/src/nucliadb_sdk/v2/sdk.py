@@ -262,6 +262,16 @@ SDK_DEFINITION = {
         method="PUT",
         path_params=("kbid", "slug", "field_id"),
     ),
+    "delete_conversation_message": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages/{message_id}",
+        method="DELETE",
+        path_params=("kbid", "rid", "field_id", "message_id"),
+    ),
+    "delete_conversation_message_by_slug": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/slug/{slug}/conversation/{field_id}/messages/{message_id}",
+        method="DELETE",
+        path_params=("kbid", "slug", "field_id", "message_id"),
+    ),
     "get_resource_field": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
         method="GET",
@@ -1155,6 +1165,12 @@ class NucliaDB(_NucliaDBBase):
     add_conversation_message_by_slug = _request_sync_builder(
         "add_conversation_message_by_slug", list[InputMessage], ResourceFieldAdded
     )
+    delete_conversation_message = _request_sync_builder(
+        "delete_conversation_message", type(None), type(None)
+    )
+    delete_conversation_message_by_slug = _request_sync_builder(
+        "delete_conversation_message_by_slug", type(None), type(None)
+    )
     get_resource_field = _request_sync_builder("get_resource_field", type(None), ResourceField)
     get_resource_field_by_slug = _request_sync_builder(
         "get_resource_field_by_slug", type(None), ResourceField
@@ -1363,6 +1379,12 @@ class NucliaDBAsync(_NucliaDBBase):
     )
     add_conversation_message_by_slug = _request_async_builder(
         "add_conversation_message_by_slug", list[InputMessage], ResourceFieldAdded
+    )
+    delete_conversation_message = _request_async_builder(
+        "delete_conversation_message", type(None), type(None)
+    )
+    delete_conversation_message_by_slug = _request_async_builder(
+        "delete_conversation_message_by_slug", type(None), type(None)
     )
     get_resource_field = _request_async_builder("get_resource_field", type(None), ResourceField)
     get_resource_field_by_slug = _request_async_builder(
