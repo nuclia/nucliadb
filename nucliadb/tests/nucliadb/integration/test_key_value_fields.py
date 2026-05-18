@@ -302,7 +302,9 @@ async def test_kv_field_filter(
             json={
                 "query": "product item",
                 "features": ["keyword"],
-                "filter_expression": filter_expression,
+                "filter_expression": {
+                    "key_value": filter_expression,
+                },
             },
         )
         assert resp.status_code == 200, resp.text
@@ -311,12 +313,9 @@ async def test_kv_field_filter(
     # --- Exact match on color=red → finds resource 1 only ---
     rids = await find_with_filter(
         {
-            "key_value": {
-                "op": "exact_match",
-                "field_id": "product",
-                "key": "color",
-                "value": "red",
-            }
+            "schema_id": "product",
+            "key": "color",
+            "eq": "red",
         }
     )
     assert rid1 in rids, f"Expected rid1 in results for color=red, got {rids}"
@@ -325,12 +324,9 @@ async def test_kv_field_filter(
     # --- Float range price >= 10.0 → finds resource 1 only ---
     rids = await find_with_filter(
         {
-            "key_value": {
-                "op": "range",
-                "field_id": "product",
-                "key": "price",
-                "gte": 10.0,
-            }
+            "schema_id": "product",
+            "key": "price",
+            "gte": 10.0,
         }
     )
     assert rid1 in rids, f"Expected rid1 in results for price>=10.0, got {rids}"
@@ -339,12 +335,9 @@ async def test_kv_field_filter(
     # --- Bool match in_stock=True → finds resource 1 only ---
     rids = await find_with_filter(
         {
-            "key_value": {
-                "op": "bool_match",
-                "field_id": "product",
-                "key": "in_stock",
-                "value": True,
-            }
+            "schema_id": "product",
+            "key": "in_stock",
+            "eq": True,
         }
     )
     assert rid1 in rids, f"Expected rid1 in results for in_stock=True, got {rids}"
@@ -353,12 +346,9 @@ async def test_kv_field_filter(
     # --- Integer range quantity <= 5 → finds resource 1 only ---
     rids = await find_with_filter(
         {
-            "key_value": {
-                "op": "range",
-                "field_id": "product",
-                "key": "quantity",
-                "lte": 5,
-            }
+            "schema_id": "product",
+            "key": "quantity",
+            "lte": 5,
         }
     )
     assert rid1 in rids, f"Expected rid1 in results for quantity<=5, got {rids}"
@@ -367,12 +357,9 @@ async def test_kv_field_filter(
     # --- Exact match on color=blue → finds resource 2 only ---
     rids = await find_with_filter(
         {
-            "key_value": {
-                "op": "exact_match",
-                "field_id": "product",
-                "key": "color",
-                "value": "blue",
-            }
+            "schema_id": "product",
+            "key": "color",
+            "eq": "blue",
         }
     )
     assert rid2 in rids, f"Expected rid2 in results for color=blue, got {rids}"
@@ -381,22 +368,18 @@ async def test_kv_field_filter(
     # --- AND: color=red AND in_stock=True → finds resource 1 only ---
     rids = await find_with_filter(
         {
-            "key_value": {
-                "and": [
-                    {
-                        "op": "exact_match",
-                        "field_id": "product",
-                        "key": "color",
-                        "value": "red",
-                    },
-                    {
-                        "op": "bool_match",
-                        "field_id": "product",
-                        "key": "in_stock",
-                        "value": True,
-                    },
-                ]
-            }
+            "and": [
+                {
+                    "schema_id": "product",
+                    "key": "color",
+                    "eq": "red",
+                },
+                {
+                    "schema_id": "product",
+                    "key": "in_stock",
+                    "eq": True,
+                },
+            ]
         }
     )
     assert rid1 in rids, f"Expected rid1 in results for color=red AND in_stock=True, got {rids}"
@@ -405,12 +388,9 @@ async def test_kv_field_filter(
     # --- Date range: launched_at >= 2024-01-01 → finds resource 2 only ---
     rids = await find_with_filter(
         {
-            "key_value": {
-                "op": "date_range",
-                "field_id": "product",
-                "key": "launched_at",
-                "gte": "2024-01-01T00:00:00Z",
-            }
+            "schema_id": "product",
+            "key": "launched_at",
+            "gte": "2024-01-01T00:00:00Z",
         }
     )
     assert rid2 in rids, f"Expected rid2 in results for launched_at>=2024, got {rids}"
@@ -419,12 +399,9 @@ async def test_kv_field_filter(
     # --- Date range: launched_at <= 2023-12-31 → finds resource 1 only ---
     rids = await find_with_filter(
         {
-            "key_value": {
-                "op": "date_range",
-                "field_id": "product",
-                "key": "launched_at",
-                "lte": "2023-12-31T23:59:59Z",
-            }
+            "schema_id": "product",
+            "key": "launched_at",
+            "lte": "2023-12-31T23:59:59Z",
         }
     )
     assert rid1 in rids, f"Expected rid1 in results for launched_at<=2023, got {rids}"
@@ -439,7 +416,7 @@ async def test_kv_filter_schema_validation(
 ):
     """
     Covers: schema validation for key_value filter expressions.
-    Unknown field_id or key should return 422.
+    Unknown schema_id or key should return 422.
     """
     kbid = standalone_knowledgebox
 
@@ -453,33 +430,29 @@ async def test_kv_filter_schema_validation(
             json={
                 "query": "product item",
                 "features": ["keyword"],
-                "filter_expression": filter_expression,
+                "filter_expression": {
+                    "key_value": filter_expression,
+                },
             },
         )
         return resp.status_code
 
-    # --- Unknown field_id → 422 ---
+    # --- Unknown schema_id → 422 ---
     status = await find_with_filter(
         {
-            "key_value": {
-                "op": "exact_match",
-                "field_id": "nonexistent_schema",
-                "key": "color",
-                "value": "red",
-            }
+            "schema_id": "nonexistent_schema",
+            "key": "color",
+            "eq": "red",
         }
     )
-    assert status == 412, f"Expected 412 for unknown field_id, got {status}"
+    assert status == 412, f"Expected 412 for unknown schema_id, got {status}"
 
     # --- Unknown key → 422 ---
     status = await find_with_filter(
         {
-            "key_value": {
-                "op": "exact_match",
-                "field_id": "product",
-                "key": "nonexistent_key",
-                "value": "red",
-            }
+            "schema_id": "product",
+            "key": "nonexistent_key",
+            "eq": "red",
         }
     )
     assert status == 412, f"Expected 412 for unknown key, got {status}"
@@ -487,38 +460,29 @@ async def test_kv_filter_schema_validation(
     # --- Wrong predicate type: exact_match on a float field → 422 ---
     status = await find_with_filter(
         {
-            "key_value": {
-                "op": "exact_match",
-                "field_id": "product",
-                "key": "price",
-                "value": "12.5",
-            }
+            "schema_id": "product",
+            "key": "price",
+            "eq": "12.5",
         }
     )
     assert status == 412, f"Expected 412 for exact_match on float field, got {status}"
 
-    # --- Wrong predicate type: bool_match on a text field → 422 ---
+    # --- Wrong predicate type: eq on a text field → 422 ---
     status = await find_with_filter(
         {
-            "key_value": {
-                "op": "bool_match",
-                "field_id": "product",
-                "key": "color",
-                "value": True,
-            }
+            "schema_id": "product",
+            "key": "color",
+            "eq": True,
         }
     )
-    assert status == 412, f"Expected 412 for bool_match on text field, got {status}"
+    assert status == 412, f"Expected 412 for eq on text field, got {status}"
 
     # --- Wrong predicate type: range on a text field → 412 ---
     status = await find_with_filter(
         {
-            "key_value": {
-                "op": "range",
-                "field_id": "product",
-                "key": "color",
-                "gte": 1.0,
-            }
+            "schema_id": "product",
+            "key": "color",
+            "gte": 1.0,
         }
     )
     assert status == 412, f"Expected 412 for range on text field, got {status}"
@@ -526,12 +490,9 @@ async def test_kv_filter_schema_validation(
     # --- Wrong predicate type: date_range on a text field → 412 ---
     status = await find_with_filter(
         {
-            "key_value": {
-                "op": "date_range",
-                "field_id": "product",
-                "key": "color",
-                "gte": "2024-01-01T00:00:00Z",
-            }
+            "schema_id": "product",
+            "key": "color",
+            "gte": "2024-01-01T00:00:00Z",
         }
     )
     assert status == 412, f"Expected 412 for date_range on text field, got {status}"

@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from enum import Enum
-from typing import Annotated, Any, Generic, Literal, TypeVar
+from typing import Annotated, Any, ClassVar, Generic, Literal, TypeVar
 from uuid import UUID
 
 import pydantic
@@ -303,98 +303,41 @@ class Status(FilterProp, extra="forbid"):
     status: ResourceProcessingStatus = pydantic.Field(description="The status of the resource")
 
 
-# --- New KV filter classes (top-level key_value in FilterExpression) ---
+#
+# Key-value filter classes (top-level key_value in FilterExpression)
+#
 
 
-class KVExactMatch(BaseModel, extra="forbid"):
-    """Matches a key-value field where the given key exactly matches the given string value"""
+class KVFilter(BaseModel, ABC, extra="forbid"):
+    """Abstract class for all key-value filters"""
 
-    op: Literal["exact_match"] = "exact_match"
-    field_id: str = pydantic.Field(description="The KV field/schema name, e.g. 'product'")
-    key: str = pydantic.Field(description="The key within the KV data, e.g. 'color'")
-    value: str = pydantic.Field(description="The string value to match exactly")
+    schema_id: str
+    key: str
 
-
-class KVRange(BaseModel, extra="forbid"):
-    """Matches a key-value field where the given key falls within a numeric range"""
-
-    op: Literal["range"] = "range"
-    field_id: str = pydantic.Field(description="The KV field/schema name, e.g. 'product'")
-    key: str = pydantic.Field(description="The key within the KV data, e.g. 'price'")
-    gte: float | int | None = pydantic.Field(default=None, description="Greater than or equal to")
-    lte: float | int | None = pydantic.Field(default=None, description="Less than or equal to")
-
-    @model_validator(mode="after")
-    def check_bounds(self) -> "KVRange":
-        if self.gte is None and self.lte is None:
-            raise ValueError("KVRange requires at least one bound (gte or lte)")
-        if self.gte is not None and self.lte is not None and self.lte < self.gte:
-            raise ValueError(f"KVRange lte ({self.lte}) must be >= gte ({self.gte})")
-        return self
+    @property
+    @abstractmethod
+    def _name(self) -> str: ...
 
 
-class KVBoolMatch(BaseModel, extra="forbid"):
-    """Matches a key-value field where the given key matches the given boolean value"""
+class Eq(KVFilter):
+    """Equal (==) operator"""
 
-    op: Literal["bool_match"] = "bool_match"
-    field_id: str = pydantic.Field(description="The KV field/schema name, e.g. 'product'")
-    key: str = pydantic.Field(description="The key within the KV data, e.g. 'in_stock'")
-    value: bool = pydantic.Field(description="The boolean value to match")
+    _name: ClassVar[Literal["eq"]] = "eq"
+    eq: str | int | float | bool
 
 
-class KVDateRange(BaseModel, extra="forbid"):
-    """Matches a key-value field where the given date key falls within a date/time range"""
+class Gte(KVFilter):
+    """Greater-than or equal (>=) operator"""
 
-    op: Literal["date_range"] = "date_range"
-    field_id: str = pydantic.Field(description="The KV field/schema name, e.g. 'event'")
-    key: str = pydantic.Field(description="The key within the KV data, e.g. 'ts'")
-    gte: DateTime | None = pydantic.Field(
-        default=None, description="Greater than or equal to (inclusive lower bound)"
-    )
-    lte: DateTime | None = pydantic.Field(
-        default=None, description="Less than or equal to (inclusive upper bound)"
-    )
-
-    @model_validator(mode="after")
-    def check_bounds(self) -> "KVDateRange":
-        if self.gte is None and self.lte is None:
-            raise ValueError("KVDateRange requires at least one bound (gte or lte)")
-        if self.gte is not None and self.lte is not None and self.lte < self.gte:
-            raise ValueError(f"KVDateRange lte ({self.lte}) must be >= gte ({self.gte})")
-        return self
+    _name: ClassVar[Literal["gte"]] = "gte"
+    gte: int | float | DateTime
 
 
-def kv_discriminator(v: Any) -> str | None:
-    if isinstance(v, dict):
-        if "and" in v:
-            return "and"
-        elif "or" in v:
-            return "or"
-        elif "not" in v:
-            return "not"
-        else:
-            return v.get("op")
+class Lte(KVFilter):
+    """Less-than or equal (<=) operator"""
 
-    if isinstance(v, And):
-        return "and"
-    elif isinstance(v, Or):
-        return "or"
-    elif isinstance(v, Not):
-        return "not"
-    else:
-        return getattr(v, "op", None)
-
-
-KVFilterExpression = Annotated[
-    Annotated[And["KVFilterExpression"], Tag("and")]
-    | Annotated[Or["KVFilterExpression"], Tag("or")]
-    | Annotated[Not["KVFilterExpression"], Tag("not")]
-    | Annotated[KVExactMatch, Tag("exact_match")]
-    | Annotated[KVRange, Tag("range")]
-    | Annotated[KVBoolMatch, Tag("bool_match")]
-    | Annotated[KVDateRange, Tag("date_range")],
-    Discriminator(kv_discriminator),
-]
+    _name: ClassVar[Literal["lte"]] = "lte"
+    lte: int | float | DateTime
 
 
 # The discriminator function is optional, everything works without it.
@@ -469,6 +412,50 @@ ResourceFilterExpression = Annotated[
     | Annotated[OriginCollaborator, Tag("origin_collaborator")]
     | Annotated[Status, Tag("status")],
     Discriminator(filter_discriminator),
+]
+
+
+def kv_discriminator(v: Any) -> str | None:
+    if isinstance(v, dict):
+        if "and" in v:
+            return "and"
+        elif "or" in v:
+            return "or"
+        elif "not" in v:
+            return "not"
+        elif "eq" in v:
+            return "eq"
+        elif "gte" in v:
+            return "gte"
+        elif "lte" in v:
+            return "lte"
+        else:
+            return ""
+
+    if isinstance(v, And):
+        return "and"
+    elif isinstance(v, Or):
+        return "or"
+    elif isinstance(v, Not):
+        return "not"
+    elif isinstance(v, Eq):
+        return "eq"
+    elif isinstance(v, Gte):
+        return "gte"
+    elif isinstance(v, Lte):
+        return "lte"
+    else:
+        return ""
+
+
+KVFilterExpression = Annotated[
+    Annotated[And["KVFilterExpression"], Tag("and")]
+    | Annotated[Or["KVFilterExpression"], Tag("or")]
+    | Annotated[Not["KVFilterExpression"], Tag("not")]
+    | Annotated[Eq, Tag("eq")]
+    | Annotated[Gte, Tag("gte")]
+    | Annotated[Lte, Tag("lte")],
+    Discriminator(kv_discriminator),
 ]
 
 

@@ -24,7 +24,7 @@ from pydantic import ValidationError
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.filter_expression import (
     parse_expression,
-    parse_kv_filter_expression_with_validation,
+    parse_kv_expression,
 )
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap
 from nucliadb.search.search.metrics import query_parser_observer
@@ -236,9 +236,7 @@ class _FindParser:
             if self.item.filter_expression.field:
                 field_expr = await parse_expression(self.item.filter_expression.field, self.kbid)
             if self.item.filter_expression.key_value:
-                json_expr = await parse_kv_filter_expression_with_validation(
-                    self.item.filter_expression.key_value, self.kbid
-                )
+                json_expr = await parse_kv_expression(self.item.filter_expression.key_value, self.kbid)
             if self.item.filter_expression.paragraph:
                 paragraph_expr = await parse_expression(self.item.filter_expression.paragraph, self.kbid)
             if self.item.filter_expression.operator == FilterExpression.Operator.OR:
