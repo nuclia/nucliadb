@@ -485,6 +485,7 @@ async def find_conversation_message(
     splits_metadata = await field.get_splits_metadata()
     deleted_splits = set(splits_metadata.deleted_splits)
     if ident in deleted_splits:
+        # The message has been deleted, we consider it not found.
         return None
     split_meta = splits_metadata.metadata.get(ident)
     if split_meta is not None:
