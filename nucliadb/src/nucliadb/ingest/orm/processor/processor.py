@@ -340,6 +340,10 @@ class Processor:
                         # TODO: remove this when processor sends the field set
                         for generated_text in generated_fields.texts:
                             message.texts[generated_text].generated_by.data_augmentation.SetInParent()
+                        for generated_conv in generated_fields.conversations:
+                            message.conversations[
+                                generated_conv
+                            ].generated_by.data_augmentation.SetInParent()
 
                 else:  # pragma: no cover
                     raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
