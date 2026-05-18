@@ -362,9 +362,9 @@ class Resource:
                 self.all_fields_keys.remove(field)
         await field_obj.delete()
 
-    async def delete_splits(self, payload: writer_pb2.DeleteSplits) -> None:
+    async def _apply_delete_splits(self, payload: writer_pb2.DeleteSplits) -> None:
         if payload.field.field_type != FieldType.CONVERSATION:
-            raise ValueError("delete_splits can only be applied to conversation fields")
+            raise ValueError("_apply_delete_splits can only be applied to conversation fields")
         field = await self.get_field(payload.field.field, FieldType.CONVERSATION)
         conv = cast(Conversation, field)
         await conv.delete_messages(payload.splits)
@@ -459,7 +459,7 @@ class Resource:
                 await self.delete_file_field_md5(fieldid.field)
 
         for delete_splits in message.delete_splits:
-            await self.delete_splits(delete_splits)
+            await self._apply_delete_splits(delete_splits)
 
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
             await self.update_all_field_ids(
