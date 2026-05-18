@@ -50,8 +50,17 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.ndbfixtures.resources._vectors import lambs_split_6_vector
-from tests.ndbfixtures.resources.lambs import lambs_resource
+from tests.ndbfixtures.resources._vectors import (
+    lambs_split_6_vector,
+    lambs_split_7_vector,
+    lambs_split_9_vector,
+)
+from tests.ndbfixtures.resources.lambs import (
+    lambs_resource,
+    lambs_split_6_text,
+    lambs_split_7_text,
+    lambs_split_9_text,
+)
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
@@ -791,6 +800,7 @@ async def _test_keyword_search(
     message_id: str,
     top_k: int = 1,
     min_score: float | dict | None = None,
+    found: bool = True,
 ):
     payload = {
         "query": message_text,
@@ -808,10 +818,15 @@ async def _test_keyword_search(
     )
     assert resp.status_code == 200
     results = KnowledgeboxFindResults.model_validate(resp.json())
-    assert message_id in results.best_matches
-    assert (
-        results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text == message_text
-    )
+
+    if found:
+        assert message_id in results.best_matches
+        assert (
+            results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text
+            == message_text
+        )
+    else:
+        assert message_id not in results.best_matches
 
 
 async def _test_semantic_search(
@@ -822,6 +837,7 @@ async def _test_semantic_search(
     message_vector: list[float],
     top_k: int = 1,
     min_score: float | dict | None = None,
+    found: bool = True,
 ):
     payload = {
         "vector": message_vector,
@@ -839,10 +855,14 @@ async def _test_semantic_search(
     )
     assert resp.status_code == 200
     results = KnowledgeboxFindResults.model_validate(resp.json())
-    assert message_id in results.best_matches
-    assert (
-        results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text == message_text
-    )
+    if found:
+        assert message_id in results.best_matches
+        assert (
+            results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text
+            == message_text
+        )
+    else:
+        assert message_id not in results.best_matches
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -994,232 +1014,164 @@ async def test_append_messages_to_non_existent_conversation_field_creates_it(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_delete_conversation_message(
+async def test_delete_conversation_message_lambs_resource(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox: str,
 ):
-    """Test that deleting a message from a conversation field works correctly,
-    including keyword and semantic search verification."""
     kbid = standalone_knowledgebox
 
-    msg1_text = "Hello from the user -- common text"
-    msg2_text = "Hi there from the assistant -- common text"
-    msg3_text = "How are you doing today -- common text"
-    msg1_vector = [-1.0] * 512
-    msg2_vector = [0.0] * 512
-    msg3_vector = [1.0] * 512
+    # Create a resource with the lambs conversation
+    rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
-    # Create a resource with a conversation field containing 3 messages
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
-        json={
-            "slug": "test_delete_msg",
-            "title": "Test Delete Message",
-            "conversations": {
-                "chat": {
-                    "messages": [
-                        {
-                            "to": ["assistant"],
-                            "who": "user",
-                            "timestamp": datetime.now().isoformat(),
-                            "content": {"text": msg1_text},
-                            "ident": "msg1",
-                            "type": MessageType.QUESTION.value,
-                        },
-                        {
-                            "to": ["user"],
-                            "who": "assistant",
-                            "timestamp": datetime.now().isoformat(),
-                            "content": {"text": msg2_text},
-                            "ident": "msg2",
-                            "type": MessageType.ANSWER.value,
-                        },
-                        {
-                            "to": ["assistant"],
-                            "who": "user",
-                            "timestamp": datetime.now().isoformat(),
-                            "content": {"text": msg3_text},
-                            "ident": "msg3",
-                            "type": MessageType.QUESTION.value,
-                        },
-                    ]
-                },
-            },
-        },
-    )
-    assert resp.status_code == 201
-    rid = resp.json()["uuid"]
+    lambs_split_6_vector_m = lambs_split_6_vector[:512]
+    lambs_split_7_vector_m = lambs_split_7_vector[:512]
+    lambs_split_9_vector_m = lambs_split_9_vector[:512]
 
-    msg1_pid = f"{rid}/c/chat/msg1/0-{len(msg1_text)}"
-    msg2_pid = f"{rid}/c/chat/msg2/0-{len(msg2_text)}"
-    msg3_pid = f"{rid}/c/chat/msg3/0-{len(msg3_text)}"
-
-    # Inject synthetic extracted data for the conversation messages
-    bmb = BrokerMessageBuilder(
-        kbid=kbid,
-        rid=rid,
-        source=BrokerMessage.MessageSource.PROCESSOR,
-    )
-    conv = bmb.field_builder("chat", FieldType.CONVERSATION)
-    for split, text, vector in [
-        ("msg1", msg1_text, msg1_vector),
-        ("msg2", msg2_text, msg2_vector),
-        ("msg3", msg3_text, msg3_vector),
-    ]:
-        conv.add_paragraph(
-            text=text,
-            split=split,
-            vectors={"multilingual": vector},
-        )
-    bm = bmb.build()
-    await inject_message(nucliadb_ingest_grpc, bm)
-
-    await mark_dirty()
-    await wait_for_sync()
+    lambs_split_6_pid = f"{rid}/c/lambs/6/0-{len(lambs_split_6_text)}"
+    lambs_split_7_pid = f"{rid}/c/lambs/7/0-{len(lambs_split_7_text)}"
+    lambs_split_9_pid = f"{rid}/c/lambs/9/0-{len(lambs_split_9_text)}"
 
     # Verify all 3 messages are present
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{rid}/conversation/chat",
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs",
         params={"page": 1, "show": ["value"]},
     )
     assert resp.status_code == 200
     field_resp = ResourceField.model_validate(resp.json())
     msgs = field_resp.value["messages"]  # type: ignore
-    assert len(msgs) == 3
-    assert [m["ident"] for m in msgs] == ["msg1", "msg2", "msg3"]
+    assert len(msgs) > 0
+    assert {"6", "7", "9"}.issubset({m["ident"] for m in msgs})
 
     # Verify all messages are searchable before deletion
-    for text, vector, pid in [
-        (msg1_text, msg1_vector, msg1_pid),
-        (msg2_text, msg2_vector, msg2_pid),
-        (msg3_text, msg3_vector, msg3_pid),
-    ]:
-        await _test_keyword_search(nucliadb_reader, kbid, text, pid)
-        await _test_semantic_search(nucliadb_reader, kbid, text, pid, vector)
+    search_cases = {
+        "split_6": {
+            "text": lambs_split_6_text,
+            "vector": lambs_split_6_vector_m,
+            "pid": lambs_split_6_pid,
+            "should_find": True,
+        },
+        "split_7": {
+            "text": lambs_split_7_text,
+            "vector": lambs_split_7_vector_m,
+            "pid": lambs_split_7_pid,
+            "should_find": True,
+        },
+        "split_9": {
+            "text": lambs_split_9_text,
+            "vector": lambs_split_9_vector_m,
+            "pid": lambs_split_9_pid,
+            "should_find": True,
+        },
+    }
+
+    async def _check_search():
+        for case in search_cases.values():
+            await _test_keyword_search(
+                nucliadb_reader, kbid, case["text"], case["pid"], found=case["should_find"]
+            )
+            await _test_semantic_search(
+                nucliadb_reader,
+                kbid,
+                case["text"],
+                case["pid"],
+                case["vector"],
+                found=case["should_find"],
+            )
+
+    await _check_search()
 
     # Delete the second message by resource id
     resp = await nucliadb_writer.delete(
-        f"/kb/{kbid}/resource/{rid}/conversation/chat/messages/msg2",
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages/7",
     )
     assert resp.status_code == 200
 
     await mark_dirty()
     await wait_for_sync()
 
-    # Verify msg2 is gone but msg1 and msg3 remain
+    # Verify 7 is gone but 6 and 9 remain
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{rid}/conversation/chat",
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs",
         params={"page": 1, "show": ["value"]},
     )
     assert resp.status_code == 200
     field_resp = ResourceField.model_validate(resp.json())
-    msgs = field_resp.value["messages"]  # type: ignore
-    assert [m["ident"] for m in msgs] == ["msg1", "msg3"]
+    msgs = {m["ident"]: m for m in field_resp.value["messages"]}  # type: ignore
+    assert {"6", "9"}.issubset(msgs.keys())
+    assert "7" not in msgs
 
-    # Verify msg2 is no longer found by keyword search
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "query": "common text",
-            "features": ["keyword"],
-            "top_k": 5,
-            "min_score": {"bm25": 0},  # to include all results regardless of score
-        },
-    )
-    assert resp.status_code == 200
-    results = KnowledgeboxFindResults.model_validate(resp.json())
-    assert msg2_pid not in results.best_matches
-    # Verify msg1 and msg3 are still searchable
-    assert msg1_pid in results.best_matches
-    assert msg3_pid in results.best_matches
-
-    # Verify msg2 is no longer found by semantic search
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "vector": msg2_vector,
-            "features": ["semantic"],
-            "top_k": 5,
-            "reranker": "noop",
-            "vectorset": "multilingual",
-            "min_score": -1,  # to include all results regardless of score
-        },
-    )
-    assert resp.status_code == 200
-    results = KnowledgeboxFindResults.model_validate(resp.json())
-    assert msg2_pid not in results.best_matches
-    # Verify msg1 and msg3 are still searchable
-    assert msg1_pid in results.best_matches
-    assert msg3_pid in results.best_matches
+    # Verify split 7 is no longer found by keyword search, but splits 6 and 9 are still searchable
+    search_cases["split_7"]["should_find"] = False
+    await _check_search()
 
     # Delete the second message again -- should be a no-op (already deleted)
     resp = await nucliadb_writer.delete(
-        f"/kb/{kbid}/resource/{rid}/conversation/chat/messages/msg2",
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages/7",
     )
     assert resp.status_code == 200
 
     # Delete a non-existent message -- should be a no-op
     resp = await nucliadb_writer.delete(
-        f"/kb/{kbid}/resource/{rid}/conversation/chat/messages/nonexistent",
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages/nonexistent",
     )
     assert resp.status_code == 200
 
     # Delete using slug endpoint
     resp = await nucliadb_writer.delete(
-        f"/kb/{kbid}/slug/test_delete_msg/conversation/chat/messages/msg3",
+        f"/kb/{kbid}/slug/lambs/conversation/lambs/messages/9",
     )
     assert resp.status_code == 200
 
     await mark_dirty()
     await wait_for_sync()
 
-    # Verify only msg1 remains
+    # Verify only split 6 remains
     resp = await nucliadb_reader.get(
-        f"/kb/{kbid}/resource/{rid}/conversation/chat",
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs",
         params={"page": 1, "show": ["value"]},
     )
     assert resp.status_code == 200
     field_resp = ResourceField.model_validate(resp.json())
     msgs = field_resp.value["messages"]  # type: ignore
-    assert [m["ident"] for m in msgs] == ["msg1"]
+    assert {"6"}.issubset({m["ident"] for m in msgs})
 
-    # Verify msg1 is still searchable
-    await _test_keyword_search(nucliadb_reader, kbid, msg1_text, msg1_pid)
-    await _test_semantic_search(nucliadb_reader, kbid, msg1_text, msg1_pid, msg1_vector)
+    # Verify split 6 is still searchable
+    search_cases["split_9"]["should_find"] = False
+    await _check_search()
 
     # Verify error cases
 
     # Non-existent resource
     resp = await nucliadb_writer.delete(
-        f"/kb/{kbid}/resource/nonexistent-rid/conversation/chat/messages/msg1",
+        f"/kb/{kbid}/resource/nonexistent-rid/conversation/lambs/messages/6",
     )
     assert resp.status_code == 404
 
     # Non-existent field
     resp = await nucliadb_writer.delete(
-        f"/kb/{kbid}/resource/{rid}/conversation/nonexistent_field/messages/msg1",
+        f"/kb/{kbid}/resource/{rid}/conversation/nonexistent_field/messages/6",
     )
     assert resp.status_code == 404
 
     # Message ident too long (> 128 chars)
     long_ident = "a" * 129
     resp = await nucliadb_writer.delete(
-        f"/kb/{kbid}/resource/{rid}/conversation/chat/messages/{long_ident}",
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages/{long_ident}",
     )
     assert resp.status_code == 422
 
     # Verify that a deleted message ident cannot be reused
     resp = await nucliadb_writer.put(
-        f"/kb/{kbid}/resource/{rid}/conversation/chat/messages",
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages",
         json=[
             {
                 "to": ["assistant"],
                 "who": "user",
                 "timestamp": datetime.now().isoformat(),
                 "content": {"text": "Trying to reuse deleted ident"},
-                "ident": "msg2",  # This was deleted earlier
+                "ident": "7",  # This was deleted earlier
                 "type": MessageType.QUESTION.value,
             },
         ],
