@@ -24,13 +24,13 @@ from dataclasses import dataclass
 
 import pytest
 from httpx import AsyncClient
-from tests.ndbfixtures.resources import cookie_tale_resource
 
 from nucliadb.writer.api.v1.router import KB_PREFIX
 from nucliadb_models import hydration
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.hydration import Hydrated
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.ndbfixtures.resources import cookie_tale_resource
 
 
 @dataclass
