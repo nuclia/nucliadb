@@ -19,6 +19,7 @@
 #
 import json
 import logging
+from collections import defaultdict
 from collections.abc import Iterator
 from copy import deepcopy
 from dataclasses import dataclass
@@ -407,7 +408,7 @@ class ResourceBrain:
     def _get_paragraph_user_classifications(
         self, basic_user_field_metadata: UserFieldMetadata | None
     ) -> ParagraphClassifications:
-        pc = ParagraphClassifications(valid={}, denied={})
+        pc = ParagraphClassifications(valid=defaultdict(list), denied=defaultdict(list))
         if basic_user_field_metadata is None:
             return pc
         for annotated_paragraph in basic_user_field_metadata.paragraphs:
@@ -415,9 +416,9 @@ class ResourceBrain:
                 paragraph_key = compute_paragraph_key(self.rid, annotated_paragraph.key)
                 classif_label = f"/l/{classification.labelset}/{classification.label}"
                 if classification.cancelled_by_user:
-                    pc.denied.setdefault(paragraph_key, []).append(classif_label)
+                    pc.denied[paragraph_key].append(classif_label)
                 else:
-                    pc.valid.setdefault(paragraph_key, []).append(classif_label)
+                    pc.valid[paragraph_key].append(classif_label)
         return pc
 
     @observer.wrap({"type": "generate_relations"})

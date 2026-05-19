@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
+from collections import defaultdict
 from typing import Any, Iterable
 
 from nucliadb.ingest import logger
@@ -268,17 +269,17 @@ class Conversation(Field[PBConversation]):
         idents_to_delete = set(message_idents) - set(splits_metadata.deleted_splits)
         idents_to_delete = idents_to_delete & set(splits_metadata.metadata.keys())
 
-        page_idents: dict[int, set[str]] = {}
+        page_idents: dict[int, set[str]] = defaultdict(set)
         for ident in idents_to_delete:
             split_meta = splits_metadata.metadata.get(ident)
             if split_meta is not None:
-                page_idents.setdefault(split_meta.page, set()).add(ident)
+                page_idents[split_meta.page].add(ident)
 
         for page, idents in page_idents.items():
             some_deleted_in_page = False
             page_obj = await self.db_get_value(page)
             for message in page_obj.messages:
-                if message.ident in idents:
+                if message.ident in idents and message.ident not in splits_metadata.deleted_splits:
                     message.content.text = ""
                     total_deleted += 1
                     some_deleted_in_page = True
