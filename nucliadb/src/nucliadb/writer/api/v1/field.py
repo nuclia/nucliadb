@@ -693,9 +693,9 @@ async def reprocess_file_field(
 
 DELETE_CONVERSATION_MESSAGES_DESCRIPTION = (
     "Delete a message from a conversation field by its ident. "
-    "Note: deleting too many messages in a single conversation can degrade the performance "
-    "of the conversation field. This endpoint is not meant to be a mutability primitive, "
-    "but is rather a convenience endpoint for occasional deletions."
+    "This is a convenience endpoint intended for occasional deletions — "
+    "frequent use on the same conversation may degrade read performance over time. "
+    "Deleted message identifiers are permanently reserved and cannot be reused."
 )
 
 
@@ -704,7 +704,7 @@ MessageIdent = Annotated[str, Path(max_length=128, description="The ident of the
 
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}/messages/{{message_ident}}",
-    status_code=200,
+    status_code=204,
     summary="Delete conversation message (by slug)",
     description=DELETE_CONVERSATION_MESSAGES_DESCRIPTION,
     tags=["Resource fields"],
@@ -724,7 +724,7 @@ async def delete_conversation_messages_rslug_prefix(
 
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/messages/{{message_ident}}",
-    status_code=200,
+    status_code=204,
     summary="Delete conversation message (by id)",
     description=DELETE_CONVERSATION_MESSAGES_DESCRIPTION,
     tags=["Resource fields"],
@@ -783,7 +783,7 @@ async def _delete_conversation_messages(
     to_delete = await validate_message_idents(kbid, rid, field_id, message_idents)
     if len(to_delete) == 0:
         # No valid message idents to delete, return early to avoid unnecessary load
-        return Response(status_code=200)
+        return Response(status_code=204)
 
     writer = BrokerMessage(kbid=kbid, uuid=rid, source=BrokerMessage.MessageSource.WRITER)
     delete_splits = DeleteSplits(
@@ -795,4 +795,4 @@ async def _delete_conversation_messages(
     partitioning = get_partitioning()
     partition = partitioning.generate_partition(kbid, rid)
     await transaction.commit(writer, partition)
-    return Response(status_code=200)
+    return Response(status_code=204)

@@ -1086,7 +1086,7 @@ async def test_delete_conversation_message_lambs_resource(
     resp = await nucliadb_writer.delete(
         f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages/7",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 204
 
     await mark_dirty()
     await wait_for_sync()
@@ -1110,19 +1110,19 @@ async def test_delete_conversation_message_lambs_resource(
     resp = await nucliadb_writer.delete(
         f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages/7",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 204
 
     # Delete a non-existent message -- should be a no-op
     resp = await nucliadb_writer.delete(
         f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages/nonexistent",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 204
 
     # Delete using slug endpoint
     resp = await nucliadb_writer.delete(
         f"/kb/{kbid}/slug/lambs/conversation/lambs/messages/9",
     )
-    assert resp.status_code == 200
+    assert resp.status_code == 204
 
     await mark_dirty()
     await wait_for_sync()

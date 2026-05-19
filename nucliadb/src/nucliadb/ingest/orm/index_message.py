@@ -493,8 +493,8 @@ async def get_stored_split_ids(
     conv: Conversation = await resource.get_field(fid.field, fid.field_type, load=False)
     splits_metadata = await conv.get_splits_metadata()
     deleted_splits = set(splits_metadata.deleted_splits)
-    non_deleted_splits = set(splits_metadata.metadata.keys()) - deleted_splits
-    return non_deleted_splits, deleted_splits
+    existing_splits = set(splits_metadata.metadata.keys()) - deleted_splits
+    return existing_splits, deleted_splits
 
 
 def needs_relations_update(
