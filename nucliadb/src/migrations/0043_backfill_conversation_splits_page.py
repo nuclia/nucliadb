@@ -18,10 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""Migration #39
+"""Migration #43
 
-Backfill splits metadata on conversation fields
+Backfill the `page` field in SplitsMetadata entries for conversation fields.
 
+Previously, SplitsMetadata tracked which message idents existed but did not
+record which page each message belongs to. This migration iterates all
+conversation fields and sets the correct page number on each split metadata
+entry, enabling efficient page-targeted deletions.
 """
 
 import logging
@@ -30,14 +34,11 @@ from typing import cast
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.ingest.fields.conversation import (
-    CONVERSATION_SPLITS_METADATA,
     Conversation,
 )
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.resources_pb2 import SplitsMetadata
-from nucliadb_utils.storages.storage import Storage
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,6 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
         async with context.kv_driver.rw_transaction() as txn:
             txn = cast(PGTransaction, txn)
             async with txn.connection.cursor() as cur:
-                # Retrieve a bunch of conversation fields
                 await cur.execute(
                     """
                     SELECT key FROM resources
@@ -74,37 +74,32 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                     to_fix.append((rid, field_id))
 
         for rid, field_id in to_fix:
-            logger.info(
-                "Backfilling splits metadata",
-                extra={"kbid": kbid, "rid": rid, "field_id": field_id},
-            )
-            async with context.kv_driver.rw_transaction() as txn2:
-                splits_metadata = await build_splits_metadata(
-                    txn2, context.blob_storage, kbid, rid, field_id
-                )
-                splits_metadata_key = CONVERSATION_SPLITS_METADATA.format(
-                    kbid=kbid, uuid=rid, type="c", field=field_id
-                )
-                await txn2.set(splits_metadata_key, splits_metadata.SerializeToString())
-                await txn2.commit()
+            async with context.kv_driver.rw_transaction() as txn:
+                try:
+                    await backfill_splits_page(txn, context.blob_storage, kbid, rid, field_id)
+                    await txn.commit()
+                except Exception:
+                    logger.exception(
+                        "Failed to backfill splits page metadata",
+                        extra={"kbid": kbid, "rid": rid, "field_id": field_id},
+                    )
 
 
-async def build_splits_metadata(
-    txn: Transaction, storage: Storage, kbid: str, rid: str, field_id: str
-) -> SplitsMetadata:
-    splits_metadata = SplitsMetadata()
+async def backfill_splits_page(txn: Transaction, storage, kbid: str, rid: str, field_id: str) -> None:
     kb_orm = KnowledgeBoxORM(txn, storage, kbid)
     resource_obj = await kb_orm.get(rid)
     if resource_obj is None:
-        return splits_metadata
+        return
+
     field_obj: Conversation = await resource_obj.get_field(
         field_id, resources_pb2.FieldType.CONVERSATION, load=False
     )
+    splits_metadata = await field_obj.get_splits_metadata()
     conv_metadata = await field_obj.get_metadata()
-    for i in range(1, conv_metadata.pages + 1):
-        page = await field_obj.get_value(page=i)
+    for page_number in range(1, conv_metadata.pages + 1):
+        page = await field_obj.get_value(page=page_number)
         if page is None:
             continue
         for message in page.messages:
-            splits_metadata.metadata.get_or_create(message.ident)
-    return splits_metadata
+            splits_metadata.metadata.get_or_create(message.ident).page = page_number
+    await field_obj.set_splits_metadata(splits_metadata)

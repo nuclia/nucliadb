@@ -189,10 +189,13 @@ message FieldConversation {
     string split_strategy = 5;
 }
 
-message SplitMetadata {}
+message SplitMetadata {
+    int32 page = 1;
+}
 
 message SplitsMetadata {
     map<string, SplitMetadata> metadata = 1;
+    repeated string deleted_splits = 2;
 }
 
 message NestedPosition {

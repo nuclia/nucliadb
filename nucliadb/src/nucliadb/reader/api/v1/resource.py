@@ -437,7 +437,15 @@ async def _get_resource_field(
 
                 value = await field.get_value(page=page_to_fetch)
                 if value is not None:
+                    splits_metadata = await field.get_splits_metadata()
+                    deleted_messages = set(splits_metadata.deleted_splits)
                     resource_field.value = from_proto.conversation(value)
+                    # Skip deleted messages
+                    resource_field.value.messages = [
+                        msg
+                        for msg in (resource_field.value.messages or [])
+                        if msg.ident not in deleted_messages
+                    ]
 
         if (
             ResourceFieldProperties.EXTRACTED in show
