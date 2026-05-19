@@ -275,10 +275,11 @@ async def _faceted_search_unfiltered(
         for status in ["PENDING", "PROCESSED", "ERROR", "EMPTY"]:
             sqls.append(
                 sql.SQL(
-                    "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s AND facet = '/n/s/{}' GROUP BY facet"
-                ).format(status)
+                    "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s AND facet = {} GROUP BY facet"
+                ).format(sql.Placeholder(f"facet_{status}"))
             )
-        await cur.execute(sql.SQL(" UNION ").join(sqls), {"kbid": catalog_query.kbid})
+            facet_params[f"facet_{status}"] = f"/n/s/{status}"
+        await cur.execute(sql.SQL(" UNION ").join(sqls), {"kbid": catalog_query.kbid, **facet_params})
     else:
         if len(tmp_facets) <= 5:
             # Asking for few facets, strictly filter to what we need in the query
