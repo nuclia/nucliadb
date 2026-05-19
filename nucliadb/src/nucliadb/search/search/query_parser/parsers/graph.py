@@ -24,7 +24,6 @@ from dataclasses import dataclass
 from nidx_protos import nodereader_pb2
 from typing_extensions import assert_never
 
-from nucliadb.common import datamanagers
 from nucliadb.common.filter_expression import add_and_expression, parse_expression
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationTypeMap
 from nucliadb.search.predict_models import QueryModel

@@ -21,9 +21,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
-from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
 
 from nucliadb.common import datamanagers
 from nucliadb.search.utilities import get_predict
@@ -33,6 +30,9 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
+from tests.utils.dirty_index import wait_for_sync
 
 PAD = [0.0] * 508
 VECTORS = {
