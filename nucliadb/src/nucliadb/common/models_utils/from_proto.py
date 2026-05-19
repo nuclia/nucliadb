@@ -17,6 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+
+
+import json
 from typing import Any
 
 from google.protobuf.json_format import MessageToDict
@@ -380,7 +383,10 @@ def conversation_page(
         always_print_fields_with_no_presence=True,
     )
     for conv_message in as_dict.get("messages", []):
-        for attachment_field in conv_message.get("content", {}).get("attachments_fields", []):
+        content_metadata = conv_message.get("metadata_json")
+        if content_metadata:
+            conv_message["metadata"] = json.loads(content_metadata)
+        for attachment_field in conv_message.get("attachments_fields", []):
             attachment_field["field_type"] = attachment_field["field_type"].lower()
     return Conversation(total=total, pages=pages, page=page, **as_dict)
 

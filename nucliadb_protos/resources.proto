@@ -165,6 +165,8 @@ message Message {
         ANSWER = 2;
     }
     MessageType type = 6;
+    // Store generic json metadata for the message
+    string metadata_json = 7;
 }
 
 message Conversation {
