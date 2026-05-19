@@ -264,7 +264,6 @@ class Conversation(Field[PBConversation]):
         """
         total_deleted = 0
 
-        metadata = await self.get_metadata()
         splits_metadata = await self.get_splits_metadata()
         idents_to_delete = set(message_idents) - set(splits_metadata.deleted_splits)
         idents_to_delete = idents_to_delete & set(splits_metadata.metadata.keys())
@@ -300,7 +299,6 @@ class Conversation(Field[PBConversation]):
             )
 
         if total_deleted > 0:
-            await self.db_set_metadata(metadata)
             await self.set_splits_metadata(splits_metadata)
 
         return total_deleted
