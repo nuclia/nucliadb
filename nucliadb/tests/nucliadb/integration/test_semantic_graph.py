@@ -21,6 +21,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient
+from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
+from tests.utils.dirty_index import wait_for_sync
 
 from nucliadb.common import datamanagers
 from nucliadb.search.utilities import get_predict
@@ -30,9 +33,6 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from tests.utils import inject_message
-from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
 
 PAD = [0.0] * 508
 VECTORS = {
@@ -63,12 +63,21 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    vectorset = None
+    node_vectorset = None
+    edge_vectorset = None
     async with datamanagers.with_ro_transaction() as txn:
-        async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=standalone_knowledgebox):
-            vectorset = vectorset_id
-            break
-    assert vectorset is not None
+        node_vectorsets = await datamanagers.graph_vectorsets.node.get_all(
+            txn, kbid=standalone_knowledgebox
+        )
+        node_vectorset = node_vectorsets[0].vectorset_id
+
+        edge_vectorsets = await datamanagers.graph_vectorsets.edge.get_all(
+            txn, kbid=standalone_knowledgebox
+        )
+        edge_vectorset = edge_vectorsets[0].vectorset_id
+
+    assert node_vectorset is not None
+    assert edge_vectorset is not None
 
     nodes = {
         "cat": RelationNode(value="Cat", ntype=RelationNode.NodeType.ENTITY, subtype="ANIMAL"),
@@ -89,57 +98,57 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
         nodes["cat"],
         "bigger_than",
         nodes["mouse"],
-        {vectorset: VECTORS["cat"]},
-        {vectorset: VECTORS["bigger"]},
-        {vectorset: VECTORS["mouse"]},
+        {node_vectorset: VECTORS["cat"]},
+        {edge_vectorset: VECTORS["bigger"]},
+        {node_vectorset: VECTORS["mouse"]},
     )
     field.add_relation(
         nodes["dog"],
         "bigger_than",
         nodes["cat"],
-        {vectorset: VECTORS["dog"]},
-        {vectorset: VECTORS["bigger"]},
-        {vectorset: VECTORS["cat"]},
+        {node_vectorset: VECTORS["dog"]},
+        {edge_vectorset: VECTORS["bigger"]},
+        {node_vectorset: VECTORS["cat"]},
     )
     field.add_relation(
         nodes["cat"],
         "faster_than",
         nodes["dog"],
-        {vectorset: VECTORS["cat"]},
-        {vectorset: VECTORS["faster"]},
-        {vectorset: VECTORS["dog"]},
+        {node_vectorset: VECTORS["cat"]},
+        {edge_vectorset: VECTORS["faster"]},
+        {node_vectorset: VECTORS["dog"]},
     )
     field.add_relation(
         nodes["dog"],
         "faster_than",
         nodes["mouse"],
-        {vectorset: VECTORS["dog"]},
-        {vectorset: VECTORS["faster"]},
-        {vectorset: VECTORS["mouse"]},
+        {node_vectorset: VECTORS["dog"]},
+        {edge_vectorset: VECTORS["faster"]},
+        {node_vectorset: VECTORS["mouse"]},
     )
     field.add_relation(
         nodes["dog"],
         "lives",
         nodes["home"],
-        {vectorset: VECTORS["dog"]},
-        {vectorset: VECTORS["lives"]},
-        {vectorset: VECTORS["home"]},
+        {node_vectorset: VECTORS["dog"]},
+        {edge_vectorset: VECTORS["lives"]},
+        {node_vectorset: VECTORS["home"]},
     )
     field.add_relation(
         nodes["cat"],
         "lives",
         nodes["home"],
-        {vectorset: VECTORS["cat"]},
-        {vectorset: VECTORS["lives"]},
-        {vectorset: VECTORS["home"]},
+        {node_vectorset: VECTORS["cat"]},
+        {edge_vectorset: VECTORS["lives"]},
+        {node_vectorset: VECTORS["home"]},
     )
     field.add_relation(
         nodes["mouse"],
         "lives",
         nodes["world"],
-        {vectorset: VECTORS["mouse"]},
-        {vectorset: VECTORS["lives"]},
-        {vectorset: VECTORS["world"]},
+        {node_vectorset: VECTORS["mouse"]},
+        {edge_vectorset: VECTORS["lives"]},
+        {node_vectorset: VECTORS["world"]},
     )
     bm = bmb.build()
 
@@ -164,8 +173,8 @@ async def test_serialize(
     assert resp.status_code == 200
     body = resp.json()
     extracted = body["data"]["texts"]["animals"]["extracted"]
-    assert len(extracted["relation_node_vectors"]["multilingual"]) == 5
-    assert len(extracted["relation_edge_vectors"]["multilingual"]) == 3
+    assert len(extracted["relation_node_vectors"]["testing-nodes-model"]) == 5
+    assert len(extracted["relation_edge_vectors"]["testing-edges-model"]) == 3
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -188,7 +197,7 @@ async def test_node_queries(
                 sentence=None,
                 graph_nodes=GraphNodeSearch(
                     vectors={
-                        "multilingual": {
+                        "testing-nodes-model": {
                             "cat": VECTORS["cat"],
                         }
                     }
@@ -230,7 +239,7 @@ async def test_relation_queries(
                 query="faster",
                 max_context=10,
                 entities=None,
-                sentence=SentenceSearch(vectors={"multilingual": VECTORS["faster"]}),
+                sentence=SentenceSearch(vectors={"testing-nodes-model": VECTORS["faster"]}),
             )
         ),
     ):
@@ -269,7 +278,7 @@ async def test_path_queries(
                 entities=None,
                 graph_nodes=GraphNodeSearch(
                     vectors={
-                        "multilingual": {
+                        "testing-nodes-model": {
                             "dog": VECTORS["dog"],
                         }
                     }
@@ -322,7 +331,7 @@ async def test_path_queries(
                 entities=None,
                 graph_nodes=GraphNodeSearch(
                     vectors={
-                        "multilingual": {
+                        "testing-nodes-model": {
                             "dog": VECTORS["dog"],
                         }
                     }
@@ -365,7 +374,7 @@ async def test_path_queries(
                 entities=None,
                 graph_nodes=GraphNodeSearch(
                     vectors={
-                        "multilingual": {
+                        "testing-nodes-model": {
                             "dog": VECTORS["dog"],
                         }
                     }

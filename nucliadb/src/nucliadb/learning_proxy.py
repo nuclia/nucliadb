@@ -527,7 +527,7 @@ class InMemoryLearningConfig(LearningConfigService):
                     )
                 },
                 semantic_graph_node_model_configs={
-                    default_model: SemanticConfig(
+                    "testing-nodes-model": SemanticConfig(
                         similarity=SimilarityFunction.COSINE,
                         size=size,
                         threshold=0,
@@ -535,7 +535,7 @@ class InMemoryLearningConfig(LearningConfigService):
                     )
                 },
                 semantic_graph_edge_model_configs={
-                    default_model: SemanticConfig(
+                    "testing-edges-model": SemanticConfig(
                         similarity=SimilarityFunction.COSINE,
                         size=size,
                         threshold=0,

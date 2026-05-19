@@ -936,7 +936,7 @@ class Resource:
         await self.get_fields(force=True)
         vectorset_ids = [
             vs.vectorset_id
-            for vs in await datamanagers.graph_vectorsets.node.get_all(self.txn, kbid=self.kbid)
+            for vs in await datamanagers.graph_vectorsets.edge.get_all(self.txn, kbid=self.kbid)
         ]
 
         for field_vectors in fields_vectors:
