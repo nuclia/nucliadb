@@ -1188,3 +1188,38 @@ async def test_delete_conversation_message_lambs_resource(
     )
     assert resp.status_code == 422
     assert "must be unique" in resp.json()["detail"]
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_conversation_message_metadata_exceeds_2kb(
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+
+    large_metadata = {"key": "x" * 2048}
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": "metadata-too-large",
+            "title": "Test",
+            "conversations": {
+                "faq": {
+                    "messages": [
+                        {
+                            "to": ["computer"],
+                            "who": "person",
+                            "timestamp": datetime.now().isoformat(),
+                            "content": {"text": "hello"},
+                            "ident": "1",
+                            "type": MessageType.QUESTION.value,
+                            "metadata": large_metadata,
+                        }
+                    ]
+                },
+            },
+        },
+    )
+    assert resp.status_code == 422
+    assert "2kb" in resp.json()["detail"][0]["msg"]
