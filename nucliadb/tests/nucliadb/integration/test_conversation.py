@@ -81,6 +81,7 @@ async def resource_with_conversation(
                 content=InputMessageContent(text="What is the meaning of life?"),
                 ident=str(i),
                 type=MessageType.QUESTION,
+                metadata={"foo": "bar", "ba": 1, "list": ["1", 2, 3.3]}
             )
         )
     resp = await nucliadb_writer.post(
@@ -171,6 +172,7 @@ async def test_conversations(
     assert len(msgs) == 200
     assert [m["ident"] for m in msgs] == [str(i) for i in range(1, 201)]
     assert msgs[0]["type"] == MessageType.QUESTION.value
+    assert msgs[0]["metadata"] == {"foo": "bar", "ba": 1, "list": ["1", 2, 3.3]}
 
     # get second page
     resp = await nucliadb_reader.get(
