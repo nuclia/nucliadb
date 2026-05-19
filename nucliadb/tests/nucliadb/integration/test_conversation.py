@@ -81,7 +81,7 @@ async def resource_with_conversation(
                 content=InputMessageContent(text="What is the meaning of life?"),
                 ident=str(i),
                 type=MessageType.QUESTION,
-                metadata={"foo": "bar", "ba": 1, "list": ["1", 2, 3.3]}
+                metadata={"foo": "bar", "ba": 1, "list": ["1", 2, 3.3]},
             )
         )
     resp = await nucliadb_writer.post(

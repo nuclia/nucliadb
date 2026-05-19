@@ -386,7 +386,7 @@ def conversation_page(
         content_metadata = conv_message.get("metadata_json")
         if content_metadata:
             conv_message["metadata"] = json.loads(content_metadata)
-        for attachment_field in conv_message.get("attachments_fields", []):
+        for attachment_field in conv_message.get("content", {}).get("attachments_fields", []):
             attachment_field["field_type"] = attachment_field["field_type"].lower()
     return Conversation(total=total, pages=pages, page=page, **as_dict)
 
