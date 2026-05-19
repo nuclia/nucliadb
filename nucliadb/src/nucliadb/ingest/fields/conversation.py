@@ -260,7 +260,7 @@ class Conversation(Field[PBConversation]):
 
         Returns the number of messages actually deleted.
 
-        Processed metadata for the deleted messages (e.g: text, vectors, etc) is not deleted immediately.
+        Processed metadata for the deleted messages (e.g: text, vectors, etc) are not deleted for now.
         """
         total_deleted = 0
 
