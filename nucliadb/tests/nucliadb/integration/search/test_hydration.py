@@ -24,13 +24,13 @@ from dataclasses import dataclass
 
 import pytest
 from httpx import AsyncClient
+from tests.ndbfixtures.resources import cookie_tale_resource
 
 from nucliadb.writer.api.v1.router import KB_PREFIX
 from nucliadb_models import hydration
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.hydration import Hydrated
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.ndbfixtures.resources import cookie_tale_resource
 
 
 @dataclass
@@ -193,7 +193,7 @@ async def test_hydration_related_paragraphs(
 
     # the requested paragraph has pointers to the other paragraphs
     related = hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related
-    assert related
+    assert related is not None
     assert related.neighbours is not None  # type: ignore[union-attr]
     assert related.neighbours.before == [  # type: ignore[union-attr]
         f"{rid}/t/cookie-tale/0-63"
@@ -239,11 +239,11 @@ async def test_hydration_related_paragraphs(
     hydrated = Hydrated.model_validate(body)
 
     related = hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related
-    assert related
-    assert related.neighbours
-    assert related.neighbours.before
+    assert related is not None
+    assert related.neighbours is not None
+    assert related.neighbours.before is not None
     assert len(related.neighbours.before) == 0
-    assert related.neighbours.after
+    assert related.neighbours.after is not None
     assert len(related.neighbours.after) == 1
 
     assert hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].text is None
@@ -269,7 +269,7 @@ async def test_hydration_related_paragraphs(
     hydrated = Hydrated.model_validate(body)
 
     related = hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related
-    assert related
+    assert related is not None
     assert related.parents is not None
     assert len(related.parents) == 1
     assert related.parents == [f"{rid}/a/title/0-17"]
@@ -295,7 +295,7 @@ async def test_hydration_related_paragraphs(
     hydrated = Hydrated.model_validate(body)
 
     related = hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related
-    assert related
+    assert related is not None
     assert related.siblings is not None
     assert len(related.siblings) == 1
     assert related.siblings == [f"{rid}/t/cookie-tale/0-63"]
@@ -321,7 +321,7 @@ async def test_hydration_related_paragraphs(
     hydrated = Hydrated.model_validate(body)
 
     related = hydrated.paragraphs[f"{rid}/t/cookie-tale/63-151"].related
-    assert related
+    assert related is not None
     assert related is not None
     assert related.replacements is not None
     assert len(related.replacements) == 2
@@ -366,8 +366,8 @@ async def test_hydration_paragraph_source_image(
     hydrated = Hydrated.model_validate(body)
 
     image = hydrated.paragraphs[f"{rid}/f/cookie-recipie/0-29"].image
-    assert image
-    assert image.source_image
+    assert image is not None
+    assert image.source_image is not None
     assert image.source_image.content_type == "image/png"
     assert image.source_image.b64encoded == base64.b64encode(b"delicious cookies image").decode()
 
@@ -409,7 +409,7 @@ async def test_hydration_paragraph_table_page_preview(
 
     assert hydrated.paragraphs[f"{rid}/f/cookie-recipie/29-75"].image is None
     table = hydrated.paragraphs[f"{rid}/f/cookie-recipie/29-75"].table
-    assert table
+    assert table is not None
     assert table.page_preview_ref == "1"
 
     previews = hydrated.fields[f"{rid}/f/cookie-recipie"].previews  # type:ignore[union-attr,ty:unresolved-attribute]
