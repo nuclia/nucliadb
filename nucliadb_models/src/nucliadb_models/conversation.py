@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import json
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -92,6 +94,20 @@ class InputMessageContent(BaseModel):
     format: MessageFormat = MessageFormat.PLAIN
     attachments: list[FileB64] = Field(default=[], max_length=50)
     attachments_fields: list[FieldRef] = Field(default=[], max_length=50)
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Metadata for the message content. This metadata is not indexed and is only stored for retrieval purposes. It can be used to store structured information about the message content that later is serialized on retrieval results, however this metadata can not be used for searching or filtering.",
+    )
+
+    @field_validator("metadata", mode="before")
+    @classmethod
+    def validate_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
+        """
+        Metadata can only contain up to 2kb of data.
+        """
+        if len(json.dumps(value)) > 2048:
+            raise ValueError("Metadata for message content cannot exceed 2kb of data")
+        return value
 
 
 class InputMessage(BaseModel):
