@@ -251,6 +251,11 @@ SDK_DEFINITION = {
         method="DELETE",
         path_params=("kbid", "rid", "field_type", "field_id"),
     ),
+    "delete_field_by_slug": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/slug/{slug}/{field_type}/{field_id}",
+        method="DELETE",
+        path_params=("kbid", "slug", "field_type", "field_id"),
+    ),
     # Conversation endpoints
     "add_conversation_message": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}/conversation/{field_id}/messages",
@@ -1158,6 +1163,7 @@ class NucliaDB(_NucliaDBBase):
     )
     # Field endpoints
     delete_field_by_id = _request_sync_builder("delete_field_by_id", type(None), type(None))
+    delete_field_by_slug = _request_sync_builder("delete_field_by_slug", type(None), type(None))
     # Conversation endpoints
     add_conversation_message = _request_sync_builder(
         "add_conversation_message", list[InputMessage], ResourceFieldAdded
@@ -1373,6 +1379,7 @@ class NucliaDBAsync(_NucliaDBBase):
     )
     # Field endpoints
     delete_field_by_id = _request_async_builder("delete_field_by_id", type(None), type(None))
+    delete_field_by_slug = _request_async_builder("delete_field_by_slug", type(None), type(None))
     # Conversation endpoints
     add_conversation_message = _request_async_builder(
         "add_conversation_message", list[InputMessage], ResourceFieldAdded
