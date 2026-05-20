@@ -161,8 +161,10 @@ class IndexMessageBuilder:
                 replace_field=replace,
             )
             if has_feature(const.Features.SEMANTIC_GRAPH):
-                assert vectorset_configs is not None
-                for vectorset_config in vectorset_configs:
+                node_vectorset_configs = await datamanagers.graph_vectorsets.node.get_all(
+                    self.resource.txn, kbid=self.resource.kbid
+                )
+                for vectorset_config in node_vectorset_configs:
                     node_vectors = await field.get_relation_node_vectors(
                         vectorset=vectorset_config.vectorset_id
                     )
@@ -175,6 +177,10 @@ class IndexMessageBuilder:
                             replace,
                         )
 
+                edge_vectorset_configs = await datamanagers.graph_vectorsets.edge.get_all(
+                    self.resource.txn, kbid=self.resource.kbid
+                )
+                for vectorset_config in edge_vectorset_configs:
                     edge_vectors = await field.get_relation_edge_vectors(
                         vectorset=vectorset_config.vectorset_id
                     )

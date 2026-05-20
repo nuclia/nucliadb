@@ -24,7 +24,6 @@ from dataclasses import dataclass
 from nidx_protos import nodereader_pb2
 from typing_extensions import assert_never
 
-from nucliadb.common import datamanagers
 from nucliadb.common.filter_expression import add_and_expression, parse_expression
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationTypeMap
 from nucliadb.search.predict_models import QueryModel
@@ -94,13 +93,6 @@ async def _parse_common(kbid: str, item: AnyGraphRequest) -> nodereader_pb2.Grap
     security = await _parse_security(kbid, item)
     if security is not None:
         pb.security.CopyFrom(security)
-
-    # TODO: Use proper vectorsets
-    # Maybe this could come from the call to predict API?
-    vss = []
-    async with datamanagers.with_ro_transaction() as txn:
-        async for vs_id, vs_config in datamanagers.vectorsets.iter(txn, kbid=kbid):
-            vss.append(vs_id)
 
     return pb
 
