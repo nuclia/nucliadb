@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from abc import ABC, abstractmethod
+from abc import ABC
 from collections.abc import Sequence
 from enum import Enum
-from typing import Annotated, Any, ClassVar, Generic, Literal, TypeVar
+from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
 
 import pydantic
@@ -314,29 +314,22 @@ class KVFilter(BaseModel, ABC, extra="forbid"):
     schema_id: str
     key: str
 
-    @property
-    @abstractmethod
-    def _name(self) -> str: ...
-
 
 class Eq(KVFilter):
     """Equal (==) operator"""
 
-    _name: ClassVar[Literal["eq"]] = "eq"
     eq: str | int | float | bool
 
 
 class Gte(KVFilter):
     """Greater-than or equal (>=) operator"""
 
-    _name: ClassVar[Literal["gte"]] = "gte"
     gte: int | float | DateTime
 
 
 class Lte(KVFilter):
     """Less-than or equal (<=) operator"""
 
-    _name: ClassVar[Literal["lte"]] = "lte"
     lte: int | float | DateTime
 
 

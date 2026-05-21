@@ -19,6 +19,7 @@
 #
 
 from datetime import datetime
+from typing import Type
 
 from nidx_protos import nodereader_pb2
 from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
@@ -145,10 +146,10 @@ async def parse_kv_expression(
     return _parse_kv_expression(expr, all_schemas)
 
 
-KEY_VALUE_ALLOWED_TYPES = {
-    Eq._name: {KVFieldType.TEXT, KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.BOOLEAN},
-    Gte._name: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
-    Lte._name: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
+KEY_VALUE_ALLOWED_TYPES: dict[Type[Eq] | Type[Gte] | Type[Lte], set[KVFieldType]] = {
+    Eq: {KVFieldType.TEXT, KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.BOOLEAN},
+    Gte: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
+    Lte: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
 }
 
 
@@ -178,13 +179,13 @@ def _parse_kv_expression(
         schema_field = field_map[expr.key]
 
         # validate operand types for the expression operation
-        allowed_types = KEY_VALUE_ALLOWED_TYPES[expr._name]
+        allowed_types = KEY_VALUE_ALLOWED_TYPES[type(expr)]
         if schema_field.type not in allowed_types:
             allowed = " or".join([f"'{type}'" for type in allowed_types])
             raise InvalidQueryError(
                 "key_value",
                 f"Key '{expr.key}' in schema '{expr.schema_id}' is of type '{schema_field.type}', "
-                f"but '{expr._name}' requires type {allowed}",
+                f"but '{type(expr).__name__.lower()}' requires type {allowed}",
             )
 
         json_filter.path.field_id = f"k/{expr.schema_id}"
@@ -200,7 +201,7 @@ def _parse_kv_expression(
                     raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.BOOLEAN)
                 json_filter.path.boolean = expr.eq
             elif isinstance(expr.eq, float):
-                if schema_field.type != KVFieldType.FLOAT:
+                if schema_field.type not in (KVFieldType.FLOAT, KVFieldType.INTEGER):
                     raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.FLOAT)
                 json_filter.path.float_range.lower = expr.eq
                 json_filter.path.float_range.upper = expr.eq
