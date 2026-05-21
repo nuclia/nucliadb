@@ -346,9 +346,11 @@ message JsonFieldPathFilter {
 
     oneof predicate {
         string text = 3;
+        bool boolean = 6;
+        int64 int = 8;
+        double float = 9;
         IntegerRangePredicate int_range   = 4;
         FloatRangePredicate float_range = 5;
-        bool boolean = 6;
         DateRangePredicate date_range = 7;
     }
 }

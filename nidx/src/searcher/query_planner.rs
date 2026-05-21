@@ -240,10 +240,12 @@ fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> anyhow::Res
                 .ok_or_else(|| anyhow::anyhow!("Missing predicate"))?
             {
                 Predicate::Text(s) => JsonPredicate::Text(s.clone()),
+                Predicate::Int(i) => JsonPredicate::Int(*i),
                 Predicate::IntRange(r) => JsonPredicate::IntRange {
                     lower: r.lower,
                     upper: r.upper,
                 },
+                Predicate::Float(f) => JsonPredicate::Float(*f),
                 Predicate::FloatRange(r) => JsonPredicate::FloatRange {
                     lower: r.lower,
                     upper: r.upper,

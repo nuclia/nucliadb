@@ -34,11 +34,12 @@ pub struct JsonPathFilter {
 #[derive(Clone)]
 pub enum JsonPredicate {
     Text(String),
-
+    Int(i64),
     IntRange {
         lower: Option<i64>,
         upper: Option<i64>,
     },
+    Float(f64),
     FloatRange {
         lower: Option<f64>,
         upper: Option<f64>,
@@ -76,6 +77,24 @@ fn build_leaf_query(filter: &JsonPathFilter, json_field: Field) -> Box<dyn Query
             // Use the fast field to do exact match
             let mut term = Term::from_field_json_path(json_field, &path, true);
             term.append_type_and_str(val);
+            Box::new(FastFieldRangeQuery::new(
+                Bound::Included(term.clone()),
+                Bound::Included(term),
+            ))
+        }
+        JsonPredicate::Int(val) => {
+            // Use the fast field to do exact match
+            let mut term = Term::from_field_json_path(json_field, &path, false);
+            term.append_type_and_fast_value(*val);
+            Box::new(FastFieldRangeQuery::new(
+                Bound::Included(term.clone()),
+                Bound::Included(term),
+            ))
+        }
+        JsonPredicate::Float(val) => {
+            // Use the fast field to do exact match
+            let mut term = Term::from_field_json_path(json_field, &path, false);
+            term.append_type_and_fast_value(*val);
             Box::new(FastFieldRangeQuery::new(
                 Bound::Included(term.clone()),
                 Bound::Included(term),
@@ -290,6 +309,15 @@ mod tests {
     }
 
     #[test]
+    fn test_int_exact() {
+        let (svc, apple, banana, cherry) = build_test_index();
+        let results = search(&svc, path("t/product", "price", JsonPredicate::Int(150)));
+        assert!(results.contains(&apple));
+        assert!(!results.contains(&banana));
+        assert!(!results.contains(&cherry));
+    }
+
+    #[test]
     fn test_int_range() {
         let (svc, apple, banana, cherry) = build_test_index();
         let results = search(
@@ -324,6 +352,15 @@ mod tests {
         );
         assert!(results.contains(&apple));
         assert!(results.contains(&cherry));
+    }
+
+    #[test]
+    fn test_float_exact() {
+        let (svc, apple, banana, cherry) = build_test_index();
+        let results = search(&svc, path("t/product", "score", JsonPredicate::Float(3.2)));
+        assert!(!results.contains(&apple));
+        assert!(results.contains(&banana));
+        assert!(!results.contains(&cherry));
     }
 
     #[test]

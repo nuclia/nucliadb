@@ -239,11 +239,9 @@ def _parse_kv_expression(
             case bool():
                 json_filter.path.boolean = expr.eq
             case float():
-                json_filter.path.float_range.lower = expr.eq
-                json_filter.path.float_range.upper = expr.eq
+                json_filter.path.float = expr.eq
             case int():
-                json_filter.path.int_range.lower = expr.eq
-                json_filter.path.int_range.upper = expr.eq
+                json_filter.path.int = expr.eq
             case _:
                 assert_never(expr.eq)
 
