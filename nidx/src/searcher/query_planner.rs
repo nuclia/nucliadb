@@ -240,15 +240,18 @@ fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> anyhow::Res
                 .ok_or_else(|| anyhow::anyhow!("Missing predicate"))?
             {
                 Predicate::Text(s) => JsonPredicate::Text(s.clone()),
+                Predicate::Int(i) => JsonPredicate::Int(*i),
                 Predicate::IntRange(r) => JsonPredicate::IntRange {
                     lower: r.lower,
                     upper: r.upper,
                 },
+                Predicate::Float(f) => JsonPredicate::Float(*f),
                 Predicate::FloatRange(r) => JsonPredicate::FloatRange {
                     lower: r.lower,
                     upper: r.upper,
                 },
                 Predicate::Boolean(b) => JsonPredicate::Boolean(*b),
+                Predicate::Date(ts) => JsonPredicate::Date(nidx_json::DateTime::from_timestamp_secs(ts.seconds)),
                 Predicate::DateRange(r) => {
                     let ts_to_dt =
                         |ts: &nidx_protos::prost_types::Timestamp| nidx_json::DateTime::from_timestamp_secs(ts.seconds);

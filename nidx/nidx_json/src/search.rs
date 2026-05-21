@@ -34,20 +34,22 @@ pub struct JsonPathFilter {
 #[derive(Clone)]
 pub enum JsonPredicate {
     Text(String),
-
+    Boolean(bool),
+    Int(i64),
     IntRange {
         lower: Option<i64>,
         upper: Option<i64>,
     },
+    Float(f64),
     FloatRange {
         lower: Option<f64>,
         upper: Option<f64>,
     },
+    Date(tantivy::DateTime),
     DateRange {
         lower: Option<tantivy::DateTime>,
         upper: Option<tantivy::DateTime>,
     },
-    Boolean(bool),
 }
 
 #[derive(Clone)]
@@ -82,6 +84,22 @@ fn build_leaf_query(filter: &JsonPathFilter, json_field: Field) -> Box<dyn Query
             ))
         }
 
+        JsonPredicate::Boolean(val) => {
+            let mut term = Term::from_field_json_path(json_field, &path, false);
+            term.append_type_and_fast_value(*val);
+            Box::new(TermQuery::new(term, IndexRecordOption::Basic))
+        }
+
+        JsonPredicate::Int(val) => {
+            // Use the fast field to do exact match
+            let mut term = Term::from_field_json_path(json_field, &path, false);
+            term.append_type_and_fast_value(*val);
+            Box::new(FastFieldRangeQuery::new(
+                Bound::Included(term.clone()),
+                Bound::Included(term),
+            ))
+        }
+
         JsonPredicate::IntRange { lower, upper } => {
             let build_bound = |opt: &Option<i64>| -> Bound<Term> {
                 match opt {
@@ -94,6 +112,16 @@ fn build_leaf_query(filter: &JsonPathFilter, json_field: Field) -> Box<dyn Query
                 }
             };
             Box::new(FastFieldRangeQuery::new(build_bound(lower), build_bound(upper)))
+        }
+
+        JsonPredicate::Float(val) => {
+            // Use the fast field to do exact match
+            let mut term = Term::from_field_json_path(json_field, &path, false);
+            term.append_type_and_fast_value(*val);
+            Box::new(FastFieldRangeQuery::new(
+                Bound::Included(term.clone()),
+                Bound::Included(term),
+            ))
         }
 
         JsonPredicate::FloatRange { lower, upper } => {
@@ -110,10 +138,14 @@ fn build_leaf_query(filter: &JsonPathFilter, json_field: Field) -> Box<dyn Query
             Box::new(FastFieldRangeQuery::new(build_bound(lower), build_bound(upper)))
         }
 
-        JsonPredicate::Boolean(val) => {
+        JsonPredicate::Date(val) => {
+            // Use the fast field to do exact match
             let mut term = Term::from_field_json_path(json_field, &path, false);
             term.append_type_and_fast_value(*val);
-            Box::new(TermQuery::new(term, IndexRecordOption::Basic))
+            Box::new(FastFieldRangeQuery::new(
+                Bound::Included(term.clone()),
+                Bound::Included(term),
+            ))
         }
 
         JsonPredicate::DateRange { lower, upper } => {
@@ -290,6 +322,15 @@ mod tests {
     }
 
     #[test]
+    fn test_int_exact() {
+        let (svc, apple, banana, cherry) = build_test_index();
+        let results = search(&svc, path("t/product", "price", JsonPredicate::Int(150)));
+        assert!(results.contains(&apple));
+        assert!(!results.contains(&banana));
+        assert!(!results.contains(&cherry));
+    }
+
+    #[test]
     fn test_int_range() {
         let (svc, apple, banana, cherry) = build_test_index();
         let results = search(
@@ -324,6 +365,15 @@ mod tests {
         );
         assert!(results.contains(&apple));
         assert!(results.contains(&cherry));
+    }
+
+    #[test]
+    fn test_float_exact() {
+        let (svc, apple, banana, cherry) = build_test_index();
+        let results = search(&svc, path("t/product", "score", JsonPredicate::Float(3.2)));
+        assert!(!results.contains(&apple));
+        assert!(results.contains(&banana));
+        assert!(!results.contains(&cherry));
     }
 
     #[test]
@@ -504,6 +554,21 @@ mod tests {
             path("k/product", "color", JsonPredicate::Text("red apple".to_string())),
         );
         assert!(!results.contains(&id), "wrong case should not match");
+    }
+
+    #[test]
+    fn test_date_exact() {
+        let (svc, _old, mid, _new) = build_date_index();
+        // [2021-01-01 .. 2023-01-01]
+        let results = search(
+            &svc,
+            path(
+                "t/event",
+                "ts",
+                JsonPredicate::Date(tantivy::DateTime::from_timestamp_secs(1655251200)),
+            ),
+        );
+        assert_eq!(results, HashSet::from([mid]));
     }
 
     #[test]
