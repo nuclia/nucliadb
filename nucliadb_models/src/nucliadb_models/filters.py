@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from datetime import datetime
 from enum import Enum
@@ -315,11 +315,17 @@ class KVFilter(BaseModel, ABC, extra="forbid"):
     schema_id: str
     key: str
 
+    @abstractmethod
+    def _value_type(self) -> type: ...
+
 
 class Eq(KVFilter):
     """Equal (==) operator"""
 
     eq: str | int | float | bool
+
+    def _value_type(self) -> type:
+        return type(self.eq)
 
 
 class Inequalities(KVFilter):
@@ -327,6 +333,13 @@ class Inequalities(KVFilter):
 
     gte: int | float | DateTime | None = pydantic.Field(default=None)
     lte: int | float | DateTime | None = pydantic.Field(default=None)
+
+    def _value_type(self) -> type:
+        # At least one is always set (validated by check_bounds)
+        # and when both are set, they're guaranteed to be compatible types
+        value = self.gte if self.gte is not None else self.lte
+        assert value is not None
+        return type(value)
 
     @model_validator(mode="after")
     def check_bounds(self) -> Self:
