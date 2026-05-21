@@ -19,7 +19,7 @@
 #
 import random
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
@@ -803,7 +803,7 @@ async def _test_keyword_search(
     min_score: float | dict | None = None,
     found: bool = True,
 ):
-    payload = {
+    payload: dict[str, Any] = {
         "query": message_text,
         "features": ["keyword"],
         "top_k": top_k,
@@ -840,7 +840,7 @@ async def _test_semantic_search(
     min_score: float | dict | None = None,
     found: bool = True,
 ):
-    payload = {
+    payload: dict[str, Any] = {
         "vector": message_vector,
         "features": ["semantic"],
         "top_k": top_k,
@@ -1070,15 +1070,19 @@ async def test_delete_conversation_message_lambs_resource(
     async def _check_search():
         for case in search_cases.values():
             await _test_keyword_search(
-                nucliadb_reader, kbid, case["text"], case["pid"], found=case["should_find"]
+                nucliadb_reader,
+                kbid,
+                cast(str, case["text"]),
+                cast(str, case["pid"]),
+                found=cast(bool, case["should_find"]),
             )
             await _test_semantic_search(
                 nucliadb_reader,
                 kbid,
-                case["text"],
-                case["pid"],
-                case["vector"],
-                found=case["should_find"],
+                cast(str, case["text"]),
+                cast(str, case["pid"]),
+                cast(list[int | float], case["vector"]),
+                found=cast(bool, case["should_find"]),
             )
 
     await _check_search()
