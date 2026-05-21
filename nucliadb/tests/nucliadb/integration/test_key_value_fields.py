@@ -311,25 +311,33 @@ async def test_kv_field_filter(
         return set(resp.json()["resources"].keys())
 
     filters = [
-        # exact match
-        ("color", "eq", "red", {rid1}),
-        ("color", "eq", "blue", {rid2}),
-        ("color", "eq", "black", set()),
-        ("price", "eq", 5.0, {rid2}),
-        ("price", "eq", 5, {rid2}),
-        ("quantity", "eq", 3, {rid1}),
+        # BOOLEAN fields
         ("in_stock", "eq", True, {rid1}),
+        ("in_stock", "eq", False, {rid2}),
+        # INTEGER fields
+        ("quantity", "eq", 3, {rid1}),
         ("quantity", "gte", 1, {rid1, rid2}),
         ("quantity", "gte", 5, {rid2}),
-        ("price", "gte", 5.0, {rid1, rid2}),
-        ("price", "gte", 5, {rid1, rid2}),  # price (float) can be filtered by an int
-        ("price", "gte", 5.01, {rid1}),
-        ("launched_at", "gte", "2024-01-01T00:00:00Z", {rid2}),
         ("quantity", "lte", 20, {rid1, rid2}),
         ("quantity", "lte", 5, {rid1}),
+        # FLOAT fields
+        ("price", "eq", 5, {rid2}),
+        ("price", "eq", 5.0, {rid2}),
+        ("price", "gte", 5.0, {rid1, rid2}),
+        ("price", "gte", 5.01, {rid1}),
         ("price", "lte", 12.5, {rid1, rid2}),
-        ("price", "lte", 5, {rid2}),  # price (float) can be filtered by an int
         ("price", "lte", 4.99, set()),
+        #  price (float) can be filtered by an int
+        ("price", "eq", 5, {rid2}),
+        ("price", "gte", 5, {rid1, rid2}),
+        ("price", "lte", 5, {rid2}),
+        # TEXT fields
+        ("color", "eq", "black", set()),
+        ("color", "eq", "blue", {rid2}),
+        ("color", "eq", "red", {rid1}),
+        # DATE fields
+        ("launched_at", "eq", "2024-06-01T00:00:00Z", {rid2}),
+        ("launched_at", "gte", "2024-01-01T00:00:00Z", {rid2}),
         ("launched_at", "lte", "2023-12-31T23:59:59Z", {rid1}),
     ]
     for key, op, value, expected in filters:

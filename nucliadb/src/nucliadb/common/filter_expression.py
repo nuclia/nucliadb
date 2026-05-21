@@ -26,7 +26,7 @@ from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
 from typing_extensions import assert_never
 
 from nucliadb.common import datamanagers
-from nucliadb.common.exceptions import InvalidKVType, InvalidQueryError
+from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR
 from nucliadb_models.common import Paragraph
 from nucliadb_models.filters import (
@@ -146,16 +146,22 @@ async def parse_kv_expression(
 
 
 KEY_VALUE_ALLOWED_TYPES: dict[Type[Eq] | Type[Inequalities], set[KVFieldType]] = {
-    Eq: {KVFieldType.TEXT, KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.BOOLEAN},
+    Eq: {
+        KVFieldType.TEXT,
+        KVFieldType.INTEGER,
+        KVFieldType.FLOAT,
+        KVFieldType.BOOLEAN,
+        KVFieldType.DATE,
+    },
     Inequalities: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
 }
 
-KV_VALUE_FIELD_TYPES: dict[type, set[KVFieldType]] = {
-    str: {KVFieldType.TEXT},
-    bool: {KVFieldType.BOOLEAN},
-    float: {KVFieldType.FLOAT},
-    int: {KVFieldType.INTEGER, KVFieldType.FLOAT},
-    datetime: {KVFieldType.DATE},
+KV_VALUE_FIELD_TYPES: dict[type, list[KVFieldType]] = {
+    str: [KVFieldType.TEXT],
+    bool: [KVFieldType.BOOLEAN],
+    float: [KVFieldType.FLOAT],
+    int: [KVFieldType.INTEGER, KVFieldType.FLOAT],
+    datetime: [KVFieldType.DATE],
 }
 
 
@@ -186,8 +192,14 @@ def _validate_kv_schema(
 
     # validate value type(s) match the field type
     expected_field_types = KV_VALUE_FIELD_TYPES.get(expr._value_type())
-    if expected_field_types is None or schema_field.type not in expected_field_types:
-        raise InvalidKVType(expr.schema_id, schema_field, schema_field.type)
+    assert expected_field_types is not None, "missing a type in the key-value field types dict!"
+    if schema_field.type not in expected_field_types:
+        invalid_type = expected_field_types[0]
+        raise InvalidQueryError(
+            "key_value",
+            f"Key '{schema_field.key}' in schema '{expr.schema_id}' is of type '{schema_field.type}', "
+            f"but '{invalid_type} has been provided",
+        )
 
 
 def _set_range_bound(
@@ -242,6 +254,8 @@ def _parse_kv_expression(
                 json_filter.path.float = expr.eq
             case int():
                 json_filter.path.int = expr.eq
+            case datetime():
+                json_filter.path.date.FromDatetime(expr.eq)
             case _:
                 assert_never(expr.eq)
 

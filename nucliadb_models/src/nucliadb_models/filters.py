@@ -321,7 +321,7 @@ class KVFilter(BaseModel, ABC, extra="forbid"):
 class Eq(KVFilter):
     """Equal (==) operator"""
 
-    eq: str | int | float | bool
+    eq: bool | int | float | DateTime | str
 
     def _value_type(self) -> type:
         return type(self.eq)

@@ -349,6 +349,7 @@ message JsonFieldPathFilter {
         bool boolean = 6;
         int64 int = 8;
         double float = 9;
+        google.protobuf.Timestamp date = 10;
         IntegerRangePredicate int_range   = 4;
         FloatRangePredicate float_range = 5;
         DateRangePredicate date_range = 7;

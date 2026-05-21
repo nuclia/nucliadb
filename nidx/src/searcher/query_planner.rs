@@ -251,6 +251,7 @@ fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> anyhow::Res
                     upper: r.upper,
                 },
                 Predicate::Boolean(b) => JsonPredicate::Boolean(*b),
+                Predicate::Date(ts) => JsonPredicate::Date(nidx_json::DateTime::from_timestamp_secs(ts.seconds)),
                 Predicate::DateRange(r) => {
                     let ts_to_dt =
                         |ts: &nidx_protos::prost_types::Timestamp| nidx_json::DateTime::from_timestamp_secs(ts.seconds);
