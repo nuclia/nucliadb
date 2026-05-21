@@ -69,9 +69,7 @@ def predict():
     ],
 )
 async def test_get_find_results_vector_search_is_optional(predict, chat_features, find_features):
-    find_results = KnowledgeboxFindResults(
-        total=0, min_score=MinScore(semantic=0.7), resources={}, facets=[]
-    )
+    find_results = KnowledgeboxFindResults(total=0, min_score=MinScore(semantic=0.7), resources={})
 
     ask_request = AskRequest(query="query")
     if chat_features is not None:

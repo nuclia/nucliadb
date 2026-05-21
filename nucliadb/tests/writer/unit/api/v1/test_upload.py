@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from fastapi.requests import Request
 
-from nucliadb.models.internal.processing import ProcessingInfo, Source
+from nucliadb.models.internal.processing import ProcessingInfo
 from nucliadb.writer.api.v1.upload import (
     store_file_on_nuclia_db,
     validate_field_upload,
@@ -31,6 +31,7 @@ from nucliadb.writer.resource.field import ResourceClassifications
 from nucliadb.writer.tus.exceptions import HTTPConflict, HTTPNotFound
 from nucliadb_models.resource import QueueType
 from nucliadb_protos.knowledgebox_pb2 import KnowledgeBoxConfig
+from nucliadb_protos.resources_pb2 import CloudFile
 
 UPLOAD_PACKAGE = "nucliadb.writer.api.v1.upload"
 
@@ -98,7 +99,7 @@ async def test_store_file_on_nucliadb_does_not_store_passwords(
         "/some/path",
         Request({"type": "http", "headers": []}),
         "bucket",
-        Source.INGEST,
+        CloudFile.Source.LOCAL,
         "rid",
         field,
         password="mypassword",
@@ -169,7 +170,7 @@ async def test_store_file_on_nucliadb_sets_hidden(
         "/some/path",
         Request({"type": "http", "headers": []}),
         "bucket",
-        Source.INGEST,
+        CloudFile.Source.LOCAL,
         "rid",
         field,
         password="mypassword",
@@ -188,7 +189,7 @@ async def test_store_file_on_nucliadb_sets_hidden(
         "/some/path",
         Request({"type": "http", "headers": []}),
         "bucket",
-        Source.INGEST,
+        CloudFile.Source.LOCAL,
         "rid",
         field,
         password="mypassword",

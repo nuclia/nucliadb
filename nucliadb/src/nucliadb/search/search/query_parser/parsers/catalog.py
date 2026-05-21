@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import cast
+
 from typing_extensions import assert_never
 
 from nucliadb.common import datamanagers
@@ -33,7 +35,7 @@ from nucliadb_models.filters import (
     Not,
     Or,
     Resource,
-    ResourceFilterExpression,
+    ResourceFilterExpressionType,
 )
 from nucliadb_models.labels import LABEL_HIDDEN
 from nucliadb_models.metadata import ResourceProcessingStatus
@@ -161,18 +163,24 @@ def parse_old_filters(item: search_models.CatalogRequest) -> CatalogExpression:
     return CatalogExpression(bool_and=expressions)
 
 
-async def parse_filter_expression(expr: ResourceFilterExpression, kbid: str) -> CatalogExpression:
+async def parse_filter_expression(expr: ResourceFilterExpressionType, kbid: str) -> CatalogExpression:
     cat = CatalogExpression()
     if isinstance(expr, And):
         cat.bool_and = []
         for op in expr.operands:
-            cat.bool_and.append(await parse_filter_expression(op, kbid))
+            cat.bool_and.append(
+                await parse_filter_expression(cast(ResourceFilterExpressionType, op), kbid)
+            )
     elif isinstance(expr, Or):
         cat.bool_or = []
         for op in expr.operands:
-            cat.bool_or.append(await parse_filter_expression(op, kbid))
+            cat.bool_or.append(
+                await parse_filter_expression(cast(ResourceFilterExpressionType, op), kbid)
+            )
     elif isinstance(expr, Not):
-        cat.bool_not = await parse_filter_expression(expr.operand, kbid)
+        cat.bool_not = await parse_filter_expression(
+            cast(ResourceFilterExpressionType, expr.operand), kbid
+        )
     elif isinstance(expr, Resource):
         if expr.id:
             cat.resource_id = expr.id

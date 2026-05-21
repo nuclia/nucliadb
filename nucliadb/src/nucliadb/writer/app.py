@@ -19,6 +19,7 @@
 #
 
 import importlib.metadata
+from typing import Any
 
 from fastapi import FastAPI
 from starlette.middleware import Middleware
@@ -52,7 +53,7 @@ middleware.extend(
 
 errors.setup_error_handling(importlib.metadata.distribution("nucliadb").version)
 
-fastapi_settings = dict(
+fastapi_settings: dict[str, Any] = dict(
     debug=running_settings.debug,
     lifespan=lifespan,
     exception_handlers={
@@ -63,7 +64,7 @@ fastapi_settings = dict(
 
 
 def create_application() -> FastAPI:
-    base_app = FastAPI(title="NucliaDB Writer API", **fastapi_settings)  # type: ignore
+    base_app = FastAPI(title="NucliaDB Writer API", **fastapi_settings)
 
     base_app.include_router(api_v1)
 

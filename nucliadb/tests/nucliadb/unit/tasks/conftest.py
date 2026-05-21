@@ -20,6 +20,8 @@
 from unittest.mock import AsyncMock, Mock
 
 import nats
+import nats.js
+import nats.js.errors
 import pytest
 
 

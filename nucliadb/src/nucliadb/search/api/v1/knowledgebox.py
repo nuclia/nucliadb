@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from typing import Awaitable
 
 from fastapi import HTTPException, Request
 from fastapi_versioning import version
@@ -159,7 +160,7 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
     """
     shard_manager = get_shard_manager()
     shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
-    ops = []
+    ops: list[Awaitable[Shard]] = []
     queried_shards = []
     for shard_object in shard_groups:
         shard_id = shard_object.nidx_shard_id
@@ -177,8 +178,8 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
         )
 
     try:
-        results: list[Shard] | None = await asyncio.wait_for(
-            asyncio.gather(*ops, return_exceptions=True),  # type: ignore
+        results: list[Shard | BaseException] | None = await asyncio.wait_for(
+            asyncio.gather(*ops, return_exceptions=True),
             timeout=settings.search_timeout,
         )
     except asyncio.TimeoutError as exc:
@@ -196,7 +197,7 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
 
     counts = IndexCounts(fields=0, paragraphs=0, sentences=0, size_bytes=0)
     for shard in results:
-        if isinstance(shard, Exception):
+        if isinstance(shard, BaseException):
             logger.error("Error getting shard info", exc_info=shard)
             errors.capture_exception(shard)
             raise HTTPException(status_code=500, detail=f"Error while geting shard data")

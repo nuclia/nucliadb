@@ -19,7 +19,7 @@
 #
 import asyncio
 from collections.abc import Coroutine
-from typing import Any
+from typing import Any, Sequence
 
 from nucliadb_utils import logger
 
@@ -62,7 +62,7 @@ class ConcurrentRunner:
         return results
 
 
-async def run_concurrently(tasks: list[Coroutine], max_concurrent: int | None = None) -> list[Any]:
+async def run_concurrently(tasks: Sequence[Coroutine], max_concurrent: int | None = None) -> list[Any]:
     """
     Runs a list of coroutines concurrently, with a maximum number of tasks running.
     Returns the results of the coroutines in the order they were scheduled.

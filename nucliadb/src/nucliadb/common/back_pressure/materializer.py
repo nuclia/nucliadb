@@ -56,8 +56,8 @@ class BackPressureMaterializer:
     def __init__(
         self,
         nats_manager: NatsConnectionManager,
-        indexing_check_interval: int = 30,
-        ingest_check_interval: int = 30,
+        indexing_check_interval: float = 30,
+        ingest_check_interval: float = 30,
     ):
         self.nats_manager = nats_manager
         self.processing_http_client = ProcessingHTTPClient()
@@ -71,7 +71,7 @@ class BackPressureMaterializer:
         self._tasks: list[asyncio.Task] = []
         self._running = False
 
-        self.processing_pending_cache = TTLCache(maxsize=1024, ttl=60)  # type: ignore
+        self.processing_pending_cache = TTLCache(maxsize=1024, ttl=60)  # type: ignore[var-annotated]
         self.processing_pending_locks: dict[str, asyncio.Lock] = {}
 
     async def start(self):

@@ -19,7 +19,7 @@
 #
 
 from datetime import datetime
-from typing import Type
+from typing import Type, cast
 
 from nidx_protos import nodereader_pb2
 from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
@@ -36,13 +36,13 @@ from nucliadb_models.filters import (
     Entity,
     Eq,
     Field,
-    FieldFilterExpression,
+    FieldFilterExpressionType,
     FieldMimetype,
     Generated,
     Inequalities,
     Keyword,
     Kind,
-    KVFilterExpression,
+    KVFilterExpressionType,
     Label,
     Language,
     Not,
@@ -52,7 +52,7 @@ from nucliadb_models.filters import (
     OriginPath,
     OriginSource,
     OriginTag,
-    ParagraphFilterExpression,
+    ParagraphFilterExpressionType,
     Resource,
     ResourceMimetype,
     Status,
@@ -79,19 +79,20 @@ FacetFilter = (
 
 
 async def parse_expression(
-    expr: FieldFilterExpression | ParagraphFilterExpression,
+    expr: FieldFilterExpressionType | ParagraphFilterExpressionType,
     kbid: str,
 ) -> PBFilterExpression:
     f = PBFilterExpression()
 
+    _ExprType = FieldFilterExpressionType | ParagraphFilterExpressionType
     if isinstance(expr, And):
         for op in expr.operands:
-            f.bool_and.operands.append(await parse_expression(op, kbid))
+            f.bool_and.operands.append(await parse_expression(cast(_ExprType, op), kbid))
     elif isinstance(expr, Or):
         for op in expr.operands:
-            f.bool_or.operands.append(await parse_expression(op, kbid))
+            f.bool_or.operands.append(await parse_expression(cast(_ExprType, op), kbid))
     elif isinstance(expr, Not):
-        f.bool_not.CopyFrom(await parse_expression(expr.operand, kbid))
+        f.bool_not.CopyFrom(await parse_expression(cast(_ExprType, expr.operand), kbid))
     elif isinstance(expr, Resource):
         if expr.id:
             f.resource.resource_id = expr.id
@@ -132,7 +133,7 @@ async def parse_expression(
 
 
 async def parse_kv_expression(
-    expr: KVFilterExpression,
+    expr: KVFilterExpressionType,
     kbid: str,
 ) -> nodereader_pb2.JsonFilterExpression:
     """Convert a key-value filter expression tree into it's proto
@@ -215,17 +216,23 @@ def _set_range_bound(
 
 
 def _parse_kv_expression(
-    expr: KVFilterExpression,
+    expr: KVFilterExpressionType,
     schemas: KBKVSchemas,
 ) -> nodereader_pb2.JsonFilterExpression:
     json_filter = nodereader_pb2.JsonFilterExpression()
 
     if isinstance(expr, And):
-        json_filter.bool_and.operands.extend([_parse_kv_expression(op, schemas) for op in expr.operands])
+        json_filter.bool_and.operands.extend(
+            [_parse_kv_expression(cast(KVFilterExpressionType, op), schemas) for op in expr.operands]
+        )
     elif isinstance(expr, Or):
-        json_filter.bool_or.operands.extend([_parse_kv_expression(op, schemas) for op in expr.operands])
+        json_filter.bool_or.operands.extend(
+            [_parse_kv_expression(cast(KVFilterExpressionType, op), schemas) for op in expr.operands]
+        )
     elif isinstance(expr, Not):
-        json_filter.bool_not.CopyFrom(_parse_kv_expression(expr.operand, schemas))
+        json_filter.bool_not.CopyFrom(
+            _parse_kv_expression(cast(KVFilterExpressionType, expr.operand), schemas)
+        )
 
     elif isinstance(expr, Eq):
         _validate_kv_schema(schemas, expr)

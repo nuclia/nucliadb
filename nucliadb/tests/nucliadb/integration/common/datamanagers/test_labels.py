@@ -42,21 +42,18 @@ async def test_labelset_ids(maindb_driver):
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
-        assert sorted(await datamanagers.labels._get_labelset_ids(txn, kbid=kbid)) == [
-            "ba",
-            "bar",
-            "baz",
-        ]
+        labels = await datamanagers.labels._get_labelset_ids(txn, kbid=kbid)
+        assert labels
+        assert sorted(labels) == ["ba", "bar", "baz"]
 
     # Check that removing from the list removes the item
     async with maindb_driver.rw_transaction() as txn:
         await datamanagers.labels._delete_from_labelset_ids(txn, kbid=kbid, labelsets=["ba"])
         await txn.commit()
     async with maindb_driver.ro_transaction() as txn:
-        assert sorted(await datamanagers.labels._get_labelset_ids(txn, kbid=kbid)) == [
-            "bar",
-            "baz",
-        ]
+        labels = await datamanagers.labels._get_labelset_ids(txn, kbid=kbid)
+        assert labels
+        assert sorted(labels) == ["bar", "baz"]
 
     # Check that list is empty after removing all
     async with maindb_driver.rw_transaction() as txn:

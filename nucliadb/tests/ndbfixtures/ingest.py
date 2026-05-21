@@ -28,6 +28,8 @@ from os.path import dirname, getsize
 from unittest.mock import AsyncMock, patch
 
 import nats
+import nats.js
+import nats.js.errors
 import pytest
 from grpc import aio
 
@@ -86,7 +88,7 @@ async def component_nucliadb_ingest_grpc(
 ) -> AsyncIterator[WriterStub]:
     channel = aio.insecure_channel(ingest_grpc_server.address)
     stub = WriterStub(channel)
-    yield stub  # type: ignore
+    yield stub
     await channel.close(grace=None)
 
 
@@ -94,7 +96,7 @@ async def component_nucliadb_ingest_grpc(
 async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[WriterStub]:
     channel = aio.insecure_channel(f"localhost:{nucliadb.ingest_grpc_port}")
     stub = WriterStub(channel)
-    yield stub  # type: ignore
+    yield stub
     await channel.close(grace=None)
 
 

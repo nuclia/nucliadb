@@ -32,8 +32,8 @@ from nucliadb_protos.utils_pb2 import ExtractedText
 @pytest.fixture()
 def extracted_text():
     yield ExtractedText(
-        text=b"Hello World!",
-        split_text={"1": b"Hello", "2": b"World!"},
+        text="Hello World!",
+        split_text={"1": "Hello", "2": "World!"},
     )
 
 
@@ -101,7 +101,7 @@ async def fake_download_pb():
 
 async def fake_get_extracted_text_from_gcloud(*args, **kwargs):
     await asyncio.sleep(random.uniform(0, 1))
-    return ExtractedText(text=b"Hello World!")
+    return ExtractedText(text="Hello World!")
 
 
 async def test_get_field_extracted_text_is_cached(field, fake_download_pb):

@@ -23,7 +23,7 @@ import os
 import sys
 
 import argdantic
-import uvicorn  # type: ignore
+import uvicorn
 from fastapi import FastAPI
 
 from nucliadb.common.cluster.settings import settings as cluster_settings

@@ -28,7 +28,7 @@ def test_get_vectorset_config():
         semantic_model="multilingual",
         semantic_vector_size=1024,
         semantic_threshold=0.5,
-        semantic_vector_similarity=SimilarityFunction.COSINE,
+        semantic_vector_similarity=SimilarityFunction.COSINE.name,
         semantic_models=["multilingual", "en-2024-04-24"],
         semantic_model_configs={
             "multilingual": SemanticConfig(

@@ -667,10 +667,11 @@ class Field(Generic[PbType]):
         author.user.SetInParent()
         return author
 
-    def serialize(self):
+    def serialize(self) -> str:
+        assert self.value
         return self.value.SerializeToString()
 
-    async def set_value(self, value: Any):
+    async def set_value(self, payload: Any):
         raise NotImplementedError()
 
     async def get_value(self) -> Any:

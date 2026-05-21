@@ -141,7 +141,7 @@ def parse_keyword_min_score(
 ) -> float:
     # Keep backward compatibility with the deprecated min_score payload
     # parameter being a float (specifying semantic)
-    if min_score is None or isinstance(min_score, float):
+    if min_score is None or isinstance(min_score, float) or isinstance(min_score, int):
         return 0.0
     else:
         return min_score.bm25
@@ -154,9 +154,7 @@ async def parse_semantic_min_score(
 ):
     if min_score is None:
         min_score = None
-    elif isinstance(min_score, float):
-        min_score = min_score
-    else:
+    elif isinstance(min_score, search_models.MinScore):
         min_score = min_score.semantic
 
     if min_score is None:

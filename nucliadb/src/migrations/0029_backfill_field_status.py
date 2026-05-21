@@ -118,7 +118,7 @@ async def do_batch(context: ExecutionContext, start: str) -> str | None:
                 resource_key = "/".join(field_key.split("/")[:5])
                 basic = resources_basic.get(resource_key, None)
                 if basic is None:
-                    logger.warn(f"{field_key} resource has no basic, skipped")
+                    logger.warning(f"{field_key} resource has no basic, skipped")
                     continue
 
                 status = writer_pb2.FieldStatus()

@@ -114,7 +114,7 @@ async def test_restore_broker_message(broker_message, transaction, partitioning)
     assert broker_message.kbid != import_kbid
 
     with patch("nucliadb.export_import.utils.process_bm_grpc", AsyncMock()) as mock_process:
-        await restore_broker_message(context, import_kbid, broker_message)
+        await restore_broker_message(context, import_kbid, broker_message)  # ty:ignore[invalid-argument-type]
 
     # Sends two messages
     assert mock_process.call_count == 2

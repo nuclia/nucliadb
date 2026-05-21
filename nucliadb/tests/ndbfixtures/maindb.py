@@ -21,10 +21,12 @@ import logging
 import os
 import random
 from collections.abc import AsyncIterator, Iterator
+from typing import Any, cast
 from unittest.mock import patch
 from urllib.parse import urlparse, urlunparse
 
 import psycopg
+import psycopg.sql
 import pytest
 from pytest_docker_fixtures import images
 
@@ -38,6 +40,7 @@ from tests.ndbfixtures.utils import global_utility
 
 logger = logging.getLogger("nucliadb.fixtures:maindb")
 
+images.settings = cast(dict[str, Any], images.settings)
 # Minimum support PostgreSQL version
 # Reason: We want the btree_gin extension to support uuid's (pg11) and `gen_random_uuid()` (pg13)
 images.settings["postgresql"]["version"] = "13"
@@ -90,7 +93,9 @@ async def create_test_database(base_url):
         for i in range(10):
             try:
                 dbname = f"_nucliadb_test_{random.randint(0, 999999)}"
-                await cursor.execute(f"CREATE DATABASE {dbname}")
+                await cursor.execute(
+                    psycopg.sql.SQL("CREATE DATABASE {}").format(psycopg.sql.Identifier(dbname))
+                )
                 return dbname
             except psycopg.errors.DuplicateDatabase:
                 pass

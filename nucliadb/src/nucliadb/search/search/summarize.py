@@ -105,7 +105,7 @@ async def get_extracted_texts(kbid: str, resource_uuids_or_slugs: list[str]) -> 
             logger.error("Error fetching extracted text", exc_info=exception)
             for pending_task in pending:
                 pending_task.cancel()
-            raise exception  # type: ignore
+            raise exception  # type: ignore[misc]
         results.append(done_task.result())
 
     tasks.clear()

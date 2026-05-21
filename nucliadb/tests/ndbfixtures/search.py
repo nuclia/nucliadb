@@ -160,7 +160,7 @@ async def wait_for_shard(knowledgebox: str, count: int) -> str:
     req = GetShardRequest()
     req.shard_id.id = shard.nidx_shard_id
     for _ in range(30):
-        count_shard: Shard = await nidx_api.GetShard(req)  # type: ignore
+        count_shard: Shard = await nidx_api.GetShard(req)
         if count_shard.fields >= count:
             break
         await asyncio.sleep(1)

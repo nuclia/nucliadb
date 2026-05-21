@@ -318,10 +318,10 @@ async def _get_resource_uuid_from_params(kbid, rid: str | None, rslug: str | Non
 
     if not rid:
         # Attempt to get it from slug
+        assert rslug
         rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
             kbid=kbid,
-            # mypy doesn't infer that we already checked for slug to be something
-            slug=rslug,  # type: ignore[arg-type]
+            slug=rslug,
         )
         if rid is None:
             raise HTTPException(status_code=404, detail="Resource does not exist")

@@ -55,7 +55,7 @@ class ProcessingAPIUnavailableError(SendToProcessError): ...
 
 
 RETRIABLE_EXCEPTIONS = (
-    aiohttp.client_exceptions.ClientConnectorError,
+    aiohttp.ClientConnectorError,
     ProcessingAPIUnavailableError,
 )
 MAX_TRIES = 4

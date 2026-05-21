@@ -155,9 +155,11 @@ async def test_get_value(resource):
             conv.value = {}
 
         page1 = await conv.get_value(page=1)
+        assert page1
         assert len(page1.messages) == 200
         assert [m.ident for m in page1.messages] == ["m1", "m2"] + [str(i) for i in range(198)]
 
         page2 = await conv.get_value(page=2)
+        assert page2
         assert len(page2.messages) == 102
         assert [m.ident for m in page2.messages] == [str(i) for i in range(198, 300)]

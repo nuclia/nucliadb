@@ -29,7 +29,7 @@ class DummyCatalog(Catalog):
     async def delete(self, txn: Transaction, kbid: str, rid: str):
         return
 
-    async def search(self, query: CatalogQuery) -> Resources:
+    async def search(self, catalog_query: CatalogQuery) -> Resources:
         return Resources(results=[], min_score=0.0)
 
     async def facets(self, kbid: str, request: CatalogFacetsRequest) -> dict[str, int]:

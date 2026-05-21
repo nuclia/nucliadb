@@ -169,7 +169,7 @@ class KnowledgeBox:
 
                 vs_external_indexes = []
 
-                for vectorset_id, semantic_model in semantic_models.items():  # type: ignore
+                for vectorset_id, semantic_model in semantic_models.items():
                     # if this KB uses a matryoshka model, we can choose a different
                     # dimension
                     if len(semantic_model.matryoshka_dimensions) > 0:
@@ -269,7 +269,7 @@ class KnowledgeBox:
                     await op()
                 except Exception:
                     if isinstance(op, partial):
-                        name: str = op.func.__name__
+                        name: str = getattr(op.func, "__name__", "unknown?")
                     else:
                         getattr(op, "__name__", "unknown?")
                     logger.exception(f"Unexpected error rolling back {name}. Keep rolling back")

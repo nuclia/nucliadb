@@ -19,6 +19,7 @@
 #
 import asyncio
 import unittest
+import unittest.mock
 import uuid
 from typing import cast
 from unittest.mock import AsyncMock
