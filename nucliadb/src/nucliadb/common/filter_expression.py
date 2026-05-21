@@ -142,9 +142,7 @@ async def parse_kv_expression(
     """
     async with datamanagers.with_ro_transaction() as txn:
         all_schemas = await datamanagers.kv_schemas.get_all(txn, kbid=kbid)
-    oxpr = _parse_kv_expression(expr, all_schemas)
-    print(oxpr)
-    return oxpr
+    return _parse_kv_expression(expr, all_schemas)
 
 
 KEY_VALUE_ALLOWED_TYPES = {
