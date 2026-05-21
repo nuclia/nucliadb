@@ -14,7 +14,6 @@
 #
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
@@ -350,18 +349,13 @@ class Inequalities(KVFilter):
         if self.gte is None or self.lte is None:
             return self
 
-        # when more than one operator is used, we can already validate some
-        # obvious invalid combinations
-        if isinstance(self.lte, datetime) and isinstance(self.gte, datetime):
-            if self.lte < self.gte:
+        # we don't want differing types in a expression with mutliple inequality
+        # operators
+        if type(self.gte) is type(self.lte):
+            if self.lte < self.gte:  # type: ignore # ty doesn't understand we already checked this
                 raise ValueError(f"lte ({self.lte}) must be >= than gte ({self.gte})")
-        if isinstance(self.lte, (int, float)) and isinstance(self.gte, (int, float)):
-            if self.lte < self.gte:
-                raise ValueError(f"lte ({self.lte}) must be >= than gte ({self.gte})")
-        if isinstance(self.lte, datetime) and isinstance(self.gte, (int, float)):
-            raise ValueError("can't mix numeric and datetimes comparisons in the same operator")
-        if isinstance(self.lte, (int, float)) and isinstance(self.gte, datetime):
-            raise ValueError("can't mix numeric and datetimes comparisons in the same operator")
+        else:
+            raise ValueError("`gte` and `lte` types must be the same")
 
         return self
 
