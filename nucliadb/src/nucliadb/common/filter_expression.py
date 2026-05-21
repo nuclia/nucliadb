@@ -215,7 +215,7 @@ def _parse_kv_expression(
 
         elif isinstance(expr, Gte):
             if isinstance(expr.gte, float):
-                if schema_field.type != KVFieldType.FLOAT:
+                if schema_field.type not in (KVFieldType.FLOAT, KVFieldType.INTEGER):
                     raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.FLOAT)
                 json_filter.path.float_range.lower = expr.gte
             elif isinstance(expr.gte, int):
@@ -231,7 +231,7 @@ def _parse_kv_expression(
 
         elif isinstance(expr, Lte):
             if isinstance(expr.lte, float):
-                if schema_field.type != KVFieldType.FLOAT:
+                if schema_field.type not in (KVFieldType.FLOAT, KVFieldType.INTEGER):
                     raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.FLOAT)
                 json_filter.path.float_range.upper = expr.lte
             elif isinstance(expr.lte, int):
