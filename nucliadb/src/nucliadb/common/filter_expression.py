@@ -18,13 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from datetime import datetime
+from typing import Type
 
 from nidx_protos import nodereader_pb2
 from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
 from typing_extensions import assert_never
 
 from nucliadb.common import datamanagers
-from nucliadb.common.exceptions import InvalidQueryError
+from nucliadb.common.exceptions import InvalidKVType, InvalidQueryError
 from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR
 from nucliadb_models.common import Paragraph
 from nucliadb_models.filters import (
@@ -32,17 +34,15 @@ from nucliadb_models.filters import (
     DateCreated,
     DateModified,
     Entity,
+    Eq,
     Field,
     FieldFilterExpression,
     FieldMimetype,
     Generated,
+    Inequalities,
     Keyword,
     Kind,
-    KVBoolMatch,
-    KVDateRange,
-    KVExactMatch,
     KVFilterExpression,
-    KVRange,
     Label,
     Language,
     Not,
@@ -57,7 +57,7 @@ from nucliadb_models.filters import (
     ResourceMimetype,
     Status,
 )
-from nucliadb_models.kv_schemas import KBKVSchemas
+from nucliadb_models.kv_schemas import KBKVSchemas, KVFieldType
 from nucliadb_models.metadata import ResourceProcessingStatus
 
 # Filters that end up as a facet
@@ -131,142 +131,137 @@ async def parse_expression(
     return f
 
 
-def parse_kv_filter_expression(
-    expr: KVFilterExpression,
-) -> nodereader_pb2.JsonFilterExpression:
-    """Convert a KVFilterExpression tree into a JsonFilterExpression proto."""
-    if isinstance(expr, And):
-        result = nodereader_pb2.JsonFilterExpression()
-        result.bool_and.operands.extend([parse_kv_filter_expression(op) for op in expr.operands])
-        return result
-    elif isinstance(expr, Or):
-        result = nodereader_pb2.JsonFilterExpression()
-        result.bool_or.operands.extend([parse_kv_filter_expression(op) for op in expr.operands])
-        return result
-    elif isinstance(expr, Not):
-        result = nodereader_pb2.JsonFilterExpression()
-        result.bool_not.CopyFrom(parse_kv_filter_expression(expr.operand))
-        return result
-    elif isinstance(expr, KVExactMatch):
-        path = nodereader_pb2.JsonFieldPathFilter(
-            field_id=f"k/{expr.field_id}",
-            json_path=expr.key,
-        )
-        path.text = expr.value
-        return nodereader_pb2.JsonFilterExpression(path=path)
-    elif isinstance(expr, KVRange):
-        path = nodereader_pb2.JsonFieldPathFilter(
-            field_id=f"k/{expr.field_id}",
-            json_path=expr.key,
-        )
-        # Detect int vs float from the bound values
-        is_int = all(
-            v is None or (isinstance(v, int) and not isinstance(v, bool)) for v in [expr.gte, expr.lte]
-        )
-        if is_int:
-            if expr.gte is not None:
-                path.int_range.lower = int(expr.gte)
-            if expr.lte is not None:
-                path.int_range.upper = int(expr.lte)
-        else:
-            if expr.gte is not None:
-                path.float_range.lower = expr.gte
-            if expr.lte is not None:
-                path.float_range.upper = expr.lte
-        return nodereader_pb2.JsonFilterExpression(path=path)
-    elif isinstance(expr, KVBoolMatch):
-        path = nodereader_pb2.JsonFieldPathFilter(
-            field_id=f"k/{expr.field_id}",
-            json_path=expr.key,
-        )
-        path.boolean = expr.value
-        return nodereader_pb2.JsonFilterExpression(path=path)
-    elif isinstance(expr, KVDateRange):
-        path = nodereader_pb2.JsonFieldPathFilter(
-            field_id=f"k/{expr.field_id}",
-            json_path=expr.key,
-        )
-        if expr.gte is not None:
-            path.date_range.lower.FromDatetime(expr.gte)
-        if expr.lte is not None:
-            path.date_range.upper.FromDatetime(expr.lte)
-        return nodereader_pb2.JsonFilterExpression(path=path)
-    else:
-        assert_never(expr)
-
-
-def _parse_kv_filter_expression(
-    expr: KVFilterExpression,
-    all_schemas: KBKVSchemas,
-    kbid: str,
-) -> nodereader_pb2.JsonFilterExpression:
-    """Recursive helper that validates a KVFilterExpression tree using pre-fetched schemas."""
-    if isinstance(expr, And):
-        result = nodereader_pb2.JsonFilterExpression()
-        result.bool_and.operands.extend(
-            [_parse_kv_filter_expression(op, all_schemas, kbid) for op in expr.operands]
-        )
-        return result
-    elif isinstance(expr, Or):
-        result = nodereader_pb2.JsonFilterExpression()
-        result.bool_or.operands.extend(
-            [_parse_kv_filter_expression(op, all_schemas, kbid) for op in expr.operands]
-        )
-        return result
-    elif isinstance(expr, Not):
-        result = nodereader_pb2.JsonFilterExpression()
-        result.bool_not.CopyFrom(_parse_kv_filter_expression(expr.operand, all_schemas, kbid))
-        return result
-    elif isinstance(expr, (KVExactMatch, KVRange, KVBoolMatch, KVDateRange)):
-        schema = all_schemas.schemas.get(expr.field_id)
-        if schema is None:
-            raise InvalidQueryError("key_value", f"Unknown key-value schema: '{expr.field_id}'")
-        field_map = {f.key: f for f in schema.fields}
-        if expr.key not in field_map:
-            raise InvalidQueryError(
-                "key_value",
-                f"Key '{expr.key}' not found in schema '{expr.field_id}'",
-            )
-        schema_field = field_map[expr.key]
-        if isinstance(expr, KVExactMatch) and schema_field.type != "text":
-            raise InvalidQueryError(
-                "key_value",
-                f"Key '{expr.key}' in schema '{expr.field_id}' is of type '{schema_field.type}', "
-                f"but 'exact_match' requires type 'text'",
-            )
-        elif isinstance(expr, KVRange) and schema_field.type not in ("float", "integer"):
-            raise InvalidQueryError(
-                "key_value",
-                f"Key '{expr.key}' in schema '{expr.field_id}' is of type '{schema_field.type}', "
-                f"but 'range' requires type 'float' or 'integer'",
-            )
-        elif isinstance(expr, KVBoolMatch) and schema_field.type != "boolean":
-            raise InvalidQueryError(
-                "key_value",
-                f"Key '{expr.key}' in schema '{expr.field_id}' is of type '{schema_field.type}', "
-                f"but 'bool_match' requires type 'boolean'",
-            )
-        elif isinstance(expr, KVDateRange) and schema_field.type != "date":
-            raise InvalidQueryError(
-                "key_value",
-                f"Key '{expr.key}' in schema '{expr.field_id}' is of type '{schema_field.type}', "
-                f"but 'date_range' requires type 'date'",
-            )
-        return parse_kv_filter_expression(expr)
-    else:
-        assert_never(expr)
-
-
-async def parse_kv_filter_expression_with_validation(
+async def parse_kv_expression(
     expr: KVFilterExpression,
     kbid: str,
 ) -> nodereader_pb2.JsonFilterExpression:
-    """Convert a KVFilterExpression tree into a JsonFilterExpression proto,
-    validating field_id and key against the KV schema.
-    Fetches all schemas once and passes them through the recursive helper."""
+    """Convert a key-value filter expression tree into it's proto
+    representation, validating types against the corresponding key-value schemas
+    used
+
+    """
     async with datamanagers.with_ro_transaction() as txn:
         all_schemas = await datamanagers.kv_schemas.get_all(txn, kbid=kbid)
-    return _parse_kv_filter_expression(expr, all_schemas, kbid)
+    return _parse_kv_expression(expr, all_schemas)
+
+
+KEY_VALUE_ALLOWED_TYPES: dict[Type[Eq] | Type[Inequalities], set[KVFieldType]] = {
+    Eq: {KVFieldType.TEXT, KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.BOOLEAN},
+    Inequalities: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
+}
+
+KV_VALUE_FIELD_TYPES: dict[type, set[KVFieldType]] = {
+    str: {KVFieldType.TEXT},
+    bool: {KVFieldType.BOOLEAN},
+    float: {KVFieldType.FLOAT},
+    int: {KVFieldType.INTEGER, KVFieldType.FLOAT},
+    datetime: {KVFieldType.DATE},
+}
+
+
+def _validate_kv_schema(
+    schemas: KBKVSchemas,
+    expr: Eq | Inequalities,
+) -> None:
+    schema = schemas.schemas.get(expr.schema_id)
+    if schema is None:
+        raise InvalidQueryError("key_value", f"Unknown key-value schema: '{expr.schema_id}'")
+    field_map = {f.key: f for f in schema.fields}
+    if expr.key not in field_map:
+        raise InvalidQueryError(
+            "key_value",
+            f"Key '{expr.key}' not found in schema '{expr.schema_id}'",
+        )
+    schema_field = field_map[expr.key]
+
+    # validate operator is applicable for the field type
+    allowed_types = KEY_VALUE_ALLOWED_TYPES[type(expr)]
+    if schema_field.type not in allowed_types:
+        allowed = " or".join([f"'{type}'" for type in allowed_types])
+        raise InvalidQueryError(
+            "key_value",
+            f"Key '{expr.key}' in schema '{expr.schema_id}' is of type '{schema_field.type}', "
+            f"but '{type(expr).__name__.lower()}' requires type {allowed}",
+        )
+
+    # validate value type(s) match the field type
+    expected_field_types = KV_VALUE_FIELD_TYPES.get(expr._value_type())
+    if expected_field_types is None or schema_field.type not in expected_field_types:
+        raise InvalidKVType(expr.schema_id, schema_field, schema_field.type)
+
+
+def _set_range_bound(
+    path: nodereader_pb2.JsonFieldPathFilter,
+    value: int | float | datetime,
+    lower: bool = False,
+) -> None:
+    if isinstance(value, float):
+        if lower:
+            path.float_range.lower = value
+        else:
+            path.float_range.upper = value
+    elif isinstance(value, int):
+        if lower:
+            path.int_range.lower = value
+        else:
+            path.int_range.upper = value
+    elif isinstance(value, datetime):
+        if lower:
+            path.date_range.lower.FromDatetime(value)
+        else:
+            path.date_range.upper.FromDatetime(value)
+    else:
+        assert_never(value)
+
+
+def _parse_kv_expression(
+    expr: KVFilterExpression,
+    schemas: KBKVSchemas,
+) -> nodereader_pb2.JsonFilterExpression:
+    json_filter = nodereader_pb2.JsonFilterExpression()
+
+    if isinstance(expr, And):
+        json_filter.bool_and.operands.extend([_parse_kv_expression(op, schemas) for op in expr.operands])
+    elif isinstance(expr, Or):
+        json_filter.bool_or.operands.extend([_parse_kv_expression(op, schemas) for op in expr.operands])
+    elif isinstance(expr, Not):
+        json_filter.bool_not.CopyFrom(_parse_kv_expression(expr.operand, schemas))
+
+    elif isinstance(expr, Eq):
+        _validate_kv_schema(schemas, expr)
+
+        json_filter.path.field_id = f"k/{expr.schema_id}"
+        json_filter.path.json_path = expr.key
+
+        match expr.eq:
+            case str():
+                json_filter.path.text = expr.eq
+            case bool():
+                json_filter.path.boolean = expr.eq
+            case float():
+                json_filter.path.float_range.lower = expr.eq
+                json_filter.path.float_range.upper = expr.eq
+            case int():
+                json_filter.path.int_range.lower = expr.eq
+                json_filter.path.int_range.upper = expr.eq
+            case _:
+                assert_never(expr.eq)
+
+    elif isinstance(expr, Inequalities):
+        _validate_kv_schema(schemas, expr)
+
+        json_filter.path.field_id = f"k/{expr.schema_id}"
+        json_filter.path.json_path = expr.key
+
+        if expr.gte is not None:
+            _set_range_bound(json_filter.path, expr.gte, lower=True)
+        if expr.lte is not None:
+            _set_range_bound(json_filter.path, expr.lte, lower=False)
+
+    else:
+        assert_never(expr)
+
+    return json_filter
 
 
 def facet_from_filter(expr: FacetFilter) -> str:

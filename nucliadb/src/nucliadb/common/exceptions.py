@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from nucliadb_models.kv_schemas import KVFieldType, KVSchemaField
+
 
 class InvalidQueryError(Exception):
     """Raised when parsing a query containing an invalid parameter"""
@@ -26,3 +28,12 @@ class InvalidQueryError(Exception):
         self.param = param
         self.reason = reason
         super().__init__(f"Invalid query. Error in {param}: {reason}")
+
+
+class InvalidKVType(InvalidQueryError):
+    def __init__(self, schema_id: str, schema_field: KVSchemaField, invalid_type: KVFieldType):
+        super().__init__(
+            "key_value",
+            f"Key '{schema_field.key}' in schema '{schema_id}' is of type '{schema_field.type}', "
+            f"but '{invalid_type} has been provided",
+        )
