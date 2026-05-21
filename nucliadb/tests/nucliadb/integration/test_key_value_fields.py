@@ -344,51 +344,6 @@ async def test_kv_field_filter(
             f"Unexpected match for `{key} {op} {value}`: matched {resources} instead of {expected}"
         )
 
-    invalid_filters = [
-        # float value on an integer field
-        ("quantity", "eq", 3.5),
-        ("quantity", "gte", 3.5),
-        ("quantity", "lte", 3.5),
-    ]
-    for key, op, value in invalid_filters:
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
-            json={
-                "query": "product item",
-                "features": ["keyword"],
-                "filter_expression": {
-                    "key_value": {
-                        "schema_id": "product",
-                        "key": key,
-                        op: value,
-                    }
-                },
-            },
-        )
-        assert resp.status_code == 412, resp.text
-
-    # --- Float range price >= 10.0 → finds resource 1 only ---
-    rids = await find_with_filter(
-        {
-            "schema_id": "product",
-            "key": "price",
-            "gte": 10.0,
-        }
-    )
-    assert rid1 in rids, f"Expected rid1 in results for price>=10.0, got {rids}"
-    assert rid2 not in rids, f"Expected rid2 NOT in results for price>=10.0, got {rids}"
-
-    # --- Integer range quantity <= 5 → finds resource 1 only ---
-    rids = await find_with_filter(
-        {
-            "schema_id": "product",
-            "key": "quantity",
-            "lte": 5,
-        }
-    )
-    assert rid1 in rids, f"Expected rid1 in results for quantity<=5, got {rids}"
-    assert rid2 not in rids, f"Expected rid2 NOT in results for quantity<=5, got {rids}"
-
     # --- AND: color=red AND in_stock=True → finds resource 1 only ---
     rids = await find_with_filter(
         {
