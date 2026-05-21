@@ -39,13 +39,12 @@ from nucliadb_models.filters import (
     FieldFilterExpression,
     FieldMimetype,
     Generated,
-    Gte,
+    Inequalities,
     Keyword,
     Kind,
     KVFilterExpression,
     Label,
     Language,
-    Lte,
     Not,
     Or,
     OriginCollaborator,
@@ -146,10 +145,9 @@ async def parse_kv_expression(
     return _parse_kv_expression(expr, all_schemas)
 
 
-KEY_VALUE_ALLOWED_TYPES: dict[Type[Eq] | Type[Gte] | Type[Lte], set[KVFieldType]] = {
+KEY_VALUE_ALLOWED_TYPES: dict[Type[Eq] | Type[Inequalities], set[KVFieldType]] = {
     Eq: {KVFieldType.TEXT, KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.BOOLEAN},
-    Gte: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
-    Lte: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
+    Inequalities: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
 }
 
 
@@ -166,7 +164,7 @@ def _parse_kv_expression(
     elif isinstance(expr, Not):
         json_filter.bool_not.CopyFrom(_parse_kv_expression(expr.operand, schemas))
 
-    elif isinstance(expr, (Eq, Gte, Lte)):
+    elif isinstance(expr, (Eq, Inequalities)):
         schema = schemas.schemas.get(expr.schema_id)
         if schema is None:
             raise InvalidQueryError("key_value", f"Unknown key-value schema: '{expr.schema_id}'")
@@ -201,49 +199,52 @@ def _parse_kv_expression(
                     raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.BOOLEAN)
                 json_filter.path.boolean = expr.eq
             elif isinstance(expr.eq, float):
-                if schema_field.type not in (KVFieldType.FLOAT, KVFieldType.INTEGER):
+                if schema_field.type not in KVFieldType.FLOAT:
                     raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.FLOAT)
                 json_filter.path.float_range.lower = expr.eq
                 json_filter.path.float_range.upper = expr.eq
             elif isinstance(expr.eq, int):
-                if schema_field.type != KVFieldType.INTEGER:
+                # we accepts ints for float types but not the other way around
+                if schema_field.type not in (KVFieldType.INTEGER, KVFieldType.FLOAT):
                     raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.INTEGER)
                 json_filter.path.int_range.lower = expr.eq
                 json_filter.path.int_range.upper = expr.eq
             else:
                 assert_never(expr.eq)
 
-        elif isinstance(expr, Gte):
-            if isinstance(expr.gte, float):
-                if schema_field.type not in (KVFieldType.FLOAT, KVFieldType.INTEGER):
-                    raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.FLOAT)
-                json_filter.path.float_range.lower = expr.gte
-            elif isinstance(expr.gte, int):
-                if schema_field.type != KVFieldType.INTEGER:
-                    raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.INTEGER)
-                json_filter.path.int_range.lower = expr.gte
-            elif isinstance(expr.gte, datetime):
-                if schema_field.type != KVFieldType.DATE:
-                    raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.DATE)
-                json_filter.path.date_range.lower.FromDatetime(expr.gte)
-            else:
-                assert_never(expr.gte)
-
-        elif isinstance(expr, Lte):
-            if isinstance(expr.lte, float):
-                if schema_field.type not in (KVFieldType.FLOAT, KVFieldType.INTEGER):
-                    raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.FLOAT)
-                json_filter.path.float_range.upper = expr.lte
-            elif isinstance(expr.lte, int):
-                if schema_field.type != KVFieldType.INTEGER:
-                    raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.INTEGER)
-                json_filter.path.int_range.upper = expr.lte
-            elif isinstance(expr.lte, datetime):
-                if schema_field.type != KVFieldType.DATE:
-                    raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.DATE)
-                json_filter.path.date_range.upper.FromDatetime(expr.lte)
-            else:
-                assert_never(expr.lte)
+        elif isinstance(expr, Inequalities):
+            if expr.gte is not None:
+                if isinstance(expr.gte, float):
+                    if schema_field.type not in KVFieldType.FLOAT:
+                        raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.FLOAT)
+                    json_filter.path.float_range.lower = expr.gte
+                elif isinstance(expr.gte, int):
+                    # we accepts ints for float types but not the other way around
+                    if schema_field.type not in (KVFieldType.INTEGER, KVFieldType.FLOAT):
+                        raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.INTEGER)
+                    json_filter.path.int_range.lower = expr.gte
+                elif isinstance(expr.gte, datetime):
+                    if schema_field.type != KVFieldType.DATE:
+                        raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.DATE)
+                    json_filter.path.date_range.lower.FromDatetime(expr.gte)
+                else:
+                    assert_never(expr.gte)
+            if expr.lte is not None:
+                if isinstance(expr.lte, float):
+                    if schema_field.type not in KVFieldType.FLOAT:
+                        raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.FLOAT)
+                    json_filter.path.float_range.upper = expr.lte
+                elif isinstance(expr.lte, int):
+                    # we accepts ints for float types but not the other way around
+                    if schema_field.type not in (KVFieldType.INTEGER, KVFieldType.FLOAT):
+                        raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.INTEGER)
+                    json_filter.path.int_range.upper = expr.lte
+                elif isinstance(expr.lte, datetime):
+                    if schema_field.type != KVFieldType.DATE:
+                        raise InvalidKVType(expr.schema_id, schema_field, KVFieldType.DATE)
+                    json_filter.path.date_range.upper.FromDatetime(expr.lte)
+                else:
+                    assert_never(expr.lte)
         else:
             assert_never(expr)
     else:

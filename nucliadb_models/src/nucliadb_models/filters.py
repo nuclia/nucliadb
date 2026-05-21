@@ -14,6 +14,7 @@
 #
 from abc import ABC
 from collections.abc import Sequence
+from datetime import datetime
 from enum import Enum
 from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
@@ -321,16 +322,35 @@ class Eq(KVFilter):
     eq: str | int | float | bool
 
 
-class Gte(KVFilter):
-    """Greater-than or equal (>=) operator"""
+class Inequalities(KVFilter):
+    """Inequality operators that can be grouped to perform range queries."""
 
-    gte: int | float | DateTime
+    gte: int | float | DateTime | None = pydantic.Field(default=None)
+    lte: int | float | DateTime | None = pydantic.Field(default=None)
 
+    @model_validator(mode="after")
+    def check_bounds(self) -> Self:
+        if self.gte is None and self.lte is None:
+            raise ValueError("must provide at least one operator (gte or lte)")
 
-class Lte(KVFilter):
-    """Less-than or equal (<=) operator"""
+        # only one operator is used, we can't have conflicting types
+        if self.gte is None or self.lte is None:
+            return self
 
-    lte: int | float | DateTime
+        # when more than one operator is used, we can already validate some
+        # obvious invalid combinations
+        if isinstance(self.lte, datetime) and isinstance(self.gte, datetime):
+            if self.lte < self.gte:
+                raise ValueError(f"lte ({self.lte}) must be >= than gte ({self.gte})")
+        if isinstance(self.lte, (int, float)) and isinstance(self.gte, (int, float)):
+            if self.lte < self.gte:
+                raise ValueError(f"lte ({self.lte}) must be >= than gte ({self.gte})")
+        if isinstance(self.lte, datetime) and isinstance(self.gte, (int, float)):
+            raise ValueError("can't mix numeric and datetimes comparisons in the same operator")
+        if isinstance(self.lte, (int, float)) and isinstance(self.gte, datetime):
+            raise ValueError("can't mix numeric and datetimes comparisons in the same operator")
+
+        return self
 
 
 # The discriminator function is optional, everything works without it.
@@ -419,9 +439,9 @@ def kv_discriminator(v: Any) -> str | None:
         elif "eq" in v:
             return "eq"
         elif "gte" in v:
-            return "gte"
+            return "inequalities"
         elif "lte" in v:
-            return "lte"
+            return "inequalities"
         else:
             return ""
 
@@ -433,10 +453,8 @@ def kv_discriminator(v: Any) -> str | None:
         return "not"
     elif isinstance(v, Eq):
         return "eq"
-    elif isinstance(v, Gte):
-        return "gte"
-    elif isinstance(v, Lte):
-        return "lte"
+    elif isinstance(v, Inequalities):
+        return "inequalities"
     else:
         return ""
 
@@ -446,8 +464,7 @@ KVFilterExpression = Annotated[
     | Annotated[Or["KVFilterExpression"], Tag("or")]
     | Annotated[Not["KVFilterExpression"], Tag("not")]
     | Annotated[Eq, Tag("eq")]
-    | Annotated[Gte, Tag("gte")]
-    | Annotated[Lte, Tag("lte")],
+    | Annotated[Inequalities, Tag("inequalities")],
     Discriminator(kv_discriminator),
 ]
 
