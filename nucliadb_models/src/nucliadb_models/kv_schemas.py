@@ -31,66 +31,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from datetime import datetime
 from enum import Enum
-from typing import Any
 
 from pydantic import (
     BaseModel,
     Field,
-    SerializationInfo,
-    SerializerFunctionWrapHandler,
-    model_serializer,
     model_validator,
 )
-from typing_extensions import Self
-
-
-class Range(BaseModel):
-    """A closed-bound integer range [lower, upper]."""
-
-    lower: int = Field(..., description="Lower closed bound (inclusive)")
-    upper: int = Field(..., description="Upper closed bound (inclusive)")
-
-    @model_validator(mode="after")
-    def check_bounds(self) -> Self:
-        if not (self.lower < self.upper):
-            raise ValueError(
-                f"IntegerInterval lower endpoint ({self.lower}) must be < than its upper endpoint ({self.upper})"
-            )
-        return self
-
-    @model_serializer(mode="wrap")
-    def serialize_model(
-        self,
-        handler: SerializerFunctionWrapHandler,
-        info: SerializationInfo,
-    ) -> dict[str, object]:
-        if info.context == "proto":
-            # special serialization for proto
-            return {
-                "min": self.lower,
-                "max": self.upper,
-            }
-        else:
-            # fallback to default serialization
-            return handler(self)
-
-    @model_validator(mode="before")
-    @classmethod
-    def parse_from_proto(cls, data: Any) -> Any:
-        if isinstance(data, dict):
-            range_min = data.pop("min", None)
-            if range_min is not None:
-                data["lower"] = range_min
-            range_max = data.pop("max", None)
-            if range_max is not None:
-                data["upper"] = range_max
-        return data
-
-
-# Type alias for valid KV field values
-KVValue = str | int | float | bool | datetime | Range
 
 MAX_KV_SCHEMAS = 20
 MAX_KV_SCHEMA_FIELDS = 50

@@ -24,7 +24,8 @@ from datetime import datetime
 from typing_extensions import assert_never
 
 from nucliadb.ingest.fields.base import Field
-from nucliadb_models.kv_schemas import KVFieldType, KVSchema, Range
+from nucliadb_models.key_value import Range
+from nucliadb_models.kv_schemas import KVFieldType, KVSchema
 from nucliadb_protos.resources_pb2 import FieldKeyValue
 
 

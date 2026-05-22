@@ -20,7 +20,7 @@ from pydantic.json_schema import SkipJsonSchema
 from nucliadb_models import content_types
 from nucliadb_models.conversation import InputConversationField
 from nucliadb_models.file import FileField
-from nucliadb_models.kv_schemas import KVValue
+from nucliadb_models.key_value import KVValue
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     Extra,

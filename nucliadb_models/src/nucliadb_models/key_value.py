@@ -13,10 +13,74 @@
 # limitations under the License.
 #
 import json
+from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import (
+    BaseModel,
+    Field,
+    SerializationInfo,
+    SerializerFunctionWrapHandler,
+    TypeAdapter,
+    model_serializer,
+    model_validator,
+)
+from typing_extensions import Self
 
-from nucliadb_models.kv_schemas import KVValue
+from nucliadb_models.utils import DateTime
+
+
+class Range(BaseModel):
+    """A closed-bound integer range [lower, upper]."""
+
+    lower: int | float | DateTime = Field(..., description="Lower closed bound (inclusive)")
+    upper: int | float | DateTime = Field(..., description="Upper closed bound (inclusive)")
+
+    @model_validator(mode="after")
+    def check_bounds(self) -> Self:
+        # we don't want differing types in a expression with mutliple inequality
+        # operators
+        if type(self.lower) is type(self.upper):
+            if not (self.lower < self.upper):  # type: ignore # ty doesn't understand we already checked this
+                raise ValueError(
+                    f"lower endpoint ({self.lower}) must be < than its upper endpoint ({self.upper})"
+                )
+        else:
+            raise ValueError("`lower` and `upper` types must be the same")
+
+        return self
+
+    @model_serializer(mode="wrap")
+    def serialize_model(
+        self,
+        handler: SerializerFunctionWrapHandler,
+        info: SerializationInfo,
+    ) -> dict[str, object]:
+        if info.context == "proto":
+            # special serialization for proto
+            return {
+                "min": self.lower,
+                "max": self.upper,
+            }
+        else:
+            # fallback to default serialization
+            return handler(self)
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_from_proto(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            range_min = data.pop("min", None)
+            if range_min is not None:
+                data["lower"] = range_min
+            range_max = data.pop("max", None)
+            if range_max is not None:
+                data["upper"] = range_max
+        return data
+
+
+# Type alias for valid KV field values
+KVValue = str | int | float | bool | datetime | Range
 
 
 class KeyValueField(BaseModel):
