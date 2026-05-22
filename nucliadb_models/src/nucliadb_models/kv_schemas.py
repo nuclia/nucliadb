@@ -69,8 +69,8 @@ class Range(BaseModel):
         if info.context == "proto":
             # special serialization for proto
             return {
-                "_range_min": self.lower,
-                "_range_max": self.upper,
+                "min": self.lower,
+                "max": self.upper,
             }
         else:
             # fallback to default serialization
@@ -80,10 +80,10 @@ class Range(BaseModel):
     @classmethod
     def parse_from_proto(cls, data: Any) -> Any:
         if isinstance(data, dict):
-            range_min = data.pop("_range_min", None)
+            range_min = data.pop("min", None)
             if range_min is not None:
                 data["lower"] = range_min
-            range_max = data.pop("_range_max", None)
+            range_max = data.pop("max", None)
             if range_max is not None:
                 data["upper"] = range_max
         return data

@@ -291,8 +291,8 @@ def _parse_kv_expression(
 
         lower_bound.path.field_id = f"k/{expr.schema_id}"
         upper_bound.path.field_id = f"k/{expr.schema_id}"
-        lower_bound.path.json_path = f"{expr.key}._range_min"
-        upper_bound.path.json_path = f"{expr.key}._range_max"
+        lower_bound.path.json_path = f"{expr.key}.min"
+        upper_bound.path.json_path = f"{expr.key}.max"
 
         # we want our value to be >= the lower bound and <= the upper bound
         _set_range_bound(lower_bound.path, expr.contains, lower=False)
