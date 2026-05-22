@@ -306,10 +306,7 @@ async def serialize_resource(
                 if field.id not in resource.data.key_values:
                     resource.data.key_values[field.id] = KeyValueFieldData()
                 if include_value and value is not None:
-                    # data is a single JSON string containing the entire KV payload
-                    kv = from_proto.field_key_value(value)
-                    if kv is not None:
-                        resource.data.key_values[field.id].value = kv.data
+                    resource.data.key_values[field.id].value = from_proto.field_key_value(value)
                 if include_errors:
                     await serialize_field_errors(field, resource.data.key_values[field.id])
     return resource
