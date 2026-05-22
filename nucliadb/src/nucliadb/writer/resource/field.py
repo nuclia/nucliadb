@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import dataclasses
-import json
 from datetime import datetime
 
 from fastapi import HTTPException
@@ -284,7 +283,7 @@ async def parse_key_value_field(
 
     pb = writer.key_value_fields[key]
     pb.schema_id = kv_field.schema_id
-    pb.data = json.dumps(kv_field.data)
+    pb.data = kv_field.serialize_json_for_proto()
 
     writer.field_statuses.append(
         FieldIDStatus(

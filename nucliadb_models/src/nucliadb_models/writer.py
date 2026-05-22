@@ -50,6 +50,15 @@ class KeyValueField(BaseModel):
         description="Key-value pairs conforming to the schema.",
     )
 
+    def serialize_json_for_proto(self) -> str:
+        """Serialize to JSON for proto purposes
+
+        This includes special handling for specific fields like Range, that
+        serialize differently in the REST API than internally to nidx
+
+        """
+        return json.dumps(self.model_dump(include={"data"}, context="proto").get("data", {}))
+
 
 class FieldDefaults:
     title = Field(None, title="Title", max_length=2048)

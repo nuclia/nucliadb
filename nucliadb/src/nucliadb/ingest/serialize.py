@@ -19,8 +19,6 @@
 #
 
 
-import json
-
 import nucliadb_models as models
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Transaction
@@ -309,9 +307,9 @@ async def serialize_resource(
                     resource.data.key_values[field.id] = KeyValueFieldData()
                 if include_value and value is not None:
                     # data is a single JSON string containing the entire KV payload
-                    resource.data.key_values[field.id].value = (
-                        json.loads(value.data) if value.data else {}
-                    )
+                    kv = from_proto.field_key_value(value)
+                    if kv is not None:
+                        resource.data.key_values[field.id].value = kv.data
                 if include_errors:
                     await serialize_field_errors(field, resource.data.key_values[field.id])
     return resource

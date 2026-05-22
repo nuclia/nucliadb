@@ -31,6 +31,7 @@ from nucliadb.common.ids import FIELD_TYPE_NAME_TO_STR
 from nucliadb_models.common import Paragraph
 from nucliadb_models.filters import (
     And,
+    Contains,
     DateCreated,
     DateModified,
     Entity,
@@ -146,7 +147,9 @@ async def parse_kv_expression(
     return _parse_kv_expression(expr, all_schemas)
 
 
-KEY_VALUE_ALLOWED_TYPES: dict[Type[Eq] | Type[Inequalities], set[KVFieldType]] = {
+# Map between an operator and the possible schema field types. This is must be
+# synchronized with the types the operators have, e.g. Eq.eq types
+KEY_VALUE_ALLOWED_TYPES: dict[Type[Eq] | Type[Inequalities] | Type[Contains], set[KVFieldType]] = {
     Eq: {
         KVFieldType.TEXT,
         KVFieldType.INTEGER,
@@ -155,20 +158,23 @@ KEY_VALUE_ALLOWED_TYPES: dict[Type[Eq] | Type[Inequalities], set[KVFieldType]] =
         KVFieldType.DATE,
     },
     Inequalities: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
+    Contains: {KVFieldType.RANGE},
 }
 
+# Map from Python types a value can have and which key-value field types can be
+# used on. For example, an int value can be used in an int/float/range types
 KV_VALUE_FIELD_TYPES: dict[type, list[KVFieldType]] = {
     str: [KVFieldType.TEXT],
     bool: [KVFieldType.BOOLEAN],
     float: [KVFieldType.FLOAT],
-    int: [KVFieldType.INTEGER, KVFieldType.FLOAT],
+    int: [KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.RANGE],
     datetime: [KVFieldType.DATE],
 }
 
 
 def _validate_kv_schema(
     schemas: KBKVSchemas,
-    expr: Eq | Inequalities,
+    expr: Eq | Inequalities | Contains,
 ) -> None:
     schema = schemas.schemas.get(expr.schema_id)
     if schema is None:
@@ -276,6 +282,23 @@ def _parse_kv_expression(
             _set_range_bound(json_filter.path, expr.gte, lower=True)
         if expr.lte is not None:
             _set_range_bound(json_filter.path, expr.lte, lower=False)
+
+    elif isinstance(expr, Contains):
+        _validate_kv_schema(schemas, expr)
+
+        lower_bound = nodereader_pb2.JsonFilterExpression()
+        upper_bound = nodereader_pb2.JsonFilterExpression()
+
+        lower_bound.path.field_id = f"k/{expr.schema_id}"
+        upper_bound.path.field_id = f"k/{expr.schema_id}"
+        lower_bound.path.json_path = f"{expr.key}._range_min"
+        upper_bound.path.json_path = f"{expr.key}._range_max"
+
+        # we want our value to be >= the lower bound and <= the upper bound
+        _set_range_bound(lower_bound.path, expr.contains, lower=False)
+        _set_range_bound(upper_bound.path, expr.contains, lower=True)
+
+        json_filter.bool_and.operands.extend([lower_bound, upper_bound])
 
     else:
         assert_never(expr)

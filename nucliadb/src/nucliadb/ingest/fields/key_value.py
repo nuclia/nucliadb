@@ -24,7 +24,7 @@ from datetime import datetime
 from typing_extensions import assert_never
 
 from nucliadb.ingest.fields.base import Field
-from nucliadb_models.kv_schemas import KVFieldType, KVSchema
+from nucliadb_models.kv_schemas import KVFieldType, KVSchema, Range
 from nucliadb_protos.resources_pb2 import FieldKeyValue
 
 
@@ -86,6 +86,8 @@ def check_kv_type(schema_name: str, key: str, value: object, expected: KVFieldTy
                 ok = False
         else:
             ok = False
+    elif expected is KVFieldType.RANGE:
+        ok = isinstance(value, Range)
     else:
         assert_never(expected)
     if not ok:
