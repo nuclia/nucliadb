@@ -49,7 +49,6 @@ class KVFieldType(str, Enum):
     FLOAT = "float"
     BOOLEAN = "boolean"
     DATE = "date"
-    RANGE = "range"
 
 
 class KVSchemaField(BaseModel):
@@ -57,6 +56,10 @@ class KVSchemaField(BaseModel):
     type: KVFieldType
     description: str = ""
     required: bool = True
+    range: bool = Field(
+        default=False,
+        description="When enabled, this field stores a range instead of a single value and operations like `contains` are possible",
+    )
 
 
 class KVSchema(BaseModel):

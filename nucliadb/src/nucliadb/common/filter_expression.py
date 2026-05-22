@@ -158,7 +158,7 @@ KEY_VALUE_ALLOWED_TYPES: dict[Type[Eq] | Type[Inequalities] | Type[Contains], se
         KVFieldType.DATE,
     },
     Inequalities: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
-    Contains: {KVFieldType.RANGE},
+    Contains: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
 }
 
 # Map from Python types a value can have and which key-value field types can be
@@ -167,7 +167,7 @@ KV_VALUE_FIELD_TYPES: dict[type, list[KVFieldType]] = {
     str: [KVFieldType.TEXT],
     bool: [KVFieldType.BOOLEAN],
     float: [KVFieldType.FLOAT],
-    int: [KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.RANGE],
+    int: [KVFieldType.INTEGER, KVFieldType.FLOAT],
     datetime: [KVFieldType.DATE],
 }
 
@@ -195,6 +195,14 @@ def _validate_kv_schema(
             "key_value",
             f"Key '{expr.key}' in schema '{expr.schema_id}' is of type '{schema_field.type}', "
             f"but '{type(expr).__name__.lower()}' requires type {allowed}",
+        )
+
+    # validate range operations
+    if schema_field.range is False and isinstance(expr, (Contains,)):
+        raise InvalidQueryError(
+            "key_value",
+            f"Key '{expr.key}' in schema '{expr.schema_id}' is not a range type. "
+            f"Therefore '{type(expr).__name__.lower()}' can't be used",
         )
 
     # validate value type(s) match the field type

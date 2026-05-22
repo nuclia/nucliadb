@@ -29,7 +29,7 @@ PRODUCT_SCHEMA = {
         {"key": "in_stock", "type": "boolean", "required": False},
         {"key": "quantity", "type": "integer", "required": False},
         {"key": "launched_at", "type": "date", "required": False},
-        {"key": "delivery_days", "type": "range", "required": False},
+        {"key": "delivery_days", "type": "integer", "range": True, "required": False},
     ],
 }
 
@@ -84,12 +84,12 @@ async def test_kv_field_crud(
     assert "key_values" in data["data"]
     assert "product" in data["data"]["key_values"]
     value = data["data"]["key_values"]["product"]["value"]
-    assert value["color"] == "red"
-    assert value["price"] == 12.5
-    assert value["in_stock"] is True
-    assert value["quantity"] == 3
-    assert value["launched_at"] == "2024-01-15T00:00:00Z"
-    assert value["delivery_days"] == {"lower": 1, "upper": 5}
+    assert value["data"]["color"] == "red"
+    assert value["data"]["price"] == 12.5
+    assert value["data"]["in_stock"] is True
+    assert value["data"]["quantity"] == 3
+    assert value["data"]["launched_at"] == "2024-01-15T00:00:00Z"
+    assert value["data"]["delivery_days"] == {"lower": 1, "upper": 5}
 
     # --- Update resource via PATCH ---
     resp = await nucliadb_writer.patch(
