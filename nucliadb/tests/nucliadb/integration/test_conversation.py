@@ -164,6 +164,9 @@ async def test_conversations(
     )
     assert resp.status_code == 200
     field_resp = ResourceField.model_validate(resp.json())
+    assert field_resp.value["total"] == 301  # type: ignore
+    assert field_resp.value["pages"] == 2  # type: ignore
+    assert field_resp.value["page"] == 1  # type: ignore
     msgs = field_resp.value["messages"]  # type: ignore
     assert len(msgs) == 200
     assert [m["ident"] for m in msgs] == [str(i) for i in range(1, 201)]

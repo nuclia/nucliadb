@@ -73,7 +73,10 @@ def push_payload(**kwargs):
             ),
             True,
         ),
-        (push_payload(conversationfield={"foo": Conversation(messages=[])}), True),
+        (
+            push_payload(conversationfield={"foo": Conversation(total=0, pages=0, page=0, messages=[])}),
+            True,
+        ),
         (push_payload(textfield={"foo": TextField(body="foo")}), True),
         (
             push_payload(linkfield={"foo": LinkField(uri="foo")}),
