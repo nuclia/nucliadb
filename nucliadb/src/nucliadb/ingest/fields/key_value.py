@@ -63,17 +63,10 @@ def check_kv_type(schema_name: str, schema_field: KVSchemaField, key: str, value
 
     ok = False
     if expected is KVFieldType.TEXT:
-        if isinstance(value, str):
-            try:
-                dt = datetime.fromisoformat(value)
-                # Tantivy's JSON indexer auto-parses strings as DateTime only when
-                # they parse as RFC 3339, which requires both a time component and a
-                # timezone offset (Z or ±HH:MM).
-                ok = dt.tzinfo is None
-            except ValueError:
-                ok = True  # not parseable as a date at all, safe
-        else:
-            ok = False
+        # Tantivy's JSON indexer auto-parses strings as DateTime only when
+        # they parse as RFC 3339, which requires both a time component and a
+        # timezone offset (Z or ±HH:MM)
+        ok = isinstance(value, str) and not is_datetime(value)
     elif expected is KVFieldType.INTEGER:
         if schema_field.range and isinstance(value, Range):
             ok = (isinstance(value.lower, int) and not isinstance(value.lower, bool)) and (
@@ -112,16 +105,16 @@ def check_kv_type(schema_name: str, schema_field: KVSchemaField, key: str, value
 
 
 def is_datetime(value: Any) -> bool:
-    # Dates must be stored as ISO-8601 strings (e.g. "2024-01-15T00:00:00Z"), so
-    # we validate against this
+    # Dates must be stored as RFC 3339, which requires both a time component and
+    # a timezone offset (Z or ±HH:MM).
     if isinstance(value, datetime):
-        ok = True
+        ok = value.tzinfo is not None
     elif isinstance(value, str):
         try:
-            datetime.fromisoformat(value)
-            ok = True
+            dt = datetime.fromisoformat(value)
+            ok = dt.tzinfo is not None
         except ValueError:
-            ok = False
+            ok = False  # not parseable as a date
     else:
         ok = False
     return ok
