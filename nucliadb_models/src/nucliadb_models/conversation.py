@@ -63,6 +63,9 @@ class Conversation(BaseModel):
     a conversation in the field level.
     """
 
+    total: int = Field(description="Total number of messages in the conversation")
+    pages: int = Field(description="Total number of pages in the conversation")
+    page: int = Field(description="Current page number")
     messages: list[Message] | None = []
 
 

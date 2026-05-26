@@ -372,7 +372,9 @@ def field_metadata(
     return FieldMetadata(**value)
 
 
-def conversation(message: resources_pb2.Conversation) -> Conversation:
+def conversation_page(
+    message: resources_pb2.Conversation, total: int, pages: int, page: int
+) -> Conversation:
     as_dict = MessageToDict(
         message,
         preserving_proto_field_name=True,
@@ -381,7 +383,7 @@ def conversation(message: resources_pb2.Conversation) -> Conversation:
     for conv_message in as_dict.get("messages", []):
         for attachment_field in conv_message.get("content", {}).get("attachments_fields", []):
             attachment_field["field_type"] = attachment_field["field_type"].lower()
-    return Conversation(**as_dict)
+    return Conversation(total=total, pages=pages, page=page, **as_dict)
 
 
 def field_conversation(message: resources_pb2.FieldConversation) -> FieldConversation:
