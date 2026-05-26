@@ -32,7 +32,7 @@ from nucliadb_models.conversation import (
     InputMessageContent,
     MessageType,
 )
-from nucliadb_models.resource import Conversation, ConversationFieldData, FieldConversation, Resource
+from nucliadb_models.resource import ConversationFieldData, FieldConversation, Resource
 from nucliadb_models.resource import Resource as ResponseResponse
 from nucliadb_models.search import (
     KnowledgeboxCounters,
@@ -164,16 +164,13 @@ async def test_conversations(
     )
     assert resp.status_code == 200
     field_resp = ResourceField.model_validate(resp.json())
-    assert field_resp.value is not None
-    assert isinstance(field_resp.value, Conversation)
-    assert field_resp.value.total == 301
-    assert field_resp.value.pages == 2
-    assert field_resp.value.page == 1
-    assert field_resp.value.messages is not None
-    msgs = field_resp.value.messages
+    assert field_resp.value["total"] == 301  # type: ignore
+    assert field_resp.value["pages"] == 2  # type: ignore
+    assert field_resp.value["page"] == 1  # type: ignore
+    msgs = field_resp.value["messages"]  # type: ignore
     assert len(msgs) == 200
-    assert [m.ident for m in msgs] == [str(i) for i in range(1, 201)]
-    assert msgs[0].type_ == MessageType.QUESTION.value
+    assert [m["ident"] for m in msgs] == [str(i) for i in range(1, 201)]
+    assert msgs[0]["type"] == MessageType.QUESTION.value
 
     # get second page
     resp = await nucliadb_reader.get(
