@@ -31,7 +31,6 @@ use crate::{
     search_query::{SharedTermC, TermCollector},
 };
 
-pub use fuzzy_parser::FUZZY_DISTANCE;
 use stop_words::remove_stop_words;
 
 /// Alias to make clippy happier. A FallbackQuery is no more than a query with a list of errors

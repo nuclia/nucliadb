@@ -46,7 +46,6 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
     query = "How should I validate this?"
     search_response = nodereader_pb2.SearchResponse(
         paragraph=nodereader_pb2.ParagraphSearchResponse(
-            fuzzy_distance=1,
             total=1,
             results=[
                 nodereader_pb2.ParagraphResult(
@@ -100,10 +99,8 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
                     ),
                 ),
             ],
-            result_per_page=20,
             query=query,
             next_page=False,
-            bm25=True,
         ),
         vector=nodereader_pb2.VectorSearchResponse(
             documents=[

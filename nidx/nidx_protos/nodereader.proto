@@ -103,24 +103,20 @@ message ParagraphResult {
 }
 
 message ParagraphSearchResponse {
-    reserved 4;
+    reserved 4, 10;
 
-    int32 fuzzy_distance = 10;
     int32 total = 1;
     repeated ParagraphResult results = 2;
 
     // For each field what facets are.
     map<string, FacetResults> facets = 3;
 
-    // How many results are in this page.
-    int32 result_per_page = 5;
-
     // The text that lead to this results
     string query = 6;
 
-    // Is there a next page
+    // Is there a next page?
     bool next_page = 7;
-    bool bm25 = 8;
+
     repeated string ematches = 9;
 }
 
