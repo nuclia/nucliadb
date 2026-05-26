@@ -33,11 +33,8 @@
 #
 from enum import Enum
 
-from pydantic import (
-    BaseModel,
-    Field,
-    model_validator,
-)
+from pydantic import BaseModel, Field, model_validator
+from typing_extensions import Self
 
 MAX_KV_SCHEMAS = 20
 MAX_KV_SCHEMA_FIELDS = 50
@@ -60,6 +57,17 @@ class KVSchemaField(BaseModel):
         default=False,
         description="When enabled, this field stores a range instead of a single value and operations like `contains` are possible",
     )
+
+    @model_validator(mode="after")
+    def validate_allowed_range_types(self) -> Self:
+        allowed_range_types = {
+            KVFieldType.INTEGER,
+            KVFieldType.FLOAT,
+            KVFieldType.DATE,
+        }
+        if self.range is True and self.type not in allowed_range_types:
+            raise ValueError(f"{self.type} is not an allowed range type")
+        return self
 
 
 class KVSchema(BaseModel):
