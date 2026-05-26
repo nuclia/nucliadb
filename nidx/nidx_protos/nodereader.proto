@@ -65,6 +65,7 @@ message DocumentResult {
 message DocumentSearchResponse {
     reserved 4;
 
+    // Total number of results matching the query
     int32 total = 1;
 
     repeated DocumentResult results = 2;
@@ -102,7 +103,9 @@ message ParagraphResult {
 message ParagraphSearchResponse {
     reserved 4, 10;
 
+    // Total number of results matching the query
     int32 total = 1;
+
     repeated ParagraphResult results = 2;
 
     // For each field what facets are.
@@ -133,9 +136,6 @@ message VectorSearchResponse {
 
     // List of docs closer to the asked one.
     repeated DocumentScored documents = 1;
-
-    // How many results are in this page.
-    int32 result_per_page = 5;
 }
 
 message RelationPrefixSearchResponse {
