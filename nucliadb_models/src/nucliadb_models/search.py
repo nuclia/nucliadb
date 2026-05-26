@@ -1005,7 +1005,7 @@ class Reasoning(BaseModel):
         default=True,
         description="Whether to display the reasoning steps in the response.",
     )
-    effort: Literal["low", "medium", "high"] = Field(
+    effort: Literal["none", "minimal", "low", "medium", "high", "xhigh"] = Field(
         default="medium",
         description=(
             "Level of reasoning effort. Used by OpenAI models to control the depth of reasoning. "
