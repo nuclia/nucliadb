@@ -286,10 +286,8 @@ impl TextReaderService {
             total,
             results,
             facets,
-            result_per_page: response.results_per_page,
             query: response.query.to_string(),
             next_page,
-            bm25: false,
         }
     }
 
@@ -355,10 +353,8 @@ impl TextReaderService {
             results,
             facets,
             total: response.total as i32,
-            result_per_page: response.results_per_page,
             query: response.query.to_string(),
             next_page,
-            bm25: true,
         }
     }
 

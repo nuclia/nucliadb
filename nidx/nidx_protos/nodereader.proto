@@ -71,14 +71,11 @@ message DocumentSearchResponse {
 
     map<string, FacetResults> facets = 3;
 
-    int32 result_per_page = 5;
-
     // The text that lead to this results
     string query = 6;
 
-    // Is there a next page
+    // Is there a next page?
     bool next_page = 7;
-    bool bm25 = 8;
 }
 
 message ParagraphResult {
