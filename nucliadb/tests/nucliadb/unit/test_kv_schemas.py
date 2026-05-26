@@ -114,9 +114,10 @@ class TestValidateKvData:
     def test_valid_date_iso_datetime_string(self):
         validate_kv_data({"name": "launch", "ts": "2024-01-15T00:00:00Z"}, DATE_SCHEMA)
 
-    def test_valid_date_iso_date_only_string(self):
-        # Date-only ISO strings are valid (no time component)
-        validate_kv_data({"name": "launch", "ts": "2024-01-15"}, DATE_SCHEMA)
+    def test_invalid_date_iso_date_only_string(self):
+        # Date-only ISO strings are invalid (no time component)
+        with pytest.raises(ValueError, match="expects type 'date'"):
+            validate_kv_data({"name": "launch", "ts": "2024-01-15"}, DATE_SCHEMA)
 
     def test_valid_date_with_optional_end(self):
         validate_kv_data(
