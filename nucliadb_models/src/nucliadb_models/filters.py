@@ -121,6 +121,19 @@ class Field(FilterProp, extra="forbid"):
     )
 
 
+class _ResourceFieldPrefix(FilterProp, extra="forbid"):
+    """Matches a field or set of fields"""
+
+    prop: Literal["field"] = "resource_field_prefix"
+    resource_id: str = pydantic.Field(description="ID of the resource containing the field(s) to match")
+    field_type: FieldTypeName = pydantic.Field(description="Type of the fields to match")
+    field_name_prefix: str | None = pydantic.Field(
+        default=None,
+        title="Field Filter",
+        description="Prefix of the name of the field to match. If blank, matches all fields of the given type in the given resource",
+    )
+
+
 class Keyword(FilterProp, extra="forbid"):
     """Matches all fields that contain a keyword"""
 
@@ -390,6 +403,7 @@ FieldFilterExpressionType = (
     | Annotated[Not["FieldFilterExpressionType"], Tag("not")]
     | Annotated[Resource, Tag("resource")]
     | Annotated[Field, Tag("field")]
+    | Annotated[_ResourceFieldPrefix, Tag("resource_field_prefix")]
     | Annotated[Keyword, Tag("keyword")]
     | Annotated[DateCreated, Tag("created")]
     | Annotated[DateModified, Tag("modified")]
