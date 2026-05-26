@@ -124,7 +124,7 @@ class Field(FilterProp, extra="forbid"):
 class _ResourceFieldPrefix(FilterProp, extra="forbid"):
     """Matches a field or set of fields"""
 
-    prop: Literal["field"] = "resource_field_prefix"
+    prop: Literal["resource_field_prefix"] = "resource_field_prefix"
     resource_id: str = pydantic.Field(description="ID of the resource containing the field(s) to match")
     field_type: FieldTypeName = pydantic.Field(description="Type of the fields to match")
     field_name_prefix: str | None = pydantic.Field(
