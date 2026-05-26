@@ -182,6 +182,23 @@ pub fn filter_to_query(schema: &TextSchema, expr: &FilterExpression) -> Box<dyn 
             Term::from_facet(schema.field, &Facet::from(&field_key(field_filter))),
             IndexRecordOption::Basic,
         )),
+        nidx_protos::filter_expression::Expr::ResourceFieldPrefix(resource_field_prefix_filter) => {
+            let resource_id = &resource_field_prefix_filter.resource_id;
+            let field_id_prefix = &resource_field_prefix_filter.field_id_prefix;
+
+            // encoded_field_id_bytes stores uuid_bytes (16) + "field_type/field_name"
+            let uuid = uuid::Uuid::parse_str(resource_id).expect("Invalid resource_id UUID");
+            let field_id_partial = format!("{}/{}", resource_field_prefix_filter.field_type, field_id_prefix);
+            let prefix_bytes = schema::encode_field_id_bytes(uuid, &field_id_partial);
+
+            let lower = Term::from_field_bytes(schema.encoded_field_id_bytes, &prefix_bytes);
+            // Upper bound: increment last byte to create exclusive upper bound for prefix match
+            let mut upper_bytes = prefix_bytes.clone();
+            *upper_bytes.last_mut().unwrap() += 1;
+            let upper = Term::from_field_bytes(schema.encoded_field_id_bytes, &upper_bytes);
+
+            Box::new(RangeQuery::new(Bound::Included(lower), Bound::Excluded(upper)))
+        }
         nidx_protos::filter_expression::Expr::Keyword(keyword_filter) => {
             translate_keyword_to_text_query(&keyword_filter.keyword, schema)
         }

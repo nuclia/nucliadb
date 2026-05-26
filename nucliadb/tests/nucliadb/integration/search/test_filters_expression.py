@@ -306,3 +306,121 @@ async def test_filtering_expression(
             expected_uuids = {slug_to_uuid[slug] for slug in expected_slugs}
             found_uuids = set(body["resources"].keys())
             assert found_uuids == expected_uuids
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_filtering_expression_resource_field_prefix(
+    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, standalone_knowledgebox: str
+):
+    kbid = standalone_knowledgebox
+
+    slug_to_uuid = {}
+    # Create resources with different text fields
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Resource1",
+            "slug": "resource1",
+            "texts": {
+                "conversation_intro": {"body": "Hello world", "format": "PLAIN"},
+                "conversation_body": {"body": "Main content here", "format": "PLAIN"},
+                "summary": {"body": "A short summary", "format": "PLAIN"},
+            },
+        },
+    )
+    assert resp.status_code == 201
+    resource1_uuid = resp.json()["uuid"]
+    slug_to_uuid["resource1"] = resource1_uuid
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Resource2",
+            "slug": "resource2",
+            "texts": {
+                "conversation_thread": {"body": "Thread discussion", "format": "PLAIN"},
+                "notes": {"body": "Some notes", "format": "PLAIN"},
+            },
+        },
+    )
+    assert resp.status_code == 201
+    resource2_uuid = resp.json()["uuid"]
+    slug_to_uuid["resource2"] = resource2_uuid
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Resource3",
+            "slug": "resource3",
+            "texts": {
+                "other_field": {"body": "Other content", "format": "PLAIN"},
+            },
+        },
+    )
+    assert resp.status_code == 201
+    resource3_uuid = resp.json()["uuid"]
+    slug_to_uuid["resource3"] = resource3_uuid
+
+    for filters, expected_slugs in [
+        # Match all text fields with prefix "conversation" in resource1
+        (
+            {
+                "prop": "resource_field_prefix",
+                "resource_id": resource1_uuid,
+                "field_type": "text",
+                "field_name_prefix": "conversation",
+            },
+            ["resource1"],
+        ),
+        # Match all text fields with prefix "conversation" in resource2
+        (
+            {
+                "prop": "resource_field_prefix",
+                "resource_id": resource2_uuid,
+                "field_type": "text",
+                "field_name_prefix": "conversation",
+            },
+            ["resource2"],
+        ),
+        # Match all text fields with prefix "conversation" in resource3 (no match)
+        (
+            {
+                "prop": "resource_field_prefix",
+                "resource_id": resource3_uuid,
+                "field_type": "text",
+                "field_name_prefix": "conversation",
+            },
+            [],
+        ),
+        # Match all text fields (empty prefix) in resource1
+        (
+            {
+                "prop": "resource_field_prefix",
+                "resource_id": resource1_uuid,
+                "field_type": "text",
+                "field_name_prefix": "",
+            },
+            ["resource1"],
+        ),
+        # Match with a prefix that doesn't exist
+        (
+            {
+                "prop": "resource_field_prefix",
+                "resource_id": resource1_uuid,
+                "field_type": "text",
+                "field_name_prefix": "nonexistent",
+            },
+            [],
+        ),
+    ]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={"query": "", "filter_expression": {"field": filters}},
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        expected_uuids = {slug_to_uuid[slug] for slug in expected_slugs}
+        found_uuids = set(body["resources"].keys())
+        assert found_uuids == expected_uuids, (
+            f"Failed for filter {filters}: expected {expected_slugs}, got {found_uuids}"
+        )

@@ -309,7 +309,7 @@ message FilterExpression {
     message ResourceFieldPrefixFilter {
         string resource_id = 1;
         string field_type = 2;
-        optional string field_id_prefix = 3;
+        string field_id_prefix = 3;
     }
 
     oneof expr {
