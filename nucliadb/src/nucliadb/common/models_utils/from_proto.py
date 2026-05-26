@@ -17,8 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-
 from typing import Any
 
 from google.protobuf.json_format import MessageToDict
@@ -40,6 +38,7 @@ from nucliadb_models.extracted import (
 )
 from nucliadb_models.file import FieldFile
 from nucliadb_models.internal.shards import KnowledgeboxShards
+from nucliadb_models.key_value import KeyValueField
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import (
     ComputedMetadata,
@@ -462,6 +461,14 @@ def field_text(message: resources_pb2.FieldText) -> FieldText:
             preserving_proto_field_name=True,
             always_print_fields_with_no_presence=True,
         )
+    )
+
+
+def field_key_value(message: resources_pb2.FieldKeyValue) -> KeyValueField | None:
+    if not message.data:
+        return None
+    return KeyValueField(
+        schema_id=message.schema_id, data=KeyValueField.parse_from_proto_json(message.data)
     )
 
 

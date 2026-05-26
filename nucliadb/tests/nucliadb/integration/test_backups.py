@@ -271,8 +271,8 @@ async def check_kv_schema(nucliadb_reader: AsyncClient, kbid: str):
         if resp.status_code == 200:
             kv_values.append(resp.json()["value"])
     assert len(kv_values) == 1, "Expected exactly one resource with a KV field"
-    assert kv_values[0]["color"] == "red"
-    assert kv_values[0]["price"] == 9.99
+    assert kv_values[0]["data"]["color"] == "red"
+    assert kv_values[0]["data"]["price"] == 9.99
 
 
 async def check_resources(nucliadb_reader: AsyncClient, kbid: str):
