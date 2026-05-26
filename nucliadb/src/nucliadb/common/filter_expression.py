@@ -148,7 +148,7 @@ async def parse_kv_expression(
 
 
 # Map between an operator and the possible schema field types. This is must be
-# synchronized with the types the operators have, e.g. Eq.eq types
+# synchronized with the types the operators have, e.g. `Eq.eq` types
 KEY_VALUE_ALLOWED_TYPES: dict[Type[Eq] | Type[Inequalities] | Type[Contains], set[KVFieldType]] = {
     Eq: {
         KVFieldType.TEXT,
@@ -197,13 +197,26 @@ def _validate_kv_schema(
             f"but '{type(expr).__name__.lower()}' requires type {allowed}",
         )
 
-    # validate range operations
-    if schema_field.range is False and isinstance(expr, (Contains,)):
-        raise InvalidQueryError(
-            "key_value",
-            f"Key '{expr.key}' in schema '{expr.schema_id}' is not a range type. "
-            f"Therefore '{type(expr).__name__.lower()}' can't be used",
-        )
+    if schema_field.range is True:
+        # validate range fields use valid range operators
+        if type(expr) not in {
+            Contains,
+        }:
+            raise InvalidQueryError(
+                "key_value",
+                f"Key '{expr.key}' in schema '{expr.schema_id}' is not a range type. "
+                f"Therefore '{type(expr).__name__.lower()}' can't be used",
+            )
+    else:
+        # validate non-range fields don't use range operators
+        if type(expr) in {
+            Contains,
+        }:
+            raise InvalidQueryError(
+                "key_value",
+                f"Key '{expr.key}' in schema '{expr.schema_id}' is not a range type. "
+                f"Therefore '{type(expr).__name__.lower()}' can't be used",
+            )
 
     # validate value type(s) match the field type
     expected_field_types = KV_VALUE_FIELD_TYPES.get(expr._value_type())
