@@ -34,6 +34,21 @@ from tests.nucliadb.migrations import get_migration
 migration: Migration = get_migration(44)
 
 
+deprecated_models = [
+    ("claude-3-5-fast", FindConfig),
+    ("claude-3", AskConfig),
+    ("azure-mistral-large-2", FindConfig),
+    ("llama-3.2-90b-vision-instruct-maas", AskConfig),
+    ("gemini-3-pro", FindConfig),
+    ("aws-claude-3-7-sonnet", FindConfig),
+    ("gcp-claude-3-7-sonnet", AskConfig),
+    ("claude-4-opus", FindConfig),
+    ("aws-claude-4-opus", AskConfig),
+    ("gemini-2.0-flash", FindConfig),
+    ("gemini-2.0-flash-lite", AskConfig),
+]
+
+
 async def test_migration_0044(maindb_driver: Driver):
     execution_context = Mock()
     execution_context.kv_driver = maindb_driver
@@ -42,118 +57,24 @@ async def test_migration_0044(maindb_driver: Driver):
 
     kbid = str(uuid.uuid4())
 
-    # Create search configurations using deprecated model names
+    # Create one search configuration per deprecated model
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.search_configurations.set(
-            txn,
-            kbid=kbid,
-            name="claude-3-5-fast",
-            config=FindSearchConfiguration(
-                kind="find", config=FindConfig(generative_model="claude-3-5-fast")
-            ),
-        )
-        await datamanagers.search_configurations.set(
-            txn,
-            kbid=kbid,
-            name="claude-3",
-            config=AskSearchConfiguration(kind="ask", config=AskConfig(generative_model="claude-3")),
-        )
-        await datamanagers.search_configurations.set(
-            txn,
-            kbid=kbid,
-            name="azure-mistral-large-2",
-            config=FindSearchConfiguration(
-                kind="find", config=FindConfig(generative_model="azure-mistral-large-2")
-            ),
-        )
-        await datamanagers.search_configurations.set(
-            txn,
-            kbid=kbid,
-            name="llama",
-            config=AskSearchConfiguration(
-                kind="ask",
-                config=AskConfig(generative_model="llama-3.2-90b-vision-instruct-maas"),
-            ),
-        )
-        await datamanagers.search_configurations.set(
-            txn,
-            kbid=kbid,
-            name="gemini-3-pro",
-            config=FindSearchConfiguration(
-                kind="find", config=FindConfig(generative_model="gemini-3-pro")
-            ),
-        )
-        await datamanagers.search_configurations.set(
-            txn,
-            kbid=kbid,
-            name="aws-claude-3-7-sonnet",
-            config=FindSearchConfiguration(
-                kind="find", config=FindConfig(generative_model="aws-claude-3-7-sonnet")
-            ),
-        )
-        await datamanagers.search_configurations.set(
-            txn,
-            kbid=kbid,
-            name="gcp-claude-3-7-sonnet",
-            config=AskSearchConfiguration(
-                kind="ask", config=AskConfig(generative_model="gcp-claude-3-7-sonnet")
-            ),
-        )
-        await datamanagers.search_configurations.set(
-            txn,
-            kbid=kbid,
-            name="claude-4-opus",
-            config=FindSearchConfiguration(
-                kind="find", config=FindConfig(generative_model="claude-4-opus")
-            ),
-        )
-        await datamanagers.search_configurations.set(
-            txn,
-            kbid=kbid,
-            name="aws-claude-4-opus",
-            config=AskSearchConfiguration(
-                kind="ask", config=AskConfig(generative_model="aws-claude-4-opus")
-            ),
-        )
-        await datamanagers.search_configurations.set(
-            txn,
-            kbid=kbid,
-            name="gemini-2.0-flash",
-            config=FindSearchConfiguration(
-                kind="find", config=FindConfig(generative_model="gemini-2.0-flash")
-            ),
-        )
-        await datamanagers.search_configurations.set(
-            txn,
-            kbid=kbid,
-            name="gemini-2.0-flash-lite",
-            config=AskSearchConfiguration(
-                kind="ask", config=AskConfig(generative_model="gemini-2.0-flash-lite")
-            ),
-        )
+        for model, config_cls in deprecated_models:
+            if config_cls is FindConfig:
+                config = FindSearchConfiguration(kind="find", config=FindConfig(generative_model=model))
+            else:
+                config = AskSearchConfiguration(kind="ask", config=AskConfig(generative_model=model))
+            await datamanagers.search_configurations.set(txn, kbid=kbid, name=model, config=config)
         await txn.commit()
 
     await migration.module.migrate_kb(execution_context, kbid)
 
     # Make sure all generative_models have been replaced with the correct targets
     async with maindb_driver.ro_transaction() as txn:
-        expected = {
-            "claude-3-5-fast": "claude-4-5-sonnet",
-            # claude-3 resolves directly to claude-4-7-opus (bypassing intermediate claude-4-opus)
-            "claude-3": "claude-4-7-opus",
-            "azure-mistral-large-2": "chatgpt-azure-5",
-            "llama": "llama-4-scout-17b-16e-instruct-maas",
-            "gemini-3-pro": "gemini-3.1-pro",
-            "aws-claude-3-7-sonnet": "aws-claude-4-6-sonnet",
-            "gcp-claude-3-7-sonnet": "gcp-claude-4-6-sonnet",
-            "claude-4-opus": "claude-4-7-opus",
-            "aws-claude-4-opus": "aws-claude-4-6-opus",
-            "gemini-2.0-flash": "gemini-2.5-flash",
-            "gemini-2.0-flash-lite": "gemini-2.5-flash-lite",
-        }
-        for name, expected_model in expected.items():
-            config = await datamanagers.search_configurations.get(txn, kbid=kbid, name=name)
-            assert config is not None, f"Config '{name}' not found"
-            assert config.config.generative_model == expected_model, (  # type: ignore[attr-defined]
-                f"Config '{name}': expected '{expected_model}', got '{config.config.generative_model}'"  # type: ignore[attr-defined]
+        for model, _ in deprecated_models:
+            config = await datamanagers.search_configurations.get(txn, kbid=kbid, name=model)
+            assert config is not None, f"Config '{model}' not found"
+            assert config.config.generative_model == migration.module.REPLACEMENTS[model], (  # type: ignore[attr-defined]
+                f"Config '{model}': expected '{migration.module.REPLACEMENTS[model]}', "
+                f"got '{config.config.generative_model}'"  # type: ignore[attr-defined]
             )
