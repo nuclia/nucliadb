@@ -87,11 +87,6 @@ class KeyValueField(BaseModel):
     """A key-value field value. The field id (key in the resource's key_values dict)
     must equal the schema name — enforcing one KV field per schema per resource."""
 
-    schema_id: str = Field(
-        ...,
-        title="Schema ID",
-        description="The name of the KV schema this field conforms to.",
-    )
     data: dict[str, KVValue] = Field(
         default_factory=dict,
         title="Data",
