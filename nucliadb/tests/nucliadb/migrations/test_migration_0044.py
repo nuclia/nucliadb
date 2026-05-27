@@ -28,6 +28,7 @@ from nucliadb_models.configuration import (
     AskSearchConfiguration,
     FindConfig,
     FindSearchConfiguration,
+    SearchConfiguration,
 )
 from tests.nucliadb.migrations import get_migration
 
@@ -60,11 +61,12 @@ async def test_migration_0044(maindb_driver: Driver):
     # Create one search configuration per deprecated model
     async with maindb_driver.rw_transaction() as txn:
         for model, config_cls in deprecated_models:
+            sc: SearchConfiguration
             if config_cls is FindConfig:
-                config = FindSearchConfiguration(kind="find", config=FindConfig(generative_model=model))
+                sc = FindSearchConfiguration(kind="find", config=FindConfig(generative_model=model))
             else:
-                config = AskSearchConfiguration(kind="ask", config=AskConfig(generative_model=model))
-            await datamanagers.search_configurations.set(txn, kbid=kbid, name=model, config=config)
+                sc = AskSearchConfiguration(kind="ask", config=AskConfig(generative_model=model))
+            await datamanagers.search_configurations.set(txn, kbid=kbid, name=model, config=sc)
         await txn.commit()
 
     await migration.module.migrate_kb(execution_context, kbid)
@@ -72,9 +74,9 @@ async def test_migration_0044(maindb_driver: Driver):
     # Make sure all generative_models have been replaced with the correct targets
     async with maindb_driver.ro_transaction() as txn:
         for model, _ in deprecated_models:
-            config = await datamanagers.search_configurations.get(txn, kbid=kbid, name=model)
-            assert config is not None, f"Config '{model}' not found"
-            assert config.config.generative_model == migration.module.REPLACEMENTS[model], (  # type: ignore[attr-defined]
+            result = await datamanagers.search_configurations.get(txn, kbid=kbid, name=model)
+            assert result is not None, f"Config '{model}' not found"
+            assert result.config.generative_model == migration.module.REPLACEMENTS[model], (  # type: ignore[attr-defined]
                 f"Config '{model}': expected '{migration.module.REPLACEMENTS[model]}', "
-                f"got '{config.config.generative_model}'"  # type: ignore[attr-defined]
+                f"got '{result.config.generative_model}'"  # type: ignore[attr-defined]
             )
