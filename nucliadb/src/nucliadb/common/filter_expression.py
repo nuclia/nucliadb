@@ -55,9 +55,9 @@ from nucliadb_models.filters import (
     OriginTag,
     ParagraphFilterExpressionType,
     Resource,
+    ResourceFieldPrefix,
     ResourceMimetype,
     Status,
-    _ResourceFieldPrefix,
 )
 from nucliadb_models.kv_schemas import KBKVSchemas, KVFieldType
 from nucliadb_models.metadata import ResourceProcessingStatus
@@ -112,7 +112,7 @@ async def parse_expression(
         f.field.field_type = FIELD_TYPE_NAME_TO_STR[expr.type]
         if expr.name:
             f.field.field_id = expr.name
-    elif isinstance(expr, _ResourceFieldPrefix):
+    elif isinstance(expr, ResourceFieldPrefix):
         f.resource_field_prefix.resource_id = expr.resource_id
         f.resource_field_prefix.field_type = FIELD_TYPE_NAME_TO_STR[expr.field_type]
         f.resource_field_prefix.field_id_prefix = expr.field_name_prefix
