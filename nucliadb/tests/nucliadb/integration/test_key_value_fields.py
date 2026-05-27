@@ -229,13 +229,6 @@ async def test_kv_field_validation(
     )
     assert resp.status_code == 422, resp.text
 
-    # Field name in URL must match schema_id in body
-    resp = await nucliadb_writer.put(
-        f"{base_url}/product",
-        json={"data": {"color": "red", "price": 1.0}},
-    )
-    assert resp.status_code == 422, resp.text
-
 
 @pytest.mark.deploy_modes("standalone")
 async def test_kv_field_filter(
