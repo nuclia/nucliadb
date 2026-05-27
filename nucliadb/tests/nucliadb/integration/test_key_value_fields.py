@@ -120,7 +120,6 @@ async def test_kv_field_crud(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid2}/key_value/product")
     assert resp.status_code == 200, resp.text
     value = resp.json()["value"]
-    assert value["schema_id"] == "product"
     assert value["data"]["color"] == "red"
     assert value["data"]["price"] == 12.5
     assert value["data"]["in_stock"] is True
@@ -227,13 +226,6 @@ async def test_kv_field_validation(
             "schema_id": "product",
             "data": {"color": "red", "price": 1.0, "launched_at": "not-a-date"},
         },
-    )
-    assert resp.status_code == 422, resp.text
-
-    # Field name in URL must match schema_id in body
-    resp = await nucliadb_writer.put(
-        f"{base_url}/product",
-        json={"schema_id": "other", "data": {"color": "red", "price": 1.0}},
     )
     assert resp.status_code == 422, resp.text
 

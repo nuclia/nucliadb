@@ -469,9 +469,7 @@ def field_text(message: resources_pb2.FieldText) -> FieldText:
 def field_key_value(message: resources_pb2.FieldKeyValue) -> KeyValueField | None:
     if not message.data:
         return None
-    return KeyValueField(
-        schema_id=message.schema_id, data=KeyValueField.parse_from_proto_json(message.data)
-    )
+    return KeyValueField(data=KeyValueField.parse_from_proto_json(message.data))
 
 
 def knowledgebox_config(message: knowledgebox_pb2.KnowledgeBoxConfig) -> KnowledgeBoxConfig:

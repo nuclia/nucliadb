@@ -257,23 +257,18 @@ async def parse_key_value_field(
     The entire data dict is JSON-encoded into the proto's single string data field.
     No NLP processing is needed for KV fields.
     """
-    if key != kv_field.schema_id:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Key-value field name '{key}' must match schema_id '{kv_field.schema_id}'",
-        )
 
     # Fetch schema and validate before touching the BrokerMessage
     if txn is not None:
-        schema = await datamanagers.kv_schemas.get(txn, kbid=kbid, name=kv_field.schema_id)
+        schema = await datamanagers.kv_schemas.get(txn, kbid=kbid, name=key)
     else:
         async with datamanagers.with_ro_transaction() as ro_txn:
-            schema = await datamanagers.kv_schemas.get(ro_txn, kbid=kbid, name=kv_field.schema_id)
+            schema = await datamanagers.kv_schemas.get(ro_txn, kbid=kbid, name=key)
 
     if schema is None:
         raise HTTPException(
             status_code=422,
-            detail=f"KV schema '{kv_field.schema_id}' does not exist in this knowledge box",
+            detail=f"KV schema '{key}' does not exist in this knowledge box",
         )
 
     try:
@@ -282,7 +277,7 @@ async def parse_key_value_field(
         raise HTTPException(status_code=422, detail=str(e)) from e
 
     pb = writer.key_value_fields[key]
-    pb.schema_id = kv_field.schema_id
+    pb.schema_id = key
     pb.data = kv_field.serialize_json_for_proto()
 
     writer.field_statuses.append(

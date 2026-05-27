@@ -20,7 +20,7 @@ from pydantic.json_schema import SkipJsonSchema
 from nucliadb_models import content_types
 from nucliadb_models.conversation import InputConversationField
 from nucliadb_models.file import FileField
-from nucliadb_models.key_value import KVValue
+from nucliadb_models.key_value import KeyValueField
 from nucliadb_models.link import LinkField
 from nucliadb_models.metadata import (
     Extra,
@@ -33,31 +33,6 @@ from nucliadb_models.processing import PushProcessingOptions
 from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import TextField
 from nucliadb_models.utils import FieldIdPattern, FieldIdString, SlugString
-
-
-class KeyValueField(BaseModel):
-    """A key-value field value. The field id (key in the resource's key_values dict)
-    must equal the schema name — enforcing one KV field per schema per resource."""
-
-    schema_id: str = Field(
-        ...,
-        title="Schema ID",
-        description="The name of the KV schema this field conforms to.",
-    )
-    data: dict[str, KVValue] = Field(
-        default_factory=dict,
-        title="Data",
-        description="Key-value pairs conforming to the schema.",
-    )
-
-    def serialize_json_for_proto(self) -> str:
-        """Serialize to JSON for proto purposes
-
-        This includes special handling for specific fields like Range, that
-        serialize differently in the REST API than internally to nidx
-
-        """
-        return json.dumps(self.model_dump(include={"data"}, context="proto").get("data", {}))
 
 
 class FieldDefaults:
