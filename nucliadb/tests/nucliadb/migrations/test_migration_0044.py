@@ -56,9 +56,7 @@ async def test_migration_0044(maindb_driver: Driver):
             txn,
             kbid=kbid,
             name="claude-3",
-            config=AskSearchConfiguration(
-                kind="ask", config=AskConfig(generative_model="claude-3")
-            ),
+            config=AskSearchConfiguration(kind="ask", config=AskConfig(generative_model="claude-3")),
         )
         await datamanagers.search_configurations.set(
             txn,
