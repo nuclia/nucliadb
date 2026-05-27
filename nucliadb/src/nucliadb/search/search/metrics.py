@@ -28,7 +28,9 @@ node_features = metrics.Counter("nucliadb_node_features", labels={"type": ""})
 query_parse_dependency_observer = metrics.Observer("query_parse_dependency", labels={"type": ""})
 query_parser_observer = metrics.Observer("nucliadb_query_parser", labels={"type": ""})
 search_observer = metrics.Observer("nucliadb_search", labels={"type": ""})
-searched_shards_histogram = metrics.Histogram("nucliadb_searched_shards", labels={"type": ""})
+searched_shards_histogram = metrics.Histogram(
+    "nucliadb_searched_shards", labels={"type": ""}, buckets=[1, 2, 3, 4, 5, 8, 10, 12, 15, 18, 20, 25]
+)
 
 
 buckets = [
