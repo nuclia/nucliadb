@@ -122,7 +122,10 @@ class Field(FilterProp, extra="forbid"):
 
 
 class ResourceFieldPrefix(FilterProp, extra="forbid"):
-    """Matches a field or set of fields"""
+    """Matches a field or set of fields.
+
+    This filter is for internal use only and is not exposed in the public API schema.
+    """
 
     prop: Literal["resource_field_prefix"] = "resource_field_prefix"
     resource_id: str = pydantic.Field(description="ID of the resource containing the field(s) to match")
@@ -419,7 +422,7 @@ FieldFilterExpressionType = (
     | Annotated[Not["FieldFilterExpressionType"], Tag("not")]
     | Annotated[Resource, Tag("resource")]
     | Annotated[Field, Tag("field")]
-    | Annotated[pydantic.json_schema.SkipJsonSchema[ResourceFieldPrefix], Tag("resource_field_prefix")]
+    | pydantic.json_schema.SkipJsonSchema[Annotated[ResourceFieldPrefix, Tag("resource_field_prefix")]]
     | Annotated[Keyword, Tag("keyword")]
     | Annotated[DateCreated, Tag("created")]
     | Annotated[DateModified, Tag("modified")]
