@@ -36,7 +36,7 @@ from nucliadb_models.extracted import (
     VectorObject,
 )
 from nucliadb_models.file import FieldFile
-from nucliadb_models.kv_schemas import KVValue
+from nucliadb_models.key_value import KeyValueField
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import (
     ComputedMetadata,
@@ -265,7 +265,7 @@ class GenericFieldData(BaseModel):
 
 
 class KeyValueFieldData(BaseModel):
-    value: dict[str, KVValue] | None = None
+    value: KeyValueField | None = None
     error: Error | None = None
     status: str | None = None
     errors: list[Error] | None = None

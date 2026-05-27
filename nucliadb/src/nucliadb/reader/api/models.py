@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 import nucliadb_models as models
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.key_value import KeyValueField
 from nucliadb_models.resource import (
     ConversationFieldExtractedData,
     Error,
@@ -33,7 +34,14 @@ from nucliadb_models.resource import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    ValueType = models.FieldText | models.FieldFile | models.FieldLink | models.Conversation | None
+    ValueType = (
+        models.FieldText
+        | models.FieldFile
+        | models.FieldLink
+        | models.Conversation
+        | KeyValueField
+        | None
+    )
 else:
     # without Any, pydantic fails to anything as validate() fails using the Union
     ValueType = Any

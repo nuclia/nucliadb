@@ -380,6 +380,15 @@ class Inequalities(KVFilter):
         return self
 
 
+class Contains(KVFilter):
+    """Computes whether a value exists inside a range"""
+
+    contains: int | float
+
+    def _value_type(self) -> type:
+        return type(self.contains)
+
+
 # The discriminator function is optional, everything works without it.
 # We implement it because it makes pydantic produce more user-friendly errors
 def filter_discriminator(v: Any) -> str | None:
@@ -474,6 +483,8 @@ def kv_discriminator(v: Any) -> str | None:
             return "inequalities"
         elif "lte" in v:
             return "inequalities"
+        elif "contains" in v:
+            return "contains"
         else:
             return ""
 
@@ -487,6 +498,8 @@ def kv_discriminator(v: Any) -> str | None:
         return "eq"
     elif isinstance(v, Inequalities):
         return "inequalities"
+    elif isinstance(v, Contains):
+        return "contains"
     else:
         return ""
 
@@ -497,6 +510,7 @@ KVFilterExpressionType = (
     | Annotated[Not["KVFilterExpression"], Tag("not")]
     | Annotated[Eq, Tag("eq")]
     | Annotated[Inequalities, Tag("inequalities")]
+    | Annotated[Contains, Tag("contains")]
 )
 KVFilterExpression = Annotated[KVFilterExpressionType, Discriminator(kv_discriminator)]
 
