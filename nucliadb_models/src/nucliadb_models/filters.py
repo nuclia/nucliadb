@@ -121,6 +121,29 @@ class Field(FilterProp, extra="forbid"):
     )
 
 
+class ResourceFieldPrefix(FilterProp, extra="forbid"):
+    """Matches a field or set of fields.
+
+    This filter is for internal use only and is not exposed in the public API schema.
+    """
+
+    prop: Literal["resource_field_prefix"] = "resource_field_prefix"
+    resource_id: str = pydantic.Field(description="ID of the resource containing the field(s) to match")
+    field_type: FieldTypeName = pydantic.Field(description="Type of the fields to match")
+    field_name_prefix: str = pydantic.Field(
+        description="Prefix of the name of the field to match. If blank, matches all fields of the given type in the given resource",
+    )
+
+    @field_validator("resource_id", mode="after")
+    def validate_id(cls, v: str) -> str:
+        if v is not None:
+            try:
+                UUID(v)
+            except ValueError:
+                raise ValueError(f"resource_id filter '{v}' should be a valid UUID")
+        return v
+
+
 class Keyword(FilterProp, extra="forbid"):
     """Matches all fields that contain a keyword"""
 
@@ -399,6 +422,7 @@ FieldFilterExpressionType = (
     | Annotated[Not["FieldFilterExpressionType"], Tag("not")]
     | Annotated[Resource, Tag("resource")]
     | Annotated[Field, Tag("field")]
+    | pydantic.json_schema.SkipJsonSchema[Annotated[ResourceFieldPrefix, Tag("resource_field_prefix")]]
     | Annotated[Keyword, Tag("keyword")]
     | Annotated[DateCreated, Tag("created")]
     | Annotated[DateModified, Tag("modified")]

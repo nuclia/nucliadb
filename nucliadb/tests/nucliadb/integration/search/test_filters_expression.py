@@ -306,3 +306,81 @@ async def test_filtering_expression(
             expected_uuids = {slug_to_uuid[slug] for slug in expected_slugs}
             found_uuids = set(body["resources"].keys())
             assert found_uuids == expected_uuids
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_filtering_expression_resource_field_prefix(
+    nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient, standalone_knowledgebox: str
+):
+    kbid = standalone_knowledgebox
+
+    slug_to_uuid = {}
+    # Create resources with different text fields
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Resource1",
+            "slug": "resource1",
+            "texts": {
+                "conversation_intro": {"body": "Hello world", "format": "PLAIN"},
+                "conversation_body": {"body": "Main content here", "format": "PLAIN"},
+                "summary": {"body": "A short summary", "format": "PLAIN"},
+            },
+        },
+    )
+    assert resp.status_code == 201
+    resource1_uuid = resp.json()["uuid"]
+    slug_to_uuid["resource1"] = resource1_uuid
+
+    for filters, expected_fields in [
+        # Match all text fields with prefix "conversation" in resource1
+        (
+            {
+                "prop": "resource_field_prefix",
+                "resource_id": resource1_uuid,
+                "field_type": "text",
+                "field_name_prefix": "conversation",
+            },
+            ["conversation_intro", "conversation_body"],
+        ),
+        # Match all text fields with prefix "foobar" in resource1 (no match)
+        (
+            {
+                "prop": "resource_field_prefix",
+                "resource_id": resource1_uuid,
+                "field_type": "text",
+                "field_name_prefix": "foobar",
+            },
+            [],
+        ),
+        # Match all text fields (empty prefix) in resource1
+        (
+            {
+                "prop": "resource_field_prefix",
+                "resource_id": resource1_uuid,
+                "field_type": "text",
+                "field_name_prefix": "",
+            },
+            ["conversation_intro", "conversation_body", "summary"],
+        ),
+        # Match with a prefix that doesn't exist
+        (
+            {
+                "prop": "resource_field_prefix",
+                "resource_id": resource1_uuid,
+                "field_type": "text",
+                "field_name_prefix": "nonexistent",
+            },
+            [],
+        ),
+    ]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/search",
+            json={"query": "", "filter_expression": {"field": filters}, "features": ["fulltext"]},
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        found_fields = {result["field"] for result in body["fulltext"]["results"]}
+        assert found_fields == set(expected_fields), (
+            f"Failed for filter {filters}: expected {expected_fields}, got {found_fields}"
+        )
