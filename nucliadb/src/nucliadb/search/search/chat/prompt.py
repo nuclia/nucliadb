@@ -75,7 +75,6 @@ from nucliadb_models.search import (
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
-from nucliadb_telemetry.metrics import Observer
 from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
 from nucliadb_utils.utilities import get_storage
 
@@ -1329,10 +1328,6 @@ def _clean_paragraph_text(paragraph: FindParagraph) -> str:
 # COPY from hydrator/__init__.py that has been refactored and removed
 
 
-hydrator_observer = Observer("hydrator", labels={"type": ""})
-
-
-@hydrator_observer.wrap({"type": "resource_text"})
 async def hydrate_resource_text(
     kbid: str, rid: str, *, max_concurrent_tasks: int
 ) -> list[tuple[FieldId, str]]:
@@ -1357,7 +1352,6 @@ async def hydrate_resource_text(
     return [text for text in field_extracted_texts if text is not None]
 
 
-@hydrator_observer.wrap({"type": "field_text"})
 async def hydrate_field_text(
     kbid: str,
     field_id: FieldId,
