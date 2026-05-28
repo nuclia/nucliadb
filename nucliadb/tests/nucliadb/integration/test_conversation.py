@@ -86,12 +86,12 @@ async def resource_with_conversation(
     resp = await nucliadb_writer.post(
         f"/kb/{standalone_knowledgebox}/resources",
         headers={"Content-Type": "application/json"},
-        json=CreateResourcePayload(
+        content=CreateResourcePayload(
             slug="myresource",
             conversations={
                 "faq": InputConversationField(messages=messages),
             },
-        ).model_dump(by_alias=True),
+        ).model_dump_json(by_alias=True),
     )
 
     assert resp.status_code == 201
