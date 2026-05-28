@@ -23,7 +23,8 @@ from typing import Any, Iterable
 
 from nucliadb.ingest import logger
 from nucliadb.ingest.fields.base import Field
-from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation, SplitsMetadata
+from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
+from nucliadb_protos.resources_pb2 import CloudFile, FieldAuthor, FieldConversation, SplitsMetadata
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_utils.storages.storage import StorageField
 
@@ -70,6 +71,7 @@ class Conversation(Field[PBConversation]):
         metadata = await self.get_metadata()
         metadata.extract_strategy = payload.extract_strategy
         metadata.split_strategy = payload.split_strategy
+        metadata.generated_by.CopyFrom(payload.generated_by)
 
         # Get the last page if it exists
         last_page: PBConversation | None = None
@@ -303,3 +305,9 @@ class Conversation(Field[PBConversation]):
             await self.set_splits_metadata(splits_metadata)
 
         return total_deleted
+
+    async def generated_by(self) -> FieldAuthor:
+        value = await self.get_metadata()
+        if value is None:
+            raise FieldAuthorNotFound("Field has no value, can't know who generated it")
+        return value.generated_by

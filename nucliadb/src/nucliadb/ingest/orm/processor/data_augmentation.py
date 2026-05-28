@@ -51,7 +51,7 @@ class GeneratedFields:
         return (len(self.texts) + len(self.links) + len(self.files) + len(self.conversations)) > 0
 
 
-async def get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource) -> GeneratedFields:
+async def get_generated_fields(bm: writer_pb2.BrokerMessage) -> GeneratedFields:
     """Processing can send messages with generated fields. Those can be
     generated with a data augmentation task and, as learning can't queue it to
     process, nucliadb is responsible to send the generated field to process (and
