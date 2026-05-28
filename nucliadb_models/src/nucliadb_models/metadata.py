@@ -105,7 +105,7 @@ class InputMetadata(BaseModel):
     languages: list[str] | None = Field(default=None, max_length=1024)
 
 
-class ResourceProcessingStatus(Enum):
+class ResourceProcessingStatus(str, Enum):
     PENDING = "PENDING"
     PROCESSED = "PROCESSED"
     ERROR = "ERROR"
@@ -277,7 +277,7 @@ class Origin(InputOrigin):
         description="Resource tags about the origin system. It can later be used for filtering on search endpoints with '/origin.tags/{tag}'",
     )
 
-    class Source(Enum):
+    class Source(str, Enum):
         WEB = "WEB"
         DESKTOP = "DESKTOP"
         API = "API"

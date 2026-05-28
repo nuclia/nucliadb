@@ -74,7 +74,7 @@ class ParamDefault(BaseModel):
 
 
 class FieldID(BaseModel):
-    class FieldType(Enum):
+    class FieldType(str, Enum):
         FILE = "file"
         LINK = "link"
         TEXT = "text"
@@ -139,7 +139,7 @@ class CloudFile(BaseModel):
     content_type: str | None = None
     bucket_name: str | None = None
 
-    class Source(Enum):
+    class Source(str, Enum):
         FLAPS = "FLAPS"
         GCS = "GCS"
         S3 = "S3"
