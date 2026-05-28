@@ -31,7 +31,6 @@ use tantivy::{DateTime, DocAddress, Index, IndexReader, Order, TantivyDocument};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
-use crate::query_parser::FUZZY_DISTANCE;
 use crate::request_types::{ParagraphSearchRequest, ParagraphSuggestRequest};
 use crate::search_query::{SharedTermC, search_query, streaming_query, suggest_query};
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse, extract_labels};
@@ -134,7 +133,6 @@ impl ParagraphReaderService {
             // println!("Fuzzy search with query: {:#?}", fuzzy_query);
             let fuzzied = searcher.do_search(termc, fuzzy_query, self, request.min_score)?;
             response = fuzzied;
-            response.fuzzy_distance = FUZZY_DISTANCE as i32;
             debug!("Fallback fuzzy query took {}µs", time_tracker.checkpoint().as_micros());
         }
 
