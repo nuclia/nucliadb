@@ -351,10 +351,7 @@ impl Searcher {
         let took = time.elapsed().as_secs_f64();
         debug!("Ending at {took} ms");
 
-        Ok(VectorSearchResponse {
-            documents,
-            result_per_page: request.result_per_page,
-        })
+        Ok(VectorSearchResponse { documents })
     }
 
     fn search_multi_vector(&self, search: &SearchRequest) -> VectorR<Vec<ScoredParagraph<'_>>> {
