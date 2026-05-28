@@ -22,26 +22,29 @@ import time
 
 import pytest
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
 from starlette.responses import PlainTextResponse
+from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from nucliadb.middleware import (
-    EventCounter,
-    ProcessTimeHeaderMiddleware,
-)
+from nucliadb.middleware import EventCounter, ProcessTimeHeaderMiddleware
 
 
 class TestCaseProcessTimeHeaderMiddleware:
     @pytest.fixture(scope="class")
     def app(self):
-        app_ = Starlette()
-        app_.add_middleware(ProcessTimeHeaderMiddleware)
-
-        @app_.route("/foo/")
         def foo(request):
             return PlainTextResponse("Foo")
 
-        return app_
+        app = Starlette(
+            routes=[
+                Route("/foo/", foo),
+            ],
+            middleware=[
+                Middleware(ProcessTimeHeaderMiddleware),
+            ],
+        )
+        yield app
 
     @pytest.fixture
     def client(self, app):

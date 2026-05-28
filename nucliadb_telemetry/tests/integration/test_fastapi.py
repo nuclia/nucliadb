@@ -17,7 +17,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
 from starlette.responses import PlainTextResponse
+from starlette.routing import Mount, Route
 from starlette.testclient import TestClient
 
 from nucliadb_telemetry.fastapi import PrometheusMiddleware, metrics_endpoint
@@ -27,31 +29,36 @@ from nucliadb_telemetry.fastapi.tracing import CaptureTraceIdMiddleware
 class TestCasePrometheusMiddleware:
     @pytest.fixture(scope="class")
     def app(self):
-        app_ = Starlette()
-        app_.add_middleware(PrometheusMiddleware)
-        app_.add_route("/metrics/", metrics_endpoint)
-
-        @app_.route("/foo/")
         def foo(request):
             return PlainTextResponse("Foo")
 
-        @app_.route("/bar/")
         def bar(request):
             raise ValueError("bar")
 
-        @app_.route("/foo/{bar}/")
         def foobar(request):
             return PlainTextResponse(f"Foo: {request.path_params['bar']}")
 
-        sub_app = Starlette()
-
-        @sub_app.route("/foobar/")
         def sub_foobar(request):
             return PlainTextResponse("Foobar")
 
-        app_.mount("/sub", sub_app)
-
-        return app_
+        app = Starlette(
+            routes=[
+                Route("/metrics/", metrics_endpoint),
+                Route("/foo/", foo),
+                Route("/bar/", bar),
+                Route("/foo/{bar}/", foobar),
+                Mount(
+                    "/sub",
+                    routes=[
+                        Route("/foobar/", sub_foobar),
+                    ],
+                ),
+            ],
+            middleware=[
+                Middleware(PrometheusMiddleware),
+            ],
+        )
+        yield app
 
     @pytest.fixture
     def client(self, app):
@@ -185,18 +192,22 @@ class TestCasePrometheusMiddlewareFilterUnhandledPaths:
 class TestCasePrometheusMiddlewareLogRequestsStart:
     @pytest.fixture(scope="class")
     def app(self):
-        app_ = Starlette()
-        app_.add_middleware(PrometheusMiddleware)
-
-        @app_.route("/foo/")
         def foo(request):
             return PlainTextResponse("Foo")
 
-        @app_.route("/foo/{bar}/")
         def foobar(request):
             return PlainTextResponse(f"Foo: {request.path_params['bar']}")
 
-        return app_
+        app = Starlette(
+            routes=[
+                Route("/foo/", foo),
+                Route("/foo/{bar}/", foobar),
+            ],
+            middleware=[
+                Middleware(PrometheusMiddleware),
+            ],
+        )
+        yield app
 
     @pytest.fixture
     def client(self, app):
@@ -229,14 +240,18 @@ class TestCasePrometheusMiddlewareLogRequestsStart:
 class TestCaseCaptureTraceIdMiddleware:
     @pytest.fixture(scope="class")
     def app(self):
-        app_ = Starlette()
-        app_.add_middleware(CaptureTraceIdMiddleware)
-
-        @app_.route("/foo/")
         def foo(request):
             return PlainTextResponse("Foo")
 
-        return app_
+        app = Starlette(
+            routes=[
+                Route("/foo/", foo),
+            ],
+            middleware=[
+                Middleware(CaptureTraceIdMiddleware),
+            ],
+        )
+        yield app
 
     @pytest.fixture
     def client(self, app):
