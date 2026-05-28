@@ -25,6 +25,9 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import ProcessingEngine
 from nucliadb.models.internal.processing import (
     PushConversation,
+    PushMessage,
+    PushMessageContent,
+    PushMessageFormat,
     PushPayload,
     PushTextFormat,
     Source,
@@ -154,8 +157,27 @@ def _bm_text_field_to_processing(text_field: resources_pb2.FieldText) -> Text:
 def _bm_conversation_field_to_processing(
     conv_field: resources_pb2.Conversation,
 ) -> PushConversation:
-    # TODO
-    push_conv = PushConversation(
-        messages=[], extract_strategy=None, split_strategy=None, classification_labels=[]
-    )
+    push_conv = PushConversation(messages=[])
+    for msg in conv_field.messages:
+        push_conv.messages.append(
+            PushMessage(
+                timestamp=msg.timestamp.ToDatetime(),
+                who=msg.who,
+                to=list(msg.to),
+                ident=msg.ident,
+                content=PushMessageContent(
+                    text=msg.content.text, format=_to_push_message_format(msg.content.format)
+                ),
+            )
+        )
     return push_conv
+
+
+def _to_push_message_format(pb: resources_pb2.MessageContent.Format.ValueType) -> PushMessageFormat:
+    # The pb and the models are not in sync, so we need this to avoid errors.
+    if pb == resources_pb2.MessageContent.Format.KEEP_MARKDOWN:
+        return PushMessageFormat.MARKDOWN
+    elif pb == resources_pb2.MessageContent.Format.JSON:
+        return PushMessageFormat.JSON
+    else:
+        return PushMessageFormat(pb)

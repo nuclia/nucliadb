@@ -91,6 +91,11 @@ class LinkUpload(BaseModel):
 
 
 class PushMessageFormat(int, Enum):
+    """
+    NOTE: These should match the nucliadb_protos.resources_pb2.MessageContent.Format enum values,
+          as they are used to convert the protobuf messages to the processing messages.
+    """
+
     PLAIN = 0
     HTML = 1
     MARKDOWN = 2
