@@ -21,7 +21,7 @@ from nucliadb_models.extracted import FieldMetadata
 from nucliadb_models.text import FieldText
 
 
-class AgentType(Enum):
+class AgentType(str, Enum):
     graph = "graph"
     label = "label"
     ask = "ask"

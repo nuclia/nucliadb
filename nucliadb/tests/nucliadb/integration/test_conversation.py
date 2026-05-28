@@ -86,12 +86,12 @@ async def resource_with_conversation(
     resp = await nucliadb_writer.post(
         f"/kb/{standalone_knowledgebox}/resources",
         headers={"Content-Type": "application/json"},
-        content=CreateResourcePayload(
+        json=CreateResourcePayload(
             slug="myresource",
             conversations={
                 "faq": InputConversationField(messages=messages),
             },
-        ).model_dump_json(by_alias=True),
+        ).model_dump(by_alias=True),
     )
 
     assert resp.status_code == 201
@@ -100,14 +100,14 @@ async def resource_with_conversation(
     # add another message using the api to add single message
     resp = await nucliadb_writer.put(
         f"/kb/{standalone_knowledgebox}/resource/{rid}/conversation/faq/messages",
-        content="["
-        + InputMessage(
-            to=[f"computer"],
-            content=InputMessageContent(text="42"),
-            ident="computer",
-            type=MessageType.ANSWER,
-        ).model_dump_json(by_alias=True)
-        + "]",
+        json=[
+            InputMessage(
+                to=[f"computer"],
+                content=InputMessageContent(text="42"),
+                ident="computer",
+                type=MessageType.ANSWER,
+            ).model_dump(by_alias=True)
+        ],
     )
     assert resp.status_code == 200
 

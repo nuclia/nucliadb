@@ -345,8 +345,7 @@ async def test_fieldmetadata_classification_labels(
         fieldmetadata=[fieldmetadata],
     )
     resp = await nucliadb_writer.post(
-        f"/kb/{standalone_knowledgebox}/resources",
-        content=payload.model_dump_json(),
+        f"/kb/{standalone_knowledgebox}/resources", json=payload.model_dump()
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
