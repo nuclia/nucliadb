@@ -21,6 +21,7 @@
 from dataclasses import dataclass
 
 import nats
+import nats.js.errors
 
 from nucliadb.common.context import ApplicationContext
 

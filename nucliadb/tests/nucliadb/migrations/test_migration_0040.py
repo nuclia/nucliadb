@@ -62,8 +62,8 @@ async def test_migration_0040(maindb_driver: Driver):
     async with maindb_driver.ro_transaction() as txn:
         find_ = await datamanagers.search_configurations.get(txn, kbid=kbid, name="find")
         assert find_ is not None
-        assert find_.config.generative_model == "claude-4-5-sonnet"  # type: ignore
+        assert find_.config.generative_model == "claude-4-5-sonnet"  # type: ignore[attr-defined]
 
         ask_ = await datamanagers.search_configurations.get(txn, kbid=kbid, name="ask")
         assert ask_ is not None
-        assert ask_.config.generative_model == "gcp-claude-4-5-sonnet"  # type: ignore
+        assert ask_.config.generative_model == "gcp-claude-4-5-sonnet"  # type: ignore[attr-defined]

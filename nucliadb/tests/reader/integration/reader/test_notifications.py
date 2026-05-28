@@ -43,7 +43,8 @@ async def pubsub(natsd):
 
     yield pubsub
 
-    await pubsub.finalize()
+    if pubsub:
+        await pubsub.finalize()
 
 
 async def test_kb_notifications(pubsub):
@@ -92,7 +93,7 @@ async def test_kb_notifications_stream_is_cancelled(shorter_timeout, pubsub):
     stream_lines = []
 
     async def read_activity_stream(kbid):
-        async for line in kb_notifications_stream(kbid):
+        async for line in kb_notifications_stream(None, kbid):  # ty:ignore[invalid-argument-type]  Ignore context, not needed here
             stream_lines.append(line)
 
     # Start a task that reads the activity stream

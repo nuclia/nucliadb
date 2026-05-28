@@ -482,11 +482,25 @@ async def find_conversation_message(
 ) -> tuple[int, int, resources_pb2.Message] | None:
     """Find a message in the conversation identified by `ident`."""
     conversation_metadata = await field.get_metadata()
-    for page in range(1, conversation_metadata.pages + 1):
-        conversation = await field.db_get_value(page)
+    splits_metadata = await field.get_splits_metadata()
+    deleted_splits = set(splits_metadata.deleted_splits)
+    if ident in deleted_splits:
+        # The message has been deleted, we consider it not found.
+        return None
+    split_meta = splits_metadata.metadata.get(ident)
+    if split_meta is not None:
+        # Go directly to the page specified in the split metadata.
+        conversation = await field.db_get_value(split_meta.page)
         for idx, message in enumerate(conversation.messages):
             if message.ident == ident:
-                return page, idx, message
+                return split_meta.page, idx, message
+    else:
+        # Fallback to scroll all the conversation pages until we find it.
+        for page in range(1, conversation_metadata.pages + 1):
+            conversation = await field.db_get_value(page)
+            for idx, message in enumerate(conversation.messages):
+                if message.ident == ident:
+                    return page, idx, message
     return None
 
 
@@ -501,9 +515,14 @@ async def iter_conversation_messages(
     """
     start_page, start_index = start_from
     conversation_metadata = await field.get_metadata()
+    splits_metadata = await field.get_splits_metadata()
+    deleted_splits = set(splits_metadata.deleted_splits)
     for page in range(start_page, conversation_metadata.pages + 1):
         conversation = await field.db_get_value(page)
         for idx, message in enumerate(conversation.messages[start_index:]):
+            if message.ident in deleted_splits:
+                # Message has been deleted, skip it
+                continue
             yield (page, start_index + idx, message)
         # next iteration we want all messages
         start_index = 0

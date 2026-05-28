@@ -19,6 +19,7 @@
 #
 import random
 from datetime import datetime
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
@@ -50,8 +51,17 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.ndbfixtures.resources._vectors import lambs_split_6_vector
-from tests.ndbfixtures.resources.lambs import lambs_resource
+from tests.ndbfixtures.resources._vectors import (
+    lambs_split_6_vector,
+    lambs_split_7_vector,
+    lambs_split_9_vector,
+)
+from tests.ndbfixtures.resources.lambs import (
+    lambs_resource,
+    lambs_split_6_text,
+    lambs_split_7_text,
+    lambs_split_9_text,
+)
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
@@ -154,6 +164,9 @@ async def test_conversations(
     )
     assert resp.status_code == 200
     field_resp = ResourceField.model_validate(resp.json())
+    assert field_resp.value["total"] == 301  # type: ignore
+    assert field_resp.value["pages"] == 2  # type: ignore
+    assert field_resp.value["page"] == 1  # type: ignore
     msgs = field_resp.value["messages"]  # type: ignore
     assert len(msgs) == 200
     assert [m["ident"] for m in msgs] == [str(i) for i in range(1, 201)]
@@ -386,7 +399,7 @@ async def test_conversation_field_indexing(
         top_k: int = 5,
         min_score: float | None = None,
     ) -> KnowledgeboxFindResults:
-        payload = {"top_k": top_k, "reranker": "noop"}
+        payload: dict[str, Any] = {"top_k": top_k, "reranker": "noop"}
         features = []
         if min_score is not None:
             payload["min_score"] = min_score
@@ -784,6 +797,78 @@ async def test_replace_conversation_with_put_endpoint_deletes_previous_pages(
     assert body["value"]["messages"][0]["ident"] == "x"
 
 
+async def _test_keyword_search(
+    nucliadb_reader: AsyncClient,
+    kbid: str,
+    message_text: str,
+    message_id: str,
+    top_k: int = 1,
+    min_score: float | dict | None = None,
+    found: bool = True,
+):
+    payload: dict[str, Any] = {
+        "query": message_text,
+        "features": ["keyword"],
+        "top_k": top_k,
+        "reranker": "noop",
+    }
+    if min_score is not None:
+        payload["min_score"] = min_score
+
+    # Test keyword search retrieves the right message
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json=payload,
+    )
+    assert resp.status_code == 200
+    results = KnowledgeboxFindResults.model_validate(resp.json())
+
+    if found:
+        assert message_id in results.best_matches
+        assert (
+            results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text
+            == message_text
+        )
+    else:
+        assert message_id not in results.best_matches
+
+
+async def _test_semantic_search(
+    nucliadb_reader: AsyncClient,
+    kbid: str,
+    message_text: str,
+    message_id: str,
+    message_vector: list[float],
+    top_k: int = 1,
+    min_score: float | dict | None = None,
+    found: bool = True,
+):
+    payload: dict[str, Any] = {
+        "vector": message_vector,
+        "features": ["semantic"],
+        "top_k": top_k,
+        "reranker": "noop",
+        "vectorset": "multilingual",
+    }
+    if min_score is not None:
+        payload["min_score"] = min_score
+    # Test semantic search retrieves the right message
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json=payload,
+    )
+    assert resp.status_code == 200
+    results = KnowledgeboxFindResults.model_validate(resp.json())
+    if found:
+        assert message_id in results.best_matches
+        assert (
+            results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text
+            == message_text
+        )
+    else:
+        assert message_id not in results.best_matches
+
+
 @pytest.mark.deploy_modes("standalone")
 async def test_conversation_search(
     nucliadb_writer: AsyncClient,
@@ -798,46 +883,8 @@ async def test_conversation_search(
     message_id = f"{rid}/c/lambs/6/0-80"
     message_vector = lambs_split_6_vector[:512]
 
-    async def _test_keyword_search(message_text: str, message_id: str):
-        # Test keyword search retrieves the right message
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
-            json={
-                "query": message_text,
-                "features": ["keyword"],
-                "top_k": 1,
-            },
-        )
-        assert resp.status_code == 200
-        results = KnowledgeboxFindResults.model_validate(resp.json())
-        assert message_id in results.best_matches
-        assert (
-            results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text
-            == message_text
-        )
-
-    async def _test_semantic_search(message_text: str, message_id: str, message_vector: list[float]):
-        # Test semantic search retrieves the right message
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
-            json={
-                "vector": message_vector,
-                "features": ["semantic"],
-                "top_k": 1,
-                "reranker": "noop",
-                "vectorset": "multilingual",
-            },
-        )
-        assert resp.status_code == 200
-        results = KnowledgeboxFindResults.model_validate(resp.json())
-        assert message_id in results.best_matches
-        assert (
-            results.resources.popitem()[1].fields.popitem()[1].paragraphs.popitem()[1].text
-            == message_text
-        )
-
-    await _test_keyword_search(message_text, message_id)
-    await _test_semantic_search(message_text, message_id, message_vector)
+    await _test_keyword_search(nucliadb_reader, kbid, message_text, message_id)
+    await _test_semantic_search(nucliadb_reader, kbid, message_text, message_id, message_vector)
 
     # Add another message to the conversation, to test that indexing works on partial updates too
     new_message_text = "Foo barba foo barba foo."
@@ -878,12 +925,14 @@ async def test_conversation_search(
     await wait_for_sync()
 
     # Previous searches still work
-    await _test_keyword_search(message_text, message_id)
-    await _test_semantic_search(message_text, message_id, message_vector)
+    await _test_keyword_search(nucliadb_reader, kbid, message_text, message_id)
+    await _test_semantic_search(nucliadb_reader, kbid, message_text, message_id, message_vector)
 
     # New message is searchable too
-    await _test_keyword_search(new_message_text, new_message_id)
-    await _test_semantic_search(new_message_text, new_message_id, new_message_vector)
+    await _test_keyword_search(nucliadb_reader, kbid, new_message_text, new_message_id)
+    await _test_semantic_search(
+        nucliadb_reader, kbid, new_message_text, new_message_id, new_message_vector
+    )
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -966,3 +1015,174 @@ async def test_append_messages_to_non_existent_conversation_field_creates_it(
     assert conv_field.value is not None
     assert conv_field.value.total == 2
     assert conv_field.value.pages == 1
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_delete_conversation_message_lambs_resource(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+
+    # Create a resource with the lambs conversation
+    rid = await lambs_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    lambs_split_6_vector_m = lambs_split_6_vector[:512]
+    lambs_split_7_vector_m = lambs_split_7_vector[:512]
+    lambs_split_9_vector_m = lambs_split_9_vector[:512]
+
+    lambs_split_6_pid = f"{rid}/c/lambs/6/0-{len(lambs_split_6_text)}"
+    lambs_split_7_pid = f"{rid}/c/lambs/7/0-{len(lambs_split_7_text)}"
+    lambs_split_9_pid = f"{rid}/c/lambs/9/0-{len(lambs_split_9_text)}"
+
+    # Verify all 3 messages are present
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs",
+        params={"page": 1, "show": ["value"]},
+    )
+    assert resp.status_code == 200
+    field_resp = ResourceField.model_validate(resp.json())
+    msgs = field_resp.value["messages"]  # type: ignore
+    assert len(msgs) > 0
+    assert {"6", "7", "9"}.issubset({m["ident"] for m in msgs})
+
+    # Verify all messages are searchable before deletion
+    search_cases = {
+        "split_6": {
+            "text": lambs_split_6_text,
+            "vector": lambs_split_6_vector_m,
+            "pid": lambs_split_6_pid,
+            "should_find": True,
+        },
+        "split_7": {
+            "text": lambs_split_7_text,
+            "vector": lambs_split_7_vector_m,
+            "pid": lambs_split_7_pid,
+            "should_find": True,
+        },
+        "split_9": {
+            "text": lambs_split_9_text,
+            "vector": lambs_split_9_vector_m,
+            "pid": lambs_split_9_pid,
+            "should_find": True,
+        },
+    }
+
+    async def _check_search():
+        for case in search_cases.values():
+            await _test_keyword_search(
+                nucliadb_reader,
+                kbid,
+                cast(str, case["text"]),
+                cast(str, case["pid"]),
+                found=cast(bool, case["should_find"]),
+            )
+            await _test_semantic_search(
+                nucliadb_reader,
+                kbid,
+                cast(str, case["text"]),
+                cast(str, case["pid"]),
+                cast(list[int | float], case["vector"]),
+                found=cast(bool, case["should_find"]),
+            )
+
+    await _check_search()
+
+    # Delete the second message by resource id
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages/7",
+    )
+    assert resp.status_code == 204
+
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Verify 7 is gone but 6 and 9 remain
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs",
+        params={"page": 1, "show": ["value"]},
+    )
+    assert resp.status_code == 200
+    field_resp = ResourceField.model_validate(resp.json())
+    msgs = {m["ident"]: m for m in field_resp.value["messages"]}  # type: ignore
+    assert {"6", "9"}.issubset(msgs.keys())
+    assert "7" not in msgs
+
+    # Verify split 7 is no longer found by keyword search, but splits 6 and 9 are still searchable
+    search_cases["split_7"]["should_find"] = False
+    await _check_search()
+
+    # Delete the second message again -- should be a no-op (already deleted)
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages/7",
+    )
+    assert resp.status_code == 204
+
+    # Delete a non-existent message -- should be a no-op
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages/nonexistent",
+    )
+    assert resp.status_code == 204
+
+    # Delete using slug endpoint
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/slug/lambs/conversation/lambs/messages/9",
+    )
+    assert resp.status_code == 204
+
+    await mark_dirty()
+    await wait_for_sync()
+
+    # Verify only split 6 remains
+    resp = await nucliadb_reader.get(
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs",
+        params={"page": 1, "show": ["value"]},
+    )
+    assert resp.status_code == 200
+    field_resp = ResourceField.model_validate(resp.json())
+    msgs = field_resp.value["messages"]  # type: ignore
+    assert {"6"}.issubset({m["ident"] for m in msgs})
+
+    # Verify split 6 is still searchable
+    search_cases["split_9"]["should_find"] = False
+    await _check_search()
+
+    # Verify error cases
+
+    # Non-existent resource
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/nonexistent-rid/conversation/lambs/messages/6",
+    )
+    assert resp.status_code == 404
+
+    # Non-existent field
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/{rid}/conversation/nonexistent_field/messages/6",
+    )
+    assert resp.status_code == 404
+
+    # Message ident too long (> 128 chars)
+    long_ident = "a" * 129
+    resp = await nucliadb_writer.delete(
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages/{long_ident}",
+    )
+    assert resp.status_code == 422
+
+    # Verify that a deleted message ident cannot be reused
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/resource/{rid}/conversation/lambs/messages",
+        json=[
+            {
+                "to": ["assistant"],
+                "who": "user",
+                "timestamp": datetime.now().isoformat(),
+                "content": {"text": "Trying to reuse deleted ident"},
+                "ident": "7",  # This was deleted earlier
+                "type": MessageType.QUESTION.value,
+            },
+        ],
+    )
+    assert resp.status_code == 422
+    assert "must be unique" in resp.json()["detail"]

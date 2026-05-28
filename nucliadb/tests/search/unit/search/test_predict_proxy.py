@@ -121,7 +121,7 @@ async def test_json_response(exists_kb, predict, predict_response):
     assert resp.headers["NUCLIA-LEARNING-ID"] == "foo"
     assert resp.headers["Access-Control-Expose-Headers"] == "NUCLIA-LEARNING-ID"
     assert resp.headers["Content-Type"] == "application/json"
-    assert json.loads(resp.body) == {"answer": "foo"}
+    assert json.loads(resp.body) == {"answer": "foo"}  # ty:ignore[invalid-argument-type]
 
 
 async def test_500_text_response(exists_kb, predict, predict_response):
@@ -166,7 +166,7 @@ async def test_json_response_rephrase(exists_kb, predict, predict_response):
     assert resp.headers["NUCLIA-LEARNING-ID"] == "foo"
     assert resp.headers["Access-Control-Expose-Headers"] == "NUCLIA-LEARNING-ID"
     assert resp.headers["Content-Type"] == "application/json"
-    assert json.loads(resp.body) == {"answer": "foo"}
+    assert json.loads(resp.body) == {"answer": "foo"}  # ty:ignore[invalid-argument-type]
 
 
 async def test_stream_response_rerank(exists_kb, predict, predict_response):

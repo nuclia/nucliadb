@@ -31,13 +31,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, model_validator
-
-# Type alias for valid KV field values
-KVValue = str | int | float | bool | datetime
+from typing_extensions import Self
 
 MAX_KV_SCHEMAS = 20
 MAX_KV_SCHEMA_FIELDS = 50
@@ -56,6 +53,21 @@ class KVSchemaField(BaseModel):
     type: KVFieldType
     description: str = ""
     required: bool = True
+    range: bool = Field(
+        default=False,
+        description="When enabled, this field stores a range instead of a single value and operations like `contains` are possible",
+    )
+
+    @model_validator(mode="after")
+    def validate_allowed_range_types(self) -> Self:
+        allowed_range_types = {
+            KVFieldType.INTEGER,
+            KVFieldType.FLOAT,
+            KVFieldType.DATE,
+        }
+        if self.range is True and self.type not in allowed_range_types:
+            raise ValueError(f"{self.type} is not an allowed range type")
+        return self
 
 
 class KVSchema(BaseModel):

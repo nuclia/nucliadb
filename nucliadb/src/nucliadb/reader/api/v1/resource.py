@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import json
 from typing import cast
 
 from fastapi import Header, HTTPException, Query, Request, Response
@@ -421,23 +420,36 @@ async def _get_resource_field(
                 resource_field.value = from_proto.field_link(value)
 
             if isinstance(value, resources_pb2.FieldKeyValue):
-                resource_field.value = json.loads(value.data) if value.data else None
+                resource_field.value = from_proto.field_key_value(value)
 
             if field_type is FieldTypeName.KEY_VALUE and value is None:
                 raise HTTPException(status_code=404, detail="Key-value field does not exist")
 
             if isinstance(field, Conversation):
+                conversation_metadata = await field.get_metadata()
                 if page == "first":
                     page_to_fetch = 1
                 elif page == "last":
-                    conversation_metadata = await field.get_metadata()
                     page_to_fetch = conversation_metadata.pages
                 else:
                     page_to_fetch = int(page)
 
-                value = await field.get_value(page=page_to_fetch)
-                if value is not None:
-                    resource_field.value = from_proto.conversation(value)
+                page_value = await field.get_value(page=page_to_fetch)
+                if page_value is not None:
+                    splits_metadata = await field.get_splits_metadata()
+                    deleted_messages = set(splits_metadata.deleted_splits)
+                    resource_field.value = from_proto.conversation_page(
+                        page_value,
+                        total=conversation_metadata.total,
+                        pages=conversation_metadata.pages,
+                        page=page_to_fetch,
+                    )
+                    # Skip deleted messages
+                    resource_field.value.messages = [
+                        msg
+                        for msg in (resource_field.value.messages or [])
+                        if msg.ident not in deleted_messages
+                    ]
 
         if (
             ResourceFieldProperties.EXTRACTED in show

@@ -51,6 +51,19 @@ from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import wait_for_sync
 
+lambs_split_1_text = "Starling."
+lambs_split_2_text = "Well, Clarice, have the lambs stopped screaming...?"
+lambs_split_3_text = "Don't bother with a trace, I won't be on long enough."
+lambs_split_4_text = "Where are you, Dr. Lecter?"
+lambs_split_5_text = "Where I have a view, Clarice..."
+lambs_split_6_text = "Orion is looking splendid tonight, and Arcturus, the Herdsman, with his flock..."
+lambs_split_7_text = "Your lambs are still for now, Clarice, but not forever... You'll have to earn it again and again, this blessed silence. Because it's the plight that drives you, and the plight will never end."
+lambs_split_8_text = "Dr. Lecter -"
+lambs_split_9_text = "I have no plans to call on you, Clarice, the world being more interesting with you in it. Be sure you extend me the same courtesy."
+lambs_split_10_text = "You know I can't make that promise."
+lambs_split_11_text = "Goodbye, Clarice... You looked - so very lovely today in your blue suit."
+lambs_split_12_text = "Dr. Lecter... Dr. Lecter...!"
+
 
 async def lambs_resource(
     kbid: str,
@@ -110,7 +123,7 @@ async def lambs_resource(
                             "who": clarice,
                             "to": [lecter],
                             "content": {
-                                "text": "Starling.",
+                                "text": lambs_split_1_text,
                             },
                         },
                         {
@@ -118,7 +131,7 @@ async def lambs_resource(
                             "who": lecter,
                             "to": [clarice],
                             "content": {
-                                "text": "Well, Clarice, have the lambs stopped screaming...?",
+                                "text": lambs_split_2_text,
                                 "attachments_fields": [
                                     {
                                         "field_type": "file",
@@ -133,7 +146,7 @@ async def lambs_resource(
                             "who": lecter,
                             "to": [clarice],
                             "content": {
-                                "text": "Don't bother with a trace, I won't be on long enough.",
+                                "text": lambs_split_3_text,
                             },
                         },
                         {
@@ -141,7 +154,7 @@ async def lambs_resource(
                             "who": clarice,
                             "to": [lecter],
                             "content": {
-                                "text": "Where are you, Dr. Lecter?",
+                                "text": lambs_split_4_text,
                             },
                             "type": MessageType.QUESTION.value,
                         },
@@ -150,7 +163,7 @@ async def lambs_resource(
                             "who": lecter,
                             "to": [clarice],
                             "content": {
-                                "text": "Where I have a view, Clarice...",
+                                "text": lambs_split_5_text,
                             },
                             "type": MessageType.ANSWER.value,
                         },
@@ -159,7 +172,7 @@ async def lambs_resource(
                             "who": lecter,
                             "to": [clarice],
                             "content": {
-                                "text": "Orion is looking splendid tonight, and Arcturus, the Herdsman, with his flock...",
+                                "text": lambs_split_6_text,
                             },
                         },
                         {
@@ -167,7 +180,7 @@ async def lambs_resource(
                             "who": lecter,
                             "to": [clarice],
                             "content": {
-                                "text": "Your lambs are still for now, Clarice, but not forever... You'll have to earn it again and again, this blessed silence. Because it's the plight that drives you, and the plight will never end.",
+                                "text": lambs_split_7_text,
                             },
                         },
                         {
@@ -175,7 +188,7 @@ async def lambs_resource(
                             "who": clarice,
                             "to": [lecter],
                             "content": {
-                                "text": "Dr. Lecter -",
+                                "text": lambs_split_8_text,
                             },
                         },
                         {
@@ -183,7 +196,7 @@ async def lambs_resource(
                             "who": lecter,
                             "to": [clarice],
                             "content": {
-                                "text": "I have no plans to call on you, Clarice, the world being more interesting with you in it. Be sure you extend me the same courtesy.",
+                                "text": lambs_split_9_text,
                             },
                         },
                         {
@@ -191,7 +204,7 @@ async def lambs_resource(
                             "who": clarice,
                             "to": [lecter],
                             "content": {
-                                "text": "You know I can't make that promise.",
+                                "text": lambs_split_10_text,
                             },
                         },
                         {
@@ -199,7 +212,7 @@ async def lambs_resource(
                             "who": lecter,
                             "to": [clarice],
                             "content": {
-                                "text": "Goodbye, Clarice... You looked - so very lovely today in your blue suit.",
+                                "text": lambs_split_11_text,
                                 "attachments_fields": [
                                     {
                                         "field_type": "file",
@@ -213,7 +226,7 @@ async def lambs_resource(
                             "who": clarice,
                             "to": [lecter],
                             "content": {
-                                "text": "Dr. Lecter... Dr. Lecter...!",
+                                "text": lambs_split_12_text,
                             },
                         },
                     ]
@@ -234,18 +247,18 @@ async def lambs_resource(
                 {
                     "body": {
                         "splitText": {
-                            "5": "Where I have a view, Clarice...",
-                            "11": "Goodbye, Clarice... You looked - so very lovely today in your blue suit.",
-                            "8": "Dr. Lecter -",
-                            "2": "Well, Clarice, have the lambs stopped screaming...?",
-                            "3": "Don't bother with a trace, I won't be on long enough.",
-                            "1": "Starling.",
-                            "9": "I have no plans to call on you, Clarice, the world being more interesting with you in it. Be sure you extend me the same courtesy.",
-                            "7": "Your lambs are still for now, Clarice, but not forever... You'll have to earn it again and again, this blessed silence. Because it's the plight that drives you, and the plight will never end.",
-                            "4": "Where are you, Dr. Lecter?",
-                            "6": "Orion is looking splendid tonight, and Arcturus, the Herdsman, with his flock...",
-                            "12": "Dr. Lecter... Dr. Lecter...!",
-                            "10": "You know I can't make that promise.",
+                            "5": lambs_split_5_text,
+                            "11": lambs_split_11_text,
+                            "8": lambs_split_8_text,
+                            "2": lambs_split_2_text,
+                            "3": lambs_split_3_text,
+                            "1": lambs_split_1_text,
+                            "9": lambs_split_9_text,
+                            "7": lambs_split_7_text,
+                            "4": lambs_split_4_text,
+                            "6": lambs_split_6_text,
+                            "12": lambs_split_12_text,
+                            "10": lambs_split_10_text,
                         }
                     },
                     "field": {"fieldType": "CONVERSATION", "field": "lambs"},

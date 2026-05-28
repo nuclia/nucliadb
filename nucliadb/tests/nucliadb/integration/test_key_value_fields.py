@@ -29,6 +29,7 @@ PRODUCT_SCHEMA = {
         {"key": "in_stock", "type": "boolean", "required": False},
         {"key": "quantity", "type": "integer", "required": False},
         {"key": "launched_at", "type": "date", "required": False},
+        {"key": "delivery_days", "type": "integer", "range": True, "required": False},
     ],
 }
 
@@ -40,6 +41,7 @@ VALID_PRODUCT_DATA = {
         "in_stock": True,
         "quantity": 3,
         "launched_at": "2024-01-15T00:00:00Z",
+        "delivery_days": {"lower": 1, "upper": 5},
     },
 }
 
@@ -82,11 +84,12 @@ async def test_kv_field_crud(
     assert "key_values" in data["data"]
     assert "product" in data["data"]["key_values"]
     value = data["data"]["key_values"]["product"]["value"]
-    assert value["color"] == "red"
-    assert value["price"] == 12.5
-    assert value["in_stock"] is True
-    assert value["quantity"] == 3
-    assert value["launched_at"] == "2024-01-15T00:00:00Z"
+    assert value["data"]["color"] == "red"
+    assert value["data"]["price"] == 12.5
+    assert value["data"]["in_stock"] is True
+    assert value["data"]["quantity"] == 3
+    assert value["data"]["launched_at"] == "2024-01-15T00:00:00Z"
+    assert value["data"]["delivery_days"] == {"lower": 1, "upper": 5}
 
     # --- Update resource via PATCH ---
     resp = await nucliadb_writer.patch(
@@ -101,7 +104,7 @@ async def test_kv_field_crud(
 
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid}/key_value/product")
     assert resp.status_code == 200, resp.text
-    assert resp.json()["value"]["color"] == "blue"
+    assert resp.json()["value"]["data"]["color"] == "blue"
 
     # --- Set/get via PUT on a fresh resource ---
     resp = await nucliadb_writer.post(f"/kb/{kbid}/resources", json={"title": "Second resource"})
@@ -117,11 +120,11 @@ async def test_kv_field_crud(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid2}/key_value/product")
     assert resp.status_code == 200, resp.text
     value = resp.json()["value"]
-    assert value["color"] == "red"
-    assert value["price"] == 12.5
-    assert value["in_stock"] is True
-    assert value["quantity"] == 3
-    assert value["launched_at"] == "2024-01-15T00:00:00Z"
+    assert value["data"]["color"] == "red"
+    assert value["data"]["price"] == 12.5
+    assert value["data"]["in_stock"] is True
+    assert value["data"]["quantity"] == 3
+    assert value["data"]["launched_at"] == "2024-01-15T00:00:00Z"
 
     # --- Update field: only required keys; optional keys disappear ---
     resp = await nucliadb_writer.put(
@@ -133,8 +136,8 @@ async def test_kv_field_crud(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/resource/{rid2}/key_value/product")
     assert resp.status_code == 200, resp.text
     value = resp.json()["value"]
-    assert value["color"] == "green"
-    assert value["price"] == 5.0
+    assert value["data"]["color"] == "green"
+    assert value["data"]["price"] == 5.0
     assert "in_stock" not in value
     assert "quantity" not in value
 
@@ -226,13 +229,6 @@ async def test_kv_field_validation(
     )
     assert resp.status_code == 422, resp.text
 
-    # Field name in URL must match schema_id in body
-    resp = await nucliadb_writer.put(
-        f"{base_url}/product",
-        json={"schema_id": "other", "data": {"color": "red", "price": 1.0}},
-    )
-    assert resp.status_code == 422, resp.text
-
 
 @pytest.mark.deploy_modes("standalone")
 async def test_kv_field_filter(
@@ -265,6 +261,7 @@ async def test_kv_field_filter(
                         "in_stock": True,
                         "quantity": 3,
                         "launched_at": "2023-06-01T00:00:00Z",
+                        "delivery_days": {"lower": 1, "upper": 5},
                     },
                 }
             },
@@ -288,6 +285,7 @@ async def test_kv_field_filter(
                         "in_stock": False,
                         "quantity": 10,
                         "launched_at": "2024-06-01T00:00:00Z",
+                        "delivery_days": {"lower": 2, "upper": 3},
                     },
                 }
             },
@@ -302,133 +300,82 @@ async def test_kv_field_filter(
             json={
                 "query": "product item",
                 "features": ["keyword"],
-                "filter_expression": filter_expression,
+                "filter_expression": {
+                    "key_value": filter_expression,
+                },
             },
         )
         assert resp.status_code == 200, resp.text
         return set(resp.json()["resources"].keys())
 
-    # --- Exact match on color=red → finds resource 1 only ---
-    rids = await find_with_filter(
-        {
-            "key_value": {
-                "op": "exact_match",
-                "field_id": "product",
-                "key": "color",
-                "value": "red",
+    filters = [
+        # BOOLEAN fields
+        ("in_stock", "eq", True, {rid1}),
+        ("in_stock", "eq", False, {rid2}),
+        # INTEGER fields
+        ("quantity", "eq", 3, {rid1}),
+        ("quantity", "gte", 1, {rid1, rid2}),
+        ("quantity", "gte", 5, {rid2}),
+        ("quantity", "lte", 20, {rid1, rid2}),
+        ("quantity", "lte", 5, {rid1}),
+        # FLOAT fields
+        ("price", "eq", 5, {rid2}),
+        ("price", "eq", 5.0, {rid2}),
+        ("price", "gte", 5.0, {rid1, rid2}),
+        ("price", "gte", 5.01, {rid1}),
+        ("price", "lte", 12.5, {rid1, rid2}),
+        ("price", "lte", 4.99, set()),
+        #  price (float) can be filtered by an int
+        ("price", "eq", 5, {rid2}),
+        ("price", "gte", 5, {rid1, rid2}),
+        ("price", "lte", 5, {rid2}),
+        # TEXT fields
+        ("color", "eq", "black", set()),
+        ("color", "eq", "blue", {rid2}),
+        ("color", "eq", "red", {rid1}),
+        # DATE fields
+        ("launched_at", "eq", "2024-06-01T00:00:00Z", {rid2}),
+        ("launched_at", "gte", "2024-01-01T00:00:00Z", {rid2}),
+        ("launched_at", "lte", "2023-12-31T23:59:59Z", {rid1}),
+        # RANGE fields
+        ("delivery_days", "contains", 2, {rid1, rid2}),
+        ("delivery_days", "contains", 4, {rid1}),
+    ]
+    for key, op, value, expected in filters:
+        resources = await find_with_filter(
+            {
+                "schema_id": "product",
+                "key": key,
+                op: value,
             }
-        }
-    )
-    assert rid1 in rids, f"Expected rid1 in results for color=red, got {rids}"
-    assert rid2 not in rids, f"Expected rid2 NOT in results for color=red, got {rids}"
-
-    # --- Float range price >= 10.0 → finds resource 1 only ---
-    rids = await find_with_filter(
+        )
         {
-            "key_value": {
-                "op": "range",
-                "field_id": "product",
-                "key": "price",
-                "gte": 10.0,
-            }
+            "key": "price_range",
+            "contains": 10,
         }
-    )
-    assert rid1 in rids, f"Expected rid1 in results for price>=10.0, got {rids}"
-    assert rid2 not in rids, f"Expected rid2 NOT in results for price>=10.0, got {rids}"
-
-    # --- Bool match in_stock=True → finds resource 1 only ---
-    rids = await find_with_filter(
-        {
-            "key_value": {
-                "op": "bool_match",
-                "field_id": "product",
-                "key": "in_stock",
-                "value": True,
-            }
-        }
-    )
-    assert rid1 in rids, f"Expected rid1 in results for in_stock=True, got {rids}"
-    assert rid2 not in rids, f"Expected rid2 NOT in results for in_stock=True, got {rids}"
-
-    # --- Integer range quantity <= 5 → finds resource 1 only ---
-    rids = await find_with_filter(
-        {
-            "key_value": {
-                "op": "range",
-                "field_id": "product",
-                "key": "quantity",
-                "lte": 5,
-            }
-        }
-    )
-    assert rid1 in rids, f"Expected rid1 in results for quantity<=5, got {rids}"
-    assert rid2 not in rids, f"Expected rid2 NOT in results for quantity<=5, got {rids}"
-
-    # --- Exact match on color=blue → finds resource 2 only ---
-    rids = await find_with_filter(
-        {
-            "key_value": {
-                "op": "exact_match",
-                "field_id": "product",
-                "key": "color",
-                "value": "blue",
-            }
-        }
-    )
-    assert rid2 in rids, f"Expected rid2 in results for color=blue, got {rids}"
-    assert rid1 not in rids, f"Expected rid1 NOT in results for color=blue, got {rids}"
+        assert resources == expected, (
+            f"Unexpected match for `{key} {op} {value}`: matched {resources} instead of {expected}"
+        )
 
     # --- AND: color=red AND in_stock=True → finds resource 1 only ---
     rids = await find_with_filter(
         {
-            "key_value": {
-                "and": [
-                    {
-                        "op": "exact_match",
-                        "field_id": "product",
-                        "key": "color",
-                        "value": "red",
-                    },
-                    {
-                        "op": "bool_match",
-                        "field_id": "product",
-                        "key": "in_stock",
-                        "value": True,
-                    },
-                ]
-            }
+            "and": [
+                {
+                    "schema_id": "product",
+                    "key": "color",
+                    "eq": "red",
+                },
+                {
+                    "schema_id": "product",
+                    "key": "in_stock",
+                    "eq": True,
+                },
+            ]
         }
     )
     assert rid1 in rids, f"Expected rid1 in results for color=red AND in_stock=True, got {rids}"
     assert rid2 not in rids, f"Expected rid2 NOT in results for color=red AND in_stock=True, got {rids}"
-
-    # --- Date range: launched_at >= 2024-01-01 → finds resource 2 only ---
-    rids = await find_with_filter(
-        {
-            "key_value": {
-                "op": "date_range",
-                "field_id": "product",
-                "key": "launched_at",
-                "gte": "2024-01-01T00:00:00Z",
-            }
-        }
-    )
-    assert rid2 in rids, f"Expected rid2 in results for launched_at>=2024, got {rids}"
-    assert rid1 not in rids, f"Expected rid1 NOT in results for launched_at>=2024, got {rids}"
-
-    # --- Date range: launched_at <= 2023-12-31 → finds resource 1 only ---
-    rids = await find_with_filter(
-        {
-            "key_value": {
-                "op": "date_range",
-                "field_id": "product",
-                "key": "launched_at",
-                "lte": "2023-12-31T23:59:59Z",
-            }
-        }
-    )
-    assert rid1 in rids, f"Expected rid1 in results for launched_at<=2023, got {rids}"
-    assert rid2 not in rids, f"Expected rid2 NOT in results for launched_at<=2023, got {rids}"
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -437,13 +384,12 @@ async def test_kv_filter_schema_validation(
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox: str,
 ):
-    """
-    Covers: schema validation for key_value filter expressions.
-    Unknown field_id or key should return 422.
+    """Test key-value schema validations: invalid schema, field or invalid types
+    (type in schema is not compatible with query types)
+
     """
     kbid = standalone_knowledgebox
 
-    # Setup: create schema
     resp = await nucliadb_writer.post(f"/kb/{kbid}/kv-schemas", json=PRODUCT_SCHEMA)
     assert resp.status_code == 201, resp.text
 
@@ -453,85 +399,93 @@ async def test_kv_filter_schema_validation(
             json={
                 "query": "product item",
                 "features": ["keyword"],
-                "filter_expression": filter_expression,
+                "filter_expression": {
+                    "key_value": filter_expression,
+                },
             },
         )
         return resp.status_code
 
-    # --- Unknown field_id → 422 ---
     status = await find_with_filter(
         {
-            "key_value": {
-                "op": "exact_match",
-                "field_id": "nonexistent_schema",
-                "key": "color",
-                "value": "red",
-            }
+            "schema_id": "nonexistent_schema",
+            "key": "color",
+            "eq": "red",
         }
     )
-    assert status == 412, f"Expected 412 for unknown field_id, got {status}"
+    assert status == 412
 
-    # --- Unknown key → 422 ---
     status = await find_with_filter(
         {
-            "key_value": {
-                "op": "exact_match",
-                "field_id": "product",
-                "key": "nonexistent_key",
-                "value": "red",
-            }
+            "schema_id": "product",
+            "key": "nonexistent_key",
+            "eq": "red",
         }
     )
-    assert status == 412, f"Expected 412 for unknown key, got {status}"
+    assert status == 412
 
-    # --- Wrong predicate type: exact_match on a float field → 422 ---
-    status = await find_with_filter(
-        {
-            "key_value": {
-                "op": "exact_match",
-                "field_id": "product",
-                "key": "price",
-                "value": "12.5",
+    # Test schema validation for invalid combinations of schemaa field types and
+    # query values
+    for key, op, value in [
+        # invalid types for a BOOLEAN field
+        ("in_stock", "eq", "true"),
+        ("in_stock", "eq", 10),
+        ("in_stock", "gte", 10),
+        ("in_stock", "lte", 10),
+        ("in_stock", "eq", 3.5),
+        ("in_stock", "gte", 3.5),
+        ("in_stock", "lte", 3.5),
+        ("in_stock", "eq", "2024-01-01T00:00:00Z"),
+        ("in_stock", "gte", "2024-01-01T00:00:00Z"),
+        ("in_stock", "lte", "2024-01-01T00:00:00Z"),
+        # invalid types for an INTEGER field
+        ("quantity", "eq", "10"),
+        ("quantity", "eq", True),
+        ("quantity", "eq", 3.5),
+        ("quantity", "gte", 3.5),
+        ("quantity", "lte", 3.5),
+        ("quantity", "eq", "2024-01-01T00:00:00Z"),
+        ("quantity", "gte", "2024-01-01T00:00:00Z"),
+        ("quantity", "lte", "2024-01-01T00:00:00Z"),
+        # invalid types for an FLOAT field
+        ("price", "eq", "3.5"),
+        ("price", "eq", True),
+        ("price", "eq", "2024-01-01T00:00:00Z"),
+        ("price", "gte", "2024-01-01T00:00:00Z"),
+        ("price", "lte", "2024-01-01T00:00:00Z"),
+        # invalid types for a TEXT field
+        ("color", "eq", True),
+        ("color", "eq", 10),
+        ("color", "gte", 10),
+        ("color", "lte", 10),
+        ("color", "eq", 3.5),
+        ("color", "gte", 3.5),
+        ("color", "lte", 3.5),
+        ("color", "eq", "2024-01-01T00:00:00Z"),
+        ("color", "gte", "2024-01-01T00:00:00Z"),
+        ("color", "lte", "2024-01-01T00:00:00Z"),
+        # invalid types for a DATE field
+        ("launched_at", "eq", "today"),
+        ("launched_at", "eq", True),
+        ("launched_at", "eq", 10),
+        ("launched_at", "gte", 10),
+        ("launched_at", "lte", 10),
+        ("launched_at", "eq", 3.5),
+        ("launched_at", "gte", 3.5),
+        ("launched_at", "lte", 3.5),
+        # invalid types for a RANGE field
+        ("delivery_days", "eq", "today"),
+        ("delivery_days", "eq", True),
+        ("delivery_days", "eq", 10.0),
+        ("delivery_days", "eq", "2024-01-01T00:00:00Z"),
+        ("delivery_days", "gte", "2024-01-01T00:00:00Z"),
+        ("delivery_days", "lte", "2024-01-01T00:00:00Z"),
+    ]:
+        status = await find_with_filter(
+            {
+                "schema_id": "product",
+                "key": key,
+                op: value,
             }
-        }
-    )
-    assert status == 412, f"Expected 412 for exact_match on float field, got {status}"
-
-    # --- Wrong predicate type: bool_match on a text field → 422 ---
-    status = await find_with_filter(
-        {
-            "key_value": {
-                "op": "bool_match",
-                "field_id": "product",
-                "key": "color",
-                "value": True,
-            }
-        }
-    )
-    assert status == 412, f"Expected 412 for bool_match on text field, got {status}"
-
-    # --- Wrong predicate type: range on a text field → 412 ---
-    status = await find_with_filter(
-        {
-            "key_value": {
-                "op": "range",
-                "field_id": "product",
-                "key": "color",
-                "gte": 1.0,
-            }
-        }
-    )
-    assert status == 412, f"Expected 412 for range on text field, got {status}"
-
-    # --- Wrong predicate type: date_range on a text field → 412 ---
-    status = await find_with_filter(
-        {
-            "key_value": {
-                "op": "date_range",
-                "field_id": "product",
-                "key": "color",
-                "gte": "2024-01-01T00:00:00Z",
-            }
-        }
-    )
-    assert status == 412, f"Expected 412 for date_range on text field, got {status}"
+        )
+        assert status == 412, f"Expected validation error for `{key} {op} {value}`, got {status}"

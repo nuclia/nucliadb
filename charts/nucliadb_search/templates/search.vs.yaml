@@ -79,22 +79,3 @@ spec:
               number: {{.Values.serving.port}}
             host: "search.{{ .Release.Namespace }}.svc.cluster.local"
 
-    # Generic canary release (traffic shifting) for /ask endpoints
-    - name: ask_endpoint
-      match:
-        - uri:
-            regex: '^/api/v\d+/kb/[^/]+/ask$'
-          method:
-            regex: "POST|OPTIONS"
-        - uri:
-            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/ask$'
-          method:
-            regex: "POST|OPTIONS"
-      route:
-        - destination:
-            host: "arag-api.arag.svc.cluster.local"
-            port:
-              number: {{ .Values.ask_canary.rao_serving_port }}
-      retries:
-        attempts: 3
-        retryOn: connect-failure,5xx

@@ -23,9 +23,9 @@ import aiohttp
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest.orm.entities import EntitiesManager
-from nucliadb.ingest.orm.processor import Processor
 from nucliadb.train import SERVICE_NAME
 from nucliadb.train.models import RequestData
+from nucliadb.train.nodes import TrainShardManager
 from nucliadb.train.settings import settings
 from nucliadb_protos.knowledgebox_pb2 import Labels
 from nucliadb_protos.train_pb2 import (
@@ -41,41 +41,38 @@ from nucliadb_protos.writer_pb2 import (
     GetLabelsRequest,
     GetLabelsResponse,
 )
-from nucliadb_utils.utilities import get_pubsub, get_storage
+from nucliadb_utils.utilities import get_storage
 
 
 class UploadServicer:
     async def initialize(self):
         storage = await get_storage(service_name=SERVICE_NAME)
         driver = await setup_driver()
-        pubsub = await get_pubsub()
-        self.proc = Processor(driver=driver, storage=storage, pubsub=pubsub)
+        self.manager = TrainShardManager(driver=driver, storage=storage)
 
     async def finalize(self): ...
 
     async def GetSentences(self, request: GetSentencesRequest, context=None):
-        async for sentence in self.proc.kb_sentences(request):
+        async for sentence in self.manager.kb_sentences(request):
             yield sentence
 
     async def GetParagraphs(self, request: GetParagraphsRequest, context=None):
-        async for paragraph in self.proc.kb_paragraphs(request):
+        async for paragraph in self.manager.kb_paragraphs(request):
             yield paragraph
 
     async def GetFields(self, request: GetFieldsRequest, context=None):
-        async for field in self.proc.kb_fields(request):
+        async for field in self.manager.kb_fields(request):
             yield field
 
     async def GetResources(self, request: GetResourcesRequest, context=None):
-        for resource in self.proc.kb_resources(request):
+        async for resource in self.manager.kb_resources(request):
             yield resource
 
-    async def GetEntities(  # type: ignore
-        self, request: GetEntitiesRequest, context=None
-    ) -> GetEntitiesResponse:
+    async def GetEntities(self, request: GetEntitiesRequest, context=None) -> GetEntitiesResponse:
         kbid = request.kb.uuid
         response = GetEntitiesResponse()
-        async with self.proc.driver.ro_transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        async with self.manager.driver.ro_transaction() as txn:
+            kbobj = await self.manager.get_kb_obj(txn, kbid)
             if kbobj is None:
                 response.status = GetEntitiesResponse.Status.NOTFOUND
                 return response
@@ -86,9 +83,7 @@ class UploadServicer:
             response.status = GetEntitiesResponse.Status.OK
         return response
 
-    async def GetOntology(  # type: ignore
-        self, request: GetLabelsRequest, context=None
-    ) -> GetLabelsResponse:
+    async def GetOntology(self, request: GetLabelsRequest, context=None) -> GetLabelsResponse:
         kbid = request.kb.uuid
         response = GetLabelsResponse()
         kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)

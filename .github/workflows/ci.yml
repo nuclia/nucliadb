@@ -140,7 +140,7 @@ jobs:
         uses: apache/skywalking-eyes/header@61275cc80d0798a405cb070f7d3a8aaf7cf2c2c1 # v0.8.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: EmbarkStudios/cargo-deny-action@6c8f9facfa5047ec02d8485b6bf52b587b7777d1 # v2.0.18
+      - uses: EmbarkStudios/cargo-deny-action@a531616d8ce3b9177443e48a1159bc945a099823 # v2.0.19
         name: cargo deny
         with:
           log-level: warn
@@ -199,7 +199,7 @@ jobs:
           SQLX_OFFLINE: true
         run: cd nidx && cargo llvm-cov --codecov --output-path codecov.json nextest --workspace --all-features
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           file: ./nidx/codecov.json
           flags: nidx
@@ -296,7 +296,7 @@ jobs:
         run: source .venv/bin/activate && make -C nucliadb test-cov-search
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb-search
@@ -351,7 +351,7 @@ jobs:
           make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb
@@ -393,7 +393,7 @@ jobs:
         run: source .venv/bin/activate && make -C nucliadb test-cov-${{ matrix.component }}
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           file: ./nucliadb/coverage.xml
           flags: nucliadb-${{ matrix.component }}
@@ -435,7 +435,7 @@ jobs:
         run: source .venv/bin/activate && make -C ${{ matrix.package }} test-cov
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           file: ./${{ matrix.package }}/coverage.xml
           flags: ${{ matrix.package }}

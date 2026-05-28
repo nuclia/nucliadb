@@ -483,20 +483,27 @@ async def test_retrieve_with_kv_field_filter(
 
     products = await retrieve_with_kv_filter(
         {
-            "field_id": "product",
+            "schema_id": "product",
             "key": "color",
-            "op": "exact_match",
-            "value": "white",
+            "eq": "white",
         }
     )
     assert products == {"floral-skirt", "white-t-shirt"}
 
     products = await retrieve_with_kv_filter(
-        {"field_id": "product", "key": "price", "op": "range", "gte": 20.0}
+        {
+            "schema_id": "product",
+            "key": "price",
+            "gte": 20.0,
+        }
     )
     assert products == {"floral-skirt"}
 
     products = await retrieve_with_kv_filter(
-        {"field_id": "product", "key": "price", "op": "range", "lte": 20.0}
+        {
+            "schema_id": "product",
+            "key": "price",
+            "lte": 20.0,
+        }
     )
     assert products == {"white-t-shirt"}

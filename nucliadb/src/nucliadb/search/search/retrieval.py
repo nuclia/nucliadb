@@ -33,7 +33,7 @@ from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, nidx_query
-from nucliadb.search.search.metrics import merge_observer, search_observer
+from nucliadb.search.search.metrics import merge_observer, search_observer, searched_shards_histogram
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.search.rank_fusion import IndexSource, get_rank_fusion
@@ -72,19 +72,19 @@ async def text_block_search(
 
     pb_query = convert_retrieval_to_proto(retrieval)
     shards_response, queried_shards = await nidx_search(kbid, pb_query)
+    searched_shards_histogram.observe(len(queried_shards), {"type": "search"})
 
     keyword_results = keyword_results_to_text_block_matches(shards_response.paragraph.results)
     semantic_results = semantic_results_to_text_block_matches(shards_response.vector.documents)
     graph_results = graph_results_to_text_block_matches(shards_response.graph)
 
     rank_fusion = get_rank_fusion(retrieval.rank_fusion)
-    merged_text_blocks = rank_fusion.fuse(
-        {
-            IndexSource.KEYWORD: keyword_results,
-            IndexSource.SEMANTIC: semantic_results,
-            IndexSource.GRAPH: graph_results,
-        }
-    )
+    sources: dict[str, list[TextBlockMatch]] = {
+        IndexSource.KEYWORD: keyword_results,
+        IndexSource.SEMANTIC: semantic_results,
+        IndexSource.GRAPH: graph_results,
+    }
+    merged_text_blocks = rank_fusion.fuse(sources)
 
     # cut to the rank fusion window. As we ask each shard and index this window,
     # we'll normally have extra results

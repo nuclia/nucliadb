@@ -19,6 +19,8 @@
 #
 
 
+from typing import Sequence
+
 from google.protobuf.message import Message
 
 from nucliadb.common.datamanagers.utils import get_kv_pb
@@ -90,7 +92,7 @@ async def get_status(
 
 
 async def get_statuses(
-    txn: Transaction, *, kbid: str, rid: str, fields: list[writer_pb2.FieldID]
+    txn: Transaction, *, kbid: str, rid: str, fields: Sequence[writer_pb2.FieldID]
 ) -> list[writer_pb2.FieldStatus]:
     keys = [
         KB_RESOURCE_FIELD_STATUS.format(

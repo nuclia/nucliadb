@@ -23,6 +23,8 @@ from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
 
 import nats
+import nats.js
+import nats.js.errors
 import pytest
 from httpx import AsyncClient
 from nats.aio.client import Client
@@ -775,7 +777,7 @@ async def test_search_automatic_relations(
         assert entity in entities
         assert len(entities[entity]["related_to"]) == len(expected[entity]["related_to"])
 
-        assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(  # type: ignore
+        assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(
             entities[entity]["related_to"], key=lambda x: x["entity"]
         )
 
@@ -817,7 +819,7 @@ async def test_search_automatic_relations(
         assert entity in entities
         assert len(entities[entity]["related_to"]) == len(expected[entity]["related_to"])
 
-        assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(  # type: ignore
+        assert sorted(expected[entity]["related_to"], key=lambda x: x["entity"]) == sorted(
             entities[entity]["related_to"], key=lambda x: x["entity"]
         )
 

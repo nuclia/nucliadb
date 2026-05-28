@@ -103,7 +103,7 @@ async def update_resource_metrics(context: ApplicationContext):
         RESOURCES_COUNT.set(count)
 
 
-async def run_exporter_task(context: ApplicationContext, exporter_task: Callable, interval: int):
+async def run_exporter_task(context: ApplicationContext, exporter_task: Callable, interval: float):
     """
     Run coroutine infinitely, catching exceptions and logging them.
     It will wait for the interval before running again.
@@ -113,7 +113,9 @@ async def run_exporter_task(context: ApplicationContext, exporter_task: Callable
             try:
                 await exporter_task(context)
             except Exception:
-                logger.error(f"Error on exporter task {exporter_task.__name__}", exc_info=True)
+                logger.error(
+                    f"Error on exporter task {getattr(exporter_task, '__name__')}", exc_info=True
+                )
             await asyncio.sleep(interval)
     except asyncio.CancelledError:
         pass

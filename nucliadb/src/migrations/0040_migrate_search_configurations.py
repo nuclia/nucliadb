@@ -55,10 +55,10 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                 extra={
                     "kbid": kbid,
                     "search_config": name,
-                    "generative_model": config.config.generative_model,  # type: ignore
+                    "generative_model": config.config.generative_model,  # type: ignore[attr-defined]
                 },
             )
-            config.config.generative_model = REPLACEMENTS[config.config.generative_model]  # type: ignore
+            config.config.generative_model = REPLACEMENTS[config.config.generative_model]  # type: ignore[attr-defined]
             await datamanagers.search_configurations.set(txn, kbid=kbid, name=name, config=config)
         await txn.commit()
 

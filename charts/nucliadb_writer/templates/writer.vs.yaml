@@ -85,6 +85,10 @@ spec:
             regex: '^/api/v\d+/kb/[^/]+/search_configurations/[^/]+$'
           method:
             regex: "POST|PATCH|DELETE|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/kv-schemas.*'
+          method:
+            regex: "POST|PUT|DELETE|OPTIONS"            
 
       route:
         - destination:

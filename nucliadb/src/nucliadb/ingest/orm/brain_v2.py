@@ -19,6 +19,7 @@
 #
 import json
 import logging
+from collections import defaultdict
 from collections.abc import Iterator
 from copy import deepcopy
 from dataclasses import dataclass
@@ -104,12 +105,14 @@ class ResourceBrain:
         field_author: FieldAuthor | None,
         replace_field: bool,
         skip_index: bool,
+        deleted_splits: set[str] | None = None,
     ) -> None:
         self.apply_field_text(
             field_key,
             extracted_text,
             replace_field=replace_field,
             skip_texts=skip_index,
+            deleted_splits=deleted_splits,
         )
         self.apply_field_labels(
             field_key,
@@ -125,13 +128,14 @@ class ResourceBrain:
         extracted_text: ExtractedText,
         replace_field: bool,
         skip_texts: bool | None,
-    ):
+        deleted_splits: set[str] | None = None,
+    ) -> None:
         if skip_texts is not None:
             self.brain.skip_texts = skip_texts
 
         field_text = extracted_text.text
 
-        for split_id in self.sorted_splits(extracted_text):
+        for split_id in self.sorted_splits(extracted_text, deleted_splits=deleted_splits):
             split_text = extracted_text.split_text[split_id]
             field_text += f"{split_text} "
 
@@ -222,6 +226,7 @@ class ResourceBrain:
         skip_paragraphs_index: bool | None,
         skip_texts_index: bool | None,
         append_splits: set[str] | None = None,
+        deleted_splits: set[str] | None = None,
     ) -> None:
         """
         append_splits: when provided, only the splits in this set will be indexed. This is used for conversation appends, to
@@ -234,6 +239,7 @@ class ResourceBrain:
             extracted_text,
             replace_field=False,
             skip_texts=skip_texts_index,
+            deleted_splits=deleted_splits,
         )
         self.apply_field_paragraphs(
             field_key,
@@ -244,10 +250,17 @@ class ResourceBrain:
             replace_field=replace_field,
             skip_paragraphs=skip_paragraphs_index,
             append_splits=append_splits,
+            deleted_splits=deleted_splits,
         )
 
-    def sorted_splits(self, extracted_text: ExtractedText) -> Iterator[str]:
-        yield from sorted(extracted_text.split_text.keys())
+    def sorted_splits(
+        self, extracted_text: ExtractedText, deleted_splits: set[str] | None = None
+    ) -> Iterator[str]:
+        yield from sorted(
+            split_id
+            for split_id in extracted_text.split_text.keys()
+            if deleted_splits is None or split_id not in deleted_splits
+        )
 
     @observer.wrap({"type": "apply_field_paragraphs"})
     def apply_field_paragraphs(
@@ -260,6 +273,7 @@ class ResourceBrain:
         replace_field: bool,
         skip_paragraphs: bool | None,
         append_splits: set[str] | None = None,
+        deleted_splits: set[str] | None = None,
     ) -> None:
         if skip_paragraphs is not None:
             self.brain.skip_paragraphs = skip_paragraphs
@@ -272,9 +286,9 @@ class ResourceBrain:
         # Used to adjust the paragraph start/end when indexing splits, as they are all
         # concatenated in the main text part of the brain Resource.
         split_offset = 0
-        for subfield in self.sorted_splits(extracted_text):
+        for subfield in self.sorted_splits(extracted_text, deleted_splits=deleted_splits):
             if subfield not in field_computed_metadata.split_metadata or should_skip_split_indexing(
-                subfield, replace_field, append_splits
+                subfield, replace_field, append_splits, deleted_splits
             ):
                 # We're skipping this split but we need to adjust the offset as we have added the text
                 # of this split to the main text
@@ -394,7 +408,7 @@ class ResourceBrain:
     def _get_paragraph_user_classifications(
         self, basic_user_field_metadata: UserFieldMetadata | None
     ) -> ParagraphClassifications:
-        pc = ParagraphClassifications(valid={}, denied={})
+        pc = ParagraphClassifications(valid=defaultdict(list), denied=defaultdict(list))
         if basic_user_field_metadata is None:
             return pc
         for annotated_paragraph in basic_user_field_metadata.paragraphs:
@@ -402,9 +416,9 @@ class ResourceBrain:
                 paragraph_key = compute_paragraph_key(self.rid, annotated_paragraph.key)
                 classif_label = f"/l/{classification.labelset}/{classification.label}"
                 if classification.cancelled_by_user:
-                    pc.denied.setdefault(paragraph_key, []).append(classif_label)
+                    pc.denied[paragraph_key].append(classif_label)
                 else:
-                    pc.valid.setdefault(paragraph_key, []).append(classif_label)
+                    pc.valid[paragraph_key].append(classif_label)
         return pc
 
     @observer.wrap({"type": "generate_relations"})
@@ -528,10 +542,11 @@ class ResourceBrain:
         # cut to specific dimension if specified
         vector_dimension: int | None = None,
         append_splits: set[str] | None = None,
+        deleted_splits: set[str] | None = None,
     ):
         fid = ids.FieldId.from_string(f"{self.rid}/{field_id}")
         for subfield, vectors in vo.split_vectors.items():
-            if should_skip_split_indexing(subfield, replace_field, append_splits):
+            if should_skip_split_indexing(subfield, replace_field, append_splits, deleted_splits):
                 continue
             _field_id = ids.FieldId(
                 rid=fid.rid,
@@ -858,6 +873,11 @@ class ParagraphPages:
             return 0
 
 
-def should_skip_split_indexing(split: str, replace_field: bool, append_splits: set[str] | None) -> bool:
+def should_skip_split_indexing(
+    split: str, replace_field: bool, append_splits: set[str] | None, deleted_splits: set[str] | None
+) -> bool:
+    if deleted_splits is not None and split in deleted_splits:
+        # This split is deleted, we should skip indexing it
+        return True
     # When replacing the whole field, reindex all splits. Otherwise, we're only indexing the splits that are appended
     return not replace_field and append_splits is not None and split not in append_splits

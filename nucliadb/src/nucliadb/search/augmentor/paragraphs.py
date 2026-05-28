@@ -325,6 +325,11 @@ async def get_paragraph_text_from_storage(field: Field, paragraph_id: ParagraphI
     end = paragraph_id.paragraph_end
 
     if split:
+        if isinstance(field, Conversation):
+            splits_metadata = await field.get_splits_metadata()
+            if split in set(splits_metadata.deleted_splits):
+                # Deleted splits should not be augmented.
+                return None
         return extracted_text.split_text[split][start:end]
     else:
         return extracted_text.text[start:end]

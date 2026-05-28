@@ -114,9 +114,10 @@ class TestValidateKvData:
     def test_valid_date_iso_datetime_string(self):
         validate_kv_data({"name": "launch", "ts": "2024-01-15T00:00:00Z"}, DATE_SCHEMA)
 
-    def test_valid_date_iso_date_only_string(self):
-        # Date-only ISO strings are valid (no time component)
-        validate_kv_data({"name": "launch", "ts": "2024-01-15"}, DATE_SCHEMA)
+    def test_invalid_date_iso_date_only_string(self):
+        # Date-only ISO strings are invalid (no time component)
+        with pytest.raises(ValueError, match="expects type 'date'"):
+            validate_kv_data({"name": "launch", "ts": "2024-01-15"}, DATE_SCHEMA)
 
     def test_valid_date_with_optional_end(self):
         validate_kv_data(
@@ -141,24 +142,32 @@ class TestValidateKvData:
 class TestKVSchemaModel:
     def test_max_fields_limit(self):
         with pytest.raises(ValidationError):
-            KVSchema(
-                name="big",
-                fields=[{"key": f"f{i}", "type": "text"} for i in range(MAX_KV_SCHEMA_FIELDS + 1)],
+            KVSchema.model_validate(
+                {
+                    "name": "big",
+                    "fields": [
+                        {"key": f"f{i}", "type": "text"} for i in range(MAX_KV_SCHEMA_FIELDS + 1)
+                    ],
+                }
             )
 
     def test_at_max_fields_is_accepted(self):
-        schema = KVSchema(
-            name="full",
-            fields=[{"key": f"f{i}", "type": "text"} for i in range(MAX_KV_SCHEMA_FIELDS)],
+        schema = KVSchema.model_validate(
+            {
+                "name": "full",
+                "fields": [{"key": f"f{i}", "type": "text"} for i in range(MAX_KV_SCHEMA_FIELDS)],
+            }
         )
         assert len(schema.fields) == MAX_KV_SCHEMA_FIELDS
 
     def test_duplicate_field_keys_rejected(self):
         with pytest.raises(ValidationError, match="unique"):
-            KVSchema(
-                name="bad",
-                fields=[
-                    {"key": "color", "type": "text"},
-                    {"key": "color", "type": "float"},
-                ],
+            KVSchema.model_validate(
+                {
+                    "name": "bad",
+                    "fields": [
+                        {"key": "color", "type": "text"},
+                        {"key": "color", "type": "float"},
+                    ],
+                }
             )

@@ -25,7 +25,7 @@ import nucliadb_models.retrieval
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.filter_expression import (
     parse_expression,
-    parse_kv_filter_expression_with_validation,
+    parse_kv_expression,
 )
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
@@ -325,7 +325,7 @@ class _RetrievalParser:
                     self.kbid,
                 )
             if self.item.filters.filter_expression.key_value is not None:
-                filters.json_expression = await parse_kv_filter_expression_with_validation(
+                filters.json_expression = await parse_kv_expression(
                     self.item.filters.filter_expression.key_value, self.kbid
                 )
             if self.item.filters.filter_expression.operator == FilterExpression.Operator.OR:

@@ -74,6 +74,10 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                     to_fix.append((rid, field_id))
 
         for rid, field_id in to_fix:
+            logger.info(
+                "Backfilling splits metadata",
+                extra={"kbid": kbid, "rid": rid, "field_id": field_id},
+            )
             async with context.kv_driver.rw_transaction() as txn2:
                 splits_metadata = await build_splits_metadata(
                     txn2, context.blob_storage, kbid, rid, field_id

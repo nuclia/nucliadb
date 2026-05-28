@@ -60,6 +60,11 @@ message Error {
 }
 
 
+message DeleteSplits {
+    resources.FieldID field = 1;
+    repeated string splits = 2;
+}
+
 
 message BrokerMessage {
     reserved 2, 10, 12, 14, 15, 27, 46;
@@ -158,6 +163,9 @@ message BrokerMessage {
 
     // Field KeyValue
     map<string, resources.FieldKeyValue> key_value_fields = 47;
+
+    // To be able to delete conversation messages
+    repeated DeleteSplits delete_splits = 48;
 }
 
 message BrokerMessageBlobReference {

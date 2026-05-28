@@ -25,12 +25,12 @@ from nucliadb.common.context import ApplicationContext
 
 async def test_initialize_happens_only_once():
     context = ApplicationContext()
-    context._initialize = AsyncMock()
+    context._initialize = AsyncMock()  # ty:ignore[invalid-assignment]
 
     tasks = []
     for _ in range(10):
         tasks.append(context.initialize())
     await asyncio.gather(*tasks)
 
-    context._initialize.assert_awaited_once()
+    context._initialize.assert_awaited_once()  # ty:ignore[unresolved-attribute]
     context._initialized is True

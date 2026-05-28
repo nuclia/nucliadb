@@ -89,7 +89,7 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
             vectorset=vectorset,
             result_per_page=5,
         )
-        results = await get_nidx_searcher_client().Search(query_pb)  # type: ignore
+        results = await get_nidx_searcher_client().Search(query_pb)
         assert len(results.vector.documents) == 5
 
     # Test that querying with the wrong dimension raises an exception
@@ -106,7 +106,7 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
             result_per_page=5,
         )
         with pytest.raises(Exception) as exc:
-            results = await get_nidx_searcher_client().Search(query_pb)  # type: ignore
+            results = await get_nidx_searcher_client().Search(query_pb)
         assert "inconsistent dimensions" in str(exc).lower()
 
 
@@ -128,7 +128,7 @@ async def test_vectorset_parameter_without_default_vectorset(
     async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
         calls.append(pb_query)
         results = [nodereader_pb2.SearchResponse()]
-        queried_nodes = []  # type: ignore
+        queried_nodes = []  # type: ignore[var-annotated]
         return (results, queried_nodes)
 
     def set_predict_default_vectorset(query_info: QueryInfo) -> QueryInfo:
@@ -187,7 +187,7 @@ async def test_vectorset_parameter_with_default_vectorset(
     async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
         calls.append(pb_query)
         results = [nodereader_pb2.SearchResponse()]
-        queried_nodes = []  # type: ignore
+        queried_nodes = []  # type: ignore[var-annotated]
         return (results, queried_nodes)
 
     with (

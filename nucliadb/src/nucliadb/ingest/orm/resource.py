@@ -23,7 +23,7 @@ import asyncio
 import logging
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
@@ -118,7 +118,7 @@ class Resource:
         self.modified: bool = False
         self._modified_extracted_text: list[FieldID] = []
 
-        self.txn = txn
+        self.txn: Transaction = txn
         self.storage = storage
         self.kbid = kbid
         self.uuid = uuid
@@ -185,7 +185,7 @@ class Resource:
                 # Immutable basic fields that are already set are cleared
                 # from the payload so that they are not overwritten
                 if getattr(self.basic, field, "") != "":
-                    payload.ClearField(field)  # type: ignore
+                    payload.ClearField(field)  # type: ignore[arg-type]
 
             self.basic.MergeFrom(payload)
 
@@ -362,6 +362,14 @@ class Resource:
                 self.all_fields_keys.remove(field)
         await field_obj.delete()
 
+    async def _apply_delete_splits(self, payload: writer_pb2.DeleteSplits) -> None:
+        if payload.field.field_type != FieldType.CONVERSATION:
+            raise ValueError("_apply_delete_splits can only be applied to conversation fields")
+        field = await self.get_field(payload.field.field, FieldType.CONVERSATION)
+        conv = cast(Conversation, field)
+        await conv.delete_messages(payload.splits)
+        self.modified = True
+
     async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
         """Return whether this resource has this field or not."""
         all_fields_ids = await self.get_fields_ids()
@@ -450,6 +458,9 @@ class Resource:
             if fieldid.field_type == FieldType.FILE:
                 await self.delete_file_field_md5(fieldid.field)
 
+        for delete_splits in message.delete_splits:
+            await self._apply_delete_splits(delete_splits)
+
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
             await self.update_all_field_ids(
                 updated=message_updated_fields,
@@ -536,6 +547,7 @@ class Resource:
             self.modified = True
 
     async def update_status(self):
+        assert self.basic
         field_ids = await self.get_all_field_ids(for_update=False)
         if field_ids is None:
             # No fields, it is processed
@@ -925,7 +937,7 @@ class Resource:
         await self.get_fields(force=True)
         vectorset_ids = [
             vs.vectorset_id
-            for vs in await datamanagers.graph_vectorsets.node.get_all(self.txn, kbid=self.kbid)
+            for vs in await datamanagers.graph_vectorsets.edge.get_all(self.txn, kbid=self.kbid)
         ]
 
         for field_vectors in fields_vectors:
@@ -965,7 +977,10 @@ class Resource:
         return f"{FIELD_TYPE_PB_TO_STR[field.field_type]}/{field.field}"
 
     def clean(self):
-        self.txn = None
+        # This intentionally unsets the transaction to release it
+        # We set a type-checker exception here rather than asserting
+        # that transaction is set all through the code
+        self.txn = None  # type: ignore[ty:invalid-assignment]
 
 
 async def get_file_page_positions(field: File) -> FilePagePositions:

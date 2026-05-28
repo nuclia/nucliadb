@@ -60,7 +60,7 @@ def mocked_search_methods():
 
 
 def test_validate_nidx_query_results():
-    assert utils.validate_nidx_query_results([Mock()]) is None
+    assert utils.validate_nidx_query_results([Mock()]) is None  # ty:ignore[invalid-argument-type]
 
 
 def test_validate_nidx_query_results_no_results():
@@ -68,22 +68,22 @@ def test_validate_nidx_query_results_no_results():
 
 
 def test_validate_nidx_query_results_unhandled_error():
-    error = utils.validate_nidx_query_results([Exception()])
+    errors: list[BaseException] = [Exception()]
+    error = utils.validate_nidx_query_results(errors)
     assert isinstance(error, HTTPException)
 
 
 def test_validate_nidx_query_results_invalid_query():
-    result = utils.validate_nidx_query_results(
-        [
-            AioRpcError(
-                code=StatusCode.INTERNAL,
-                initial_metadata=Mock(),
-                trailing_metadata=Mock(),
-                details="An invalid argument was passed: 'Query is invalid. AllButQueryForbidden'",
-                debug_error_string="",
-            )
-        ]
-    )
+    errors: list[BaseException] = [
+        AioRpcError(
+            code=StatusCode.INTERNAL,
+            initial_metadata=Mock(),
+            trailing_metadata=Mock(),
+            details="An invalid argument was passed: 'Query is invalid. AllButQueryForbidden'",
+            debug_error_string="",
+        )
+    ]
+    result = utils.validate_nidx_query_results(errors)
 
     assert isinstance(result, HTTPException)
     assert result.status_code == 412
@@ -91,17 +91,16 @@ def test_validate_nidx_query_results_invalid_query():
 
 
 def test_validate_nidx_query_results_internal_unhandled():
-    result = utils.validate_nidx_query_results(
-        [
-            AioRpcError(
-                code=StatusCode.INTERNAL,
-                initial_metadata=Mock(),
-                trailing_metadata=Mock(),
-                details="There is something wrong with your query, my friend!",
-                debug_error_string="This query is simply wrong",
-            )
-        ]
-    )
+    errors: list[BaseException] = [
+        AioRpcError(
+            code=StatusCode.INTERNAL,
+            initial_metadata=Mock(),
+            trailing_metadata=Mock(),
+            details="There is something wrong with your query, my friend!",
+            debug_error_string="This query is simply wrong",
+        )
+    ]
+    result = utils.validate_nidx_query_results(errors)
     assert isinstance(result, HTTPException)
     assert result.status_code == 500
     assert result.detail == "There is something wrong with your query, my friend!"

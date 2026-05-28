@@ -20,11 +20,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from typing_extensions import assert_never
 
 from nucliadb.ingest.fields.base import Field
-from nucliadb_models.kv_schemas import KVFieldType, KVSchema
+from nucliadb_models.key_value import Range
+from nucliadb_models.kv_schemas import KVFieldType, KVSchema, KVSchemaField
 from nucliadb_protos.resources_pb2 import FieldKeyValue
 
 
@@ -43,7 +45,7 @@ def validate_kv_data(data: dict, schema: KVSchema) -> None:
     _validate_keys(data, schema)
     schema_fields = {f.key: f for f in schema.fields}
     for key, value in data.items():
-        check_kv_type(schema.name, key, value, schema_fields[key].type)
+        check_kv_type(schema.name, schema_fields[key], key, value)
 
 
 def _validate_keys(data: dict, schema: KVSchema) -> None:
@@ -56,36 +58,39 @@ def _validate_keys(data: dict, schema: KVSchema) -> None:
         raise ValueError(f"Missing required keys for schema {schema.name!r}: {missing}")
 
 
-def check_kv_type(schema_name: str, key: str, value: object, expected: KVFieldType) -> None:
+def check_kv_type(schema_name: str, schema_field: KVSchemaField, key: str, value: object) -> None:
+    expected = schema_field.type
+
     ok = False
     if expected is KVFieldType.TEXT:
-        if isinstance(value, str):
-            try:
-                dt = datetime.fromisoformat(value)
-                # Tantivy's JSON indexer auto-parses strings as DateTime only when
-                # they parse as RFC 3339, which requires both a time component and a
-                # timezone offset (Z or ±HH:MM).
-                ok = dt.tzinfo is None
-            except ValueError:
-                ok = True  # not parseable as a date at all, safe
-        else:
-            ok = False
+        # Tantivy's JSON indexer auto-parses strings as DateTime only when
+        # they parse as RFC 3339, which requires both a time component and a
+        # timezone offset (Z or ±HH:MM)
+        ok = isinstance(value, str) and not is_datetime(value)
     elif expected is KVFieldType.INTEGER:
-        ok = isinstance(value, int) and not isinstance(value, bool)
+        if schema_field.range and isinstance(value, Range):
+            ok = (isinstance(value.lower, int) and not isinstance(value.lower, bool)) and (
+                isinstance(value.upper, int) and not isinstance(value.upper, bool)
+            )
+        else:
+            ok = isinstance(value, int) and not isinstance(value, bool)
     elif expected is KVFieldType.FLOAT:
-        ok = isinstance(value, (int, float)) and not isinstance(value, bool)
+        if schema_field.range and isinstance(value, Range):
+            ok = (isinstance(value.lower, (int, float)) and not isinstance(value.lower, bool)) and (
+                isinstance(value.upper, (int, float)) and not isinstance(value.upper, bool)
+            )
+        else:
+            ok = isinstance(value, (int, float)) and not isinstance(value, bool)
     elif expected is KVFieldType.BOOLEAN:
         ok = isinstance(value, bool)
     elif expected is KVFieldType.DATE:
-        # Dates must be stored as ISO-8601 strings (e.g. "2024-01-15T00:00:00Z")
-        if isinstance(value, str):
-            try:
-                datetime.fromisoformat(value)
-                ok = True
-            except ValueError:
+        if schema_field.range:
+            if isinstance(value, Range):
+                ok = is_datetime(value.lower) and is_datetime(value.upper)
+            else:
                 ok = False
         else:
-            ok = False
+            ok = is_datetime(value)
     else:
         assert_never(expected)
     if not ok:
@@ -97,3 +102,19 @@ def check_kv_type(schema_name: str, key: str, value: object, expected: KVFieldTy
         raise ValueError(
             f"Key {key!r} in schema {schema_name!r} expects type {expected.value!r}, got {type(value).__name__}"
         )
+
+
+def is_datetime(value: Any) -> bool:
+    # Dates must be stored as RFC 3339, which requires both a time component and
+    # a timezone offset (Z or ±HH:MM).
+    if isinstance(value, datetime):
+        ok = value.tzinfo is not None
+    elif isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value)
+            ok = dt.tzinfo is not None
+        except ValueError:
+            ok = False  # not parseable as a date
+    else:
+        ok = False
+    return ok

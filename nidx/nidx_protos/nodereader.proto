@@ -306,6 +306,11 @@ message FilterExpression {
     message FacetFilter {
         string facet = 1;
     }
+    message ResourceFieldPrefixFilter {
+        string resource_id = 1;
+        string field_type = 2;
+        string field_id_prefix = 3;
+    }
 
     oneof expr {
         FilterExpressionList bool_and = 1;
@@ -317,6 +322,7 @@ message FilterExpression {
         KeywordFilter keyword = 6;
         DateRangeFilter date = 7;
         FacetFilter facet = 8;
+        ResourceFieldPrefixFilter resource_field_prefix = 9;
     }
 }
 
@@ -346,9 +352,12 @@ message JsonFieldPathFilter {
 
     oneof predicate {
         string text = 3;
+        bool boolean = 6;
+        int64 int = 8;
+        double float = 9;
+        google.protobuf.Timestamp date = 10;
         IntegerRangePredicate int_range   = 4;
         FloatRangePredicate float_range = 5;
-        bool boolean = 6;
         DateRangePredicate date_range = 7;
     }
 }

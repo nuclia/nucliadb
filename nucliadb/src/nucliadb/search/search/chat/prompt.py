@@ -210,7 +210,7 @@ async def get_expanded_conversation_messages(
     resource = await kb.get(rid)
     if resource is None:  # pragma: no cover
         return []
-    field_obj: Conversation = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)  # type: ignore
+    field_obj: Conversation = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)
     found_message, found_page, found_idx = await find_conversation_message(
         field_obj=field_obj, mident=mident
     )
@@ -833,7 +833,7 @@ async def conversation_prompt_context(
 
                 field_obj: Conversation = await resource.get_field(
                     field_id, FIELD_TYPE_STR_TO_PB["c"], load=True
-                )  # type: ignore
+                )
                 cmetadata = await field_obj.get_metadata()
 
                 attachments: list[resources_pb2.FieldRef] = []
@@ -921,7 +921,7 @@ async def conversation_prompt_context(
                         ops += 1
                         field: File = await resource.get_field(
                             attachment.field_id, attachment.field_type, load=True
-                        )  # type: ignore
+                        )
                         extracted_text = await field.get_extracted_text()
                         if extracted_text is not None:
                             attachment_field_type = FIELD_TYPE_PB_TO_STR[attachment.field_type]
@@ -942,7 +942,7 @@ async def conversation_prompt_context(
                         ops += 1
                         file_field: File = await resource.get_field(
                             attachment.field_id, attachment.field_type, load=True
-                        )  # type: ignore
+                        )
                         image = await get_file_thumbnail_image(file_field)
                         if image is not None:
                             pid = f"{rid}/f/{attachment.field_id}/0-0"

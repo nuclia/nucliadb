@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 from unittest import mock
 
-import jsonschema  # type: ignore
+import jsonschema  # type: ignore[import-untyped]
 import pytest
 
 from nucliadb.search.search.filters import (

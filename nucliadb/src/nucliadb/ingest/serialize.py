@@ -19,8 +19,6 @@
 #
 
 
-import json
-
 import nucliadb_models as models
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Transaction
@@ -308,10 +306,7 @@ async def serialize_resource(
                 if field.id not in resource.data.key_values:
                     resource.data.key_values[field.id] = KeyValueFieldData()
                 if include_value and value is not None:
-                    # data is a single JSON string containing the entire KV payload
-                    resource.data.key_values[field.id].value = (
-                        json.loads(value.data) if value.data else {}
-                    )
+                    resource.data.key_values[field.id].value = from_proto.field_key_value(value)
                 if include_errors:
                     await serialize_field_errors(field, resource.data.key_values[field.id])
     return resource
@@ -464,24 +459,24 @@ async def serialize_extracted_vectors(field: Field) -> VectorObject | None:
 async def serialize_relation_node_vectors(field: Field) -> dict[str, list[RelationNodeVector]]:
     vectors: dict[str, list[RelationNodeVector]] = {}
     async with datamanagers.with_ro_transaction() as txn:
-        async for vectorset_id, _ in datamanagers.vectorsets.iter(txn=txn, kbid=field.kbid):
-            data_vec = await field.get_relation_node_vectors(vectorset_id)
+        for vs in await datamanagers.graph_vectorsets.node.get_all(txn, kbid=field.kbid):
+            data_vec = await field.get_relation_node_vectors(vs.vectorset_id)
             if data_vec is None:
-                vectors[vectorset_id] = []
+                vectors[vs.vectorset_id] = []
             else:
-                vectors[vectorset_id] = [from_proto.relation_node_vector(v) for v in data_vec.vectors]
+                vectors[vs.vectorset_id] = [from_proto.relation_node_vector(v) for v in data_vec.vectors]
     return vectors
 
 
 async def serialize_relation_edge_vectors(field: Field) -> dict[str, list[RelationEdgeVector]]:
     vectors: dict[str, list[RelationEdgeVector]] = {}
     async with datamanagers.with_ro_transaction() as txn:
-        async for vectorset_id, _ in datamanagers.vectorsets.iter(txn=txn, kbid=field.kbid):
-            data_vec = await field.get_relation_edge_vectors(vectorset_id)
+        for vs in await datamanagers.graph_vectorsets.edge.get_all(txn, kbid=field.kbid):
+            data_vec = await field.get_relation_edge_vectors(vs.vectorset_id)
             if data_vec is None:
-                vectors[vectorset_id] = []
+                vectors[vs.vectorset_id] = []
             else:
-                vectors[vectorset_id] = [from_proto.relation_edge_vector(v) for v in data_vec.vectors]
+                vectors[vs.vectorset_id] = [from_proto.relation_edge_vector(v) for v in data_vec.vectors]
     return vectors
 
 
