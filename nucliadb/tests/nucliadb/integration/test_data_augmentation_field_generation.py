@@ -465,4 +465,4 @@ async def test_send_to_process_generated_conversation_field(
     index_message: noderesources_pb2.Resource = index_resource_spy.call_args.args[1]
     assert index_message.resource.uuid == rid
     # label for generated fields from data augmentation is present
-    assert "/g/da/facts" in index_message.texts[f"t/{user_facts_field_id}"].labels
+    assert "/g/da/facts" in index_message.texts[f"c/{user_facts_field_id}"].labels
