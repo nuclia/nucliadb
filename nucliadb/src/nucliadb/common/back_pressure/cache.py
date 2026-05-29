@@ -43,7 +43,7 @@ class BackPressureCache:
     """
 
     def __init__(self):
-        self._cache = TTLCache(maxsize=1024, ttl=5 * 60)
+        self._cache: TTLCache[str, BackPressureData] = TTLCache(maxsize=1024, ttl=5 * 60)
         self._lock = threading.Lock()
 
     def get(self, key: str) -> BackPressureData | None:

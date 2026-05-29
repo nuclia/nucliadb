@@ -381,6 +381,21 @@ class S3Storage(Storage):
         if use_path_addressing_style:
             s3_config["addressing_style"] = "path"
 
+        if disable_checksums:
+            config = aiobotocore.config.AioConfig(
+                None,
+                max_pool_connections=max_pool_connections,
+                s3=s3_config,
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+            )
+        else:
+            config = aiobotocore.config.AioConfig(
+                None,
+                max_pool_connections=max_pool_connections,
+                s3=s3_config,
+            )
+
         self.opts = dict(
             aws_secret_access_key=self._aws_secret_key,
             aws_access_key_id=self._aws_access_key,
@@ -388,19 +403,7 @@ class S3Storage(Storage):
             verify=verify_ssl,
             use_ssl=use_ssl,
             region_name=region_name,
-            config=aiobotocore.config.AioConfig(
-                None,
-                max_pool_connections=max_pool_connections,
-                s3=s3_config,
-                **(
-                    {
-                        "request_checksum_calculation": "when_required",
-                        "response_checksum_validation": "when_required",
-                    }
-                    if disable_checksums
-                    else {}
-                ),
-            ),
+            config=config,
         )
         self._exit_stack = AsyncExitStack()
         self.bucket = bucket

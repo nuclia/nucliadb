@@ -24,7 +24,7 @@ import pytest
 import requests
 from fastapi import FastAPI
 from grpc import aio
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from nats.aio.msg import Msg
 from nats.js import api
 from opentelemetry.propagate import set_global_textmap
@@ -347,6 +347,7 @@ async def http_service(set_telemetry_settings, telemetry_grpc: GRPCTelemetry, gr
         return response.message
 
     client_base_url = "http://test"
-    client = AsyncClient(app=app, base_url=client_base_url)
+    transport = ASGITransport(app=app)
+    client = AsyncClient(transport=transport, base_url=client_base_url)
     yield client
     await clean_telemetry("HTTP_SERVICE")

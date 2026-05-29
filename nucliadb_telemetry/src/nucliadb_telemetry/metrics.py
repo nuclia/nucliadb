@@ -72,7 +72,7 @@ class Observer:
             f"{name}_duration_seconds",
             f"Histogram for {name} duration.",
             labelnames=tuple(self.labels.keys()),
-            **hist_kwargs,  # type: ignore[arg-type]
+            **hist_kwargs,  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
         )
 
     def wrap(self, labels: dict[str, str] | None = None) -> Callable[[F], F]:
@@ -243,7 +243,7 @@ class Histogram:
             name,
             f"Counter for {name}.",
             labelnames=tuple(self.labels.keys()),
-            **kwargs,  # type: ignore[arg-type]
+            **kwargs,  # type: ignore[arg-type] # ty: ignore[invalid-argument-type]
         )
 
     def observe(self, value: float, labels: dict[str, str] | None = None):

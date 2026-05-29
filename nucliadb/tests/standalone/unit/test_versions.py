@@ -19,7 +19,7 @@
 
 from unittest import mock
 
-import pkg_resources
+import pkg_resources  # type: ignore
 import pytest
 
 from nucliadb.standalone.versions import (
