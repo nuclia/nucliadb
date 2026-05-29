@@ -65,6 +65,7 @@ fastapi_settings: dict[str, Any] = dict(
         Exception: global_exception_handler,
         ClientDisconnect: client_disconnect_handler,
     },
+    strict_content_type=False,
 )
 
 
