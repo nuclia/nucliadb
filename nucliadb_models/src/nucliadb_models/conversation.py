@@ -127,8 +127,13 @@ class InputMessage(BaseModel):
         """
         Metadata can only contain up to 2kb of data.
         """
-        if value is not None and len(json.dumps(value)) > 2048:
-            raise ValueError("Metadata for message content cannot exceed 2kb of data")
+        if value is not None:
+            try:
+                json_value = json.dumps(value)
+            except (TypeError, ValueError) as err:
+                raise ValueError(f"Metadata for message content must be JSON serializable: {err}")
+            if len(json_value) > 2048:
+                raise ValueError("Metadata for message content cannot exceed 2kb of data")
         return value
 
     @field_validator("ident", mode="after")
