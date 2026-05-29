@@ -23,7 +23,7 @@ from nucliadb_models.utils import DateTime
 # Shared classes
 
 
-class MessageFormat(Enum):
+class MessageFormat(str, Enum):
     PLAIN = "PLAIN"
     HTML = "HTML"
     RST = "RST"
@@ -42,7 +42,7 @@ class MessageContent(BaseModel):
     attachments_fields: list[FieldRef] = []
 
 
-class MessageType(Enum):
+class MessageType(str, Enum):
     UNSET = "UNSET"
     QUESTION = "QUESTION"
     ANSWER = "ANSWER"

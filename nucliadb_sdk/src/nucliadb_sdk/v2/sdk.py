@@ -24,6 +24,7 @@ from json import JSONDecodeError
 from typing import (
     Any,
     Awaitable,
+    Literal,
     TypeVar,
 )
 
@@ -131,7 +132,14 @@ ASK_STATUS_CODE_ERROR = "-1"
 
 @dataclass
 class SdkEndpointDefinition:
-    method: str
+    method: (
+        Literal["HEAD"]
+        | Literal["GET"]
+        | Literal["POST"]
+        | Literal["PATCH"]
+        | Literal["PUT"]
+        | Literal["DELETE"]
+    )
     path_template: str
     path_params: tuple[str, ...]
 
@@ -663,7 +671,7 @@ def prepare_request(
     request_type: type[INPUT_TYPE] | None,
     content: INPUT_TYPE | None = None,
     **kwargs,
-) -> tuple[str, RawRequestContent | None, QUERY_PARAMS_TYPE]:
+) -> tuple[str, RawRequestContent | None]:
     path = prepare_request_base(path_template, path_params, kwargs)
     data: RawRequestContent | None = None
     if request_type is not None and request_type is not type(None):
@@ -696,11 +704,10 @@ def prepare_request(
     ):
         data = content  # type: ignore[ty:invalid-assignment]
 
-    query_params: QUERY_PARAMS_TYPE = kwargs.pop("query_params", None)
     if len(kwargs) > 0:
         raise TypeError(f"Invalid arguments provided: {kwargs}")
 
-    return path, data, query_params
+    return path, data
 
 
 def _request_sync_builder(
@@ -718,11 +725,12 @@ def _request_sync_builder(
 
     def _func(
         self: NucliaDB,
+        query_params: QUERY_PARAMS_TYPE | None = None,
         content: INPUT_TYPE | None = None,
         headers: dict[str, str] | None = None,
         **kwargs,
     ) -> OUTPUT_TYPE:
-        path, data, query_params = prepare_request(
+        path, data = prepare_request(
             path_template=path_template,
             path_params=path_params,
             request_type=request_type,
@@ -865,11 +873,12 @@ def _request_async_builder(
 
     async def _func(
         self: NucliaDBAsync,
+        query_params: QUERY_PARAMS_TYPE = None,
         content: INPUT_TYPE | None = None,
         headers: dict[str, str] | None = None,
         **kwargs,
     ):
-        path, data, query_params = prepare_request(
+        path, data = prepare_request(
             path_template=path_template,
             path_params=path_params,
             request_type=request_type,
@@ -1097,6 +1106,7 @@ class NucliaDB(_NucliaDBBase):
         extra_headers: dict[str, str] | None = None,
     ):
         url = f"{self.base_url}{path}"
+        headers = {"content-type": "application/json"}
         opts: dict[str, Any] = {}
         if content is not None:
             if isinstance(content, dict):
@@ -1105,8 +1115,9 @@ class NucliaDB(_NucliaDBBase):
         if query_params is not None:
             opts["params"] = query_params
         if extra_headers is not None:
-            opts["headers"] = extra_headers
-        response: httpx.Response = getattr(self.session, method.lower())(url, **opts)
+            headers.update(extra_headers)
+
+        response: httpx.Response = getattr(self.session, method.lower())(url, headers=headers, **opts)
         return self._check_response(response)
 
     def _stream_request(
@@ -1310,6 +1321,7 @@ class NucliaDBAsync(_NucliaDBBase):
         extra_headers: dict[str, str] | None = None,
     ):
         url = f"{self.base_url}{path}"
+        headers = {"content-type": "application/json"}
         opts: dict[str, Any] = {}
         if content is not None:
             if isinstance(content, dict):
@@ -1318,8 +1330,10 @@ class NucliaDBAsync(_NucliaDBBase):
         if query_params is not None:
             opts["params"] = query_params
         if extra_headers is not None:
-            opts["headers"] = extra_headers
-        response: httpx.Response = await getattr(self.session, method.lower())(url, **opts)
+            headers.update(extra_headers)
+        response: httpx.Response = await getattr(self.session, method.lower())(
+            url, headers=headers, **opts
+        )
         return self._check_response(response)
 
     def _stream_request(

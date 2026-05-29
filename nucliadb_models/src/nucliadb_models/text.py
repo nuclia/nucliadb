@@ -24,7 +24,7 @@ MB = 1024 * 1024
 # Shared classes
 
 
-class TextFormat(Enum):
+class TextFormat(str, Enum):
     PLAIN = "PLAIN"
     HTML = "HTML"
     RST = "RST"
