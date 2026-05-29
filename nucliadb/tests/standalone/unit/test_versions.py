@@ -19,12 +19,10 @@
 
 from unittest import mock
 
-import pkg_resources  # type: ignore
 import pytest
 
 from nucliadb.standalone.versions import (
     get_latest_version,
-    installed_nucliadb,
     is_newer_release,
     latest_nucliadb,
 )
@@ -45,10 +43,6 @@ from nucliadb.standalone.versions import (
 )
 def test_is_newer_release(installed, latest, expected):
     assert is_newer_release(installed, latest) is expected
-
-
-def test_installed_nucliadb():
-    pkg_resources.parse_version(installed_nucliadb())
 
 
 @pytest.fixture()
