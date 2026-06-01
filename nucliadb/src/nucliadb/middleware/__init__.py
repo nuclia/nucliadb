@@ -18,16 +18,25 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import re
 import time
 from collections import deque
 from typing import ClassVar
 
+from cachetools import TTLCache
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
+
+from nucliadb.common import datamanagers
 
 PROCESS_TIME_HEADER = "X-PROCESS-TIME"
 ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
+
+_KB_PATH_RE = re.compile(r"/kb/([^/]+)")
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
+
+_kb_exists_cache: TTLCache[str, bool] = TTLCache(maxsize=4096, ttl=5 * 60)
 
 
 logger = logging.getLogger("nucliadb.middleware")
@@ -131,3 +140,32 @@ class EventCounter:
 class HourlyLogCounter(EventCounter):
     def __init__(self):
         super().__init__(window_seconds=3600)
+
+
+class KBExistsMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware that checks whether the kbid found in the request path exists.
+    If the kbid is not found in the path the request is passed through unchanged.
+    Results are cached in memory for 5 minutes.
+    """
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        match = _KB_PATH_RE.search(request.url.path)
+        if match:
+            kbid = match.group(1)
+            if _UUID_RE.match(kbid):
+                exists = await self._kb_exists(kbid)
+                if not exists:
+                    return JSONResponse(
+                        status_code=404,
+                        content={"detail": f"Knowledge Box '{kbid}' not found"},
+                    )
+        return await call_next(request)
+
+    async def _kb_exists(self, kbid: str) -> bool:
+        cached = _kb_exists_cache.get(kbid)
+        if cached is not None:
+            return cached
+        exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+        _kb_exists_cache[kbid] = exists
+        return exists
