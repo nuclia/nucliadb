@@ -343,6 +343,16 @@ async def test_filtering_expression_resource_field_prefix(
             },
             ["conversation_intro", "conversation_body"],
         ),
+        # Match all text fields with prefix "conversation" in resource1, with slug
+        (
+            {
+                "prop": "resource_field_prefix",
+                "resource_slug": "resource1",
+                "field_type": "text",
+                "field_name_prefix": "conversation",
+            },
+            ["conversation_intro", "conversation_body"],
+        ),
         # Match all text fields with prefix "foobar" in resource1 (no match)
         (
             {
