@@ -33,8 +33,9 @@ from nucliadb.common import datamanagers
 PROCESS_TIME_HEADER = "X-PROCESS-TIME"
 ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
 
-_KB_PATH_RE = re.compile(r"/kb/([^/]+)")
-_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
+_KB_UUID_PATH_RE = re.compile(
+    r"/kb/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:/|$)", re.IGNORECASE
+)
 
 _kb_exists_cache: TTLCache[str, bool] = TTLCache(maxsize=4096, ttl=5 * 60)
 
@@ -150,17 +151,19 @@ class KBExistsMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        match = _KB_PATH_RE.search(request.url.path)
-        if match:
-            kbid = match.group(1)
-            if _UUID_RE.match(kbid):
-                exists = await self._kb_exists(kbid)
-                if not exists:
-                    return JSONResponse(
-                        status_code=404,
-                        content={"detail": f"Knowledge Box '{kbid}' not found"},
-                    )
+        kbid = self.get_kbid_from_path(request.url.path)
+        if kbid and not await self._kb_exists(kbid):
+            return JSONResponse(
+                status_code=404,
+                content={"detail": f"Knowledge Box '{kbid}' not found"},
+            )
         return await call_next(request)
+
+    def get_kbid_from_path(self, path: str) -> str | None:
+        match = _KB_UUID_PATH_RE.search(path)
+        if match:
+            return match.group(1)
+        return None
 
     async def _kb_exists(self, kbid: str) -> bool:
         cached = _kb_exists_cache.get(kbid)
