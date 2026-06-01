@@ -19,6 +19,7 @@ import pytest
 from pydantic_core import ValidationError
 
 from nucliadb_models import filters
+from nucliadb_models.common import FieldTypeName
 
 
 @pytest.mark.parametrize(
@@ -45,3 +46,13 @@ def test_key_value_inequality_filter_bounds_check(
 ):
     with pytest.raises(ValidationError):
         filters.Inequalities(schema_id="schema", key="k", gte=gte, lte=lte)
+
+
+def test_resource_field_prefix_filter_resource_id_or_slug_check():
+    with pytest.raises(ValidationError):
+        filters.ResourceFieldPrefix(
+            resource_id=None,
+            resource_slug=None,
+            field_type=FieldTypeName.CONVERSATION,
+            field_name_prefix="foo",
+        )
