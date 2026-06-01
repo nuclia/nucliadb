@@ -430,7 +430,7 @@ class GCSStorageField(StorageField):
 class GCSStorage(Storage):
     field_klass = GCSStorageField
     _session: aiohttp.ClientSession | None = None
-    _credentials = None
+    _credentials: google.auth.credentials.Credentials | None = None
     _json_credentials = None
     chunk_size = CHUNK_SIZE
 

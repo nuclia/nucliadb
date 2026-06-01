@@ -14,7 +14,7 @@
 #
 
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import datetime, timezone
 from functools import partial
 from typing import Any
 from urllib.parse import ParseResult
@@ -105,7 +105,7 @@ async def _traced_callback(origin_cb: Callable[[Msg], Awaitable[None]], tracer: 
             raise error
         finally:
             msg_consume_time_histo.observe(
-                (datetime.now() - msg.metadata.timestamp).total_seconds(),
+                (datetime.now(timezone.utc) - msg.metadata.timestamp).total_seconds(),
                 {
                     "stream": msg.metadata.stream,
                     "consumer": msg.metadata.consumer or "",
@@ -206,7 +206,7 @@ class JetStreamContextTelemetry:
                 raise error
             finally:
                 msg_consume_time_histo.observe(
-                    (datetime.now() - message.metadata.timestamp).total_seconds(),
+                    (datetime.now(timezone.utc) - message.metadata.timestamp).total_seconds(),
                     {
                         "stream": message.metadata.stream,
                         "consumer": message.metadata.consumer or "",

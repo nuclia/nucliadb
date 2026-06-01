@@ -134,7 +134,7 @@ async def nidx_query(
         )
 
     try:
-        results: list[T | BaseException] = await asyncio.wait_for(
+        results: list[T | BaseException] = await asyncio.wait_for(  # type: ignore
             asyncio.gather(*ops, return_exceptions=True),
             timeout=timeout,
         )

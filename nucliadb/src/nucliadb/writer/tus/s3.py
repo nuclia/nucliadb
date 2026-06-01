@@ -213,6 +213,21 @@ class S3BlobStore(BlobStore):
         if use_path_addressing_style:
             s3_config["addressing_style"] = "path"
 
+        if disable_checksums:
+            config = aiobotocore.config.AioConfig(
+                None,
+                max_pool_connections=max_pool_connections,
+                s3=s3_config,
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+            )
+        else:
+            config = aiobotocore.config.AioConfig(
+                None,
+                max_pool_connections=max_pool_connections,
+                s3=s3_config,
+            )
+
         self.opts = dict(
             aws_secret_access_key=client_secret,
             aws_access_key_id=client_id,
@@ -220,19 +235,7 @@ class S3BlobStore(BlobStore):
             verify=verify_ssl,
             use_ssl=ssl,
             region_name=region_name,
-            config=aiobotocore.config.AioConfig(
-                None,
-                max_pool_connections=max_pool_connections,
-                s3=s3_config,
-                **(
-                    {
-                        "request_checksum_calculation": "when_required",
-                        "response_checksum_validation": "when_required",
-                    }
-                    if disable_checksums
-                    else {}
-                ),
-            ),
+            config=config,
         )
         session = AioSession()
         self._s3aioclient = await self._exit_stack.enter_async_context(
