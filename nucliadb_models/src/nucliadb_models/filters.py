@@ -395,9 +395,9 @@ class Inequalities(KVFilter):
 
 
 class Contains(KVFilter):
-    """Computes whether a value exists inside a range"""
+    """Computes whether a value exists inside a range or a repeated field"""
 
-    contains: int | float
+    contains: int | float | str
 
     def _value_type(self) -> type:
         return type(self.contains)

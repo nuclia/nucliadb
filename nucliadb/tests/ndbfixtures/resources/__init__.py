@@ -26,5 +26,6 @@ from .datafusion import datafusion_resource
 from .full import full_resource
 from .knowledge_graph import entity_graph, graph_resource, kb_with_entity_graph, knowledge_graph
 from .knowledgebox import knowledgebox, standalone_knowledgebox
+from .lambs import lambs_resource
 from .simples import resource, simple_resources
 from .smb_wonder import smb_wonder_resource
