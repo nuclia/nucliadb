@@ -55,6 +55,14 @@ spec:
           method:
             regex: "GET|POST|OPTIONS"
         - uri:
+            regex: '^/api/v\d+/kb/[^/]+/retrieve'
+          method:
+            regex: "POST|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/augment'
+          method:
+            regex: "POST|OPTIONS"
+        - uri:
             regex: '^/api/v\d+/kb/[^/]+/graph'
           method:
             regex: "POST|OPTIONS"

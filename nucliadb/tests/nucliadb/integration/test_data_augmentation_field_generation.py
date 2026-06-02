@@ -17,12 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import datetime
 import hashlib
+import json
 import uuid
 from collections.abc import AsyncIterator, Iterable
 from unittest.mock import patch
 
 import pytest
+from google.protobuf.timestamp_pb2 import Timestamp
 from httpx import AsyncClient
 from nidx_protos import noderesources_pb2
 from pytest_mock import MockerFixture
@@ -61,6 +64,7 @@ from nucliadb_utils.utilities import (
     stop_partitioning_utility,
 )
 from tests.utils import inject_message
+from tests.utils.broker_messages import BrokerMessageBuilder
 
 
 @pytest.fixture(scope="function")
@@ -348,3 +352,117 @@ async def test_data_augmentation_field_generation_and_search(
     filtered_out = resp.json()
     assert filtered_out["total"] == 1
     assert filtered_out["resources"][rid]["fields"].keys() == {f"/t/{field_id}"}
+
+
+async def test_send_to_process_generated_conversation_field(
+    dummy_nidx_utility,
+    knowledgebox: str,
+    processor: Processor,
+    partition_utility: PartitionUtility,
+    processing_utility: DummyProcessingEngine,
+    mocker: MockerFixture,
+):
+    """
+    This emulates the generation of a conversation field in the context of the memory feature.
+    """
+    kbid = knowledgebox
+    rid = uuid.uuid4().hex
+    slug = "my-resource"
+
+    # Resource creation (from writer)
+    bm = BrokerMessage()
+    bm.kbid = kbid
+    bm.uuid = rid
+    bm.slug = slug
+    bm.source = BrokerMessage.MessageSource.WRITER
+    annotation_json = json.dumps(
+        {
+            "text": "This is an annotation",
+            "context": [{"author": "system", "text": "This is the context of the annotation"}],
+            "reasoning": "This is the reasoning behind the annotation",
+        }
+    )
+    user_annotation_field_id = "_memory-annotations_userid"
+    _ts = Timestamp()
+    _ts.FromDatetime(datetime.datetime.now())
+    bm.conversations[user_annotation_field_id].messages.append(
+        resources_pb2.Message(
+            timestamp=_ts,
+            who="user1",
+            to=["user2"],
+            ident="msg1",
+            content=resources_pb2.MessageContent(
+                text=annotation_json,
+                format=resources_pb2.MessageContent.JSON,
+            ),
+        )
+    )
+    await processor.process(bm, 1)
+
+    # Processed resource (from processing)
+    bmb = BrokerMessageBuilder(
+        kbid=kbid, rid=rid, slug=slug, source=BrokerMessage.MessageSource.PROCESSOR
+    )
+    conv = bmb.field_builder("my-conv", FieldType.CONVERSATION)
+    conv.with_extracted_text("This is the extracted text of the annotation", split="msg1")
+    bm = bmb.build()
+    await processor.process(bm, 2)
+
+    # Data augmentation broker message, this should be like the ones generated
+    # by data augmentation task
+    bm = BrokerMessage()
+    bm.kbid = kbid
+    bm.uuid = rid
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    user_facts_field_id = f"da-facts-{user_annotation_field_id}"
+    _ts2 = Timestamp()
+    _ts2.FromDatetime(datetime.datetime.now())
+    bm.conversations[user_facts_field_id].messages.append(
+        resources_pb2.Message(
+            timestamp=_ts2,
+            who="system",
+            to=["user1"],
+            ident="msg1",
+            content=resources_pb2.MessageContent(
+                text="This is a fact extracted from the annotation",
+                format=resources_pb2.MessageContent.PLAIN,
+            ),
+        )
+    )
+    bm.conversations[user_facts_field_id].generated_by.data_augmentation.SetInParent()
+
+    await processor.process(bm, 3)
+
+    assert len(processing_utility.calls) == 1
+    send_to_process_call = processing_utility.calls[0]
+    payload, partition = send_to_process_call
+    assert payload.uuid == rid
+    assert payload.source == Source.INGEST
+    assert (
+        payload.conversationfield[user_facts_field_id].messages[0].content.text
+        == bm.conversations[user_facts_field_id].messages[0].content.text
+    )
+    assert partition == 1
+
+    async with datamanagers.with_ro_transaction() as txn:
+        kb = KnowledgeBox(txn, storage=await get_storage(), kbid=kbid)
+        resource = await kb.get(rid)
+        assert resource is not None
+        field = await resource.get_field(user_facts_field_id, FieldType.CONVERSATION)
+        generated_by = await field.generated_by()
+        assert generated_by.WhichOneof("author") == "data_augmentation"
+
+    # Processed DA resource (from processing)
+    bmb = BrokerMessageBuilder(
+        kbid=kbid, rid=rid, slug=slug, source=BrokerMessage.MessageSource.PROCESSOR
+    )
+    facts_conv = bmb.field_builder(user_facts_field_id, FieldType.CONVERSATION)
+    facts_conv.with_extracted_text("This is the extracted text of the fact", split="msg1")
+    bm = bmb.build()
+    index_resource_spy = mocker.spy(processor.index_node_shard_manager, "add_resource")
+    await processor.process(bm, 4)
+
+    index_message: noderesources_pb2.Resource = index_resource_spy.call_args.args[1]
+    assert index_message.resource.uuid == rid
+    # label for generated fields from data augmentation is present
+    assert "/g/da/facts" in index_message.texts[f"c/{user_facts_field_id}"].labels

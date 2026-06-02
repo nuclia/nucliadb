@@ -19,6 +19,7 @@
 #
 import inspect
 from contextlib import asynccontextmanager
+from typing import Awaitable, Callable
 
 from fastapi import FastAPI
 
@@ -33,7 +34,7 @@ from nucliadb.train.lifecycle import lifespan as train_lifespan
 from nucliadb.writer.lifecycle import lifespan as writer_lifespan
 from nucliadb_utils.utilities import finalize_utilities
 
-SYNC_FINALIZERS = []
+SYNC_FINALIZERS: list[Callable[[], None] | Callable[[], Awaitable[None]]] = []
 
 
 @asynccontextmanager

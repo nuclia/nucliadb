@@ -108,6 +108,7 @@ def application_factory(settings: Settings) -> FastAPI:
             Exception: global_exception_handler,
             ClientDisconnect: client_disconnect_handler,
         },
+        strict_content_type=False,
     )
 
     base_app = FastAPI(title="NucliaDB API", **fastapi_settings)

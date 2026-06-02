@@ -116,7 +116,7 @@ impl ParagraphReaderService {
         let results = request.result_per_page as usize;
         let (keyword_query, termc, fuzzy_query) = search_query(request, prefilter, &self.index, &self.schema);
         let facets = request.facets();
-        debug!("Query parsing took {}µs", time_tracker.checkpoint().as_micros());
+        debug!("Query parsing took {:?}", time_tracker.checkpoint());
 
         let searcher = Searcher {
             request,
@@ -127,17 +127,17 @@ impl ParagraphReaderService {
         };
         // println!("Regular search with query: {:#?}", keyword_query);
         let mut response = searcher.do_search(termc.clone(), keyword_query, self, request.min_score)?;
-        debug!("Keyword search took {}µs", time_tracker.checkpoint().as_micros());
+        debug!("Keyword search took {:?}", time_tracker.checkpoint());
 
         if response.results.is_empty() && request.result_per_page > 0 && request.min_score == 0 as f32 {
             // println!("Fuzzy search with query: {:#?}", fuzzy_query);
             let fuzzied = searcher.do_search(termc, fuzzy_query, self, request.min_score)?;
             response = fuzzied;
-            debug!("Fallback fuzzy query took {}µs", time_tracker.checkpoint().as_micros());
+            debug!("Fallback fuzzy query took {:?}", time_tracker.checkpoint());
         }
 
-        debug!("Result processing took {}µs", time_tracker.checkpoint().as_micros());
-        debug!("Paragraph search took {}µs", time_tracker.elapsed().as_micros());
+        debug!("Result processing took {:?}", time_tracker.checkpoint());
+        debug!("Paragraph search took {:?}", time_tracker.elapsed());
 
         Ok(response)
     }
@@ -216,8 +216,7 @@ impl Iterator for BatchProducer {
             items.push(ParagraphItem { id, labels });
         }
         self.offset += Self::BATCH;
-        let v = time.elapsed().as_millis();
-        debug!("New batch created, took {v} ms");
+        debug!("New batch created, took {:?}", time.elapsed());
 
         Some(items)
     }

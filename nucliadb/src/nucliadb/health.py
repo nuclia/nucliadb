@@ -30,7 +30,7 @@ from nucliadb_utils.utilities import Utility, get_nats_manager, get_utility
 
 logger = logging.getLogger(__name__)
 
-_health_checks = []
+_health_checks: list[Callable[[], bool]] = []
 
 
 def nats_manager_healthy() -> bool:
@@ -70,7 +70,7 @@ async def grpc_health_check(health_servicer) -> None:
     while True:
         for check in _health_checks:
             if not check():
-                logger.info(f"Health check failed on {check.__name__}")
+                logger.info(f"Health check failed on {check.__name__}")  # type: ignore
                 await health_servicer.set("", health_pb2.HealthCheckResponse.NOT_SERVING)
                 break
         else:

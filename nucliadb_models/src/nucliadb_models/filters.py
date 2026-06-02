@@ -128,11 +128,22 @@ class ResourceFieldPrefix(FilterProp, extra="forbid"):
     """
 
     prop: Literal["resource_field_prefix"] = "resource_field_prefix"
-    resource_id: str = pydantic.Field(description="ID of the resource containing the field(s) to match")
+    resource_id: str | None = pydantic.Field(
+        default=None, description="ID of the resource containing the field(s) to match"
+    )
+    resource_slug: str | None = pydantic.Field(
+        default=None, description="Slug of the resource containing the field(s) to match."
+    )
     field_type: FieldTypeName = pydantic.Field(description="Type of the fields to match")
     field_name_prefix: str = pydantic.Field(
         description="Prefix of the name of the field to match. If blank, matches all fields of the given type in the given resource",
     )
+
+    @model_validator(mode="after")
+    def validate_resource_id_or_slug(self) -> Self:
+        if self.resource_id is None and self.resource_slug is None:
+            raise ValueError("Must set `resource_id` or `resource_slug` (or both)")
+        return self
 
     @field_validator("resource_id", mode="after")
     def validate_id(cls, v: str) -> str:

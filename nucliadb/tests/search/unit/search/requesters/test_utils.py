@@ -60,7 +60,7 @@ def mocked_search_methods():
 
 
 def test_validate_nidx_query_results():
-    assert utils.validate_nidx_query_results([Mock()]) is None  # ty:ignore[invalid-argument-type]
+    assert utils.validate_nidx_query_results([Mock()]) is None
 
 
 def test_validate_nidx_query_results_no_results():

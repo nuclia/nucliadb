@@ -79,8 +79,6 @@ def run_fastapi_with_metrics(application: FastAPI) -> None:
     )
     server = Server(config=config)
 
-    server.config.setup_event_loop()
-
     async def serve_both():
         await start_server(metrics_server, metrics_config)
         await run_server_forever(server, config)

@@ -308,7 +308,7 @@ async def _tus_post(
 
     metadata.setdefault("content_type", request_content_type)
 
-    metadata["implies_resource_creation"] = implies_resource_creation
+    metadata["implies_resource_creation"] = implies_resource_creation  # type: ignore[assignment,ty:invalid-assignment]
 
     creation_payload = None
     if implies_resource_creation and item is not None:

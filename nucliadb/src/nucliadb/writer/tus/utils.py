@@ -34,7 +34,7 @@ match_ascii = re.compile(r"^[ -~]+$")
 match_b64 = re.compile(r"[^-A-Za-z0-9+/=]|=[^=]|={3,}$")
 
 
-def parse_tus_metadata(header: str) -> dict:
+def parse_tus_metadata(header: str) -> dict[str, str]:
     """
     https://tus.io/protocols/resumable-upload.html#upload-metadata
     """

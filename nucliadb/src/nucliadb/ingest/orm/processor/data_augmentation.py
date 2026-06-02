@@ -23,7 +23,16 @@ from dataclasses import dataclass, field
 
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import ProcessingEngine
-from nucliadb.models.internal.processing import PushPayload, PushTextFormat, Source, Text
+from nucliadb.models.internal.processing import (
+    PushConversation,
+    PushMessage,
+    PushMessageContent,
+    PushMessageFormat,
+    PushPayload,
+    PushTextFormat,
+    Source,
+    Text,
+)
 from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_utils.utilities import Utility, get_partitioning, get_utility
@@ -42,7 +51,7 @@ class GeneratedFields:
         return (len(self.texts) + len(self.links) + len(self.files) + len(self.conversations)) > 0
 
 
-async def get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource) -> GeneratedFields:
+async def get_generated_fields(bm: writer_pb2.BrokerMessage) -> GeneratedFields:
     """Processing can send messages with generated fields. Those can be
     generated with a data augmentation task and, as learning can't queue it to
     process, nucliadb is responsible to send the generated field to process (and
@@ -64,6 +73,12 @@ async def get_generated_fields(bm: writer_pb2.BrokerMessage, resource: Resource)
         has_error = len(errors) > 0
         if text.generated_by.WhichOneof("author") == "data_augmentation" and not has_error:
             generated_fields.texts.append(field_id)
+
+    for field_id, conv in bm.conversations.items():
+        errors = [e for e in bm.errors if e.field_type == FieldType.CONVERSATION and e.field == field_id]
+        has_error = len(errors) > 0
+        if conv.generated_by.WhichOneof("author") == "data_augmentation" and not has_error:
+            generated_fields.conversations.append(field_id)
 
     return generated_fields
 
@@ -124,13 +139,11 @@ def _generate_processing_payload_for_fields(
         pass
 
     for conversation in fields.conversations:
-        logger.warning(
-            "Ingest received a broker message from processor with a new conversation field! Skipping",
-            extra={"kbid": kbid, "rid": rid, "field_id": conversation},
+        payload.conversationfield[conversation] = _bm_conversation_field_to_processing(
+            bm.conversations[conversation]
         )
-        pass
 
-    if len(fields.texts) > 0:
+    if len(fields.texts) > 0 or len(fields.conversations) > 0:
         return payload
     else:
         # we don't want to send weird empty messages to processing
@@ -139,3 +152,32 @@ def _generate_processing_payload_for_fields(
 
 def _bm_text_field_to_processing(text_field: resources_pb2.FieldText) -> Text:
     return Text(body=text_field.body, format=PushTextFormat(text_field.format))
+
+
+def _bm_conversation_field_to_processing(
+    conv_field: resources_pb2.Conversation,
+) -> PushConversation:
+    push_conv = PushConversation(messages=[])
+    for msg in conv_field.messages:
+        push_conv.messages.append(
+            PushMessage(
+                timestamp=msg.timestamp.ToDatetime(),
+                who=msg.who,
+                to=list(msg.to),
+                ident=msg.ident,
+                content=PushMessageContent(
+                    text=msg.content.text, format=_to_push_message_format(msg.content.format)
+                ),
+            )
+        )
+    return push_conv
+
+
+def _to_push_message_format(pb: resources_pb2.MessageContent.Format.ValueType) -> PushMessageFormat:
+    # The pb and the models are not in sync, so we need this to avoid errors.
+    if pb == resources_pb2.MessageContent.Format.KEEP_MARKDOWN:
+        return PushMessageFormat.MARKDOWN
+    elif pb == resources_pb2.MessageContent.Format.JSON:
+        return PushMessageFormat.JSON
+    else:
+        return PushMessageFormat(pb)
