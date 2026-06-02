@@ -201,8 +201,7 @@ impl TextReaderService {
         let time = Instant::now();
         let searcher = self.reader.searcher();
         let count = searcher.search(&AllQuery, &Count)?;
-        let v = time.elapsed().as_millis();
-        debug!("Ending at: {v} ms");
+        debug!("Ending at: {:?}", time.elapsed());
 
         Ok(count)
     }
@@ -372,9 +371,7 @@ impl TextReaderService {
         use crate::search_query::create_query;
         let time = Instant::now();
 
-        let v = time.elapsed().as_millis();
-        debug!("Creating query: starts at {v} ms");
-
+        debug!("Creating query: starts at {:?}", time.elapsed());
         let query_parser = {
             let mut query_parser = QueryParser::for_index(&self.index, vec![self.schema.text]);
             query_parser.set_conjunction_by_default();
@@ -403,15 +400,11 @@ impl TextReaderService {
             facets.push(facet.clone());
             facet_collector.add_facet(Facet::from(facet));
         }
-        let v = time.elapsed().as_millis();
-        debug!("Creating query: ends at {v} ms");
+        debug!("Creating query: ends at {:?}", time.elapsed());
 
-        let v = time.elapsed().as_millis();
-        debug!("Searching: starts at {v} ms");
-
+        debug!("Searching: starts at {:?}", time.elapsed());
         let searcher = self.reader.searcher();
-        let v = time.elapsed().as_millis();
-        debug!("Searching: ends at {v} ms");
+        debug!("Searching: ends at {:?}", time.elapsed());
 
         match maybe_order {
             _ if request.only_faceted => {
@@ -719,8 +712,7 @@ impl Iterator for BatchProducer {
             items.push(DocumentItem { field, uuid, labels });
         }
         self.offset += Self::BATCH;
-        let v = time.elapsed().as_millis();
-        debug!("New batch created, took {v} ms");
+        debug!("New batch created, took {:?}", time.elapsed());
 
         Some(items)
     }
