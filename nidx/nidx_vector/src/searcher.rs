@@ -327,29 +327,22 @@ impl Searcher {
             FilterOperator::And => {}
         }
 
-        let v = time.elapsed().as_millis();
-        debug!("Searching: starts at {v} ms");
+        debug!("Searching: starts at {:?}", time.elapsed());
         let search_request = &SearchRequest { request, formula };
         let result = match self.config.vector_cardinality {
             VectorCardinality::Single => self._search(search_request, &request.segment_filtering_formula)?,
             VectorCardinality::Multi => self.search_multi_vector(search_request)?,
         };
+        debug!("Searching: ends at {:?}", time.elapsed());
 
-        let v = time.elapsed().as_millis();
-        debug!("Searching: ends at {v} ms");
-
-        debug!("Creating results: starts at {v} ms");
-
+        debug!("Creating results: starts at {:?}", time.elapsed());
         let documents = result
             .into_iter()
             .flat_map(|sp| sp.try_to_document_scored(&self.config.entity))
             .collect::<Vec<_>>();
-        let v = time.elapsed().as_millis();
+        debug!("Creating results: ends at {:?}", time.elapsed());
 
-        debug!("Creating results: ends at {v} ms");
-
-        let took = time.elapsed().as_secs_f64();
-        debug!("Ending at {took} ms");
+        debug!("Ending at {:?}", time.elapsed());
 
         Ok(VectorSearchResponse { documents })
     }
