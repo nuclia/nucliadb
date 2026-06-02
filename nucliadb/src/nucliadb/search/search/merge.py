@@ -42,6 +42,9 @@ from nucliadb.common.models_utils.from_proto import (
     RelationNodeTypePbMap,
     RelationTypePbMap,
 )
+from nucliadb.models.internal.augment import AugmentedParagraph, ParagraphText
+from nucliadb.models.internal.augment import Paragraph as AugmentorParagraph
+from nucliadb.search.augmentor.augmentor import augment_paragraphs
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.fetch import (
     fetch_resources,
@@ -256,6 +259,9 @@ async def merge_vectors_results(
     raw_vectors_list, _ = cut_page(raw_vectors_list, top_k)
 
     resources = []
+
+    augments = []
+    result_index_by_id = {}
     result_sentence_list: list[Sentence] = []
     for result in raw_vectors_list:
         vector_id = VectorId.from_string(result.doc_id.id)
@@ -269,15 +275,20 @@ async def merge_vectors_results(
             paragraph_start=result.metadata.position.start,
             paragraph_end=result.metadata.position.end,
         )
+        augments.append(
+            AugmentorParagraph(
+                id=paragraph_id,
+                metadata=None,  # TODO: add metadata, we have it
+            )
+        )
 
-        text = await get_paragraph_text(kbid=kbid, paragraph_id=paragraph_id)
         result_sentence_list.append(
             Sentence(
                 score=result.score,
-                rid=vector_id.rid,
-                field_type=vector_id.field_id.type,
-                field=vector_id.field_id.key,
-                text=text,
+                rid=paragraph_id.rid,
+                field_type=paragraph_id.field_id.type,
+                field=paragraph_id.field_id.key,
+                text="",  # we batch augments and populate it afterwards
                 index=str(vector_id.index),
                 position=TextPosition(
                     start=paragraph_id.paragraph_start,
@@ -286,8 +297,21 @@ async def merge_vectors_results(
                 ),
             )
         )
+        result_index_by_id[paragraph_id] = len(result_sentence_list) - 1
+
         if vector_id.rid not in resources:
             resources.append(vector_id.rid)
+
+    augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = await augment_paragraphs(
+        kbid, given=augments, select=[ParagraphText()], concurrency_control=asyncio.Semaphore(20)
+    )
+    for paragraph_id, idx in result_index_by_id.items():
+        augmented = augmented_paragraphs.get(paragraph_id)
+        # this fallback to "" is the historical response, although it may not
+        # have much sense
+        text = augmented.text or "" if augmented else ""
+        sentence = result_sentence_list[idx]
+        sentence.text = text
 
     return Sentences(
         results=result_sentence_list,

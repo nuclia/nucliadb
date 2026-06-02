@@ -219,7 +219,7 @@ async def hydrate_and_rerank(
     FIND_FETCH_OPS_DISTRIBUTION.observe(len(text_block_id_to_hydrate) + len(resources_to_hydrate))
     results = await asyncio.gather(*ops)
 
-    augmented_paragraphs: dict[ParagraphId, AugmentedParagraph | None] = results[0]  # type: ignore
+    augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = results[0]  # type: ignore
     augmented_resources: dict[str, Resource | None] = results[1]  # type: ignore
 
     # add hydrated text to our text blocks
