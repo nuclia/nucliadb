@@ -433,7 +433,7 @@ FieldFilterExpressionType = (
     | Annotated[Not["FieldFilterExpressionType"], Tag("not")]
     | Annotated[Resource, Tag("resource")]
     | Annotated[Field, Tag("field")]
-    | pydantic.json_schema.SkipJsonSchema[Annotated[ResourceFieldPrefix, Tag("resource_field_prefix")]]
+    | Annotated[pydantic.json_schema.SkipJsonSchema[ResourceFieldPrefix], Tag("resource_field_prefix")]
     | Annotated[Keyword, Tag("keyword")]
     | Annotated[DateCreated, Tag("created")]
     | Annotated[DateModified, Tag("modified")]
