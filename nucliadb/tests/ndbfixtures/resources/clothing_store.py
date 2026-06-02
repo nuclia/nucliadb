@@ -82,7 +82,6 @@ async def clothing_store_resources(
                 "title": description,
                 "key_values": {
                     "product": {
-                        "schema_id": "product",
                         "data": json,
                     },
                 },
