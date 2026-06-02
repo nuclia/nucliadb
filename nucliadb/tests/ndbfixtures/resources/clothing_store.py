@@ -27,7 +27,7 @@ from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import wait_for_sync
 
 SCHEMA = {
-    "name": "product",
+    "id": "product",
     "description": "Clothing store product schema",
     "fields": [
         {"key": "color", "type": "text", "required": True},

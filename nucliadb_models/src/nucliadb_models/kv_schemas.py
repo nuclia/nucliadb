@@ -84,7 +84,7 @@ class KVSchemaField(BaseModel):
 
 
 class KVSchema(BaseModel):
-    name: str = Field(pattern=r"^[^/.]{1,64}$")
+    id: str = Field(pattern=r"^[^/.]{1,64}$")
     description: str = ""
     fields: list[KVSchemaField] = Field(default_factory=list, max_length=MAX_KV_SCHEMA_FIELDS)
 

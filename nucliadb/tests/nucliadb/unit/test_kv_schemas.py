@@ -24,7 +24,7 @@ from nucliadb.ingest.fields.key_value import validate_kv_data
 from nucliadb_models.kv_schemas import MAX_KV_SCHEMA_FIELDS, KVFieldType, KVSchema, KVSchemaField
 
 SCHEMA = KVSchema(
-    name="product",
+    id="product",
     fields=[
         KVSchemaField(key="color", type=KVFieldType.TEXT, required=True),
         KVSchemaField(key="price", type=KVFieldType.FLOAT, required=True),
@@ -34,7 +34,7 @@ SCHEMA = KVSchema(
 )
 
 DATE_SCHEMA = KVSchema(
-    name="event",
+    id="event",
     fields=[
         KVSchemaField(key="name", type=KVFieldType.TEXT, required=True),
         KVSchemaField(key="ts", type=KVFieldType.DATE, required=True),
@@ -144,7 +144,7 @@ class TestKVSchemaModel:
         with pytest.raises(ValidationError):
             KVSchema.model_validate(
                 {
-                    "name": "big",
+                    "id": "big",
                     "fields": [
                         {"key": f"f{i}", "type": "text"} for i in range(MAX_KV_SCHEMA_FIELDS + 1)
                     ],
@@ -154,7 +154,7 @@ class TestKVSchemaModel:
     def test_at_max_fields_is_accepted(self):
         schema = KVSchema.model_validate(
             {
-                "name": "full",
+                "id": "full",
                 "fields": [{"key": f"f{i}", "type": "text"} for i in range(MAX_KV_SCHEMA_FIELDS)],
             }
         )
@@ -164,7 +164,7 @@ class TestKVSchemaModel:
         with pytest.raises(ValidationError, match="unique"):
             KVSchema.model_validate(
                 {
-                    "name": "bad",
+                    "id": "bad",
                     "fields": [
                         {"key": "color", "type": "text"},
                         {"key": "color", "type": "float"},

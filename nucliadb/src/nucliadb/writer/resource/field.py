@@ -260,10 +260,10 @@ async def parse_key_value_field(
 
     # Fetch schema and validate before touching the BrokerMessage
     if txn is not None:
-        schema = await datamanagers.kv_schemas.get(txn, kbid=kbid, name=key)
+        schema = await datamanagers.kv_schemas.get(txn, kbid=kbid, id=key)
     else:
         async with datamanagers.with_ro_transaction() as ro_txn:
-            schema = await datamanagers.kv_schemas.get(ro_txn, kbid=kbid, name=key)
+            schema = await datamanagers.kv_schemas.get(ro_txn, kbid=kbid, id=key)
 
     if schema is None:
         raise HTTPException(
