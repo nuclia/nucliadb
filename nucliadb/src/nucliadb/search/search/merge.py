@@ -42,8 +42,9 @@ from nucliadb.common.models_utils.from_proto import (
     RelationNodeTypePbMap,
     RelationTypePbMap,
 )
-from nucliadb.models.internal.augment import AugmentedParagraph, ParagraphText
+from nucliadb.models.internal.augment import AugmentedParagraph, Metadata, ParagraphText
 from nucliadb.models.internal.augment import Paragraph as AugmentorParagraph
+from nucliadb.search import logger
 from nucliadb.search.augmentor.augmentor import augment_paragraphs
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.fetch import (
@@ -52,6 +53,7 @@ from nucliadb.search.search.fetch import (
     get_labels_resource,
     get_seconds_paragraph,
 )
+from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
@@ -80,6 +82,7 @@ from nucliadb_models.search import (
     TextPosition,
 )
 from nucliadb_protos.utils_pb2 import RelationNode
+from nucliadb_telemetry import errors
 
 from .metrics import merge_observer
 from .paragraphs import get_paragraph_text
@@ -276,10 +279,7 @@ async def merge_vectors_results(
             paragraph_end=result.metadata.position.end,
         )
         augments.append(
-            AugmentorParagraph(
-                id=paragraph_id,
-                metadata=None,  # TODO: add metadata, we have it
-            )
+            AugmentorParagraph(id=paragraph_id, metadata=Metadata.from_vector_result(result))
         )
 
         result_sentence_list.append(
@@ -331,7 +331,7 @@ async def merge_paragraph_results(
     min_score: float,
     offset: int,
 ) -> tuple[Paragraphs, list[str]]:
-    raw_paragraph_list: list[tuple[ParagraphResult, SortValue]] = []
+    raw_paragraph_list: list[tuple[ParagraphId, ParagraphResult, SortValue]] = []
     facets: dict[str, Any] = {}
     query = None
     next_page = False
@@ -353,27 +353,53 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
+            _, field_type, field_key = result.field.split("/")
+            paragraph_id = ParagraphId(
+                field_id=FieldId(
+                    rid=result.uuid,
+                    type=field_type,
+                    key=field_key,
+                    subfield_id=result.split,
+                ),
+                paragraph_start=result.start,
+                paragraph_end=result.end,
+            )
+
             sort_value: SortValue
             if sort.field == SortField.SCORE:
                 sort_value = (result.score.bm25, result.score.booster)
             else:
                 sort_value = result.date.ToDatetime()
             if sort_value is not None:
-                raw_paragraph_list.append((result, sort_value))
+                raw_paragraph_list.append((paragraph_id, result, sort_value))
 
         total += paragraph_response.total
 
     # Sort the list by score. It's important that this sort is stable, so the
     # ordering of results with same scores accross multiple shards doesn't change
-    raw_paragraph_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
+    raw_paragraph_list.sort(key=lambda x: x[2], reverse=(sort.order == SortOrder.DESC))
 
     raw_paragraph_list, has_more = cut_page(raw_paragraph_list[offset:], top_k)
     next_page = next_page or has_more
 
-    result_resource_ids = []
-    result_paragraph_list: list[Paragraph] = await asyncio.gather(
-        *(load_paragraph(result, kbid, highlight, ematches) for result, _ in raw_paragraph_list)
+    augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = await augment_paragraphs(
+        kbid,
+        given=[
+            AugmentorParagraph(id=paragraph_id, metadata=Metadata.from_paragraph_result(result))
+            for paragraph_id, result, _ in raw_paragraph_list
+        ],
+        select=[ParagraphText()],
+        concurrency_control=asyncio.Semaphore(20),
     )
+
+    result_paragraph_list: list[Paragraph] = await asyncio.gather(
+        *(
+            load_paragraph(result, kbid, augmented_paragraphs.get(paragraph_id), highlight, ematches)
+            for paragraph_id, result, _ in raw_paragraph_list
+        )
+    )
+
+    result_resource_ids = []
     for paragraph in result_paragraph_list:
         if paragraph.rid not in result_resource_ids:
             result_resource_ids.append(paragraph.rid)
@@ -391,25 +417,25 @@ async def merge_paragraph_results(
 
 
 async def load_paragraph(
-    result: ParagraphResult, kbid: str, highlight: bool, ematches: list[str] | None
+    result: ParagraphResult,
+    kbid: str,
+    augmented: AugmentedParagraph | None,
+    highlight: bool,
+    ematches: list[str] | None,
 ) -> Paragraph:
+    text = augmented.text or "" if augmented else ""
+    if text and highlight:
+        try:
+            text = highlight_paragraph(
+                text,
+                words=result.matches,  # type: ignore[arg-type,ty:invalid-argument-type]
+                ematches=ematches,
+            )
+        except Exception as ex:
+            errors.capture_exception(ex)
+            logger.exception("Error highlighting paragraph", extra={"kbid": kbid})
+
     _, field_type, field = result.field.split("/")
-    text = await get_paragraph_text(
-        kbid=kbid,
-        paragraph_id=ParagraphId(
-            field_id=FieldId(
-                rid=result.uuid,
-                type=field_type,
-                key=field,
-                subfield_id=result.split,
-            ),
-            paragraph_start=result.start,
-            paragraph_end=result.end,
-        ),
-        highlight=highlight,
-        ematches=ematches,
-        matches=result.matches,  # type: ignore
-    )
     labels = await get_labels_paragraph(result, kbid)
     fuzzy_result = len(result.matches) > 0
     new_paragraph = Paragraph(
