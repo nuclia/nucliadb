@@ -32,7 +32,7 @@ jobs:
 
       - name: Run Black Duck SCA PR Scan
         id: blackduck-pr-scan
-        uses: blackduck-inc/black-duck-security-scan@659a0742e793a093377fab3117b0d90f23b04bfa # v2.9.0
+        uses: blackduck-inc/black-duck-security-scan@3fe94e4b3c3947bd21ba46b7da255d6d3638b325 # v2.10.0
         env:
           DETECT_PROJECT_NAME: nuclia-nucliadb
           DETECT_PROJECT_GROUP_NAME: Nuclia
