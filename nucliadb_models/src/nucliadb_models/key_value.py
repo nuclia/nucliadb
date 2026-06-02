@@ -80,7 +80,7 @@ class Range(BaseModel):
 
 
 # Type alias for valid KV field values
-KVValue = str | int | float | bool | datetime | Range
+KVValue = str | list[str] | int | float | bool | datetime | Range
 
 
 class KeyValueField(BaseModel):

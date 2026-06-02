@@ -174,7 +174,7 @@ KEY_VALUE_ALLOWED_TYPES: dict[Type[Eq] | Type[Inequalities] | Type[Contains], se
         KVFieldType.DATE,
     },
     Inequalities: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
-    Contains: {KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
+    Contains: {KVFieldType.TEXT, KVFieldType.INTEGER, KVFieldType.FLOAT, KVFieldType.DATE},
 }
 
 # Map from Python types a value can have and which key-value field types can be
@@ -213,8 +213,8 @@ def _validate_kv_schema(
             f"but '{type(expr).__name__.lower()}' requires type {allowed}",
         )
 
-    if schema_field.range is True:
-        # validate range fields use valid range operators
+    if schema_field.range or schema_field.repeated:
+        # validate range and repeated fields use valid range operators
         if type(expr) not in {
             Contains,
         }:
@@ -224,7 +224,7 @@ def _validate_kv_schema(
                 f"Therefore '{type(expr).__name__.lower()}' can't be used",
             )
     else:
-        # validate non-range fields don't use range operators
+        # validate non-range or non-repeated fields don't use range operators
         if type(expr) in {
             Contains,
         }:
@@ -323,19 +323,25 @@ def _parse_kv_expression(
     elif isinstance(expr, Contains):
         _validate_kv_schema(schemas, expr)
 
-        lower_bound = nodereader_pb2.JsonFilterExpression()
-        upper_bound = nodereader_pb2.JsonFilterExpression()
+        # NOTE range and repeated field types don't overlap and that's why this is ok
+        if isinstance(expr.contains, str):
+            json_filter.path.field_id = f"k/{expr.schema_id}"
+            json_filter.path.json_path = expr.key
+            json_filter.path.text = expr.contains
+        else:
+            lower_bound = nodereader_pb2.JsonFilterExpression()
+            upper_bound = nodereader_pb2.JsonFilterExpression()
 
-        lower_bound.path.field_id = f"k/{expr.schema_id}"
-        upper_bound.path.field_id = f"k/{expr.schema_id}"
-        lower_bound.path.json_path = f"{expr.key}.min"
-        upper_bound.path.json_path = f"{expr.key}.max"
+            lower_bound.path.field_id = f"k/{expr.schema_id}"
+            upper_bound.path.field_id = f"k/{expr.schema_id}"
+            lower_bound.path.json_path = f"{expr.key}.min"
+            upper_bound.path.json_path = f"{expr.key}.max"
 
-        # we want our value to be >= the lower bound and <= the upper bound
-        _set_range_bound(lower_bound.path, expr.contains, lower=False)
-        _set_range_bound(upper_bound.path, expr.contains, lower=True)
+            # we want our value to be >= the lower bound and <= the upper bound
+            _set_range_bound(lower_bound.path, expr.contains, lower=False)
+            _set_range_bound(upper_bound.path, expr.contains, lower=True)
 
-        json_filter.bool_and.operands.extend([lower_bound, upper_bound])
+            json_filter.bool_and.operands.extend([lower_bound, upper_bound])
 
     else:
         assert_never(expr)

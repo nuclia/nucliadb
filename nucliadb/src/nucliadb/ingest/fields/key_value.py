@@ -66,7 +66,10 @@ def check_kv_type(schema_name: str, schema_field: KVSchemaField, key: str, value
         # Tantivy's JSON indexer auto-parses strings as DateTime only when
         # they parse as RFC 3339, which requires both a time component and a
         # timezone offset (Z or ±HH:MM)
-        ok = isinstance(value, str) and not is_datetime(value)
+        if schema_field.repeated and isinstance(value, list):
+            ok = all((isinstance(x, str) and not is_datetime(x)) for x in value)
+        else:
+            ok = isinstance(value, str) and not is_datetime(value)
     elif expected is KVFieldType.INTEGER:
         if schema_field.range and isinstance(value, Range):
             ok = (isinstance(value.lower, int) and not isinstance(value.lower, bool)) and (

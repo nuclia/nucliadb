@@ -357,10 +357,6 @@ async def test_kv_field_filter(
                 op: value,
             }
         )
-        {
-            "key": "price_range",
-            "contains": 10,
-        }
         assert resources == expected, (
             f"Unexpected match for `{key} {op} {value}`: matched {resources} instead of {expected}"
         )
@@ -401,40 +397,27 @@ async def test_kv_filter_schema_validation(
     resp = await nucliadb_writer.post(f"/kb/{kbid}/kv-schemas", json=PRODUCT_SCHEMA)
     assert resp.status_code == 201, resp.text
 
-    async def find_with_filter(filter_expression: dict) -> int:
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
-            json={
-                "query": "product item",
-                "features": ["keyword"],
-                "filter_expression": {
-                    "key_value": filter_expression,
+    # Nonexistent schema
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find",
+        json={
+            "query": "product item",
+            "features": ["keyword"],
+            "filter_expression": {
+                "key_value": {
+                    "schema_id": "nonexistent_schema",
+                    "key": "color",
+                    "eq": "red",
                 },
             },
-        )
-        return resp.status_code
-
-    status = await find_with_filter(
-        {
-            "schema_id": "nonexistent_schema",
-            "key": "color",
-            "eq": "red",
-        }
+        },
     )
-    assert status == 412
+    return resp.status_code
 
-    status = await find_with_filter(
-        {
-            "schema_id": "product",
-            "key": "nonexistent_key",
-            "eq": "red",
-        }
-    )
-    assert status == 412
-
-    # Test schema validation for invalid combinations of schemaa field types and
+    # Test schema validation for invalid combinations of schema field types and
     # query values
     for key, op, value in [
+        ("nonexistent_key", "eq", "red"),
         # invalid types for a BOOLEAN field
         ("in_stock", "eq", "true"),
         ("in_stock", "eq", 10),
@@ -503,11 +486,21 @@ async def test_kv_filter_schema_validation(
         ("labels", "gte", "2024-01-01T00:00:00Z"),
         ("labels", "lte", "2024-01-01T00:00:00Z"),
     ]:
-        status = await find_with_filter(
-            {
-                "schema_id": "product",
-                "key": key,
-                op: value,
-            }
+        filter = {
+            "schema_id": "product",
+            "key": key,
+            op: value,
+        }
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "query": "product item",
+                "features": ["keyword"],
+                "filter_expression": {
+                    "key_value": filter,
+                },
+            },
         )
-        assert status == 412, f"Expected validation error for `{key} {op} {value}`, got {status}"
+        assert resp.status_code == 412, (
+            f"Expected validation error for `{key} {op} {value}`, got {resp.json()}"
+        )

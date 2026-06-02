@@ -57,6 +57,10 @@ class KVSchemaField(BaseModel):
         default=False,
         description="When enabled, this field stores a range instead of a single value and operations like `contains` are possible",
     )
+    repeated: bool = Field(
+        default=False,
+        description="When enabled, this field stores a list of elements instead of a single value and operations like `contains` are possible",
+    )
 
     @model_validator(mode="after")
     def validate_allowed_range_types(self) -> Self:
@@ -67,6 +71,15 @@ class KVSchemaField(BaseModel):
         }
         if self.range is True and self.type not in allowed_range_types:
             raise ValueError(f"{self.type} is not an allowed range type")
+        return self
+
+    @model_validator(mode="after")
+    def validate_allowed_repeated_types(self) -> Self:
+        allowed_repeated_types = {
+            KVFieldType.TEXT,
+        }
+        if self.repeated is True and self.type not in allowed_repeated_types:
+            raise ValueError(f"{self.type} is not an allowed repeated type")
         return self
 
 
