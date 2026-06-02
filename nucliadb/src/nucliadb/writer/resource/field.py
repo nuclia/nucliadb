@@ -512,11 +512,11 @@ async def parse_conversation_field(
 
         processing_message_content = processing_models.PushMessageContent(
             text=message.content.text,
-            format=getattr(processing_models.PushMessageFormat, message.content.format.value),
+            format=_to_push_message_format(message.content.format),
         )
 
         cm.content.text = message.content.text
-        cm.content.format = resources_pb2.MessageContent.Format.Value(message.content.format.value)
+        cm.content.format = to_proto.conversation_message_format(message.content.format)
         cm.content.attachments_fields.extend(
             [
                 resources_pb2.FieldRef(
@@ -638,3 +638,13 @@ async def _conversation_append_checks(
                 status_code=422,
                 detail=f"Message identifiers must be unique field={field_id}: {list(intersection)[:50]}",
             )
+
+
+def _to_push_message_format(
+    format: models.MessageFormat,
+) -> processing_models.PushMessageFormat:
+    if format == models.MessageFormat.KEEP_MARKDOWN:
+        # Keep markdown is not in the processing models, we want to keep it
+        # as markdown.
+        format = models.MessageFormat.MARKDOWN
+    return getattr(processing_models.PushMessageFormat, format.value)

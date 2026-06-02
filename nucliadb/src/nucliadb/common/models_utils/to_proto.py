@@ -19,6 +19,7 @@
 #
 
 from nucliadb_models.common import FieldID, FieldTypeName
+from nucliadb_models.conversation import MessageFormat
 from nucliadb_models.search import FeedbackTasks, NucliaDBClientType
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_protos import knowledgebox_pb2, resources_pb2
@@ -59,3 +60,13 @@ def kb_synonyms(obj: KnowledgeBoxSynonyms) -> knowledgebox_pb2.Synonyms:
     for term, term_synonyms in obj.synonyms.items():
         pbsyn.terms[term].synonyms.extend(term_synonyms)
     return pbsyn
+
+
+def conversation_message_format(fmt: MessageFormat) -> resources_pb2.MessageContent.Format.ValueType:
+    # The models are not in sync, so we need to do this conversion manually!
+    if fmt == MessageFormat.JSON:
+        return resources_pb2.MessageContent.Format.JSON
+    elif fmt == MessageFormat.KEEP_MARKDOWN:
+        return resources_pb2.MessageContent.Format.MARKDOWN
+    else:
+        return resources_pb2.MessageContent.Format.Value(fmt.value)
