@@ -133,7 +133,7 @@ async def src_kb(
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/kv-schemas",
         json={
-            "name": "product",
+            "id": "product",
             "fields": [
                 {"key": "color", "type": "text", "required": True},
                 {"key": "price", "type": "float", "required": True},
@@ -257,7 +257,7 @@ async def check_kv_schema(nucliadb_reader: AsyncClient, kbid: str):
     resp = await nucliadb_reader.get(f"/kb/{kbid}/kv-schemas/product")
     assert resp.status_code == 200
     schema = resp.json()
-    assert schema["name"] == "product"
+    assert schema["id"] == "product"
     assert len(schema["fields"]) == 2
 
     # KV field data on the resource must be restored
