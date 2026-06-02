@@ -394,3 +394,29 @@ async def test_filtering_expression_resource_field_prefix(
         assert found_fields == set(expected_fields), (
             f"Failed for filter {filters}: expected {expected_fields}, got {found_fields}"
         )
+
+    # Make sure it works with ask, find and graph too
+    filter_expression = {
+        "field": {
+            "prop": "resource_field_prefix",
+            "resource_id": resource1_uuid,
+            "resource_slug": "resource1",
+            "field_type": "text",
+            "field_name_prefix": "conversation",
+        }
+    }
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/ask",
+        json={"query": "What is the conversation intro?", "filter_expression": filter_expression},
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/find", json={"query": "", "filter_expression": filter_expression}
+    )
+    assert resp.status_code == 200
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph", json={"query": {"prop": "node"}, "filter_expression": filter_expression}
+    )
+    assert resp.status_code == 200

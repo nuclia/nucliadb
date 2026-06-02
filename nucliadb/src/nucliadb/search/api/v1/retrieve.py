@@ -141,7 +141,7 @@ async def retrieve_endpoint(
 async def rerank(
     kbid: str, text_blocks: list[TextBlockMatch], reranker: Reranker, options: RerankingOptions
 ) -> list[TextBlockMatch]:
-    text_blocks_by_id = {}  # used for faster lookup after rerank
+    text_blocks_by_id: dict[str, TextBlockMatch] = {}  # used for faster lookup after rerank
     to_augment = []
     for text_block in text_blocks:
         text_blocks_by_id[text_block.paragraph_id.full()] = text_block
