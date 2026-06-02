@@ -235,11 +235,10 @@ async def merge_suggest_paragraph_results(
 
 async def merge_vectors_results(
     vector_responses: list[VectorSearchResponse],
-    resources: list[str],
     kbid: str,
     top_k: int,
     min_score: float | None = None,
-) -> Sentences:
+) -> tuple[Sentences, list[str]]:
     facets: dict[str, Any] = {}
     raw_vectors_list: list[DocumentScored] = []
 
@@ -256,6 +255,7 @@ async def merge_vectors_results(
 
     raw_vectors_list, _ = cut_page(raw_vectors_list, top_k)
 
+    resources = []
     result_sentence_list: list[Sentence] = []
     for result in raw_vectors_list:
         vector_id = VectorId.from_string(result.doc_id.id)
@@ -295,7 +295,7 @@ async def merge_vectors_results(
         page_number=0,  # Bw/c with pagination
         page_size=top_k,
         min_score=round(min_score or 0, ndigits=3),
-    )
+    ), resources
 
 
 async def merge_paragraph_results(
@@ -536,13 +536,13 @@ async def merge_results(
         resources.extend(matched_resources)
 
     if retrieval.query.semantic is not None:
-        api_results.sentences = await merge_vectors_results(
+        api_results.sentences, matched_resources = await merge_vectors_results(
             vectors,
-            resources,
             kbid,
             retrieval.top_k,
             min_score=retrieval.query.semantic.min_score,
         )
+        resources.extend(matched_resources)
 
     if retrieval.query.relation is not None:
         api_results.relations = await merge_relations_results(
