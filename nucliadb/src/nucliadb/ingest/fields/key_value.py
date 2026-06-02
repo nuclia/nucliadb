@@ -45,17 +45,17 @@ def validate_kv_data(data: dict, schema: KVSchema) -> None:
     _validate_keys(data, schema)
     schema_fields = {f.key: f for f in schema.fields}
     for key, value in data.items():
-        check_kv_type(schema.name, schema_fields[key], key, value)
+        check_kv_type(schema.id, schema_fields[key], key, value)
 
 
 def _validate_keys(data: dict, schema: KVSchema) -> None:
     schema_keys = {f.key for f in schema.fields}
     unknown = set(data.keys()) - schema_keys
     if unknown:
-        raise ValueError(f"Unknown keys for schema {schema.name!r}: {sorted(unknown)}")
+        raise ValueError(f"Unknown keys for schema {schema.id!r}: {sorted(unknown)}")
     missing = [f.key for f in schema.fields if f.required and f.key not in data]
     if missing:
-        raise ValueError(f"Missing required keys for schema {schema.name!r}: {missing}")
+        raise ValueError(f"Missing required keys for schema {schema.id!r}: {missing}")
 
 
 def check_kv_type(schema_name: str, schema_field: KVSchemaField, key: str, value: object) -> None:

@@ -31,9 +31,9 @@ async def get_all(txn: Transaction, *, kbid: str) -> KBKVSchemas:
     return KBKVSchemas.model_validate_json(data)
 
 
-async def get(txn: Transaction, *, kbid: str, name: str) -> KVSchema | None:
+async def get(txn: Transaction, *, kbid: str, id: str) -> KVSchema | None:
     schemas = await get_all(txn, kbid=kbid)
-    return schemas.schemas.get(name)
+    return schemas.schemas.get(id)
 
 
 async def set(txn: Transaction, *, kbid: str, schema: KVSchema) -> None:
@@ -44,19 +44,19 @@ async def set(txn: Transaction, *, kbid: str, schema: KVSchema) -> None:
         schemas = KBKVSchemas.model_validate_json(data)
     else:
         schemas = KBKVSchemas()
-    schemas.schemas[schema.name] = schema
+    schemas.schemas[schema.id] = schema
     await txn.set(key, schemas.model_dump_json().encode())
 
 
-async def delete(txn: Transaction, *, kbid: str, name: str) -> bool:
+async def delete(txn: Transaction, *, kbid: str, id: str) -> bool:
     """Returns True if deleted, False if not found."""
     key = KB_KV_SCHEMAS.format(kbid=kbid)
     data = await txn.get(key, for_update=True)
     if not data:
         return False
     schemas = KBKVSchemas.model_validate_json(data)
-    if name not in schemas.schemas:
+    if id not in schemas.schemas:
         return False
-    del schemas.schemas[name]
+    del schemas.schemas[id]
     await txn.set(key, schemas.model_dump_json().encode())
     return True

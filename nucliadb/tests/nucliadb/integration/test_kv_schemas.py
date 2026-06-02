@@ -23,7 +23,7 @@ from httpx import AsyncClient
 from nucliadb_models.kv_schemas import MAX_KV_SCHEMAS
 
 PRODUCT_SCHEMA = {
-    "name": "product",
+    "id": "product",
     "description": "A product schema",
     "fields": [
         {"key": "color", "type": "text", "description": "Product color", "required": True},
@@ -45,13 +45,13 @@ async def test_kv_schema_limit(
     for i in range(MAX_KV_SCHEMAS):
         resp = await nucliadb_writer.post(
             f"/kb/{kbid}/kv-schemas",
-            json={"name": f"schema{i}", "fields": []},
+            json={"id": f"schema{i}", "fields": []},
         )
         assert resp.status_code == 201, f"Schema {i} creation failed: {resp.text}"
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/kv-schemas",
-        json={"name": "one_too_many", "fields": []},
+        json={"id": "one_too_many", "fields": []},
     )
     assert resp.status_code == 422
     assert str(MAX_KV_SCHEMAS) in resp.json()["detail"]
@@ -69,7 +69,7 @@ async def test_kv_schema_create(
     resp = await nucliadb_writer.post(f"/kb/{kbid}/kv-schemas", json=PRODUCT_SCHEMA)
     assert resp.status_code == 201, resp.text
     data = resp.json()
-    assert data["name"] == "product"
+    assert data["id"] == "product"
     assert data["description"] == "A product schema"
     assert len(data["fields"]) == 5
 
@@ -77,7 +77,7 @@ async def test_kv_schema_create(
     resp = await nucliadb_reader.get(f"/kb/{kbid}/kv-schemas/product")
     assert resp.status_code == 200, resp.text
     data = resp.json()
-    assert data["name"] == "product"
+    assert data["id"] == "product"
     assert data["fields"][0]["key"] == "color"
     assert data["fields"][0]["type"] == "text"
     assert data["fields"][0]["required"] is True
@@ -111,7 +111,7 @@ async def test_kv_schema_create_duplicate_keys_rejected(
     kbid = standalone_knowledgebox
 
     bad_schema = {
-        "name": "bad",
+        "id": "bad",
         "fields": [
             {"key": "color", "type": "text"},
             {"key": "color", "type": "float"},  # duplicate key
@@ -140,7 +140,7 @@ async def test_kv_schema_list(
 
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/kv-schemas",
-        json={"name": "metadata", "description": "Generic metadata", "fields": []},
+        json={"id": "metadata", "description": "Generic metadata", "fields": []},
     )
     assert resp.status_code == 201
 
@@ -297,11 +297,11 @@ async def test_kv_schema_name_is_immutable_after_create(
     # Passing 'name' in PUT body should be rejected (extra fields forbidden)
     resp = await nucliadb_writer.put(
         f"/kb/{kbid}/kv-schemas/product",
-        json={"name": "renamed", "description": "Trying to rename"},
+        json={"id": "renamed", "description": "Trying to rename"},
     )
     assert resp.status_code == 422
 
     # Original name still intact
     resp = await nucliadb_reader.get(f"/kb/{kbid}/kv-schemas/product")
     assert resp.status_code == 200
-    assert resp.json()["name"] == "product"
+    assert resp.json()["id"] == "product"

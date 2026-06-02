@@ -380,7 +380,7 @@ async def list_kv_schemas(request: Request, kbid: str) -> KBKVSchemas:
 
 
 @api.get(
-    f"/{KB_PREFIX}/{{kbid}}/kv-schemas/{{schema_name}}",
+    f"/{KB_PREFIX}/{{kbid}}/kv-schemas/{{schema_id}}",
     status_code=200,
     summary="Get a KV schema",
     tags=["Knowledge Box Services"],
@@ -389,12 +389,12 @@ async def list_kv_schemas(request: Request, kbid: str) -> KBKVSchemas:
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_kv_schema(request: Request, kbid: str, schema_name: str) -> KVSchema:
+async def get_kv_schema(request: Request, kbid: str, schema_id: str) -> KVSchema:
     async with datamanagers.with_ro_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
-        schema = await datamanagers.kv_schemas.get(txn, kbid=kbid, name=schema_name)
+        schema = await datamanagers.kv_schemas.get(txn, kbid=kbid, id=schema_id)
         if schema is None:
             raise HTTPException(status_code=404, detail="KV schema does not exist")
 

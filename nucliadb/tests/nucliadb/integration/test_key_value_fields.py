@@ -21,7 +21,7 @@ import pytest
 from httpx import AsyncClient
 
 PRODUCT_SCHEMA = {
-    "name": "product",
+    "id": "product",
     "description": "Product schema",
     "fields": [
         {"key": "color", "type": "text", "required": True},
@@ -155,8 +155,7 @@ async def test_kv_field_validation(
     standalone_knowledgebox: str,
 ):
     """
-    Covers: unknown schema, unknown keys, missing required keys, wrong types,
-    field name != schema_id — all must return 422.
+    Covers: unknown schema, unknown keys, missing required keys, wrong types — all must return 422.
     """
     kbid = standalone_knowledgebox
 
