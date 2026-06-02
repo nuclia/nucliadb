@@ -30,6 +30,7 @@ PRODUCT_SCHEMA = {
         {"key": "quantity", "type": "integer", "required": False},
         {"key": "launched_at", "type": "date", "required": False},
         {"key": "delivery_days", "type": "integer", "range": True, "required": False},
+        {"key": "labels", "type": "text", "repeated": True, "required": False},
     ],
 }
 
@@ -42,6 +43,7 @@ VALID_PRODUCT_DATA = {
         "quantity": 3,
         "launched_at": "2024-01-15T00:00:00Z",
         "delivery_days": {"lower": 1, "upper": 5},
+        "labels": ["A"],
     },
 }
 
@@ -262,6 +264,7 @@ async def test_kv_field_filter(
                         "quantity": 3,
                         "launched_at": "2023-06-01T00:00:00Z",
                         "delivery_days": {"lower": 1, "upper": 5},
+                        "labels": ["R", "E", "D"],
                     },
                 }
             },
@@ -286,6 +289,7 @@ async def test_kv_field_filter(
                         "quantity": 10,
                         "launched_at": "2024-06-01T00:00:00Z",
                         "delivery_days": {"lower": 2, "upper": 3},
+                        "labels": ["B", "L", "U", "E"],
                     },
                 }
             },
@@ -340,6 +344,10 @@ async def test_kv_field_filter(
         # RANGE fields
         ("delivery_days", "contains", 2, {rid1, rid2}),
         ("delivery_days", "contains", 4, {rid1}),
+        # TEXT LIST fields
+        ("labels", "contains", "R", {rid1}),
+        ("labels", "contains", "E", {rid1, rid2}),
+        ("labels", "contains", "B", {rid2}),
     ]
     for key, op, value, expected in filters:
         resources = await find_with_filter(
@@ -480,6 +488,20 @@ async def test_kv_filter_schema_validation(
         ("delivery_days", "eq", "2024-01-01T00:00:00Z"),
         ("delivery_days", "gte", "2024-01-01T00:00:00Z"),
         ("delivery_days", "lte", "2024-01-01T00:00:00Z"),
+        # invalid types for a TEXT LIST field
+        ("labels", "eq", True),
+        ("labels", "eq", 10),
+        ("labels", "gte", 10),
+        ("labels", "lte", 10),
+        ("labels", "eq", 3.5),
+        ("labels", "gte", 3.5),
+        ("labels", "lte", 3.5),
+        ("labels", "eq", "label"),
+        ("labels", "gte", "label"),
+        ("labels", "lte", "label"),
+        ("labels", "eq", "2024-01-01T00:00:00Z"),
+        ("labels", "gte", "2024-01-01T00:00:00Z"),
+        ("labels", "lte", "2024-01-01T00:00:00Z"),
     ]:
         status = await find_with_filter(
             {
