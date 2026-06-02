@@ -119,7 +119,7 @@ impl<'a> FieldKey<'a> {
     }
 
     pub fn resource_id(&self) -> &[u8] {
-        &self.bytes()[0..8]
+        &self.bytes()[0..16]
     }
 
     pub fn bytes(&self) -> &[u8] {

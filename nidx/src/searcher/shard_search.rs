@@ -408,6 +408,7 @@ fn run_semantic_graph_queries(
         let mut context = VectorQueryResults::default();
         while let Some(node_thread) = node_threads.pop() {
             let (key, results) = node_thread.join().unwrap();
+
             context.nodes.insert(
                 key,
                 results?
