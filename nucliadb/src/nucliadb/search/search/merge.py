@@ -35,7 +35,7 @@ from nidx_protos.nodereader_pb2 import (
     VectorSearchResponse,
 )
 
-from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.ids import FieldId, ParagraphId, VectorId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.common.models_utils.from_proto import (
     RelationNodeTypeMap,
@@ -79,7 +79,7 @@ from nucliadb_models.search import (
 from nucliadb_protos.utils_pb2 import RelationNode
 
 from .metrics import merge_observer
-from .paragraphs import get_paragraph_text, get_text_sentence
+from .paragraphs import get_paragraph_text
 
 Bm25Score = tuple[float, float]
 TimestampScore = datetime.datetime
@@ -258,49 +258,36 @@ async def merge_vectors_results(
 
     result_sentence_list: list[Sentence] = []
     for result in raw_vectors_list:
-        id_count = result.doc_id.id.count("/")
-        if id_count == 4:
-            rid, field_type, field, index, position = result.doc_id.id.split("/")
-            subfield = None
-        elif id_count == 5:
-            (
-                rid,
-                field_type,
-                field,
-                subfield,
-                index,
-                position,
-            ) = result.doc_id.id.split("/")
-        if result.metadata.HasField("position"):
-            start_int = result.metadata.position.start
-            end_int = result.metadata.position.end
-            index_int = result.metadata.position.index
-        else:
-            # bbb pull position from key for old results that were
-            # not properly filling metadata
-            start, end = position.split("-")
-            start_int = int(start)
-            end_int = int(end)
-            try:
-                index_int = int(index)
-            except ValueError:
-                index_int = -1
-        text = await get_text_sentence(
-            rid, field_type, field, kbid, index_int, start_int, end_int, subfield
+        vector_id = VectorId.from_string(result.doc_id.id)
+        # In case we have multiple vectors per paragraph, the vector id will
+        # have its start-end referencing a portion of the paragraph. However, we
+        # are interested in the whole paragraph, not only the portion, so we'll
+        # use the metadata.position to get the actual paragraph start-end
+        # positions
+        paragraph_id = ParagraphId(
+            field_id=vector_id.field_id,
+            paragraph_start=result.metadata.position.start,
+            paragraph_end=result.metadata.position.end,
         )
+
+        text = await get_paragraph_text(kbid=kbid, paragraph_id=paragraph_id)
         result_sentence_list.append(
             Sentence(
                 score=result.score,
-                rid=rid,
-                field_type=field_type,
-                field=field,
+                rid=vector_id.rid,
+                field_type=vector_id.field_id.type,
+                field=vector_id.field_id.key,
                 text=text,
-                index=index,
-                position=TextPosition(start=start_int, end=end_int, index=index_int),
+                index=str(vector_id.index),
+                position=TextPosition(
+                    start=paragraph_id.paragraph_start,
+                    end=paragraph_id.paragraph_end,
+                    index=vector_id.index,
+                ),
             )
         )
-        if rid not in resources:
-            resources.append(rid)
+        if vector_id.rid not in resources:
+            resources.append(vector_id.rid)
 
     return Sentences(
         results=result_sentence_list,
