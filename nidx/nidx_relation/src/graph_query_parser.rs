@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // Copyright (C) 2021 Bosutech XXI S.L.
 //
@@ -26,7 +26,7 @@ use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_types::query_language::{BooleanExpression, BooleanOperation, Operator};
 use tantivy::query::{
-    AllQuery, BooleanQuery, BoostQuery, EmptyQuery, FuzzyTermQuery, Occur, Query, TermQuery, TermSetQuery,
+    AllQuery, BooleanQuery, ConstScoreQuery, EmptyQuery, FuzzyTermQuery, Occur, Query, TermQuery, TermSetQuery,
 };
 use tantivy::schema::{Facet, Field, IndexRecordOption};
 use tantivy::tokenizer::TokenizerManager;
@@ -488,17 +488,28 @@ impl<'a> GraphQueryParser<'a> {
                 return Some(Box::new(EmptyQuery));
             };
 
+            // Used to avoid multiple nodes that normalize to the same text (e.g: Alaska and ALASKA)
+            // so that it doesn't appear multiple times in the query which causes Tantivy to match both
+            // and sum the scores for each matching clause.
+            let mut used_values = HashSet::new();
+
             return Some(Box::new(BooleanQuery::union(
                 keys.iter()
-                    .map(|(value, score)| {
-                        let q: Box<dyn Query> = Box::new(BoostQuery::new(
-                            Box::new(TermQuery::new(
-                                tantivy::Term::from_field_text(exact_field, &self.schema.normalize(value)),
-                                IndexRecordOption::Basic,
-                            )),
-                            *score,
-                        ));
-                        q
+                    .filter_map(|(value, score)| {
+                        let normalized = self.schema.normalize(value);
+                        if used_values.contains(&normalized) {
+                            None
+                        } else {
+                            let q: Box<dyn Query> = Box::new(ConstScoreQuery::new(
+                                Box::new(TermQuery::new(
+                                    tantivy::Term::from_field_text(exact_field, &normalized),
+                                    IndexRecordOption::Basic,
+                                )),
+                                *score,
+                            ));
+                            used_values.insert(normalized);
+                            Some(q)
+                        }
                     })
                     .collect(),
             )));
@@ -585,17 +596,28 @@ impl<'a> GraphQueryParser<'a> {
                     return Box::new(EmptyQuery);
                 };
 
+                // Used to avoid multiple relations that normalize to the same text so that it
+                // doesn't appear multiple times in the query which causes Tantivy to match both
+                // and sum the scores for each matching clause.
+                let mut used_values = HashSet::new();
+
                 Box::new(BooleanQuery::union(
                     keys.iter()
-                        .map(|(value, score)| {
-                            let q: Box<dyn Query> = Box::new(BoostQuery::new(
-                                Box::new(TermQuery::new(
-                                    tantivy::Term::from_field_text(self.schema.label, &self.schema.normalize(value)),
-                                    IndexRecordOption::Basic,
-                                )),
-                                *score,
-                            ));
-                            q
+                        .filter_map(|(value, score)| {
+                            let normalized = self.schema.normalize(value);
+                            if used_values.contains(&normalized) {
+                                None
+                            } else {
+                                let q: Box<dyn Query> = Box::new(ConstScoreQuery::new(
+                                    Box::new(TermQuery::new(
+                                        tantivy::Term::from_field_text(self.schema.label, &normalized),
+                                        IndexRecordOption::Basic,
+                                    )),
+                                    *score,
+                                ));
+                                used_values.insert(normalized);
+                                Some(q)
+                            }
                         })
                         .collect(),
                 ))
