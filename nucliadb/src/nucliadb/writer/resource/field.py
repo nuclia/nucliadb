@@ -173,10 +173,14 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
                     if "attachments_fields" in parsed_message["content"]:
                         # Not defined on the push payload
                         del parsed_message["content"]["attachments_fields"]
-                    parsed_message["content"]["format"] = resources_pb2.MessageContent.Format.Value(
+                    # Temporarily set format to PLAIN to avoid errors. This happens because the processing models and the pb are not in sync.
+                    stored_format_pb = resources_pb2.MessageContent.Format.Value(
                         parsed_message["content"]["format"]
                     )
-                    full_conversation.messages.append(processing_models.PushMessage(**parsed_message))
+                    parsed_message["content"]["format"] = resources_pb2.MessageContent.Format.PLAIN
+                    push_message = processing_models.PushMessage(**parsed_message)
+                    push_message.content.format = _to_push_message_format(stored_format_pb)
+                    full_conversation.messages.append(push_message)
             toprocess.conversationfield[field_id] = full_conversation
             toprocess.conversationfield[field_id].classification_labels = classif_labels
 
@@ -641,10 +645,22 @@ async def _conversation_append_checks(
 
 
 def _to_push_message_format(
-    format: models.MessageFormat,
+    format: models.MessageFormat | resources_pb2.MessageContent.Format.ValueType,
 ) -> processing_models.PushMessageFormat:
-    if format == models.MessageFormat.KEEP_MARKDOWN:
-        # Keep markdown is not in the processing models, we want to keep it
-        # as markdown.
-        format = models.MessageFormat.MARKDOWN
-    return getattr(processing_models.PushMessageFormat, format.value)
+    """
+    The pb, ndb model, and processing model enums are not in sync, so we need this to avoid errors.
+    """
+    if isinstance(format, models.MessageFormat):
+        if format == models.MessageFormat.KEEP_MARKDOWN:
+            # Keep markdown is not in the processing models, we want to keep it as markdown.
+            format = models.MessageFormat.MARKDOWN
+        return getattr(processing_models.PushMessageFormat, format.value)
+    else:
+        if format == resources_pb2.MessageContent.Format.JSON:
+            # JSON has value 5 in the pb, but 4 in the processing models, so we need to convert it manually.
+            return processing_models.PushMessageFormat.JSON
+        elif format == resources_pb2.MessageContent.Format.KEEP_MARKDOWN:
+            # Keep markdown is not in the processing models, we want to keep it as markdown.
+            return processing_models.PushMessageFormat.MARKDOWN
+        else:
+            return processing_models.PushMessageFormat(format)
