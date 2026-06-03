@@ -82,7 +82,6 @@ from nucliadb_models.search import (
     TextPosition,
 )
 from nucliadb_protos.utils_pb2 import RelationNode
-from nucliadb_telemetry import errors
 
 from .metrics import merge_observer
 from .paragraphs import get_paragraph_text
@@ -431,9 +430,8 @@ async def load_paragraph(
                 words=result.matches,  # type: ignore[arg-type,ty:invalid-argument-type]
                 ematches=ematches,
             )
-        except Exception as ex:
-            errors.capture_exception(ex)
-            logger.exception("Error highlighting paragraph", extra={"kbid": kbid})
+        except Exception as exc:
+            logger.warning("Error highlighting paragraph", extra={"kbid": kbid}, exc_info=exc)
 
     _, field_type, field = result.field.split("/")
     labels = await get_labels_paragraph(result, kbid)
