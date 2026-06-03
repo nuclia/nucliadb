@@ -18,26 +18,27 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
+import uuid
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
-from nidx_protos.nodereader_pb2 import GetShardRequest
-from nidx_protos.noderesources_pb2 import Shard
+from nats.aio.msg import Msg
 
-from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
-from nucliadb.ingest.orm.processor.processor import Processor
+from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.search.app import application
 from nucliadb.standalone.settings import Settings
 from nucliadb.writer import API_PREFIX
 from nucliadb_models.resource import NucliaDBRoles
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos import writer_pb2
+from nucliadb_utils import const
+from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.settings import settings as cache_settings
 from nucliadb_utils.settings import (
     nuclia_settings,
@@ -51,6 +52,7 @@ from nucliadb_utils.utilities import (
     clear_global_cache,
 )
 from tests.ndbfixtures.ingest import broker_resource
+from tests.ndbfixtures.nidx import SEARCHER_REFRESH_INTERVAL_SECONDS
 from tests.ndbfixtures.utils import create_api_client_factory
 from tests.utils.dirty_index import wait_for_sync
 
@@ -99,71 +101,104 @@ async def standalone_nucliadb_search(standalone_nucliadb: Settings) -> AsyncIter
         yield client
 
 
+@asynccontextmanager
+async def nidx_sync_indexing(
+    pubsub: PubSubDriver, expect: int, *, timeout: float = 10.0
+) -> AsyncGenerator[None]:
+    """Provide the illusion of sync indexing in nidx. This is useful in the
+    distributed/cluster tests, where we want to wait for N resources being
+    indexed.
+
+    This is faster and more efficient than polling nidx for counts or other
+    methods that have been implemented around in our test suite for a while
+
+    """
+    indexed = 0
+    done = asyncio.Event()
+
+    async def handle(msg: Msg) -> None:
+        nonlocal pubsub, indexed, expect
+
+        data = pubsub.parse(msg)
+        notification = writer_pb2.Notification()
+        notification.ParseFromString(data)
+
+        if notification.action == writer_pb2.Notification.Action.INDEXED:
+            indexed += 1
+            if indexed >= expect:
+                done.set()
+
+    subscription_id = str(uuid.uuid4())
+    await pubsub.subscribe(
+        handler=handle,
+        key=const.PubSubChannels.RESOURCE_NOTIFY.format(kbid="*"),
+        group="tests",
+        subscription_id=subscription_id,
+    )
+
+    try:
+        yield
+
+        # After exiting the context manager, we must wait for the expected
+        # resources to be indexed and raise an error if nidx didn't do it on
+        # time
+        try:
+            await asyncio.wait_for(done.wait(), timeout)
+        except TimeoutError:
+            raise Exception("Fixture setup error: nidx didn't index the expected resources on time")
+
+        # Once everything is indexed, we wait for the searcher to refresh it's
+        # contents to make sure data is searchable
+        await asyncio.sleep(SEARCHER_REFRESH_INTERVAL_SECONDS + 0.1)
+
+    finally:
+        # make sure to cleanup pubsub even if the task is cancelled
+        await pubsub.unsubscribe(subscription_id)
+
+
 # Rest, TODO keep cleaning
 
 
 @pytest.fixture(scope="function")
 async def test_search_resource(
-    processor,
-    knowledgebox,
+    processor: Processor,
+    knowledgebox: str,
+    pubsub: PubSubDriver,
 ):
     """
     Create a resource that has every possible bit of information
     """
-    message1 = broker_resource(knowledgebox, rid="68b6e3b747864293b71925b7bacaee7c", slug="foobar-slug")
-    kbid = await inject_message(processor, knowledgebox, message1)
-    resource_field_count = 3
-    await wait_for_shard(knowledgebox, resource_field_count)
-    yield kbid
+    async with nidx_sync_indexing(pubsub, expect=2):
+        message = broker_resource(
+            knowledgebox, rid="68b6e3b747864293b71925b7bacaee7c", slug="foobar-slug"
+        )
+        message_writer = get_writer_bm(message)
+        message_processor = get_processor_bm(message)
+
+        await processor.process(message=message_writer, seqid=1)
+        await processor.process(message=message_processor, seqid=2)
+
+    yield knowledgebox
 
 
 @pytest.fixture(scope="function")
 async def multiple_search_resource(
-    processor,
-    knowledgebox,
+    processor: Processor,
+    knowledgebox: str,
+    pubsub: PubSubDriver,
 ):
     """
     Create 25 resources that have every possible bit of information
     """
+
     n_resources = 25
-    fields_per_resource = 3
-    for count in range(1, n_resources + 1):
-        message = broker_resource(knowledgebox)
-        await processor.process(message=message, seqid=count)
+    async with nidx_sync_indexing(pubsub, expect=n_resources * 2, timeout=10.0):
+        for seqid in range(1, n_resources * 2 + 1, 2):
+            message = broker_resource(knowledgebox)
+            message_writer = get_writer_bm(message)
+            message_processor = get_processor_bm(message)
 
-    await wait_for_shard(knowledgebox, n_resources * fields_per_resource)
-    return knowledgebox
+            await processor.process(message=message_writer, seqid=seqid)
+            await processor.process(message=message_processor, seqid=seqid + 1)
 
-
-async def inject_message(
-    processor: Processor, knowledgebox: str, message: BrokerMessage, count: int = 1
-) -> str:
-    message_writer = get_writer_bm(message)
-    await processor.process(message=message_writer, seqid=count, transaction_check=False)
-    message_processor = get_processor_bm(message)
-    await processor.process(message=message_processor, seqid=count, transaction_check=False)
-    await wait_for_shard(knowledgebox, count)
-    return knowledgebox
-
-
-async def wait_for_shard(knowledgebox: str, count: int) -> str:
-    # Make sure is indexed
-    driver = get_driver()
-    async with driver.ro_transaction() as txn:
-        shard_manager = KBShardManager()
-        shard = await shard_manager.get_current_active_shard(txn, knowledgebox)
-        if shard is None:
-            raise Exception("Could not find shard")
-        await txn.abort()
-
-    nidx_api = get_nidx_api_client()
-    req = GetShardRequest()
-    req.shard_id.id = shard.nidx_shard_id
-    for _ in range(30):
-        count_shard: Shard = await nidx_api.GetShard(req)
-        if count_shard.fields >= count:
-            break
-        await asyncio.sleep(1)
-    # Wait an extra couple of seconds for reader/searcher to catch up
-    await asyncio.sleep(2)
-    return knowledgebox
+    yield knowledgebox
