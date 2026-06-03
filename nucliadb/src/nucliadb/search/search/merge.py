@@ -242,6 +242,7 @@ async def merge_vectors_results(
     vector_responses: list[VectorSearchResponse],
     kbid: str,
     top_k: int,
+    concurrency_control: asyncio.Semaphore | None = None,
     min_score: float | None = None,
 ) -> tuple[Sentences, list[str]]:
     facets: dict[str, Any] = {}
@@ -302,7 +303,7 @@ async def merge_vectors_results(
             resources.append(vector_id.rid)
 
     augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = await augment_paragraphs(
-        kbid, given=augments, select=[ParagraphText()], concurrency_control=asyncio.Semaphore(20)
+        kbid, given=augments, select=[ParagraphText()], concurrency_control=concurrency_control
     )
     for paragraph_id, idx in result_index_by_id.items():
         augmented = augmented_paragraphs.get(paragraph_id)
@@ -329,6 +330,7 @@ async def merge_paragraph_results(
     sort: SortOptions,
     min_score: float,
     offset: int,
+    concurrency_control: asyncio.Semaphore | None = None,
 ) -> tuple[Paragraphs, list[str]]:
     raw_paragraph_list: list[tuple[ParagraphId, ParagraphResult, SortValue]] = []
     facets: dict[str, Any] = {}
@@ -388,7 +390,7 @@ async def merge_paragraph_results(
             for paragraph_id, result, _ in raw_paragraph_list
         ],
         select=[ParagraphText()],
-        concurrency_control=asyncio.Semaphore(20),
+        concurrency_control=concurrency_control,
     )
 
     result_paragraph_list: list[Paragraph] = await asyncio.gather(
@@ -542,6 +544,8 @@ async def merge_results(
     offset: int,
     highlight: bool = False,
 ) -> KnowledgeboxSearchResults:
+    concurrency_control = asyncio.Semaphore(50)
+
     paragraphs = []
     documents = []
     vectors = []
@@ -580,6 +584,7 @@ async def merge_results(
             sort,
             min_score=retrieval.query.keyword.min_score,
             offset=offset,
+            concurrency_control=concurrency_control,
         )
         resources.extend(matched_resources)
 
@@ -589,6 +594,7 @@ async def merge_results(
             kbid,
             retrieval.top_k,
             min_score=retrieval.query.semantic.min_score,
+            concurrency_control=concurrency_control,
         )
         resources.extend(matched_resources)
 
