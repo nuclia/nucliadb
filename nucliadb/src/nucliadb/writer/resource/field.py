@@ -30,6 +30,7 @@ from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.conversation import MAX_CONVERSATION_MESSAGES, Conversation
 from nucliadb.ingest.fields.key_value import validate_kv_data
 from nucliadb.ingest.orm.resource import Resource as ORMResource
+from nucliadb.ingest.processing import ProcessingEngine
 from nucliadb.models.internal import processing as processing_models
 from nucliadb.models.internal.processing import ClassificationLabel, PushConversation, PushPayload
 from nucliadb.writer import SERVICE_NAME
@@ -43,7 +44,7 @@ from nucliadb_models.writer import (
 )
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
-from nucliadb_utils.storages.storage import StorageField
+from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.utilities import get_storage
 
 
@@ -159,24 +160,10 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
                 conversation_pb = await field.get_value(page + 1)
                 if conversation_pb is None:
                     continue
-
                 for message in conversation_pb.messages:
-                    parsed_message = MessageToDict(
-                        message,
-                        preserving_proto_field_name=True,
-                        always_print_fields_with_no_presence=True,
+                    full_conversation.messages.append(
+                        await _to_push_message(message, processing, storage)
                     )
-                    parsed_message["content"]["attachments"] = [
-                        await processing.convert_internal_cf_to_str(cf, storage)
-                        for cf in message.content.attachments
-                    ]
-                    if "attachments_fields" in parsed_message["content"]:
-                        # Not defined on the push payload
-                        del parsed_message["content"]["attachments_fields"]
-                    parsed_message["content"]["format"] = resources_pb2.MessageContent.Format.Value(
-                        parsed_message["content"]["format"]
-                    )
-                    full_conversation.messages.append(processing_models.PushMessage(**parsed_message))
             toprocess.conversationfield[field_id] = full_conversation
             toprocess.conversationfield[field_id].classification_labels = classif_labels
 
@@ -641,10 +628,38 @@ async def _conversation_append_checks(
 
 
 def _to_push_message_format(
-    format: models.MessageFormat,
+    format: models.MessageFormat | resources_pb2.MessageContent.Format.ValueType,
 ) -> processing_models.PushMessageFormat:
-    if format == models.MessageFormat.KEEP_MARKDOWN:
-        # Keep markdown is not in the processing models, we want to keep it
-        # as markdown.
-        format = models.MessageFormat.MARKDOWN
-    return getattr(processing_models.PushMessageFormat, format.value)
+    """
+    The pb, ndb model, and processing model enums are not in sync, so we need this to avoid errors.
+    """
+    if isinstance(format, models.MessageFormat):
+        return getattr(processing_models.PushMessageFormat, format.value)
+    else:
+        # The int values in the protobuffer are swapped between JSON and KEEP_MARKDOWN compared to the processing models,
+        # so we need to handle them separately.
+        if format == resources_pb2.MessageContent.Format.JSON:
+            return processing_models.PushMessageFormat.JSON
+        elif format == resources_pb2.MessageContent.Format.KEEP_MARKDOWN:
+            return processing_models.PushMessageFormat.KEEP_MARKDOWN
+        else:
+            return processing_models.PushMessageFormat(format)
+
+
+async def _to_push_message(
+    message_pb: resources_pb2.Message, processing: ProcessingEngine, storage: Storage
+) -> processing_models.PushMessage:
+    push_message = processing_models.PushMessage(
+        timestamp=message_pb.timestamp.ToDatetime(),
+        who=message_pb.who,
+        to=list(message_pb.to),
+        ident=message_pb.ident,
+        content=processing_models.PushMessageContent(
+            text=message_pb.content.text,
+            format=_to_push_message_format(message_pb.content.format),
+            attachments=[],
+        ),
+    )
+    for cf in message_pb.content.attachments:
+        push_message.content.attachments.append(await processing.convert_internal_cf_to_str(cf, storage))
+    return push_message

@@ -174,7 +174,8 @@ def _bm_conversation_field_to_processing(
 
 
 def _to_push_message_format(pb: resources_pb2.MessageContent.Format.ValueType) -> PushMessageFormat:
-    # The pb and the models are not in sync, so we need this to avoid errors.
+    # The int values in the protobuffer are swapped between JSON and KEEP_MARKDOWN compared to the processing models,
+    # so we need to handle them separately.
     if pb == resources_pb2.MessageContent.Format.KEEP_MARKDOWN:
         return PushMessageFormat.MARKDOWN
     elif pb == resources_pb2.MessageContent.Format.JSON:

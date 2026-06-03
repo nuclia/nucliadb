@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 import random
 from datetime import datetime
 from typing import Any, cast
@@ -25,7 +26,10 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.ingest.processing import DummyProcessingEngine
+from nucliadb.models.internal.processing import PushMessageFormat, PushPayload
 from nucliadb.reader.api.models import ResourceField
+from nucliadb.writer.utilities import get_processing
 from nucliadb_models.conversation import (
     InputConversationField,
     InputMessage,
@@ -1186,3 +1190,55 @@ async def test_delete_conversation_message_lambs_resource(
     )
     assert resp.status_code == 422
     assert "must be unique" in resp.json()["detail"]
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_reprocess_conversation_with_json_message(
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+
+    processing = get_processing()
+    assert isinstance(processing, DummyProcessingEngine)
+
+    # Create a resource with a conversation field with one message which has JSON content
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "slug": "test_resource",
+            "title": "Test Resource",
+            "conversations": {
+                "chat": {
+                    "messages": [
+                        {
+                            "to": ["assistant"],
+                            "who": "user",
+                            "timestamp": datetime.now().isoformat(),
+                            "content": {"text": json.dumps({"foo": "bar"}), "format": "JSON"},
+                            "ident": "1",
+                            "type": MessageType.UNSET.value,
+                        }
+                    ]
+                },
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    processing.calls.clear()
+    processing.values.clear()
+
+    # Call the reprocess endpoint for the resource, make sure it doesn't fail.
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resource/{rid}/reprocess",
+    )
+    assert resp.status_code == 202
+
+    # Validate send to process payload
+    assert len(processing.values["send_to_process"]) == 1
+    send_to_process_call = cast(PushPayload, processing.values["send_to_process"][0][0])
+    push_conv = send_to_process_call.conversationfield["chat"]
+    assert push_conv.messages[0].content.format == PushMessageFormat.JSON

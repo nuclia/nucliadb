@@ -101,6 +101,7 @@ class PushMessageFormat(int, Enum):
     MARKDOWN = 2
     RST = 3
     JSON = 4
+    KEEP_MARKDOWN = 5
 
 
 class PushMessageContent(BaseModel):
