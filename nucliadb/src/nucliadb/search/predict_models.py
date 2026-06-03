@@ -207,3 +207,7 @@ Please return ONLY the question without any explanation.""",
         None,
         description="List of graph node names to compute embeddings for. If not provided, no graph node embeddings will be computed.",
     )
+    graph_edges: list[str] | None = Field(
+        None,
+        description="List of graph edge labels to compute embeddings for. If not provided, no graph edge embeddings will be computed.",
+    )
