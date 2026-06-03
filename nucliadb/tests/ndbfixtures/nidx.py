@@ -200,7 +200,6 @@ async def nidx(natsd: str, pg, nidx_storage: dict[str, str]):
     )
     image = NidxImage()
     image.run()
-    print("RUNNING nidx")
 
     api_port = image.get_port(10000)
     searcher_port = image.get_port(10001)

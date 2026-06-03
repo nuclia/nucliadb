@@ -29,6 +29,7 @@ from httpx import AsyncClient
 from nats.aio.msg import Msg
 
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.nidx import NidxBindingUtility, NidxServiceUtility
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.settings import settings as ingest_settings
@@ -40,17 +41,11 @@ from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
 from nucliadb_utils.cache.settings import settings as cache_settings
-from nucliadb_utils.settings import (
-    nuclia_settings,
-    nucliadb_settings,
-    running_settings,
-)
+from nucliadb_utils.settings import nuclia_settings, nucliadb_settings, running_settings
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.tests import free_port
 from nucliadb_utils.transaction import TransactionUtility
-from nucliadb_utils.utilities import (
-    clear_global_cache,
-)
+from nucliadb_utils.utilities import Utility, clear_global_cache, get_utility
 from tests.ndbfixtures.ingest import broker_resource
 from tests.ndbfixtures.nidx import SEARCHER_REFRESH_INTERVAL_SECONDS
 from tests.ndbfixtures.utils import create_api_client_factory
@@ -107,53 +102,67 @@ async def nidx_sync_indexing(
 ) -> AsyncGenerator[None]:
     """Provide the illusion of sync indexing in nidx. This is useful in the
     distributed/cluster tests, where we want to wait for N resources being
-    indexed.
+    indexed. However, it also supports nidx binding for compatibility with
+    different fixture deploy modes.
 
     This is faster and more efficient than polling nidx for counts or other
     methods that have been implemented around in our test suite for a while
 
     """
-    indexed = 0
-    done = asyncio.Event()
+    nidx = get_utility(Utility.NIDX)
 
-    async def handle(msg: Msg) -> None:
-        nonlocal pubsub, indexed, expect
-
-        data = pubsub.parse(msg)
-        notification = writer_pb2.Notification()
-        notification.ParseFromString(data)
-
-        if notification.action == writer_pb2.Notification.Action.INDEXED:
-            indexed += 1
-            if indexed >= expect:
-                done.set()
-
-    subscription_id = str(uuid.uuid4())
-    await pubsub.subscribe(
-        handler=handle,
-        key=const.PubSubChannels.RESOURCE_NOTIFY.format(kbid="*"),
-        group="tests",
-        subscription_id=subscription_id,
-    )
-
-    try:
+    if isinstance(nidx, NidxBindingUtility):
         yield
 
-        # After exiting the context manager, we must wait for the expected
-        # resources to be indexed and raise an error if nidx didn't do it on
-        # time
+        # nidx binding already has a workaround to wait until search is synced,
+        # we just use it
+        await wait_for_sync()
+
+    elif isinstance(nidx, NidxServiceUtility):
+        indexed = 0
+        done = asyncio.Event()
+
+        async def handle(msg: Msg) -> None:
+            nonlocal pubsub, indexed, expect
+
+            data = pubsub.parse(msg)
+            notification = writer_pb2.Notification()
+            notification.ParseFromString(data)
+
+            if notification.action == writer_pb2.Notification.Action.INDEXED:
+                indexed += 1
+                if indexed >= expect:
+                    done.set()
+
+        subscription_id = str(uuid.uuid4())
+        await pubsub.subscribe(
+            handler=handle,
+            key=const.PubSubChannels.RESOURCE_NOTIFY.format(kbid="*"),
+            group="tests",
+            subscription_id=subscription_id,
+        )
+
         try:
-            await asyncio.wait_for(done.wait(), timeout)
-        except TimeoutError:
-            raise Exception("Fixture setup error: nidx didn't index the expected resources on time")
+            yield
 
-        # Once everything is indexed, we wait for the searcher to refresh it's
-        # contents to make sure data is searchable
-        await asyncio.sleep(SEARCHER_REFRESH_INTERVAL_SECONDS + 0.1)
+            # After exiting the context manager, we must wait for the expected
+            # resources to be indexed and raise an error if nidx didn't do it on
+            # time
+            try:
+                await asyncio.wait_for(done.wait(), timeout)
+            except TimeoutError:
+                raise Exception("Fixture setup error: nidx didn't index the expected resources on time")
 
-    finally:
-        # make sure to cleanup pubsub even if the task is cancelled
-        await pubsub.unsubscribe(subscription_id)
+            # Once everything is indexed, we wait for the searcher to refresh it's
+            # contents to make sure data is searchable
+            await asyncio.sleep(SEARCHER_REFRESH_INTERVAL_SECONDS + 0.1)
+
+        finally:
+            # make sure to cleanup pubsub even if the task is cancelled
+            await pubsub.unsubscribe(subscription_id)
+
+    else:
+        assert False, f"unknown nidx type: {type(nidx)}"
 
 
 # Rest, TODO keep cleaning
@@ -168,7 +177,7 @@ async def test_search_resource(
     """
     Create a resource that has every possible bit of information
     """
-    async with nidx_sync_indexing(pubsub, expect=2, timeout=20.0):
+    async with nidx_sync_indexing(pubsub, expect=2):
         message = broker_resource(
             knowledgebox, rid="68b6e3b747864293b71925b7bacaee7c", slug="foobar-slug"
         )
@@ -192,7 +201,7 @@ async def multiple_search_resource(
     """
 
     n_resources = 25
-    async with nidx_sync_indexing(pubsub, expect=n_resources * 2, timeout=20.0):
+    async with nidx_sync_indexing(pubsub, expect=n_resources * 2, timeout=10.0):
         for seqid in range(1, n_resources * 2 + 1, 2):
             message = broker_resource(knowledgebox)
             message_writer = get_writer_bm(message)
