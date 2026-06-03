@@ -78,18 +78,14 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
                     split="subfield-y",
                     start=0,
                     end=17,
-                    index=2,
+                    index=10,
                     paragraph="rid-2/f/field-b/subfield-y/0-17",
                     score=nodereader_pb2.ResultScore(
                         bm25=0.7025,
                     ),
                     metadata=noderesources_pb2.ParagraphMetadata(
                         position=noderesources_pb2.Position(
-                            index=2,
-                            start=0,
-                            end=17,
-                            page_number=10,
-                            in_page=True,
+                            index=2, start=0, end=17, page_number=10, in_page=True
                         ),
                         page_with_visual=True,
                         representation=noderesources_pb2.Representation(
@@ -110,12 +106,18 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
                     ),
                     score=1.5,
                     labels=["u/link", "/k/text"],
+                    metadata=noderesources_pb2.SentenceMetadata(
+                        position=noderesources_pb2.Position(index=5, start=0, end=30)
+                    ),
                 ),
                 nodereader_pb2.DocumentScored(
                     doc_id=nodereader_pb2.DocumentVectorIdentifier(
                         id="rid-2/f/field-b/subfield-y/10/0-17",
                     ),
                     score=0.89,
+                    metadata=noderesources_pb2.SentenceMetadata(
+                        position=noderesources_pb2.Position(index=10, start=0, end=17)
+                    ),
                 ),
             ],
         ),
@@ -369,7 +371,7 @@ def expected_find_response():
                                 "position": {
                                     "end": 30,
                                     "end_seconds": [],
-                                    "index": 0,
+                                    "index": 5,
                                     "page_number": 0,
                                     "start": 0,
                                     "start_seconds": [],

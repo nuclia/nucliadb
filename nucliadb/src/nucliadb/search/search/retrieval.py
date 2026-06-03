@@ -227,8 +227,18 @@ def semantic_result_to_text_block_match(item: DocumentScored) -> TextBlockMatch:
     except (IndexError, ValueError):
         raise InvalidDocId(item.doc_id.id)
 
+    # In case we have multiple vectors per paragraph, the vector id will have
+    # its start-end referencing a portion of the paragraph. However, we are
+    # interested in the whole paragraph, not only the portion, so we'll use the
+    # metadata.position to get the actual paragraph start-end positions
+    paragraph_id = ParagraphId(
+        field_id=vector_id.field_id,
+        paragraph_start=item.metadata.position.start,
+        paragraph_end=item.metadata.position.end,
+    )
+
     return TextBlockMatch(
-        paragraph_id=ParagraphId.from_vector_id(vector_id),
+        paragraph_id=paragraph_id,
         scores=[SemanticScore(score=item.score)],
         score_type=SCORE_TYPE.VECTOR,
         order=0,  # NOTE: this will be filled later

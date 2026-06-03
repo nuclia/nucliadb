@@ -96,43 +96,6 @@ async def get_paragraph_text(
     return text
 
 
-async def get_text_sentence(
-    rid: str,
-    field_type: str,
-    field: str,
-    kbid: str,
-    index: int,
-    start: int,
-    end: int,
-    split: str | None = None,
-) -> str:
-    """
-    Leave separated from get paragraph for now until we understand the differences
-    better.
-    """
-    orm_resource = await cache.get_resource(kbid, rid)
-
-    if orm_resource is None:
-        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
-        return ""
-
-    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    extracted_text = await field_obj.get_extracted_text()
-    if extracted_text is None:
-        logger.info(f"{rid} {field} {field_type_int} extracted_text does not exist on DB")
-        return ""
-    start = start - 1
-    if start < 0:
-        start = 0
-    if split not in (None, ""):
-        text = extracted_text.split_text[split]
-        splitted_text = text[start:end]
-    else:
-        splitted_text = extracted_text.text[start:end]
-    return splitted_text
-
-
 def highlight_paragraph(
     text: str, words: list[str] | None = None, ematches: list[str] | None = None
 ) -> str:
