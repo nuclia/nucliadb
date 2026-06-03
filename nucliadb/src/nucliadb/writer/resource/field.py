@@ -636,7 +636,8 @@ def _to_push_message_format(
     if isinstance(format, models.MessageFormat):
         return getattr(processing_models.PushMessageFormat, format.value)
     else:
-        # The int values in the protobuffer are swapped between JSON and KEEP_MARKDOWN compared to the processing models, so we need to handle them separately.
+        # The int values in the protobuffer are swapped between JSON and KEEP_MARKDOWN compared to the processing models,
+        # so we need to handle them separately.
         if format == resources_pb2.MessageContent.Format.JSON:
             return processing_models.PushMessageFormat.JSON
         elif format == resources_pb2.MessageContent.Format.KEEP_MARKDOWN:
