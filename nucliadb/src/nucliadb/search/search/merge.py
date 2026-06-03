@@ -42,6 +42,10 @@ from nucliadb.common.models_utils.from_proto import (
     RelationNodeTypePbMap,
     RelationTypePbMap,
 )
+from nucliadb.models.internal.augment import AugmentedParagraph, Metadata, ParagraphText
+from nucliadb.models.internal.augment import Paragraph as AugmentorParagraph
+from nucliadb.search import logger
+from nucliadb.search.augmentor.augmentor import augment_paragraphs
 from nucliadb.search.search.cut import cut_page
 from nucliadb.search.search.fetch import (
     fetch_resources,
@@ -49,6 +53,7 @@ from nucliadb.search.search.fetch import (
     get_labels_resource,
     get_seconds_paragraph,
 )
+from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
@@ -196,7 +201,7 @@ async def merge_suggest_paragraph_results(
                     rid=result.uuid,
                     type=field_type,
                     key=field,
-                    subfield_id=result.split,
+                    subfield_id=result.split or None,
                 ),
                 paragraph_start=result.start,
                 paragraph_end=result.end,
@@ -235,11 +240,11 @@ async def merge_suggest_paragraph_results(
 
 async def merge_vectors_results(
     vector_responses: list[VectorSearchResponse],
-    resources: list[str],
     kbid: str,
     top_k: int,
+    concurrency_control: asyncio.Semaphore | None = None,
     min_score: float | None = None,
-) -> Sentences:
+) -> tuple[Sentences, list[str]]:
     facets: dict[str, Any] = {}
     raw_vectors_list: list[DocumentScored] = []
 
@@ -256,6 +261,10 @@ async def merge_vectors_results(
 
     raw_vectors_list, _ = cut_page(raw_vectors_list, top_k)
 
+    resources = []
+
+    augments = []
+    result_index_by_id = {}
     result_sentence_list: list[Sentence] = []
     for result in raw_vectors_list:
         vector_id = VectorId.from_string(result.doc_id.id)
@@ -269,15 +278,17 @@ async def merge_vectors_results(
             paragraph_start=result.metadata.position.start,
             paragraph_end=result.metadata.position.end,
         )
+        augments.append(
+            AugmentorParagraph(id=paragraph_id, metadata=Metadata.from_vector_result(result))
+        )
 
-        text = await get_paragraph_text(kbid=kbid, paragraph_id=paragraph_id)
         result_sentence_list.append(
             Sentence(
                 score=result.score,
-                rid=vector_id.rid,
-                field_type=vector_id.field_id.type,
-                field=vector_id.field_id.key,
-                text=text,
+                rid=paragraph_id.rid,
+                field_type=paragraph_id.field_id.type,
+                field=paragraph_id.field_id.key,
+                text="",  # we batch augments and populate it afterwards
                 index=str(vector_id.index),
                 position=TextPosition(
                     start=paragraph_id.paragraph_start,
@@ -286,8 +297,21 @@ async def merge_vectors_results(
                 ),
             )
         )
+        result_index_by_id[paragraph_id] = len(result_sentence_list) - 1
+
         if vector_id.rid not in resources:
             resources.append(vector_id.rid)
+
+    augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = await augment_paragraphs(
+        kbid, given=augments, select=[ParagraphText()], concurrency_control=concurrency_control
+    )
+    for paragraph_id, idx in result_index_by_id.items():
+        augmented = augmented_paragraphs.get(paragraph_id)
+        # this fallback to "" is the historical response, although it may not
+        # have much sense
+        text = augmented.text or "" if augmented else ""
+        sentence = result_sentence_list[idx]
+        sentence.text = text
 
     return Sentences(
         results=result_sentence_list,
@@ -295,7 +319,7 @@ async def merge_vectors_results(
         page_number=0,  # Bw/c with pagination
         page_size=top_k,
         min_score=round(min_score or 0, ndigits=3),
-    )
+    ), resources
 
 
 async def merge_paragraph_results(
@@ -306,8 +330,9 @@ async def merge_paragraph_results(
     sort: SortOptions,
     min_score: float,
     offset: int,
+    concurrency_control: asyncio.Semaphore | None = None,
 ) -> tuple[Paragraphs, list[str]]:
-    raw_paragraph_list: list[tuple[ParagraphResult, SortValue]] = []
+    raw_paragraph_list: list[tuple[ParagraphId, ParagraphResult, SortValue]] = []
     facets: dict[str, Any] = {}
     query = None
     next_page = False
@@ -329,27 +354,53 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
+            _, field_type, field_key = result.field.split("/")
+            paragraph_id = ParagraphId(
+                field_id=FieldId(
+                    rid=result.uuid,
+                    type=field_type,
+                    key=field_key,
+                    subfield_id=result.split or None,
+                ),
+                paragraph_start=result.start,
+                paragraph_end=result.end,
+            )
+
             sort_value: SortValue
             if sort.field == SortField.SCORE:
                 sort_value = (result.score.bm25, result.score.booster)
             else:
                 sort_value = result.date.ToDatetime()
             if sort_value is not None:
-                raw_paragraph_list.append((result, sort_value))
+                raw_paragraph_list.append((paragraph_id, result, sort_value))
 
         total += paragraph_response.total
 
     # Sort the list by score. It's important that this sort is stable, so the
     # ordering of results with same scores accross multiple shards doesn't change
-    raw_paragraph_list.sort(key=lambda x: x[1], reverse=(sort.order == SortOrder.DESC))
+    raw_paragraph_list.sort(key=lambda x: x[2], reverse=(sort.order == SortOrder.DESC))
 
     raw_paragraph_list, has_more = cut_page(raw_paragraph_list[offset:], top_k)
     next_page = next_page or has_more
 
-    result_resource_ids = []
-    result_paragraph_list: list[Paragraph] = await asyncio.gather(
-        *(load_paragraph(result, kbid, highlight, ematches) for result, _ in raw_paragraph_list)
+    augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = await augment_paragraphs(
+        kbid,
+        given=[
+            AugmentorParagraph(id=paragraph_id, metadata=Metadata.from_paragraph_result(result))
+            for paragraph_id, result, _ in raw_paragraph_list
+        ],
+        select=[ParagraphText()],
+        concurrency_control=concurrency_control,
     )
+
+    result_paragraph_list: list[Paragraph] = await asyncio.gather(
+        *(
+            load_paragraph(result, kbid, augmented_paragraphs.get(paragraph_id), highlight, ematches)
+            for paragraph_id, result, _ in raw_paragraph_list
+        )
+    )
+
+    result_resource_ids = []
     for paragraph in result_paragraph_list:
         if paragraph.rid not in result_resource_ids:
             result_resource_ids.append(paragraph.rid)
@@ -367,25 +418,24 @@ async def merge_paragraph_results(
 
 
 async def load_paragraph(
-    result: ParagraphResult, kbid: str, highlight: bool, ematches: list[str] | None
+    result: ParagraphResult,
+    kbid: str,
+    augmented: AugmentedParagraph | None,
+    highlight: bool,
+    ematches: list[str] | None,
 ) -> Paragraph:
+    text = augmented.text or "" if augmented else ""
+    if text and highlight:
+        try:
+            text = highlight_paragraph(
+                text,
+                words=result.matches,  # type: ignore[arg-type,ty:invalid-argument-type]
+                ematches=ematches,
+            )
+        except Exception as exc:
+            logger.warning("Error highlighting paragraph", extra={"kbid": kbid}, exc_info=exc)
+
     _, field_type, field = result.field.split("/")
-    text = await get_paragraph_text(
-        kbid=kbid,
-        paragraph_id=ParagraphId(
-            field_id=FieldId(
-                rid=result.uuid,
-                type=field_type,
-                key=field,
-                subfield_id=result.split,
-            ),
-            paragraph_start=result.start,
-            paragraph_end=result.end,
-        ),
-        highlight=highlight,
-        ematches=ematches,
-        matches=result.matches,  # type: ignore
-    )
     labels = await get_labels_paragraph(result, kbid)
     fuzzy_result = len(result.matches) > 0
     new_paragraph = Paragraph(
@@ -494,6 +544,8 @@ async def merge_results(
     offset: int,
     highlight: bool = False,
 ) -> KnowledgeboxSearchResults:
+    concurrency_control = asyncio.Semaphore(50)
+
     paragraphs = []
     documents = []
     vectors = []
@@ -532,17 +584,19 @@ async def merge_results(
             sort,
             min_score=retrieval.query.keyword.min_score,
             offset=offset,
+            concurrency_control=concurrency_control,
         )
         resources.extend(matched_resources)
 
     if retrieval.query.semantic is not None:
-        api_results.sentences = await merge_vectors_results(
+        api_results.sentences, matched_resources = await merge_vectors_results(
             vectors,
-            resources,
             kbid,
             retrieval.top_k,
             min_score=retrieval.query.semantic.min_score,
+            concurrency_control=concurrency_control,
         )
+        resources.extend(matched_resources)
 
     if retrieval.query.relation is not None:
         api_results.relations = await merge_relations_results(

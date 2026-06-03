@@ -21,11 +21,15 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
+from nidx_protos.nodereader_pb2 import (
+    DocumentScored,
+    ParagraphResult,
+)
 from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 from typing_extensions import Self
 
 import nucliadb_models
-from nucliadb.common.external_index_providers.base import TextBlockMatch
+from nucliadb.common.external_index_providers.base import _INCEPTION_LABEL, _OCR_LABEL, TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb_models import filters
 from nucliadb_models.augment import ResourceId
@@ -121,6 +125,28 @@ class Metadata(BaseModel):
             source_file=source_file,
             page=page,
             in_page_with_visual=in_page_with_visual,
+        )
+
+    @classmethod
+    def from_paragraph_result(cls, item: ParagraphResult) -> Self:
+        is_an_image = _OCR_LABEL in item.labels or _INCEPTION_LABEL in item.labels
+        return cls(
+            is_an_image=is_an_image,
+            is_a_table=item.metadata.representation.is_a_table,
+            source_file=item.metadata.representation.file or None,
+            page=item.metadata.position.page_number,
+            in_page_with_visual=item.metadata.page_with_visual,
+        )
+
+    @classmethod
+    def from_vector_result(cls, item: DocumentScored) -> Self:
+        is_an_image = _OCR_LABEL in item.labels or _INCEPTION_LABEL in item.labels
+        return cls(
+            is_an_image=is_an_image,
+            is_a_table=item.metadata.representation.is_a_table,
+            source_file=item.metadata.representation.file or None,
+            page=item.metadata.position.page_number,
+            in_page_with_visual=item.metadata.page_with_visual,
         )
 
 

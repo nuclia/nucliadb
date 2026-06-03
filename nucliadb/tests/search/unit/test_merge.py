@@ -22,13 +22,15 @@ from unittest.mock import patch
 from nucliadb.search.search.merge import ResourceSearchResults, merge_paragraphs_results
 
 
-async def test_str_model():
+@patch("nucliadb.search.search.merge.augment_paragraphs", return_value={})
+async def test_str_model(_mock):
     # make sure __str__ works as advertised
     res = await merge_paragraphs_results([], 1, "kbid", False, 1)
     assert str(res) == res.model_dump_json()
 
 
-async def test_str_model_fallback():
+@patch("nucliadb.search.search.merge.augment_paragraphs", return_value={})
+async def test_str_model_fallback(_mock):
     with patch.object(ResourceSearchResults, "model_dump_json", side_effect=Exception("ERROR")):
         res = await merge_paragraphs_results([], 1, "kbid", False, 1)
         assert "sentences=None" in str(res)

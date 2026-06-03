@@ -35,7 +35,6 @@ from nucliadb_protos.writer_pb2 import Shards as PBShards
 RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
 
 
-@pytest.mark.flaky(reruns=5)
 @pytest.mark.deploy_modes("cluster")
 async def test_multiple_fuzzy_search_resource_all(
     nucliadb_search: AsyncClient, multiple_search_resource: str
@@ -59,7 +58,6 @@ async def test_multiple_fuzzy_search_resource_all(
     )
 
 
-@pytest.mark.flaky(reruns=3)
 @pytest.mark.deploy_modes("cluster")
 async def test_search_resource_all(
     nucliadb_search: AsyncClient,

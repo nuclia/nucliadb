@@ -42,6 +42,8 @@ from tests.ndbfixtures.utils import global_utility
 
 logger = logging.getLogger(__name__)
 
+SEARCHER_REFRESH_INTERVAL_SECONDS = 0.5
+
 
 @dataclasses.dataclass
 class Image:
@@ -192,6 +194,7 @@ async def nidx(natsd: str, pg, nidx_storage: dict[str, str]):
             "RUST_LOG": "info",
             "METADATA__DATABASE_URL": f"postgresql://postgres:postgres@172.17.0.1:{pg[1]}/postgres",
             "INDEXER__NATS_SERVER": natsd_url,
+            "SEARCHER__METADATA_REFRESH_INTERVAL": SEARCHER_REFRESH_INTERVAL_SECONDS,
             **nidx_storage,
         }
     )
