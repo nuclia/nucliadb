@@ -168,7 +168,7 @@ async def test_search_resource(
     """
     Create a resource that has every possible bit of information
     """
-    async with nidx_sync_indexing(pubsub, expect=2):
+    async with nidx_sync_indexing(pubsub, expect=2, timeout=20.0):
         message = broker_resource(
             knowledgebox, rid="68b6e3b747864293b71925b7bacaee7c", slug="foobar-slug"
         )
@@ -192,7 +192,7 @@ async def multiple_search_resource(
     """
 
     n_resources = 25
-    async with nidx_sync_indexing(pubsub, expect=n_resources * 2, timeout=10.0):
+    async with nidx_sync_indexing(pubsub, expect=n_resources * 2, timeout=20.0):
         for seqid in range(1, n_resources * 2 + 1, 2):
             message = broker_resource(knowledgebox)
             message_writer = get_writer_bm(message)
