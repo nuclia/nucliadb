@@ -29,6 +29,7 @@ from nucliadb.common.filter_expression import add_and_expression, parse_expressi
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationTypeMap
 from nucliadb.search.predict_models import QueryModel
 from nucliadb.search.search.query_parser.models import GraphRetrieval
+from nucliadb.search.search.query_parser.parsers.common import DEFAULT_GENERIC_SEMANTIC_THRESHOLD
 from nucliadb.search.search.utils import filter_hidden_resources, kb_security_enforced
 from nucliadb.search.utilities import get_predict
 from nucliadb_models import filters
@@ -52,6 +53,8 @@ async def parse_graph_search(kbid: str, item: graph_requests.GraphSearchRequest)
         pb.graph_node_vectorset = vectors.node_vectorset
     if vectors.relation_vectorset:
         pb.graph_edge_vectorset = vectors.relation_vectorset
+    pb.min_score_node_semantic = vectors.node_min_score
+    pb.min_score_edge_semantic = vectors.edge_min_score
     return pb
 
 
@@ -65,6 +68,8 @@ async def parse_graph_node_search(
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.NODES
     if vectors.node_vectorset:
         pb.graph_node_vectorset = vectors.node_vectorset
+    pb.min_score_node_semantic = vectors.node_min_score
+    pb.min_score_edge_semantic = vectors.edge_min_score
     return pb
 
 
@@ -78,6 +83,8 @@ async def parse_graph_relation_search(
     pb.kind = nodereader_pb2.GraphSearchRequest.QueryKind.RELATIONS
     if vectors.relation_vectorset:
         pb.graph_edge_vectorset = vectors.relation_vectorset
+    pb.min_score_node_semantic = vectors.node_min_score
+    pb.min_score_edge_semantic = vectors.edge_min_score
     return pb
 
 
@@ -334,6 +341,8 @@ class GraphVectors:
     relation_vectors: dict[str, list[float]]
     node_vectorset: str | None
     relation_vectorset: str | None
+    node_min_score: float
+    edge_min_score: float
 
 
 async def _calculate_graph_vectors(
@@ -350,6 +359,9 @@ async def _calculate_graph_vectors(
     relation_vectoset: str = ""
 
     # TODO(semantic-graph): Assumming a single vectorset for now
+    node_min_score = DEFAULT_GENERIC_SEMANTIC_THRESHOLD
+    edge_min_score = DEFAULT_GENERIC_SEMANTIC_THRESHOLD
+
     if nodes or relations:
         predict = get_predict()
         result = await predict.query(
@@ -363,16 +375,24 @@ async def _calculate_graph_vectors(
             node_vectorset = next(iter(result.graph_nodes.vectors.keys()))
             for node in nodes:
                 node_vectors[node] = result.graph_nodes.vectors[node_vectorset][node]
+            node_min_score = result.semantic_thresholds.get(
+                node_vectorset, DEFAULT_GENERIC_SEMANTIC_THRESHOLD
+            )
         if result.graph_edges:
             relation_vectoset = next(iter(result.graph_edges.vectors.keys()))
             for relation in relations:
                 relation_vectors[relation] = result.graph_edges.vectors[relation_vectoset][relation]
+            edge_min_score = result.semantic_thresholds.get(
+                relation_vectoset, DEFAULT_GENERIC_SEMANTIC_THRESHOLD
+            )
 
     return GraphVectors(
         node_vectors=node_vectors,
         relation_vectors=relation_vectors,
         node_vectorset=node_vectorset,
         relation_vectorset=relation_vectoset,
+        node_min_score=node_min_score,
+        edge_min_score=edge_min_score,
     )
 
 

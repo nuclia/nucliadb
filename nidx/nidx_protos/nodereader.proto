@@ -247,6 +247,9 @@ message GraphSearchRequest {
 
     optional string graph_node_vectorset = 7;
     optional string graph_edge_vectorset = 8;
+
+    float min_score_node_semantic = 9;
+    float min_score_edge_semantic = 10;
 }
 
 message GraphSearchResponse {
