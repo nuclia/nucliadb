@@ -452,17 +452,9 @@ async def load_paragraph(
             page_number=result.metadata.position.page_number,
         ),
         fuzzy_result=fuzzy_result,
+        start_seconds=list(result.metadata.position.start_seconds) or None,
+        end_seconds=list(result.metadata.position.end_seconds) or None,
     )
-    if len(result.metadata.position.start_seconds) or len(result.metadata.position.end_seconds):
-        new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
-        new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
-    else:
-        # TODO: Remove once we are sure all data has been migrated!
-        seconds_positions = await get_seconds_paragraph(result, kbid)
-        if seconds_positions is not None:
-            new_paragraph.start_seconds = seconds_positions[0]
-            new_paragraph.end_seconds = seconds_positions[1]
-
     return new_paragraph
 
 
