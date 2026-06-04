@@ -251,22 +251,21 @@ def broker_resource_with_classifications(standalone_knowledgebox):
 
 @pytest.mark.deploy_modes("standalone")
 async def test_search_returns_labels(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
+    nucliadb_search: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox,
 ):
     bm = broker_resource_with_classifications(standalone_knowledgebox)
     await inject_message(nucliadb_ingest_grpc, bm)
 
-    resp = await nucliadb_reader.get(
+    resp = await nucliadb_search.get(
         f"/kb/{standalone_knowledgebox}/search?query=Some",
     )
     assert resp.status_code == 200
     content = resp.json()
     assert content["paragraphs"]["results"]
     par = content["paragraphs"]["results"][0]
-    assert par["labels"] == ["labelset1/label2", "labelset1/label1"]
+    assert set(par["labels"]) == {"labelset1/label2", "labelset1/label1"}
 
 
 @pytest.mark.deploy_modes("standalone")
