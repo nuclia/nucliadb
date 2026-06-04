@@ -41,7 +41,7 @@ use nidx_tantivy::{
     index_reader::{DeletionQueryBuilder, open_index_with_deletions},
 };
 use nidx_types::{OpenIndexMetadata, prefilter::PrefilterResult};
-use reader::{FUZZY_DISTANCE, NUMBER_OF_RESULTS_SUGGEST, RelationsReaderService};
+use reader::{FUZZY_DISTANCE, RelationsReaderService};
 use resource_indexer::index_relations;
 pub use schema::Schema as RelationSchema;
 use schema::encode_field_id;
@@ -219,7 +219,12 @@ impl RelationSearcher {
     }
 
     #[instrument(name = "relation::suggest", skip_all)]
-    pub fn suggest(&self, prefixes: Vec<String>, prefilter: &PrefilterResult) -> anyhow::Result<Vec<RelationNode>> {
+    pub fn suggest(
+        &self,
+        prefixes: Vec<String>,
+        prefilter: &PrefilterResult,
+        top_k: u32,
+    ) -> anyhow::Result<Vec<RelationNode>> {
         let subqueries: Vec<_> = prefixes
             .into_iter()
             .filter(|prefix| prefix.len() >= MIN_SUGGEST_PREFIX_LENGTH)
@@ -246,7 +251,7 @@ impl RelationSearcher {
 
         let request = GraphSearchRequest {
             kind: QueryKind::Nodes.into(),
-            top_k: NUMBER_OF_RESULTS_SUGGEST as u32,
+            top_k,
             query: Some(nidx_protos::GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::BoolOr(graph_query::BoolQuery {

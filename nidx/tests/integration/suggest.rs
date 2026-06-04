@@ -69,6 +69,7 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
         .suggest(Request::new(SuggestRequest {
             shard: shard.id.clone(),
             body: "prince".to_string(),
+            top_k: 20,
             features: vec![SuggestFeatures::Paragraphs as i32],
             field_filter: Some(FilterExpression {
                 expr: Some(Expr::Field(FieldFilter {
@@ -88,6 +89,7 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     let request = SuggestRequest {
         shard: shard.id.clone(),
         body: "prince".to_string(),
+        top_k: 20,
         features: vec![SuggestFeatures::Paragraphs as i32],
         ..Default::default()
     };
@@ -95,6 +97,7 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     let response = fixture
         .searcher_client
         .suggest(Request::new(SuggestRequest {
+            top_k: 20,
             field_filter: Some(FilterExpression {
                 expr: Some(Expr::Facet(FacetFilter {
                     facet: "/s/p/en".into(),
@@ -117,6 +120,7 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     let response = fixture
         .searcher_client
         .suggest(Request::new(SuggestRequest {
+            top_k: 20,
             field_filter: Some(FilterExpression {
                 expr: Some(Expr::Facet(FacetFilter {
                     facet: "/s/p/de".into(),
@@ -134,6 +138,7 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     let response = fixture
         .searcher_client
         .suggest(Request::new(SuggestRequest {
+            top_k: 20,
             field_filter: Some(FilterExpression {
                 expr: Some(Expr::BoolNot(Box::new(FilterExpression {
                     expr: Some(Expr::Facet(FacetFilter {
@@ -158,6 +163,7 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     let response = fixture
         .searcher_client
         .suggest(Request::new(SuggestRequest {
+            top_k: 20,
             field_filter: Some(FilterExpression {
                 expr: Some(Expr::BoolNot(Box::new(FilterExpression {
                     expr: Some(Expr::Facet(FacetFilter {
@@ -308,6 +314,7 @@ async fn suggest_paragraphs(
     let request = Request::new(SuggestRequest {
         shard: shard_id.into(),
         body: query.into(),
+        top_k: 20,
         features: vec![SuggestFeatures::Paragraphs as i32],
         ..Default::default()
     });
@@ -341,6 +348,7 @@ async fn suggest_entities(
     let request = Request::new(SuggestRequest {
         shard: shard_id.into(),
         body: query.into(),
+        top_k: 20,
         features: vec![SuggestFeatures::Entities as i32],
         ..Default::default()
     });

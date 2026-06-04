@@ -90,6 +90,10 @@ fn blocking_suggest(
     paragraph_searcher: &ParagraphSearcher,
     relation_searcher: &RelationSearcher,
 ) -> anyhow::Result<SuggestResponse> {
+    // TODO: assign to top_k once we deploy, i.e., all suggest requests send the
+    // top_k. 10 was the legacy number of results used by Python
+    let top_k = if request.top_k == 0 { 10 } else { request.top_k };
+
     let suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
     let suggest_entities = request.features.contains(&(SuggestFeatures::Entities as i32));
 
@@ -107,6 +111,7 @@ fn blocking_suggest(
     let paragraph_request = if suggest_paragraphs {
         Some(ParagraphSuggestRequest {
             body: request.body,
+            top_k,
             filtering_formula: request
                 .paragraph_filter
                 .clone()
@@ -136,7 +141,7 @@ fn blocking_suggest(
         let prefilter = prefilter.clone();
         paragraph_request.map(|request| move || paragraph_searcher.suggest(&request, &prefilter))
     };
-    let relation_task = relation_request.map(|prefixes| move || relation_searcher.suggest(prefixes, &prefilter));
+    let relation_task = relation_request.map(|prefixes| move || relation_searcher.suggest(prefixes, &prefilter, top_k));
 
     let mut rparagraph = None;
     let mut rrelation = None;

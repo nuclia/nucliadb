@@ -36,7 +36,6 @@ use crate::top_unique_n::TopUniqueN;
 use crate::{RelationConfig, io_maps};
 
 pub const FUZZY_DISTANCE: u8 = 1;
-pub const NUMBER_OF_RESULTS_SUGGEST: usize = 20;
 
 pub struct RelationsReaderService {
     pub index: Index,
