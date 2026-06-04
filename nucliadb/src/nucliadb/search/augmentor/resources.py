@@ -50,33 +50,6 @@ from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
 
-async def augment_resources(
-    kbid: str,
-    given: list[str],
-    select: list[ResourceProp],
-    *,
-    concurrency_control: asyncio.Semaphore | None = None,
-) -> dict[str, AugmentedResource | None]:
-    """Augment a list of resources following an augmentation"""
-
-    ops = []
-    for rid in given:
-        task = asyncio.create_task(
-            limited_concurrency(
-                augment_resource(kbid, rid, select),
-                max_ops=concurrency_control,
-            )
-        )
-        ops.append(task)
-    results: list[AugmentedResource | None] = await asyncio.gather(*ops)
-
-    augmented = {}
-    for rid, augmentation in zip(given, results):
-        augmented[rid] = augmentation
-
-    return augmented
-
-
 @augmentor_observer.wrap({"type": "resource"})
 async def augment_resource(
     kbid: str,
@@ -179,7 +152,7 @@ async def augment_resources_deep(
     opts: ResourceHydrationOptions,
     *,
     concurrency_control: asyncio.Semaphore | None = None,
-) -> dict[str, nucliadb_models.resource.Resource | None]:
+) -> dict[str, nucliadb_models.resource.Resource]:
     """Augment resources using the Resource model. Depending on the options,
     this can serialize resource fields, extracted data like text, vectors...
 
@@ -206,9 +179,10 @@ async def augment_resources_deep(
         ops.append(task)
     results: list[nucliadb_models.resource.Resource | None] = await asyncio.gather(*ops)
 
-    augmented: dict[str, nucliadb_models.resource.Resource | None] = {}
+    augmented: dict[str, nucliadb_models.resource.Resource] = {}
     for rid, augmentation in zip(given, results):
-        augmented[rid] = augmentation
+        if augmentation is not None:
+            augmented[rid] = augmentation
 
     return augmented
 

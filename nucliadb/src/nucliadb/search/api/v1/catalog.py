@@ -31,8 +31,9 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
+from nucliadb.search.augmentor.resources import augment_resources_deep
 from nucliadb.search.search import cache
-from nucliadb.search.search.merge import fetch_resources
+from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.query_parser.parsers import parse_catalog
 from nucliadb.search.search.utils import (
     maybe_log_request_payload,
@@ -161,12 +162,14 @@ async def catalog(
 
             catalog_results = CatalogResponse()
             catalog_results.fulltext = await catalog_search(query_parser)
-            catalog_results.resources = await fetch_resources(
-                resources=[r.rid for r in catalog_results.fulltext.results],
-                kbid=kbid,
-                show=item.show,
-                field_type_filter=list(FieldTypeName),
-                extracted=[],
+            catalog_results.resources = await augment_resources_deep(
+                kbid,
+                given=[r.rid for r in catalog_results.fulltext.results],
+                opts=ResourceHydrationOptions(
+                    show=item.show,
+                    extracted=[],
+                    field_type_filter=list(FieldTypeName),
+                ),
             )
             return catalog_results
     except InvalidQueryError as exc:
