@@ -19,6 +19,8 @@
 #
 import asyncio
 import datetime
+import heapq
+import itertools
 from collections.abc import Iterable
 from typing import Any
 
@@ -50,6 +52,7 @@ from nucliadb.search.search.fetch import get_labels_resource
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
+from nucliadb.search.search.query_parser.parsers.suggest import MAX_SUGGEST_RESULTS
 from nucliadb.search.search.retrieval import merge_shards_semantic_responses
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
@@ -80,7 +83,6 @@ from nucliadb_models.search import (
 from nucliadb_protos.utils_pb2 import RelationNode
 
 from .metrics import merge_observer
-from .paragraphs import get_paragraph_text
 
 Bm25Score = tuple[float, float]
 TimestampScore = datetime.datetime
@@ -172,61 +174,79 @@ async def merge_suggest_paragraph_results(
     kbid: str,
     highlight: bool,
 ) -> Paragraphs:
-    raw_paragraph_list: list[ParagraphResult] = []
-    query = None
-    ematches = None
+    query = ""
+    ematches: list[str] = []
     for suggest_response in suggest_responses:
-        if query is None:
-            query = suggest_response.query
-        if ematches is None:
-            ematches = suggest_response.ematches
-        for result in suggest_response.results:
-            raw_paragraph_list.append(result)
+        query = suggest_response.query
+        ematches.extend(suggest_response.ematches)
 
-    if len(suggest_responses) > 1:
-        sort_results_by_score(raw_paragraph_list)
+    # merge while keeping sorted order by score
+    merged = heapq.merge(
+        *(response.results for response in suggest_responses),
+        reverse=True,
+        key=lambda x: (x.score.bm25, x.score.booster),
+    )
+    # cut the best results
+    matches = list(itertools.islice(merged, MAX_SUGGEST_RESULTS))
 
-    result_paragraph_list: list[Paragraph] = []
-    for result in raw_paragraph_list[:10]:
-        _, field_type, field = result.field.split("/")
-        text = await get_paragraph_text(
-            kbid=kbid,
-            paragraph_id=ParagraphId(
-                field_id=FieldId(
-                    rid=result.uuid,
-                    type=field_type,
-                    key=field,
-                    subfield_id=result.split or None,
-                ),
-                paragraph_start=result.start,
-                paragraph_end=result.end,
+    augments = []
+    paragraph_id_position = {}
+    for idx, match in enumerate(matches):
+        _, field_type, field = match.field.split("/")
+        paragraph_id = ParagraphId(
+            field_id=FieldId(
+                rid=match.uuid, type=field_type, key=field, subfield_id=match.split or None
             ),
-            highlight=highlight,
-            ematches=ematches,  # type: ignore
-            matches=result.matches,  # type: ignore
+            paragraph_start=match.start,
+            paragraph_end=match.end,
         )
+        paragraph_id_position[paragraph_id] = idx
+        augments.append(
+            AugmentorParagraph(id=paragraph_id, metadata=Metadata.from_paragraph_result(match))
+        )
+
+    augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = await augment_paragraphs(
+        kbid, given=augments, select=[ParagraphText()]
+    )
+
+    results = []
+    for match in matches:
+        augmented = augmented_paragraphs.get(paragraph_id)
+        text = augmented.text or "" if augmented else ""
+        if text and highlight:
+            try:
+                text = highlight_paragraph(
+                    text,
+                    words=match.matches,  # type: ignore[arg-type,ty:invalid-argument-type]
+                    ematches=ematches,
+                )
+            except Exception as exc:
+                logger.warning("Error highlighting paragraph", extra={"kbid": kbid}, exc_info=exc)
+
         # bw/c: historically, we returned labels from maindb, which didn't have the
         # /l prefix. As we now return the labels from the index (which do have the
         # /l), we trim the prefix
-        labels = list(set((label.removeprefix("/l/") for label in result.labels)))
-        new_paragraph = Paragraph(
-            score=result.score.bm25,
-            rid=result.uuid,
+        labels = list(set((label.removeprefix("/l/") for label in match.labels)))
+
+        suggested_paragraph = Paragraph(
+            score=match.score.bm25,
+            rid=match.uuid,
             field_type=field_type,
             field=field,
             text=text,
             labels=labels,
             position=TextPosition(
-                index=result.metadata.position.index,
-                start=result.metadata.position.start,
-                end=result.metadata.position.end,
-                page_number=result.metadata.position.page_number,
+                index=match.metadata.position.index,
+                start=match.metadata.position.start,
+                end=match.metadata.position.end,
+                page_number=match.metadata.position.page_number,
             ),
-            start_seconds=list(result.metadata.position.start_seconds) or None,
-            end_seconds=list(result.metadata.position.end_seconds) or None,
+            start_seconds=list(match.metadata.position.start_seconds) or None,
+            end_seconds=list(match.metadata.position.end_seconds) or None,
         )
-        result_paragraph_list.append(new_paragraph)
-    return Paragraphs(results=result_paragraph_list, query=query, min_score=0)
+        results.append(suggested_paragraph)
+
+    return Paragraphs(results=results, query=query, min_score=0)
 
 
 async def merge_vectors_results(
@@ -600,7 +620,7 @@ async def merge_paragraphs_results(
     return api_results
 
 
-async def merge_suggest_entities_results(
+def merge_suggest_entities_results(
     suggest_responses: list[SuggestResponse],
 ) -> RelatedEntities:
     unique_entities: set[RelatedEntity] = set()
@@ -623,5 +643,5 @@ async def merge_suggest_results(
     api_results.paragraphs = await merge_suggest_paragraph_results(
         suggest_responses, kbid, highlight=highlight
     )
-    api_results.entities = await merge_suggest_entities_results(suggest_responses)
+    api_results.entities = merge_suggest_entities_results(suggest_responses)
     return api_results
