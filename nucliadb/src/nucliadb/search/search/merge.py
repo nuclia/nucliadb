@@ -104,7 +104,7 @@ async def merge_documents_results(
     query: FulltextQuery,
     top_k: int,
     offset: int,
-) -> tuple[Resources, list[str]]:
+) -> tuple[Resources, set[str]]:
     raw_resource_list: list[tuple[DocumentResult, SortValue]] = []
     facets: dict[str, Any] = {}
     total = 0
@@ -139,7 +139,7 @@ async def merge_documents_results(
     # ordering of results with same scores accross multiple shards doesn't change
     raw_resource_list.sort(key=lambda x: x[1], reverse=(query.sort == SortOrder.DESC))
 
-    result_resource_ids = []
+    result_resource_ids = set()
     result_resource_list: list[ResourceResult] = []
     for result, _ in raw_resource_list:
         labels = await get_labels_resource(result, kbid)
@@ -154,8 +154,7 @@ async def merge_documents_results(
                 labels=labels,
             )
         )
-        if result.uuid not in result_resource_ids:
-            result_resource_ids.append(result.uuid)
+        result_resource_ids.add(result.uuid)
 
     return Resources(
         facets=facets,
@@ -237,7 +236,7 @@ async def merge_vectors_results(
     top_k: int,
     concurrency_control: asyncio.Semaphore | None = None,
     min_score: float | None = None,
-) -> tuple[Sentences, list[str]]:
+) -> tuple[Sentences, set[str]]:
     facets: dict[str, Any] = {}
     raw_vectors_list: list[DocumentScored] = []
 
@@ -254,7 +253,7 @@ async def merge_vectors_results(
 
     raw_vectors_list, _ = cut_page(raw_vectors_list, top_k)
 
-    resources = []
+    result_resource_ids = set()
 
     augments = []
     result_index_by_id = {}
@@ -292,8 +291,7 @@ async def merge_vectors_results(
         )
         result_index_by_id[paragraph_id] = len(result_sentence_list) - 1
 
-        if vector_id.rid not in resources:
-            resources.append(vector_id.rid)
+        result_resource_ids.add(vector_id.rid)
 
     augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = await augment_paragraphs(
         kbid, given=augments, select=[ParagraphText()], concurrency_control=concurrency_control
@@ -312,7 +310,7 @@ async def merge_vectors_results(
         page_number=0,  # Bw/c with pagination
         page_size=top_k,
         min_score=round(min_score or 0, ndigits=3),
-    ), resources
+    ), result_resource_ids
 
 
 async def merge_paragraph_results(
@@ -324,7 +322,7 @@ async def merge_paragraph_results(
     min_score: float,
     offset: int,
     concurrency_control: asyncio.Semaphore | None = None,
-) -> tuple[Paragraphs, list[str]]:
+) -> tuple[Paragraphs, set[str]]:
     raw_paragraph_list: list[tuple[ParagraphId, ParagraphResult, SortValue]] = []
     facets: dict[str, Any] = {}
     query = None
@@ -437,7 +435,7 @@ async def merge_paragraph_results(
         page_size=top_k,
         next_page=next_page,
         min_score=min_score,
-    ), list(result_resource_ids)
+    ), result_resource_ids
 
 
 @merge_observer.wrap({"type": "merge_relations"})
