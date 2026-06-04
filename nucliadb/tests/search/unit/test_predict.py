@@ -254,6 +254,7 @@ async def test_check_response_error():
         "GET",
         URL("http://predict:8080/api/chat"),
         writer=None,
+        stream_writer=Mock(),
         continue100=Mock(),
         timer=Mock(),
         request_info=Mock(),

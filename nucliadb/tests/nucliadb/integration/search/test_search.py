@@ -251,9 +251,7 @@ def broker_resource_with_classifications(standalone_knowledgebox):
 
 @pytest.mark.deploy_modes("standalone")
 async def test_search_returns_labels(
-    nucliadb_search: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-    standalone_knowledgebox,
+    nucliadb_search: AsyncClient, nucliadb_ingest_grpc: WriterStub, standalone_knowledgebox
 ):
     bm = broker_resource_with_classifications(standalone_knowledgebox)
     await inject_message(nucliadb_ingest_grpc, bm)

@@ -18,10 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import pytest
-from aioresponses import aioresponses
 
 from nucliadb_protos.train_pb2 import GetLabelsetsCountRequest, LabelsetsCount
 from nucliadb_protos.train_pb2_grpc import TrainStub
+from nucliadb_utils.utilities import Utility, get_utility
+from tests.utils.aiohttp_session import get_mocked_session
 
 
 @pytest.mark.deploy_modes("component")
@@ -31,24 +32,24 @@ async def test_get_ontology_count(
     req = GetLabelsetsCountRequest()
     req.kb.uuid = knowledgebox
 
-    with aioresponses() as m:
-        m.get(
-            f"http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{knowledgebox}/search?faceted=/l/my-labelset",
-            payload={
-                "resources": {},
-                "sentences": {"results": [], "facets": {}},
-                "paragraphs": {
-                    "results": [],
-                    "facets": {
-                        "/l/my-labelset": {
-                            "facetresults": [{"tag": "/l/my-labelset/Label 1", "total": 1}]
-                        }
-                    },
+    servicer = get_utility(Utility.TRAIN)
+    servicer.session = get_mocked_session(
+        "GET",
+        200,
+        json={
+            "resources": {},
+            "sentences": {"results": [], "facets": {}},
+            "paragraphs": {
+                "results": [],
+                "facets": {
+                    "/l/my-labelset": {"facetresults": [{"tag": "/l/my-labelset/Label 1", "total": 1}]}
                 },
-                "fulltext": {"results": [], "facets": {}},
             },
-        )
+            "fulltext": {"results": [], "facets": {}},
+        },
+        context_manager=True,
+    )
 
-        req.resource_labelsets.append("my-labelset")
-        labels: LabelsetsCount = await nucliadb_train_grpc.GetOntologyCount(req)  # type: ignore
+    req.resource_labelsets.append("my-labelset")
+    labels: LabelsetsCount = await nucliadb_train_grpc.GetOntologyCount(req)  # type: ignore
     assert labels.labelsets["/l/my-labelset"].paragraphs["Label 1"] == 1

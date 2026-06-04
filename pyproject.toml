@@ -40,7 +40,6 @@ dev = [
     "pre-commit",
     "ruff",
     # Testing
-    "aioresponses",
     "faker>=25.1.0",
     "jsonschema",
     "pdbpp>=0.10.3",
