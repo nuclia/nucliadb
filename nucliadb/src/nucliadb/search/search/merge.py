@@ -19,13 +19,11 @@
 #
 import asyncio
 import datetime
-import math
 from collections.abc import Iterable
 from typing import Any
 
 from nidx_protos.nodereader_pb2 import (
     DocumentResult,
-    DocumentScored,
     DocumentSearchResponse,
     GraphSearchResponse,
     ParagraphResult,
@@ -52,6 +50,7 @@ from nucliadb.search.search.fetch import get_labels_resource
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
+from nucliadb.search.search.retrieval import merge_shards_semantic_responses
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -237,28 +236,14 @@ async def merge_vectors_results(
     concurrency_control: asyncio.Semaphore | None = None,
     min_score: float | None = None,
 ) -> tuple[Sentences, set[str]]:
-    facets: dict[str, Any] = {}
-    raw_vectors_list: list[DocumentScored] = []
-
-    for vector_response in vector_responses:
-        for document in vector_response.documents:
-            if min_score is not None and document.score < min_score:
-                continue
-            if math.isnan(document.score):
-                continue
-            raw_vectors_list.append(document)
-
-    if len(vector_responses) > 1:
-        raw_vectors_list.sort(key=lambda x: x.score, reverse=True)
-
-    raw_vectors_list, _ = cut_page(raw_vectors_list, top_k)
-
-    result_resource_ids = set()
+    # merge keeping sorting and cut a page
+    merged = merge_shards_semantic_responses(vector_responses, limit=top_k)
 
     augments = []
     result_index_by_id = {}
     result_sentence_list: list[Sentence] = []
-    for result in raw_vectors_list:
+    result_resource_ids = set()
+    for result in merged.documents:
         vector_id = VectorId.from_string(result.doc_id.id)
         # In case we have multiple vectors per paragraph, the vector id will
         # have its start-end referencing a portion of the paragraph. However, we
@@ -306,7 +291,7 @@ async def merge_vectors_results(
 
     return Sentences(
         results=result_sentence_list,
-        facets=facets,
+        facets={},
         page_number=0,  # Bw/c with pagination
         page_size=top_k,
         min_score=round(min_score or 0, ndigits=3),

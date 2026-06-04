@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import heapq
+import itertools
 from collections.abc import Iterable
 
 from nidx_protos.nodereader_pb2 import (
@@ -142,18 +144,32 @@ def merge_shards_keyword_responses(
 
 
 def merge_shards_semantic_responses(
-    semantic_responses: list[VectorSearchResponse],
+    semantic_responses: list[VectorSearchResponse], limit: int | None = None
 ) -> VectorSearchResponse:
     """Merge semantic (vector) search responses into a single response as if
     there were no shards involved.
+
+    The `limit` parameter allow to cut and return at most this number of
+    results.
 
     ATENTION! This is not a complete merge, we are only merging the fields
     needed to compose a /find response.
 
     """
     merged = VectorSearchResponse()
-    for response in semantic_responses:
-        merged.documents.extend(response.documents)
+
+    # each shard returns results in sorted order, we can take advantage and keep
+    # sorted order, so we don't have to re-sort later
+    merged.documents.extend(
+        itertools.islice(
+            heapq.merge(
+                *(response.documents for response in semantic_responses),
+                reverse=True,
+                key=lambda x: x.score,
+            ),
+            limit,
+        )
+    )
 
     return merged
 
