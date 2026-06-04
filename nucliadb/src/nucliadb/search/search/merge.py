@@ -47,12 +47,7 @@ from nucliadb.models.internal.augment import Paragraph as AugmentorParagraph
 from nucliadb.search import logger
 from nucliadb.search.augmentor.augmentor import augment_paragraphs
 from nucliadb.search.search.cut import cut_page
-from nucliadb.search.search.fetch import (
-    fetch_resources,
-    get_labels_paragraph,
-    get_labels_resource,
-    get_seconds_paragraph,
-)
+from nucliadb.search.search.fetch import fetch_resources, get_labels_paragraph, get_labels_resource
 from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
 from nucliadb_models.common import FieldTypeName
@@ -224,16 +219,9 @@ async def merge_suggest_paragraph_results(
                 end=result.metadata.position.end,
                 page_number=result.metadata.position.page_number,
             ),
+            start_seconds=list(result.metadata.position.start_seconds) or None,
+            end_seconds=list(result.metadata.position.end_seconds) or None,
         )
-        if len(result.metadata.position.start_seconds) or len(result.metadata.position.end_seconds):
-            new_paragraph.start_seconds = list(result.metadata.position.start_seconds)
-            new_paragraph.end_seconds = list(result.metadata.position.end_seconds)
-        else:
-            # TODO: Remove once we are sure all data has been migrated!
-            seconds_positions = await get_seconds_paragraph(result, kbid)
-            if seconds_positions is not None:
-                new_paragraph.start_seconds = seconds_positions[0]
-                new_paragraph.end_seconds = seconds_positions[1]
         result_paragraph_list.append(new_paragraph)
     return Paragraphs(results=result_paragraph_list, query=query, min_score=0)
 
