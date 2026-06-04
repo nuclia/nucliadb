@@ -107,35 +107,3 @@ async def get_labels_resource(result: DocumentResult, kbid: str) -> list[str]:
             labels.append(f"{classification.labelset}/{classification.label}")
 
     return labels
-
-
-async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> list[str]:
-    orm_resource = await cache.get_resource(kbid, result.uuid)
-
-    if orm_resource is None:
-        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": result.uuid})
-        return []
-
-    labels: list[str] = []
-    basic = await orm_resource.get_basic()
-    if basic is not None:
-        for classification in basic.usermetadata.classifications:
-            labels.append(f"{classification.labelset}/{classification.label}")
-
-    _, field_type, field = result.field.split("/")
-    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    field_metadata = await field_obj.get_field_metadata()
-    if field_metadata:
-        paragraph = None
-        if result.split not in (None, ""):
-            metadata = field_metadata.split_metadata[result.split]
-            paragraph = metadata.paragraphs[result.index]
-        elif len(field_metadata.metadata.paragraphs) > result.index:
-            paragraph = field_metadata.metadata.paragraphs[result.index]
-
-        if paragraph is not None:
-            for classification in paragraph.classifications:
-                labels.append(f"{classification.labelset}/{classification.label}")
-
-    return labels
