@@ -75,9 +75,10 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         result = TrainInfo()
         url = settings.internal_counter_api.format(kbid=request.kb.uuid)
         headers = {"X-NUCLIADB-ROLES": "READER"}
-        resp = await self.session.get(url, headers=headers)
-        resp.raise_for_status()
-        data = await resp.json()
+        async with self.session.get(url, headers=headers) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+
         result.resources = data["resources"]
         result.paragraphs = data["paragraphs"]
         result.fields = data["fields"]
@@ -123,10 +124,9 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
         facets.extend([f"faceted=/l/{labelset}" for labelset in request.resource_labelsets])
         query = "&".join(facets)
         headers = {"X-NUCLIADB-ROLES": "READER"}
-        async with aiohttp.ClientSession() as sess:
-            async with sess.get(f"{url}?{query}", headers=headers) as resp:
-                data = await resp.json()
-                data.get("paragraphs", {})
+        async with self.session.get(f"{url}?{query}", headers=headers) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
 
         res = LabelsetsCount()
         for labelset, labels in data["paragraphs"]["facets"].items():

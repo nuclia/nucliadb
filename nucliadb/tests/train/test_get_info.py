@@ -18,10 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
-from aioresponses import aioresponses
 
 from nucliadb_protos.train_pb2 import GetInfoRequest, TrainInfo
 from nucliadb_protos.train_pb2_grpc import TrainStub
+from nucliadb_utils.utilities import Utility, get_utility
+from tests.utils.aiohttp_session import get_mocked_session
 
 
 @pytest.mark.deploy_modes("component")
@@ -31,13 +32,15 @@ async def test_get_info(
     req = GetInfoRequest()
     req.kb.uuid = knowledgebox
 
-    with aioresponses() as m:
-        m.get(
-            f"http://search.nuclia.svc.cluster.local:8030/api/v1/kb/{knowledgebox}/counters",
-            payload={"resources": 4, "paragraphs": 89, "fields": 4, "sentences": 90},
-        )
+    servicer = get_utility(Utility.TRAIN)
+    servicer.session = get_mocked_session(
+        "GET",
+        200,
+        json={"resources": 4, "paragraphs": 89, "fields": 4, "sentences": 90},
+        context_manager=True,
+    )
 
-        labels: TrainInfo = await nucliadb_train_grpc.GetInfo(req)  # type: ignore
+    labels: TrainInfo = await nucliadb_train_grpc.GetInfo(req)  # type: ignore
     assert labels.fields == 4
     assert labels.resources == 4
     assert labels.paragraphs == 89
