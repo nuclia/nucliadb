@@ -35,7 +35,7 @@ from nidx_protos.nodereader_pb2 import (
     VectorSearchResponse,
 )
 
-from nucliadb.common.ids import FieldId, ParagraphId, VectorId
+from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.common.models_utils.from_proto import (
     RelationNodeTypeMap,
@@ -189,28 +189,21 @@ async def merge_suggest_paragraph_results(
     # cut the best results
     matches = list(itertools.islice(merged, MAX_SUGGEST_RESULTS))
 
-    augments = []
-    paragraph_id_position = {}
-    for idx, match in enumerate(matches):
-        _, field_type, field = match.field.split("/")
-        paragraph_id = ParagraphId(
-            field_id=FieldId(
-                rid=match.uuid, type=field_type, key=field, subfield_id=match.split or None
-            ),
-            paragraph_start=match.start,
-            paragraph_end=match.end,
-        )
-        paragraph_id_position[paragraph_id] = idx
-        augments.append(
-            AugmentorParagraph(id=paragraph_id, metadata=Metadata.from_paragraph_result(match))
-        )
-
     augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = await augment_paragraphs(
-        kbid, given=augments, select=[ParagraphText()]
+        kbid,
+        given=[
+            AugmentorParagraph(
+                id=ParagraphId.from_string(match.paragraph),
+                metadata=Metadata.from_paragraph_result(match),
+            )
+            for match in matches
+        ],
+        select=[ParagraphText()],
     )
 
     results = []
     for match in matches:
+        paragraph_id = ParagraphId.from_string(match.paragraph)
         augmented = augmented_paragraphs.get(paragraph_id)
         text = augmented.text or "" if augmented else ""
         if text and highlight:
@@ -231,8 +224,8 @@ async def merge_suggest_paragraph_results(
         suggested_paragraph = Paragraph(
             score=match.score.bm25,
             rid=match.uuid,
-            field_type=field_type,
-            field=field,
+            field_type=paragraph_id.field_id.type,
+            field=paragraph_id.field_id.key,
             text=text,
             labels=labels,
             position=TextPosition(
@@ -350,17 +343,7 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
-            _, field_type, field_key = result.field.split("/")
-            paragraph_id = ParagraphId(
-                field_id=FieldId(
-                    rid=result.uuid,
-                    type=field_type,
-                    key=field_key,
-                    subfield_id=result.split or None,
-                ),
-                paragraph_start=result.start,
-                paragraph_end=result.end,
-            )
+            paragraph_id = ParagraphId.from_string(result.paragraph)
 
             sort_value: SortValue
             if sort.field == SortField.SCORE:
