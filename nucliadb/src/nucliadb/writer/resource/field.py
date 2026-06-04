@@ -204,7 +204,7 @@ async def _to_push_conversationfield(
         if conversation_pb is None:
             continue
         for message in conversation_pb.messages:
-            if message.content.text != "":
+            if message.content.text == "":
                 # Do not include empty or deleted messages
                 continue
             full_conversation.messages.append(await _to_push_message(message, processing, storage))
@@ -601,8 +601,9 @@ async def parse_conversation_field(
     # Set the conversation field value in the proto and the processing models
     toprocess.conversationfield[key] = convs
 
-    # Add generated conversations to push payload
-    await add_generated_conversations_to_pushpayload(processing, storage, kbid, uuid, key, toprocess)
+    if not replace_field:
+        # When appending new messages to a conversation, add the generated conversations to push payload too.
+        await add_generated_conversations_to_pushpayload(processing, storage, kbid, uuid, key, toprocess)
 
     writer.conversations[key].CopyFrom(field_value)
     writer.field_statuses.append(
