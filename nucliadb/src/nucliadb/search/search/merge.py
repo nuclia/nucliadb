@@ -533,7 +533,7 @@ async def merge_results(
 
     api_results = KnowledgeboxSearchResults()
 
-    resources: list[str] = list()
+    resources = set()
 
     if retrieval.query.fulltext is not None:
         api_results.fulltext, matched_resources = await merge_documents_results(
@@ -543,7 +543,7 @@ async def merge_results(
             top_k=retrieval.top_k,
             offset=offset,
         )
-        resources.extend(matched_resources)
+        resources.update(matched_resources)
 
     if retrieval.query.keyword is not None:
         sort = SortOptions(
@@ -560,7 +560,7 @@ async def merge_results(
             offset=offset,
             concurrency_control=concurrency_control,
         )
-        resources.extend(matched_resources)
+        resources.update(matched_resources)
 
     if retrieval.query.semantic is not None:
         api_results.sentences, matched_resources = await merge_vectors_results(
@@ -570,7 +570,7 @@ async def merge_results(
             min_score=retrieval.query.semantic.min_score,
             concurrency_control=concurrency_control,
         )
-        resources.extend(matched_resources)
+        resources.update(matched_resources)
 
     if retrieval.query.relation is not None:
         api_results.relations = await merge_relations_results(
@@ -579,7 +579,7 @@ async def merge_results(
 
     api_results.resources = await augment_resources_deep(
         kbid,
-        given=resources,
+        given=list(resources),
         opts=ResourceHydrationOptions(
             show=show,
             field_type_filter=field_type_filter,
