@@ -63,6 +63,8 @@ async def parse_suggest(
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(nodereader_pb2.SuggestFeatures.PARAGRAPHS)
 
+    request.top_k = MAX_SUGGEST_RESULTS
+
     old = OldFilterParams(
         label_filters=filters,
         keyword_filters=[],
