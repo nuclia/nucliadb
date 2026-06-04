@@ -20,9 +20,8 @@
 import asyncio
 from contextvars import ContextVar
 
-from nidx_protos.nodereader_pb2 import DocumentResult, ParagraphResult
+from nidx_protos.nodereader_pb2 import DocumentResult
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.serialize import managed_serialize
@@ -31,7 +30,6 @@ from nucliadb.search.search import cache
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import ResourceProperties
-from nucliadb_protos.resources_pb2 import Paragraph
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
@@ -74,23 +72,6 @@ async def fetch_resources(
             if serialization is not None:
                 result[resource] = serialization
     return result
-
-
-async def get_paragraph_from_resource(
-    orm_resource: ResourceORM, result: ParagraphResult
-) -> Paragraph | None:
-    _, field_type, field = result.field.split("/")
-    field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
-    field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-    field_metadata = await field_obj.get_field_metadata()
-    paragraph = None
-    if field_metadata:
-        if result.split not in (None, ""):
-            metadata = field_metadata.split_metadata[result.split]
-            paragraph = metadata.paragraphs[result.index]
-        elif len(field_metadata.metadata.paragraphs) > result.index:
-            paragraph = field_metadata.metadata.paragraphs[result.index]
-    return paragraph
 
 
 async def get_labels_resource(result: DocumentResult, kbid: str) -> list[str]:
