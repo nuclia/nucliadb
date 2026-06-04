@@ -381,17 +381,47 @@ async def merge_paragraph_results(
         concurrency_control=concurrency_control,
     )
 
-    result_paragraph_list: list[Paragraph] = await asyncio.gather(
-        *(
-            load_paragraph(result, kbid, augmented_paragraphs.get(paragraph_id), highlight, ematches)
-            for paragraph_id, result, _ in raw_paragraph_list
-        )
-    )
+    result_paragraph_list: list[Paragraph] = []
+    result_resource_ids = set()
+    for paragraph_id, result, _ in raw_paragraph_list:
+        augmented = augmented_paragraphs.get(paragraph_id)
+        text = augmented.text or "" if augmented else ""
+        if text and highlight:
+            try:
+                text = highlight_paragraph(
+                    text,
+                    words=result.matches,  # type: ignore[arg-type,ty:invalid-argument-type]
+                    ematches=ematches,
+                )
+            except Exception as exc:
+                logger.warning("Error highlighting paragraph", extra={"kbid": kbid}, exc_info=exc)
 
-    result_resource_ids = []
-    for paragraph in result_paragraph_list:
-        if paragraph.rid not in result_resource_ids:
-            result_resource_ids.append(paragraph.rid)
+        fuzzy_result = len(result.matches) > 0
+        # bw/c: historically, we returned labels from maindb, which didn't have the
+        # /l prefix. As we now return the labels from the index (which do have the
+        # /l), we trim the prefix
+        labels = list(set((label.removeprefix("/l/") for label in result.labels)))
+
+        result_resource_ids.add(paragraph_id.rid)
+        result_paragraph_list.append(
+            Paragraph(
+                score=result.score.bm25,
+                rid=paragraph_id.rid,
+                field_type=paragraph_id.field_id.type,
+                field=paragraph_id.field_id.key,
+                text=text,
+                labels=labels,
+                position=TextPosition(
+                    index=result.metadata.position.index,
+                    start=result.metadata.position.start,
+                    end=result.metadata.position.end,
+                    page_number=result.metadata.position.page_number,
+                ),
+                fuzzy_result=fuzzy_result,
+                start_seconds=list(result.metadata.position.start_seconds) or None,
+                end_seconds=list(result.metadata.position.end_seconds) or None,
+            )
+        )
 
     return Paragraphs(
         results=result_paragraph_list,
@@ -402,52 +432,7 @@ async def merge_paragraph_results(
         page_size=top_k,
         next_page=next_page,
         min_score=min_score,
-    ), result_resource_ids
-
-
-async def load_paragraph(
-    result: ParagraphResult,
-    kbid: str,
-    augmented: AugmentedParagraph | None,
-    highlight: bool,
-    ematches: list[str] | None,
-) -> Paragraph:
-    text = augmented.text or "" if augmented else ""
-    if text and highlight:
-        try:
-            text = highlight_paragraph(
-                text,
-                words=result.matches,  # type: ignore[arg-type,ty:invalid-argument-type]
-                ematches=ematches,
-            )
-        except Exception as exc:
-            logger.warning("Error highlighting paragraph", extra={"kbid": kbid}, exc_info=exc)
-
-    # bw/c: historically, we returned labels from maindb, which didn't have the
-    # /l prefix. As we now return the labels from the index (which do have the
-    # /l), we trim the prefix
-    labels = list(set((label.removeprefix("/l/") for label in result.labels)))
-
-    _, field_type, field = result.field.split("/")
-    fuzzy_result = len(result.matches) > 0
-    new_paragraph = Paragraph(
-        score=result.score.bm25,
-        rid=result.uuid,
-        field_type=field_type,
-        field=field,
-        text=text,
-        labels=labels,
-        position=TextPosition(
-            index=result.metadata.position.index,
-            start=result.metadata.position.start,
-            end=result.metadata.position.end,
-            page_number=result.metadata.position.page_number,
-        ),
-        fuzzy_result=fuzzy_result,
-        start_seconds=list(result.metadata.position.start_seconds) or None,
-        end_seconds=list(result.metadata.position.end_seconds) or None,
-    )
-    return new_paragraph
+    ), list(result_resource_ids)
 
 
 @merge_observer.wrap({"type": "merge_relations"})
