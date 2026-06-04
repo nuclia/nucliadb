@@ -74,9 +74,11 @@ class ResourceClassifications:
 
 
 async def _to_push_filefield(
-    field_pb: resources_pb2.FieldFile, classif_labels: list[ClassificationLabel]
+    processing: ProcessingEngine,
+    storage: Storage,
+    field_pb: resources_pb2.FieldFile,
+    classif_labels: list[ClassificationLabel],
 ) -> str:
-    processing = get_processing()
     if field_pb.file.source == resources_pb2.CloudFile.Source.EXTERNAL:
         file_field = models.FileField(
             language=field_pb.language,
@@ -87,7 +89,6 @@ async def _to_push_filefield(
         )
         return processing.convert_external_filefield_to_str(file_field, classif_labels)
     else:
-        storage = await get_storage(service_name=SERVICE_NAME)
         return await processing.convert_internal_filefield_to_str(field_pb, storage, classif_labels)
 
 
@@ -106,9 +107,12 @@ async def extract_file_field(
 
     if password is not None:
         field_pb.password = password
-
+    processing = get_processing()
+    storage = await get_storage(service_name=SERVICE_NAME)
     classif_labels = resource_classifications.for_field(field_id, resources_pb2.FieldType.FILE)
-    toprocess.filefield[field_id] = await _to_push_filefield(field_pb, classif_labels)
+    toprocess.filefield[field_id] = await _to_push_filefield(
+        processing, storage, field_pb, classif_labels
+    )
 
 
 async def extract_fields(resource: ORMResource, toprocess: PushPayload):
@@ -134,7 +138,9 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
         field_pb = await field.get_value()
         classif_labels = resource_classifications.for_field(field_id, field_type)
         if field_type_name is FieldTypeName.FILE:
-            toprocess.filefield[field_id] = await _to_push_filefield(field_pb, classif_labels)
+            toprocess.filefield[field_id] = await _to_push_filefield(
+                processing, storage, field_pb, classif_labels
+            )
 
         if field_type_name is FieldTypeName.LINK:
             toprocess.linkfield[field_id] = _to_push_linkfield(field_pb, classif_labels)
