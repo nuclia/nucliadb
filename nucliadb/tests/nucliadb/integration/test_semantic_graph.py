@@ -24,7 +24,7 @@ from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.internal.predict import GraphNodeSearch, QueryInfo, SentenceSearch
+from nucliadb_models.internal.predict import GraphEdgeSearch, GraphNodeSearch, QueryInfo
 from nucliadb_protos.resources_pb2 import (
     FieldType,
 )
@@ -220,8 +220,6 @@ async def test_node_queries(
     assert nodes[0]["score"] > nodes[1]["score"]
 
 
-# TODO(semantic-graph): Disabled for now, not supported by NUA/processor yet
-@pytest.mark.skip
 @pytest.mark.deploy_modes("standalone")
 async def test_relation_queries(
     nucliadb_reader: AsyncClient,
@@ -239,7 +237,14 @@ async def test_relation_queries(
                 query="faster",
                 max_context=10,
                 entities=None,
-                sentence=SentenceSearch(vectors={"testing-nodes-model": VECTORS["faster"]}),
+                sentence=None,
+                graph_edges=GraphEdgeSearch(
+                    vectors={
+                        "testing-edges-model": {
+                            "faster": VECTORS["faster"],
+                        }
+                    }
+                ),
             )
         ),
     ):

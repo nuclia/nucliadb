@@ -51,6 +51,11 @@ class GraphNodeSearch(BaseModel):
     vectors: dict[str, dict[str, list[float]]]
 
 
+class GraphEdgeSearch(BaseModel):
+    # {model: {edge_label: vector}}
+    vectors: dict[str, dict[str, list[float]]]
+
+
 class QueryInfo(BaseModel):
     language: str | None
     stop_words: list[str] = Field(default_factory=list)
@@ -66,6 +71,7 @@ class QueryInfo(BaseModel):
     query: str | None
     rephrased_query: str | None = None
     graph_nodes: GraphNodeSearch | None = None
+    graph_edges: GraphEdgeSearch | None = None
 
 
 class RerankModel(BaseModel):
