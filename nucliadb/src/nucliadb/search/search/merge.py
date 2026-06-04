@@ -52,7 +52,6 @@ from nucliadb.search.search.fetch import get_labels_resource
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
-from nucliadb.search.search.query_parser.parsers.suggest import MAX_SUGGEST_RESULTS
 from nucliadb.search.search.retrieval import merge_shards_semantic_responses
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
@@ -172,6 +171,8 @@ async def merge_documents_results(
 async def merge_suggest_paragraph_results(
     suggest_responses: list[SuggestResponse],
     kbid: str,
+    *,
+    top_k: int,
     highlight: bool,
 ) -> Paragraphs:
     query = ""
@@ -187,7 +188,7 @@ async def merge_suggest_paragraph_results(
         key=lambda x: (x.score.bm25, x.score.booster),
     )
     # cut the best results
-    matches = list(itertools.islice(merged, MAX_SUGGEST_RESULTS))
+    matches = list(itertools.islice(merged, top_k))
 
     augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = await augment_paragraphs(
         kbid,
@@ -619,12 +620,14 @@ def merge_suggest_entities_results(
 async def merge_suggest_results(
     suggest_responses: list[SuggestResponse],
     kbid: str,
+    *,
+    top_k: int,
     highlight: bool = False,
 ) -> KnowledgeboxSuggestResults:
     api_results = KnowledgeboxSuggestResults()
 
     api_results.paragraphs = await merge_suggest_paragraph_results(
-        suggest_responses, kbid, highlight=highlight
+        suggest_responses, kbid, top_k=top_k, highlight=highlight
     )
     api_results.entities = merge_suggest_entities_results(suggest_responses)
     return api_results
