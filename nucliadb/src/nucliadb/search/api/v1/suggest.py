@@ -184,6 +184,7 @@ async def suggest(
             results,
             kbid=kbid,
             highlight=highlight,
+            top_k=pb_query.top_k,
         )
         if debug and queried_shards:
             search_results.shards = queried_shards

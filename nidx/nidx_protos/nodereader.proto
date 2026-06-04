@@ -431,6 +431,7 @@ message SuggestRequest {
 
     string body = 2;
     repeated SuggestFeatures features = 6;
+    uint32 top_k = 11;
 
     optional FilterExpression field_filter = 7;
     optional FilterExpression paragraph_filter = 8;

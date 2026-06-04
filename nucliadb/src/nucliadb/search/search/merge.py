@@ -19,13 +19,13 @@
 #
 import asyncio
 import datetime
-import math
+import heapq
+import itertools
 from collections.abc import Iterable
 from typing import Any
 
 from nidx_protos.nodereader_pb2 import (
     DocumentResult,
-    DocumentScored,
     DocumentSearchResponse,
     GraphSearchResponse,
     ParagraphResult,
@@ -35,7 +35,7 @@ from nidx_protos.nodereader_pb2 import (
     VectorSearchResponse,
 )
 
-from nucliadb.common.ids import FieldId, ParagraphId, VectorId
+from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.common.models_utils.from_proto import (
     RelationNodeTypeMap,
@@ -52,6 +52,7 @@ from nucliadb.search.search.fetch import get_labels_resource
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
+from nucliadb.search.search.retrieval import merge_shards_semantic_responses
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -81,7 +82,6 @@ from nucliadb_models.search import (
 from nucliadb_protos.utils_pb2 import RelationNode
 
 from .metrics import merge_observer
-from .paragraphs import get_paragraph_text
 
 Bm25Score = tuple[float, float]
 TimestampScore = datetime.datetime
@@ -171,63 +171,72 @@ async def merge_documents_results(
 async def merge_suggest_paragraph_results(
     suggest_responses: list[SuggestResponse],
     kbid: str,
+    *,
+    top_k: int,
     highlight: bool,
 ) -> Paragraphs:
-    raw_paragraph_list: list[ParagraphResult] = []
-    query = None
-    ematches = None
+    query = ""
+    ematches: list[str] = []
     for suggest_response in suggest_responses:
-        if query is None:
-            query = suggest_response.query
-        if ematches is None:
-            ematches = suggest_response.ematches
-        for result in suggest_response.results:
-            raw_paragraph_list.append(result)
+        query = suggest_response.query
+        ematches.extend(suggest_response.ematches)
 
-    if len(suggest_responses) > 1:
-        sort_results_by_score(raw_paragraph_list)
+    # merge while keeping sorted order by score
+    merged = heapq.merge(
+        *(response.results for response in suggest_responses),
+        reverse=True,
+        key=lambda x: (x.score.bm25, x.score.booster),
+    )
+    # cut the best results
+    matches = list(itertools.islice(merged, top_k))
 
-    result_paragraph_list: list[Paragraph] = []
-    for result in raw_paragraph_list[:10]:
-        _, field_type, field = result.field.split("/")
-        text = await get_paragraph_text(
-            kbid=kbid,
-            paragraph_id=ParagraphId(
-                field_id=FieldId(
-                    rid=result.uuid,
-                    type=field_type,
-                    key=field,
-                    subfield_id=result.split or None,
-                ),
-                paragraph_start=result.start,
-                paragraph_end=result.end,
-            ),
-            highlight=highlight,
-            ematches=ematches,  # type: ignore
-            matches=result.matches,  # type: ignore
-        )
+    augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = await augment_paragraphs(
+        kbid,
+        given=[
+            AugmentorParagraph(
+                id=ParagraphId.from_string(match.paragraph),
+                metadata=Metadata.from_paragraph_result(match),
+            )
+            for match in matches
+        ],
+        select=[ParagraphText()],
+    )
+
+    results = []
+    for match in matches:
+        paragraph_id = ParagraphId.from_string(match.paragraph)
+        augmented = augmented_paragraphs.get(paragraph_id)
+        text = augmented.text or "" if augmented else ""
+        if text and highlight:
+            try:
+                text = highlight_paragraph(text, words=match.matches, ematches=ematches)
+            except Exception as exc:
+                logger.warning("Error highlighting paragraph", extra={"kbid": kbid}, exc_info=exc)
+
         # bw/c: historically, we returned labels from maindb, which didn't have the
         # /l prefix. As we now return the labels from the index (which do have the
         # /l), we trim the prefix
-        labels = list(set((label.removeprefix("/l/") for label in result.labels)))
-        new_paragraph = Paragraph(
-            score=result.score.bm25,
-            rid=result.uuid,
-            field_type=field_type,
-            field=field,
+        labels = list(set((label.removeprefix("/l/") for label in match.labels)))
+
+        suggested_paragraph = Paragraph(
+            score=match.score.bm25,
+            rid=match.uuid,
+            field_type=paragraph_id.field_id.type,
+            field=paragraph_id.field_id.key,
             text=text,
             labels=labels,
             position=TextPosition(
-                index=result.metadata.position.index,
-                start=result.metadata.position.start,
-                end=result.metadata.position.end,
-                page_number=result.metadata.position.page_number,
+                index=match.metadata.position.index,
+                start=match.metadata.position.start,
+                end=match.metadata.position.end,
+                page_number=match.metadata.position.page_number,
             ),
-            start_seconds=list(result.metadata.position.start_seconds) or None,
-            end_seconds=list(result.metadata.position.end_seconds) or None,
+            start_seconds=list(match.metadata.position.start_seconds) or None,
+            end_seconds=list(match.metadata.position.end_seconds) or None,
         )
-        result_paragraph_list.append(new_paragraph)
-    return Paragraphs(results=result_paragraph_list, query=query, min_score=0)
+        results.append(suggested_paragraph)
+
+    return Paragraphs(results=results, query=query, min_score=0)
 
 
 async def merge_vectors_results(
@@ -237,28 +246,14 @@ async def merge_vectors_results(
     concurrency_control: asyncio.Semaphore | None = None,
     min_score: float | None = None,
 ) -> tuple[Sentences, set[str]]:
-    facets: dict[str, Any] = {}
-    raw_vectors_list: list[DocumentScored] = []
-
-    for vector_response in vector_responses:
-        for document in vector_response.documents:
-            if min_score is not None and document.score < min_score:
-                continue
-            if math.isnan(document.score):
-                continue
-            raw_vectors_list.append(document)
-
-    if len(vector_responses) > 1:
-        raw_vectors_list.sort(key=lambda x: x.score, reverse=True)
-
-    raw_vectors_list, _ = cut_page(raw_vectors_list, top_k)
-
-    result_resource_ids = set()
+    # merge keeping sorting and cut a page
+    merged = merge_shards_semantic_responses(vector_responses, limit=top_k)
 
     augments = []
     result_index_by_id = {}
     result_sentence_list: list[Sentence] = []
-    for result in raw_vectors_list:
+    result_resource_ids = set()
+    for result in merged.documents:
         vector_id = VectorId.from_string(result.doc_id.id)
         # In case we have multiple vectors per paragraph, the vector id will
         # have its start-end referencing a portion of the paragraph. However, we
@@ -306,7 +301,7 @@ async def merge_vectors_results(
 
     return Sentences(
         results=result_sentence_list,
-        facets=facets,
+        facets={},
         page_number=0,  # Bw/c with pagination
         page_size=top_k,
         min_score=round(min_score or 0, ndigits=3),
@@ -345,17 +340,7 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
-            _, field_type, field_key = result.field.split("/")
-            paragraph_id = ParagraphId(
-                field_id=FieldId(
-                    rid=result.uuid,
-                    type=field_type,
-                    key=field_key,
-                    subfield_id=result.split or None,
-                ),
-                paragraph_start=result.start,
-                paragraph_end=result.end,
-            )
+            paragraph_id = ParagraphId.from_string(result.paragraph)
 
             sort_value: SortValue
             if sort.field == SortField.SCORE:
@@ -391,11 +376,7 @@ async def merge_paragraph_results(
         text = augmented.text or "" if augmented else ""
         if text and highlight:
             try:
-                text = highlight_paragraph(
-                    text,
-                    words=result.matches,  # type: ignore[arg-type,ty:invalid-argument-type]
-                    ematches=ematches,
-                )
+                text = highlight_paragraph(text, words=result.matches, ematches=ematches)
             except Exception as exc:
                 logger.warning("Error highlighting paragraph", extra={"kbid": kbid}, exc_info=exc)
 
@@ -615,7 +596,7 @@ async def merge_paragraphs_results(
     return api_results
 
 
-async def merge_suggest_entities_results(
+def merge_suggest_entities_results(
     suggest_responses: list[SuggestResponse],
 ) -> RelatedEntities:
     unique_entities: set[RelatedEntity] = set()
@@ -631,12 +612,14 @@ async def merge_suggest_entities_results(
 async def merge_suggest_results(
     suggest_responses: list[SuggestResponse],
     kbid: str,
+    *,
+    top_k: int,
     highlight: bool = False,
 ) -> KnowledgeboxSuggestResults:
     api_results = KnowledgeboxSuggestResults()
 
     api_results.paragraphs = await merge_suggest_paragraph_results(
-        suggest_responses, kbid, highlight=highlight
+        suggest_responses, kbid, top_k=top_k, highlight=highlight
     )
-    api_results.entities = await merge_suggest_entities_results(suggest_responses)
+    api_results.entities = merge_suggest_entities_results(suggest_responses)
     return api_results

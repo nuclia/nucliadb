@@ -42,6 +42,7 @@ pub struct ParagraphSearchRequest {
 
 pub struct ParagraphSuggestRequest {
     pub body: String,
+    pub top_k: u32,
     pub filtering_formula: Option<BooleanExpression<String>>,
     /// Whether to do an OR/AND between prefilter results and filtering_formula
     pub filter_operator: FilterOperator,

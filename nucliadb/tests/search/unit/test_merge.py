@@ -19,7 +19,12 @@
 #
 from unittest.mock import patch
 
+from nidx_protos.nodereader_pb2 import DocumentScored, DocumentVectorIdentifier, VectorSearchResponse
+
 from nucliadb.search.search.merge import ResourceSearchResults, merge_paragraphs_results
+from nucliadb.search.search.retrieval import (
+    merge_shards_semantic_responses,
+)
 
 
 @patch("nucliadb.search.search.merge.augment_paragraphs", return_value={})
@@ -34,3 +39,77 @@ async def test_str_model_fallback(_mock):
     with patch.object(ResourceSearchResults, "model_dump_json", side_effect=Exception("ERROR")):
         res = await merge_paragraphs_results([], 1, "kbid", False, 1)
         assert "sentences=None" in str(res)
+
+
+def test_merge_shards_semantic_responses_maintains_order() -> None:
+    def into_vector_result(item: tuple[str, float]) -> DocumentScored:
+        id, score = item
+        return DocumentScored(doc_id=DocumentVectorIdentifier(id=id), score=score)
+
+    shard_1 = VectorSearchResponse(
+        documents=map(
+            into_vector_result,
+            [
+                ("vec_1a", 10.0),
+                ("vec_1b", 8.0),
+                ("vec_1c", 6.0),
+                ("vec_1d", 4.0),
+                ("vec_1e", 2.0),
+            ],
+        )
+    )
+    shard_2 = VectorSearchResponse(
+        documents=map(
+            into_vector_result,
+            [
+                ("vec_2a", 10.0),
+                ("vec_2b", 9.0),
+                ("vec_2c", 7.0),
+                ("vec_2d", 4.0),
+                ("vec_2e", 3.0),
+            ],
+        )
+    )
+
+    merged = merge_shards_semantic_responses([shard_1, shard_2])
+    expected = [
+        ("vec_1a", 10.0),
+        ("vec_2a", 10.0),
+        ("vec_2b", 9.0),
+        ("vec_1b", 8.0),
+        ("vec_2c", 7.0),
+        ("vec_1c", 6.0),
+        ("vec_1d", 4.0),
+        ("vec_2d", 4.0),
+        ("vec_2e", 3.0),
+        ("vec_1e", 2.0),
+    ]
+    got = [(result.doc_id.id, result.score) for result in merged.documents]
+    assert got == expected
+
+    merged = merge_shards_semantic_responses([shard_2, shard_1])
+    expected = [
+        ("vec_2a", 10.0),
+        ("vec_1a", 10.0),
+        ("vec_2b", 9.0),
+        ("vec_1b", 8.0),
+        ("vec_2c", 7.0),
+        ("vec_1c", 6.0),
+        ("vec_2d", 4.0),
+        ("vec_1d", 4.0),
+        ("vec_2e", 3.0),
+        ("vec_1e", 2.0),
+    ]
+    got = [(result.doc_id.id, result.score) for result in merged.documents]
+    assert got == expected
+
+    merged = merge_shards_semantic_responses([shard_1, shard_2], limit=5)
+    expected = [
+        ("vec_1a", 10.0),
+        ("vec_2a", 10.0),
+        ("vec_2b", 9.0),
+        ("vec_1b", 8.0),
+        ("vec_2c", 7.0),
+    ]
+    got = [(result.doc_id.id, result.score) for result in merged.documents]
+    assert got == expected

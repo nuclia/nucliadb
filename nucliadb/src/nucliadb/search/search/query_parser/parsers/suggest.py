@@ -34,6 +34,10 @@ from nucliadb_models.search import (
 )
 from nucliadb_models.security import RequestSecurity
 
+# This is a quite arbitrary number we set loong time ago. If needed, we
+# could allow users to set it
+MAX_SUGGEST_RESULTS = 10
+
 
 @query_parser_observer.wrap({"type": "parse_suggest"})
 async def parse_suggest(
@@ -58,6 +62,8 @@ async def parse_suggest(
 
     if SuggestOptions.PARAGRAPH in features:
         request.features.append(nodereader_pb2.SuggestFeatures.PARAGRAPHS)
+
+    request.top_k = MAX_SUGGEST_RESULTS
 
     old = OldFilterParams(
         label_filters=filters,

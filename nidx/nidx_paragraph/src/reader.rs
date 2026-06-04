@@ -35,8 +35,6 @@ use crate::request_types::{ParagraphSearchRequest, ParagraphSuggestRequest};
 use crate::search_query::{SharedTermC, search_query, streaming_query, suggest_query};
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse, extract_labels};
 
-const NUMBER_OF_RESULTS_SUGGEST: usize = 20;
-
 pub struct ParagraphReaderService {
     pub index: Index,
     pub schema: ParagraphSchema,
@@ -68,11 +66,11 @@ impl ParagraphReaderService {
         let (keyword, term_collector, fuzzy) = suggest_query(request, prefilter, &self.schema);
 
         let searcher = self.reader.searcher();
-        let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST).order_by_score();
+        let topdocs = TopDocs::with_limit(request.top_k as usize).order_by_score();
         let mut results = searcher.search(&keyword, &topdocs)?;
 
         if results.is_empty() {
-            let topdocs = TopDocs::with_limit(NUMBER_OF_RESULTS_SUGGEST).order_by_score();
+            let topdocs = TopDocs::with_limit(request.top_k as usize).order_by_score();
             match searcher.search(&fuzzy, &topdocs) {
                 Ok(mut fuzzy) => results.append(&mut fuzzy),
                 Err(err) => error!("{err:?} during suggest"),

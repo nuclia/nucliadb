@@ -20,6 +20,7 @@
 import logging
 import re
 import string
+from typing import Sequence
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
 from nucliadb.ingest.fields.base import Field
@@ -97,7 +98,7 @@ async def get_paragraph_text(
 
 
 def highlight_paragraph(
-    text: str, words: list[str] | None = None, ematches: list[str] | None = None
+    text: str, words: Sequence[str] | None = None, ematches: Sequence[str] | None = None
 ) -> str:
     """
     Highlight `text` with <mark></mark> tags around the words in `words` and `ematches`.
