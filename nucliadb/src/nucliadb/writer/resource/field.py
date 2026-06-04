@@ -29,10 +29,16 @@ from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.conversation import MAX_CONVERSATION_MESSAGES, Conversation
 from nucliadb.ingest.fields.key_value import validate_kv_data
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.processing import ProcessingEngine
 from nucliadb.models.internal import processing as processing_models
-from nucliadb.models.internal.processing import ClassificationLabel, PushConversation, PushPayload
+from nucliadb.models.internal.processing import (
+    ClassificationLabel,
+    PushConversation,
+    PushGeneratedConversation,
+    PushPayload,
+)
 from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.common import FieldTypeName
@@ -67,10 +73,12 @@ class ResourceClassifications:
         return list(resource_level.union(field_level))
 
 
-async def extract_file_field_from_pb(
-    field_pb: resources_pb2.FieldFile, classif_labels: list[ClassificationLabel]
+async def _to_push_filefield(
+    processing: ProcessingEngine,
+    storage: Storage,
+    field_pb: resources_pb2.FieldFile,
+    classif_labels: list[ClassificationLabel],
 ) -> str:
-    processing = get_processing()
     if field_pb.file.source == resources_pb2.CloudFile.Source.EXTERNAL:
         file_field = models.FileField(
             language=field_pb.language,
@@ -81,7 +89,6 @@ async def extract_file_field_from_pb(
         )
         return processing.convert_external_filefield_to_str(file_field, classif_labels)
     else:
-        storage = await get_storage(service_name=SERVICE_NAME)
         return await processing.convert_internal_filefield_to_str(field_pb, storage, classif_labels)
 
 
@@ -100,9 +107,12 @@ async def extract_file_field(
 
     if password is not None:
         field_pb.password = password
-
+    processing = get_processing()
+    storage = await get_storage(service_name=SERVICE_NAME)
     classif_labels = resource_classifications.for_field(field_id, resources_pb2.FieldType.FILE)
-    toprocess.filefield[field_id] = await extract_file_field_from_pb(field_pb, classif_labels)
+    toprocess.filefield[field_id] = await _to_push_filefield(
+        processing, storage, field_pb, classif_labels
+    )
 
 
 async def extract_fields(resource: ORMResource, toprocess: PushPayload):
@@ -128,44 +138,79 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
         field_pb = await field.get_value()
         classif_labels = resource_classifications.for_field(field_id, field_type)
         if field_type_name is FieldTypeName.FILE:
-            toprocess.filefield[field_id] = await extract_file_field_from_pb(field_pb, classif_labels)
+            toprocess.filefield[field_id] = await _to_push_filefield(
+                processing, storage, field_pb, classif_labels
+            )
 
         if field_type_name is FieldTypeName.LINK:
-            parsed_link = MessageToDict(
-                field_pb,
-                preserving_proto_field_name=True,
-                always_print_fields_with_no_presence=True,
-            )
-            parsed_link["link"] = parsed_link.pop("uri", None)
-            toprocess.linkfield[field_id] = processing_models.LinkUpload(**parsed_link)
-            toprocess.linkfield[field_id].classification_labels = classif_labels
+            toprocess.linkfield[field_id] = _to_push_linkfield(field_pb, classif_labels)
 
         if field_type_name is FieldTypeName.TEXT:
-            parsed_text = MessageToDict(
-                field_pb,
-                preserving_proto_field_name=True,
-                always_print_fields_with_no_presence=True,
-            )
-            parsed_text["format"] = processing_models.PushTextFormat[parsed_text["format"]]
-            toprocess.textfield[field_id] = processing_models.Text(**parsed_text)
-            toprocess.textfield[field_id].classification_labels = classif_labels
+            toprocess.textfield[field_id] = _to_push_textfield(field_pb, classif_labels)
 
         if field_type_name is FieldTypeName.CONVERSATION and isinstance(field, Conversation):
-            metadata = await field.get_metadata()
-            if metadata.pages == 0:
+            full_conversation = await _to_push_conversationfield(
+                processing, storage, field, classif_labels
+            )
+            if full_conversation is None:
                 continue
-
-            full_conversation = PushConversation(messages=[])
-            for page in range(0, metadata.pages):
-                conversation_pb = await field.get_value(page + 1)
-                if conversation_pb is None:
-                    continue
-                for message in conversation_pb.messages:
-                    full_conversation.messages.append(
-                        await _to_push_message(message, processing, storage)
-                    )
             toprocess.conversationfield[field_id] = full_conversation
-            toprocess.conversationfield[field_id].classification_labels = classif_labels
+
+
+def _to_push_linkfield(
+    field_pb: resources_pb2.FieldLink, classif_labels: list[ClassificationLabel]
+) -> processing_models.LinkUpload:
+    parsed_link = MessageToDict(
+        field_pb,
+        preserving_proto_field_name=True,
+        always_print_fields_with_no_presence=True,
+    )
+    parsed_link["link"] = parsed_link.pop("uri", None)
+    return processing_models.LinkUpload(**parsed_link, classification_labels=classif_labels)
+
+
+def _to_push_textfield(
+    field_pb: resources_pb2.FieldText, classif_labels: list[ClassificationLabel]
+) -> processing_models.Text:
+    parsed_text = MessageToDict(
+        field_pb,
+        preserving_proto_field_name=True,
+        always_print_fields_with_no_presence=True,
+    )
+    parsed_text["format"] = processing_models.PushTextFormat[parsed_text["format"]]
+    return processing_models.Text(**parsed_text, classification_labels=classif_labels)
+
+
+async def _to_push_conversationfield(
+    processing: ProcessingEngine,
+    storage: Storage,
+    field: Conversation,
+    classification_labels: list[ClassificationLabel],
+) -> PushConversation | None:
+    """
+    Converts a Conversation field into a PushConversation model, which includes all messages and attachments, ready to be sent to the processing engine.
+    Returns None if the conversation has no messages.
+    """
+    metadata = await field.get_metadata()
+    if metadata.pages == 0:
+        return None
+
+    full_conversation = PushConversation(
+        messages=[],
+        classification_labels=classification_labels,
+    )
+    for page in range(0, metadata.pages):
+        conversation_pb = await field.get_value(page + 1)
+        if conversation_pb is None:
+            continue
+        for message in conversation_pb.messages:
+            if message.content.text == "":
+                # Do not include empty or deleted messages
+                continue
+            full_conversation.messages.append(await _to_push_message(message, processing, storage))
+    if len(full_conversation.messages) == 0:
+        return None
+    return full_conversation
 
 
 async def parse_fields(
@@ -486,24 +531,33 @@ async def parse_conversation_field(
     field_value = resources_pb2.Conversation(replace_field=replace_field)
     convs = processing_models.PushConversation()
     for message in conversation_field.messages:
+        # Message content
+        processing_message = processing_models.PushMessage(
+            timestamp=message.timestamp,
+            content=processing_models.PushMessageContent(
+                text=message.content.text,
+                format=_to_push_message_format(message.content.format),
+            ),
+            ident=message.ident,
+        )
         cm = resources_pb2.Message()
+        cm.content.text = message.content.text
+        cm.content.format = to_proto.conversation_message_format(message.content.format)
+
+        # Message metadata
         if message.timestamp:
             cm.timestamp.FromDatetime(message.timestamp)
         if message.who:
             cm.who = message.who
+            processing_message.who = message.who
         for to in message.to:
             cm.to.append(to)
+            processing_message.to.append(to)
         cm.ident = message.ident
         if message.type_ is not None:
             cm.type = resources_pb2.Message.MessageType.Value(message.type_.value)
 
-        processing_message_content = processing_models.PushMessageContent(
-            text=message.content.text,
-            format=_to_push_message_format(message.content.format),
-        )
-
-        cm.content.text = message.content.text
-        cm.content.format = to_proto.conversation_message_format(message.content.format)
+        # Message content attachments
         cm.content.attachments_fields.extend(
             [
                 resources_pb2.FieldRef(
@@ -514,7 +568,6 @@ async def parse_conversation_field(
                 for attachment in message.content.attachments_fields
             ]
         )
-
         for idx, file in enumerate(message.content.attachments):
             sf_conv_field: StorageField = storage.conversation_field_attachment(
                 kbid, uuid, field=key, ident=message.ident, attachment_index=idx
@@ -528,21 +581,15 @@ async def parse_conversation_field(
             )
             cm.content.attachments.append(cf_conv_field)
 
-            processing_message_content.attachments.append(
+            processing_message.content.attachments.append(
                 await processing.convert_internal_cf_to_str(cf_conv_field, storage)
             )
 
-        processing_message = processing_models.PushMessage(
-            timestamp=message.timestamp,
-            content=processing_message_content,
-            ident=message.ident,
-        )
-        if message.who:
-            processing_message.who = message.who
-        for to in message.to:
-            processing_message.to.append(to)
+        # Append message to conversation
         convs.messages.append(processing_message)
         field_value.messages.append(cm)
+
+    # Processing options and classification labels
     convs.classification_labels = classif_labels
     if conversation_field.extract_strategy:
         field_value.extract_strategy = conversation_field.extract_strategy
@@ -550,7 +597,14 @@ async def parse_conversation_field(
     if conversation_field.split_strategy:
         field_value.split_strategy = conversation_field.split_strategy
         convs.split_strategy = conversation_field.split_strategy
+
+    # Set the conversation field value in the proto and the processing models
     toprocess.conversationfield[key] = convs
+
+    if not replace_field:
+        # When appending new messages to a conversation, add the generated conversations to push payload too.
+        await add_generated_conversations_to_pushpayload(processing, storage, kbid, uuid, key, toprocess)
+
     writer.conversations[key].CopyFrom(field_value)
     writer.field_statuses.append(
         FieldIDStatus(
@@ -558,6 +612,57 @@ async def parse_conversation_field(
             status=FieldStatus.Status.PENDING,
         )
     )
+
+
+async def add_generated_conversations_to_pushpayload(
+    processing: ProcessingEngine,
+    storage: Storage,
+    kbid: str,
+    resource_id: str,
+    source_field_id: str,
+    toprocess: PushPayload,
+) -> None:
+    """
+    For each conversation field (source_field_id), add the corresponding generated conversation fields to the push payload,
+    so they can be sent to processing to generate new messages upon new messages being appended to the original conversation.
+    """
+    all_field_ids = await datamanagers.atomic.resources.get_all_field_ids(
+        kbid=kbid, rid=resource_id, for_update=False
+    )
+    if all_field_ids is None:
+        return
+    generated_fields = [
+        field_id.field
+        for field_id in all_field_ids.fields
+        if field_id.field_type == resources_pb2.FieldType.CONVERSATION
+        and field_id.field != source_field_id
+        and field_id.field.startswith("da-")
+        and source_field_id in field_id.field
+    ]
+    if len(generated_fields) == 0:
+        return
+
+    resource = await _get_resource(kbid, resource_id, storage)
+    if resource is None:
+        return
+
+    for generated_field_id in generated_fields:
+        gfield = await resource.get_field(
+            generated_field_id, resources_pb2.FieldType.CONVERSATION, load=False
+        )
+        gconversation = await _to_push_conversationfield(processing, storage, gfield, [])
+        if gconversation is None:
+            continue
+        toprocess.generated_conversationfield[generated_field_id] = PushGeneratedConversation(
+            source_field_id=source_field_id,
+            conversationfield=gconversation,
+        )
+
+
+async def _get_resource(kbid: str, rid: str, storage: Storage) -> ORMResource | None:
+    async with datamanagers.with_ro_transaction() as txn:
+        kb = KnowledgeBox(txn, storage, kbid)
+        return await kb.get(rid)
 
 
 async def atomic_get_stored_resource_classifications(
