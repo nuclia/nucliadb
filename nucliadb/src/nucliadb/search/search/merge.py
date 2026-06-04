@@ -209,11 +209,7 @@ async def merge_suggest_paragraph_results(
         text = augmented.text or "" if augmented else ""
         if text and highlight:
             try:
-                text = highlight_paragraph(
-                    text,
-                    words=match.matches,  # type: ignore[arg-type,ty:invalid-argument-type]
-                    ematches=ematches,
-                )
+                text = highlight_paragraph(text, words=match.matches, ematches=ematches)
             except Exception as exc:
                 logger.warning("Error highlighting paragraph", extra={"kbid": kbid}, exc_info=exc)
 
@@ -380,11 +376,7 @@ async def merge_paragraph_results(
         text = augmented.text or "" if augmented else ""
         if text and highlight:
             try:
-                text = highlight_paragraph(
-                    text,
-                    words=result.matches,  # type: ignore[arg-type,ty:invalid-argument-type]
-                    ematches=ematches,
-                )
+                text = highlight_paragraph(text, words=result.matches, ematches=ematches)
             except Exception as exc:
                 logger.warning("Error highlighting paragraph", extra={"kbid": kbid}, exc_info=exc)
 
