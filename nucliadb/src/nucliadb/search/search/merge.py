@@ -47,7 +47,7 @@ from nucliadb.models.internal.augment import Paragraph as AugmentorParagraph
 from nucliadb.search import logger
 from nucliadb.search.augmentor.augmentor import augment_paragraphs
 from nucliadb.search.search.cut import cut_page
-from nucliadb.search.search.fetch import fetch_resources, get_labels_paragraph, get_labels_resource
+from nucliadb.search.search.fetch import fetch_resources, get_labels_resource
 from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
 from nucliadb_models.common import FieldTypeName
@@ -205,7 +205,10 @@ async def merge_suggest_paragraph_results(
             ematches=ematches,  # type: ignore
             matches=result.matches,  # type: ignore
         )
-        labels = await get_labels_paragraph(result, kbid)
+        # bw/c: historically, we returned labels from maindb, which didn't have the
+        # /l prefix. As we now return the labels from the index (which do have the
+        # /l), we trim the prefix
+        labels = list(set((label.removeprefix("/l/") for label in result.labels)))
         new_paragraph = Paragraph(
             score=result.score.bm25,
             rid=result.uuid,
