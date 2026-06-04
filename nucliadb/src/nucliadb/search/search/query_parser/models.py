@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from nidx_protos import nodereader_pb2
@@ -61,8 +62,23 @@ class RelationQuery(BaseModel):
     deleted_entities: dict[str, list[str]]
 
 
+@dataclass
+class GraphVectors:
+    """Pre-computed vector embeddings and metadata for a graph query's semantic terms."""
+
+    node_vectors: dict[str, list[float]] = field(default_factory=dict)
+    relation_vectors: dict[str, list[float]] = field(default_factory=dict)
+    node_vectorset: str | None = None
+    relation_vectorset: str | None = None
+    node_min_score: float = 0.7
+    edge_min_score: float = 0.7
+
+
 class GraphQuery(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     query: GraphPathQuery
+    vectors: GraphVectors | None = None
 
 
 class Query(BaseModel):

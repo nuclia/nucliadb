@@ -87,13 +87,16 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
         "home": RelationNode(value="Home", ntype=RelationNode.NodeType.ENTITY, subtype="PLACE"),
     }
 
+    animals_text = "Cats are bigger than mice but not as big as dogs"
+    paragraph_id = f"{rid}/t/animals/0-{len(animals_text)}"
+
     bmb = BrokerMessageBuilder(
         kbid=standalone_knowledgebox,
         rid=rid,
         source=BrokerMessage.MessageSource.PROCESSOR,
     )
     field = bmb.field_builder("animals", FieldType.TEXT)
-    field.with_extracted_text("Cats are bigger than mice but not as big as dogs")
+    field.with_extracted_text(animals_text)
     field.add_relation(
         nodes["cat"],
         "bigger_than",
@@ -101,6 +104,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
         {node_vectorset: VECTORS["cat"]},
         {edge_vectorset: VECTORS["bigger"]},
         {node_vectorset: VECTORS["mouse"]},
+        paragraph_id=paragraph_id,
     )
     field.add_relation(
         nodes["dog"],
@@ -109,6 +113,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
         {node_vectorset: VECTORS["dog"]},
         {edge_vectorset: VECTORS["bigger"]},
         {node_vectorset: VECTORS["cat"]},
+        paragraph_id=paragraph_id,
     )
     field.add_relation(
         nodes["cat"],
@@ -117,6 +122,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
         {node_vectorset: VECTORS["cat"]},
         {edge_vectorset: VECTORS["faster"]},
         {node_vectorset: VECTORS["dog"]},
+        paragraph_id=paragraph_id,
     )
     field.add_relation(
         nodes["dog"],
@@ -125,6 +131,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
         {node_vectorset: VECTORS["dog"]},
         {edge_vectorset: VECTORS["faster"]},
         {node_vectorset: VECTORS["mouse"]},
+        paragraph_id=paragraph_id,
     )
     field.add_relation(
         nodes["dog"],
@@ -133,6 +140,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
         {node_vectorset: VECTORS["dog"]},
         {edge_vectorset: VECTORS["lives"]},
         {node_vectorset: VECTORS["home"]},
+        paragraph_id=paragraph_id,
     )
     field.add_relation(
         nodes["cat"],
@@ -141,6 +149,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
         {node_vectorset: VECTORS["cat"]},
         {edge_vectorset: VECTORS["lives"]},
         {node_vectorset: VECTORS["home"]},
+        paragraph_id=paragraph_id,
     )
     field.add_relation(
         nodes["mouse"],
@@ -149,6 +158,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
         {node_vectorset: VECTORS["mouse"]},
         {edge_vectorset: VECTORS["lives"]},
         {node_vectorset: VECTORS["world"]},
+        paragraph_id=paragraph_id,
     )
     bm = bmb.build()
 
@@ -412,3 +422,93 @@ async def test_path_queries(
         ]
     )
     assert paths[0]["score"] >= paths[1]["score"]
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_find_graph_semantic_match(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    graph_resource: str,
+):
+    kbid = standalone_knowledgebox
+    predict = get_predict()
+
+    # Semantic source node: searching for paths involving "dog"
+    with patch.object(
+        predict,
+        "query",
+        AsyncMock(
+            return_value=QueryInfo(
+                language=None,
+                visual_llm=False,
+                max_context=10,
+                entities=None,
+                query=None,
+                sentence=None,
+                graph_nodes=GraphNodeSearch(
+                    vectors={
+                        "testing-nodes-model": {
+                            "dog": VECTORS["dog"],
+                        }
+                    }
+                ),
+            )
+        ),
+    ):
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "features": ["graph"],
+                "graph_query": {
+                    "prop": "path",
+                    "source": {
+                        "value": "dog",
+                        "match": "semantic",
+                    },
+                },
+                "top_k": 10,
+            },
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert graph_resource in body["resources"]
+
+    # Semantic relation: searching for paths with a "bigger" relation
+    with patch.object(
+        predict,
+        "query",
+        AsyncMock(
+            return_value=QueryInfo(
+                language=None,
+                visual_llm=False,
+                max_context=10,
+                entities=None,
+                query=None,
+                sentence=None,
+                graph_edges=GraphEdgeSearch(
+                    vectors={
+                        "testing-edges-model": {
+                            "bigger": VECTORS["bigger"],
+                        }
+                    }
+                ),
+            )
+        ),
+    ):
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "features": ["graph"],
+                "graph_query": {
+                    "prop": "path",
+                    "relation": {
+                        "label": "bigger",
+                        "match": "semantic",
+                    },
+                },
+                "top_k": 10,
+            },
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert graph_resource in body["resources"]

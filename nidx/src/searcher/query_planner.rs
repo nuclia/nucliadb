@@ -36,8 +36,6 @@ use std::collections::HashMap;
 
 use super::query_language::extract_label_filters;
 
-const SEMANTIC_MIN_SCORE: f32 = 0.7;
-
 #[derive(Clone)]
 pub struct GraphIndexQueries {
     pub relations_request: GraphSearchRequest,
@@ -61,6 +59,8 @@ impl GraphIndexQueries {
                 &mut vector_node_requests,
                 &mut vector_edge_requests,
                 request.top_k * GRAPH_VECTOR_OVERREQUEST_FACTOR,
+                request.min_score_node_semantic,
+                request.min_score_edge_semantic,
             );
         }
 
@@ -76,6 +76,8 @@ impl GraphIndexQueries {
         node: &mut HashMap<String, VectorSearchRequest>,
         edge: &mut HashMap<String, VectorSearchRequest>,
         top_k: u32,
+        node_min_score: f32,
+        edge_min_score: f32,
     ) {
         let Some(query) = &query.query else {
             return;
@@ -90,7 +92,7 @@ impl GraphIndexQueries {
                         VectorSearchRequest {
                             vector: filter.vector.clone(),
                             result_per_page: top_k as i32,
-                            min_score: SEMANTIC_MIN_SCORE,
+                            min_score: node_min_score,
                             ..Default::default()
                         },
                     );
@@ -103,7 +105,7 @@ impl GraphIndexQueries {
                         VectorSearchRequest {
                             vector: filter.vector.clone(),
                             result_per_page: top_k as i32,
-                            min_score: SEMANTIC_MIN_SCORE,
+                            min_score: node_min_score,
                             ..Default::default()
                         },
                     );
@@ -116,16 +118,18 @@ impl GraphIndexQueries {
                         VectorSearchRequest {
                             vector: filter.vector.clone(),
                             result_per_page: top_k as i32,
-                            min_score: SEMANTIC_MIN_SCORE,
+                            min_score: edge_min_score,
                             ..Default::default()
                         },
                     );
                 }
             }
-            path_query::Query::BoolNot(not) => Self::extract_vector_requests(not, node, edge, top_k),
+            path_query::Query::BoolNot(not) => {
+                Self::extract_vector_requests(not, node, edge, top_k, node_min_score, edge_min_score)
+            }
             path_query::Query::BoolAnd(bool) | path_query::Query::BoolOr(bool) => {
                 for op in &bool.operands {
-                    Self::extract_vector_requests(op, node, edge, top_k);
+                    Self::extract_vector_requests(op, node, edge, top_k, node_min_score, edge_min_score);
                 }
             }
             path_query::Query::Facet(_) => {}
@@ -363,6 +367,8 @@ fn compute_graph_request(search_request: &SearchRequest) -> anyhow::Result<Optio
         kind: QueryKind::Path.into(),
         graph_node_vectorset: search_request.graph_node_vectorset.clone(),
         graph_edge_vectorset: search_request.graph_edge_vectorset.clone(),
+        min_score_node_semantic: search_request.min_score_node_semantic,
+        min_score_edge_semantic: search_request.min_score_edge_semantic,
         // we don't need to populate filters nor shard as they won't be used in search. Prefilter
         // will be done with request filters and shard have been already obtained
         ..Default::default()

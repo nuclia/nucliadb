@@ -317,12 +317,15 @@ class FieldBuilder:
         source_vectors: dict[str, list[float]],
         relation_vectors: dict[str, list[float]],
         target_vectors: dict[str, list[float]],
+        paragraph_id: str | None = None,
     ):
+        metadata = utils_pb2.RelationMetadata(paragraph_id=paragraph_id) if paragraph_id else None
         relation = utils_pb2.Relation(
             source=source,
             to=target,
             relation=utils_pb2.Relation.RelationType.ENTITY,
             relation_label=label,
+            **(dict(metadata=metadata) if metadata else {}),
         )
 
         if len(self._extracted_metadata.metadata.metadata.relations) == 0:
