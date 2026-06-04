@@ -139,20 +139,3 @@ async def get_labels_paragraph(result: ParagraphResult, kbid: str) -> list[str]:
                 labels.append(f"{classification.labelset}/{classification.label}")
 
     return labels
-
-
-async def get_seconds_paragraph(
-    result: ParagraphResult, kbid: str
-) -> tuple[list[int], list[int]] | None:
-    orm_resource = await cache.get_resource(kbid, result.uuid)
-
-    if orm_resource is None:
-        logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": result.uuid})
-        return None
-
-    paragraph = await get_paragraph_from_resource(orm_resource=orm_resource, result=result)
-
-    if paragraph is not None and len(paragraph.end_seconds) > 0 and paragraph.end_seconds[0] > 0:
-        return (list(paragraph.start_seconds), list(paragraph.end_seconds))
-
-    return None
