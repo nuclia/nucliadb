@@ -17,61 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
-from contextvars import ContextVar
 
 from nidx_protos.nodereader_pb2 import DocumentResult
 
-from nucliadb.common.maindb.utils import get_driver
-from nucliadb.ingest.orm.resource import Resource as ResourceORM
-from nucliadb.ingest.serialize import managed_serialize
-from nucliadb.search import SERVICE_NAME, logger
+from nucliadb.search import logger
 from nucliadb.search.search import cache
-from nucliadb_models.common import FieldTypeName
-from nucliadb_models.resource import ExtractedDataTypeName, Resource
-from nucliadb_models.search import ResourceProperties
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
-
-rcache: ContextVar[dict[str, ResourceORM] | None] = ContextVar("rcache", default=None)
-
-
-async def fetch_resources(
-    resources: list[str],
-    kbid: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
-    extracted: list[ExtractedDataTypeName],
-) -> dict[str, Resource]:
-    if ResourceProperties.EXTRACTED in show and has_feature(
-        const.Features.IGNORE_EXTRACTED_IN_SEARCH, context={"kbid": kbid}, default=False
-    ):
-        # Returning extracted metadata in search results is deprecated and this flag
-        # will be set to True for all KBs in the future.
-        show.remove(ResourceProperties.EXTRACTED)
-        extracted = []
-
-    result = {}
-    async with get_driver().ro_transaction() as txn:
-        tasks = []
-        for resource in resources:
-            tasks.append(
-                asyncio.create_task(
-                    managed_serialize(
-                        txn,
-                        kbid,
-                        resource,
-                        show,
-                        field_type_filter=field_type_filter,
-                        extracted=extracted,
-                        service_name=SERVICE_NAME,
-                    )
-                )
-            )
-        for resource, serialization in zip(resources, await asyncio.gather(*tasks)):
-            if serialization is not None:
-                result[resource] = serialization
-    return result
 
 
 async def get_labels_resource(result: DocumentResult, kbid: str) -> list[str]:

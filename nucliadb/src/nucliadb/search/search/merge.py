@@ -46,8 +46,10 @@ from nucliadb.models.internal.augment import AugmentedParagraph, Metadata, Parag
 from nucliadb.models.internal.augment import Paragraph as AugmentorParagraph
 from nucliadb.search import logger
 from nucliadb.search.augmentor.augmentor import augment_paragraphs
+from nucliadb.search.augmentor.resources import augment_resources_deep
 from nucliadb.search.search.cut import cut_page
-from nucliadb.search.search.fetch import fetch_resources, get_labels_resource
+from nucliadb.search.search.fetch import get_labels_resource
+from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
 from nucliadb_models.common import FieldTypeName
@@ -575,7 +577,15 @@ async def merge_results(
             graphs, retrieval.query.relation.entry_points
         )
 
-    api_results.resources = await fetch_resources(resources, kbid, show, field_type_filter, extracted)
+    api_results.resources = await augment_resources_deep(
+        kbid,
+        given=resources,
+        opts=ResourceHydrationOptions(
+            show=show,
+            field_type_filter=field_type_filter,
+            extracted=extracted,
+        ),
+    )
     return api_results
 
 

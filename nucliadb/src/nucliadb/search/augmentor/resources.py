@@ -179,7 +179,7 @@ async def augment_resources_deep(
     opts: ResourceHydrationOptions,
     *,
     concurrency_control: asyncio.Semaphore | None = None,
-) -> dict[str, nucliadb_models.resource.Resource | None]:
+) -> dict[str, nucliadb_models.resource.Resource]:
     """Augment resources using the Resource model. Depending on the options,
     this can serialize resource fields, extracted data like text, vectors...
 
@@ -206,9 +206,10 @@ async def augment_resources_deep(
         ops.append(task)
     results: list[nucliadb_models.resource.Resource | None] = await asyncio.gather(*ops)
 
-    augmented: dict[str, nucliadb_models.resource.Resource | None] = {}
+    augmented: dict[str, nucliadb_models.resource.Resource] = {}
     for rid, augmentation in zip(given, results):
-        augmented[rid] = augmentation
+        if augmentation is not None:
+            augmented[rid] = augmentation
 
     return augmented
 
