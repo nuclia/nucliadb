@@ -125,6 +125,17 @@ class PushConversation(BaseModel):
     classification_labels: list[ClassificationLabel] = []
 
 
+class PushGeneratedConversation(BaseModel):
+    """
+    This model is used to send the generated conversation to processing to possibly generate new messages upon new messages being appended to the original conversation.
+    """
+
+    source_field_id: str = Field(
+        ..., description="Id of the source field this conversation was generated from."
+    )
+    conversationfield: PushConversation
+
+
 class Source(SourceValue, Enum):  # type: ignore
     HTTP = 0
     INGEST = 1
@@ -161,6 +172,11 @@ class PushPayload(BaseModel):
 
     # New conversations to process
     conversationfield: dict[str, PushConversation] = {}
+
+    # Generated conversations to augment
+    generated_conversationfield: dict[str, PushGeneratedConversation] = Field(
+        default={}, description="Map of each generated conversation field id to its metadata and content"
+    )
 
     # Only internal
     partition: int
