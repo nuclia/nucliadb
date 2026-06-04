@@ -435,8 +435,12 @@ async def load_paragraph(
         except Exception as exc:
             logger.warning("Error highlighting paragraph", extra={"kbid": kbid}, exc_info=exc)
 
+    # bw/c: historically, we returned labels from maindb, which didn't have the
+    # /l prefix. As we now return the labels from the index (which do have the
+    # /l), we trim the prefix
+    labels = list(set((label.removeprefix("/l/") for label in result.labels)))
+
     _, field_type, field = result.field.split("/")
-    labels = await get_labels_paragraph(result, kbid)
     fuzzy_result = len(result.matches) > 0
     new_paragraph = Paragraph(
         score=result.score.bm25,
