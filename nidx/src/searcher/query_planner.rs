@@ -45,7 +45,9 @@ pub struct GraphIndexQueries {
 
 // Each relation node or edge may have multiple vectors (one per field occurrence).
 // We request more results than asked for so that duplicates don't crowd out unique nodes.
-const GRAPH_VECTOR_OVERREQUEST_FACTOR: u32 = 4;
+const GRAPH_VECTOR_OVERREQUEST_FACTOR: u32 = 10;
+const GRAPH_VECTOR_REQUEST_MIN: u32 = 50;
+const GRAPH_VECTOR_REQUEST_MAX: u32 = 200;
 
 impl GraphIndexQueries {
     pub fn build(request: GraphSearchRequest) -> Self {
@@ -54,11 +56,14 @@ impl GraphIndexQueries {
         if let Some(query) = &request.query
             && let Some(path_query) = &query.path
         {
+            let vector_top_k = (request.top_k * GRAPH_VECTOR_OVERREQUEST_FACTOR)
+                .clamp(GRAPH_VECTOR_REQUEST_MIN, GRAPH_VECTOR_REQUEST_MAX);
+
             Self::extract_vector_requests(
                 path_query,
                 &mut vector_node_requests,
                 &mut vector_edge_requests,
-                request.top_k * GRAPH_VECTOR_OVERREQUEST_FACTOR,
+                vector_top_k,
                 request.min_score_node_semantic,
                 request.min_score_edge_semantic,
             );
