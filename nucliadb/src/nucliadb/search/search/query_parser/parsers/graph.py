@@ -301,15 +301,13 @@ def _set_relation_to_pb(
         pb.relation_type = RelationTypeMap[relation.type]
 
     if relation.label is not None:
-        pb.exact.SetInParent()
-        # TODO(semantic-graph): Disabled for now, not supported by NUA/processor yet
-        # match relation.match:
-        #     case graph_requests.RelationMatchKindName.EXACT:
-        #         pb.exact.SetInParent()
-        #     case graph_requests.RelationMatchKindName.SEMANTIC:
-        #         pb.vector.vector.extend(relation_vectors[relation.label])
-        #     case _:  # pragma: no cover
-        #         assert_never(relation.match)
+        match relation.match:
+            case graph_requests.RelationMatchKindName.EXACT:
+                pb.exact.SetInParent()
+            case graph_requests.RelationMatchKindName.SEMANTIC:
+                pb.vector.vector.extend(relation_vectors[relation.label])
+            case _:  # pragma: no cover
+                assert_never(relation.match)
 
 
 def _set_generated_to_pb(generated: graph_requests.Generated, pb: nodereader_pb2.GraphQuery.PathQuery):
@@ -351,15 +349,24 @@ async def _calculate_graph_vectors(
     node_vectorset: str = ""
     relation_vectoset: str = ""
 
-    # TODO(semantic-graph): Disabled relations for now, not supported by NUA/processor yet
     # TODO(semantic-graph): Assumming a single vectorset for now
     if nodes or relations:
         predict = get_predict()
-        result = await predict.query(kbid, QueryModel(graph_nodes=list(nodes)))
+        result = await predict.query(
+            kbid,
+            QueryModel(
+                graph_nodes=list(nodes) if nodes else None,
+                graph_edges=list(relations) if relations else None,
+            ),
+        )
         if result.graph_nodes:
             node_vectorset = next(iter(result.graph_nodes.vectors.keys()))
             for node in nodes:
                 node_vectors[node] = result.graph_nodes.vectors[node_vectorset][node]
+        if result.graph_edges:
+            relation_vectoset = next(iter(result.graph_edges.vectors.keys()))
+            for relation in relations:
+                relation_vectors[relation] = result.graph_edges.vectors[relation_vectoset][relation]
 
     return GraphVectors(
         node_vectors=node_vectors,
@@ -401,10 +408,8 @@ def _extract_semantic_terms(
             if query.match == graph_requests.NodeMatchKindName.SEMANTIC and query.value:
                 nodes.add(query.value)
         case graph_requests.GraphRelation():
-            pass
-            # TODO(semantic-graph): Disabled for now, not supported by NUA/processor yet
-            # if query.match == graph_requests.RelationMatchKindName.SEMANTIC and query.label:
-            #     relations.add(query.label)
+            if query.match == graph_requests.RelationMatchKindName.SEMANTIC and query.label:
+                relations.add(query.label)
         case graph_requests.Generated():
             pass
         case None:
