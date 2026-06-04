@@ -41,6 +41,7 @@ from nucliadb.search.search.query_parser.models import (
     UnitRetrieval,
 )
 from nucliadb.search.search.query_parser.parsers.common import query_with_synonyms, validate_query_syntax
+from nucliadb.search.search.query_parser.parsers.graph import _calculate_graph_vectors
 from nucliadb.search.search.utils import filter_hidden_resources, kb_security_enforced
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.retrieval import RetrievalRequest
@@ -185,7 +186,8 @@ class _RetrievalParser:
 
         graph = None
         if query.graph is not None:
-            graph = GraphQuery(query=query.graph.query)
+            vectors = await _calculate_graph_vectors(self.kbid, query.graph.query)
+            graph = GraphQuery(query=query.graph.query, vectors=vectors)
 
         return Query(keyword=keyword, semantic=semantic, graph=graph)
 

@@ -367,8 +367,8 @@ fn compute_graph_request(search_request: &SearchRequest) -> anyhow::Result<Optio
         kind: QueryKind::Path.into(),
         graph_node_vectorset: search_request.graph_node_vectorset.clone(),
         graph_edge_vectorset: search_request.graph_edge_vectorset.clone(),
-        min_score_node_semantic: search_request.min_score_semantic,
-        min_score_edge_semantic: search_request.min_score_semantic,
+        min_score_node_semantic: search_request.min_score_node_semantic,
+        min_score_edge_semantic: search_request.min_score_edge_semantic,
         // we don't need to populate filters nor shard as they won't be used in search. Prefilter
         // will be done with request filters and shard have been already obtained
         ..Default::default()

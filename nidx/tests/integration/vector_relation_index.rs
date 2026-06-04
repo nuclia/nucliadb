@@ -280,6 +280,8 @@ async fn test_relation_path_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
             }),
             graph_node_vectorset: Some("minivectors".to_string()),
             graph_edge_vectorset: Some("minivectors".to_string()),
+            min_score_node_semantic: 0.7,
+            min_score_edge_semantic: 0.7,
             ..Default::default()
         })
         .await?

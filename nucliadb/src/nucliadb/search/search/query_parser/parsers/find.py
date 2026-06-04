@@ -56,6 +56,7 @@ from .common import (
     parse_top_k,
     should_disable_vector_search,
 )
+from .graph import _calculate_graph_vectors
 
 
 @query_parser_observer.wrap({"type": "parse_find"})
@@ -177,7 +178,8 @@ class _FindParser:
             raise InvalidQueryError(
                 "graph_query", "Graph query must be provided when using graph search"
             )
-        return GraphQuery(query=self.item.graph_query)
+        vectors = await _calculate_graph_vectors(self.kbid, self.item.graph_query)
+        return GraphQuery(query=self.item.graph_query, vectors=vectors)
 
     async def _get_detected_entities(self) -> list[utils_pb2.RelationNode]:
         """Get entities from request, either automatically detected or

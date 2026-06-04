@@ -19,7 +19,6 @@
 #
 
 
-from dataclasses import dataclass
 from typing import cast
 
 from nidx_protos import nodereader_pb2
@@ -28,7 +27,7 @@ from typing_extensions import assert_never
 from nucliadb.common.filter_expression import add_and_expression, parse_expression
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationTypeMap
 from nucliadb.search.predict_models import QueryModel
-from nucliadb.search.search.query_parser.models import GraphRetrieval
+from nucliadb.search.search.query_parser.models import GraphRetrieval, GraphVectors
 from nucliadb.search.search.query_parser.parsers.common import DEFAULT_GENERIC_SEMANTIC_THRESHOLD
 from nucliadb.search.search.utils import filter_hidden_resources, kb_security_enforced
 from nucliadb.search.utilities import get_predict
@@ -44,7 +43,7 @@ from nucliadb_protos import utils_pb2
 
 
 async def parse_graph_search(kbid: str, item: graph_requests.GraphSearchRequest) -> GraphRetrieval:
-    vectors = await _calculate_graph_vectors(kbid, item)
+    vectors = await _calculate_graph_vectors(kbid, item.query)
 
     pb = await _parse_common(kbid, item)
     pb.query.path.CopyFrom(parse_path_query(item.query, vectors.node_vectors, vectors.relation_vectors))
@@ -61,7 +60,7 @@ async def parse_graph_search(kbid: str, item: graph_requests.GraphSearchRequest)
 async def parse_graph_node_search(
     kbid: str, item: graph_requests.GraphNodesSearchRequest
 ) -> GraphRetrieval:
-    vectors = await _calculate_graph_vectors(kbid, item)
+    vectors = await _calculate_graph_vectors(kbid, item.query)
 
     pb = await _parse_common(kbid, item)
     pb.query.path.CopyFrom(_parse_node_query(item.query, vectors.node_vectors))
@@ -76,7 +75,7 @@ async def parse_graph_node_search(
 async def parse_graph_relation_search(
     kbid: str, item: graph_requests.GraphRelationsSearchRequest
 ) -> GraphRetrieval:
-    vectors = await _calculate_graph_vectors(kbid, item)
+    vectors = await _calculate_graph_vectors(kbid, item.query)
 
     pb = await _parse_common(kbid, item)
     pb.query.path.CopyFrom(_parse_relation_query(item.query, vectors.relation_vectors))
@@ -335,23 +334,13 @@ def _set_generated_to_pb(generated: graph_requests.Generated, pb: nodereader_pb2
         assert_never(generated.by)
 
 
-@dataclass
-class GraphVectors:
-    node_vectors: dict[str, list[float]]
-    relation_vectors: dict[str, list[float]]
-    node_vectorset: str | None
-    relation_vectorset: str | None
-    node_min_score: float
-    edge_min_score: float
-
-
 async def _calculate_graph_vectors(
     kbid: str,
-    request: AnyGraphRequest,
+    query: GraphPathQueryType | GraphNodesQueryType | GraphRelationsQueryType,
 ) -> GraphVectors:
     nodes: set[str] = set()
     relations: set[str] = set()
-    _extract_semantic_terms(request.query, nodes, relations)
+    _extract_semantic_terms(query, nodes, relations)
 
     node_vectors: dict[str, list[float]] = {}
     relation_vectors: dict[str, list[float]] = {}

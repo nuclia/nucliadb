@@ -186,9 +186,18 @@ class _Converter:
     def _apply_graph_query(self) -> None:
         if self.retrieval.query.graph is None:
             return
-
-        q = parse_path_query(self.retrieval.query.graph.query, {}, {})
+        g = self.retrieval.query.graph
+        node_vectors = g.vectors.node_vectors if g.vectors else {}
+        relation_vectors = g.vectors.relation_vectors if g.vectors else {}
+        q = parse_path_query(g.query, node_vectors, relation_vectors)
         self.req.graph_search.query.path.CopyFrom(q)
+        if g.vectors:
+            if g.vectors.node_vectorset:
+                self.req.graph_node_vectorset = g.vectors.node_vectorset
+            if g.vectors.relation_vectorset:
+                self.req.graph_edge_vectorset = g.vectors.relation_vectorset
+            self.req.min_score_node_semantic = g.vectors.node_min_score
+            self.req.min_score_edge_semantic = g.vectors.edge_min_score
 
     def _apply_filters(self) -> None:
         self.req.with_duplicates = self.retrieval.filters.with_duplicates
