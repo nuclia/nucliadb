@@ -63,7 +63,7 @@ def s3() -> Iterator[str]:
     container.stop()
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def session_s3_storage_settings(s3: str) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
     settings = {
         "file_backend": FileBackendConfig.S3,
