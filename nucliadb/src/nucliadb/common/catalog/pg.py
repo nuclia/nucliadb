@@ -173,34 +173,37 @@ class PGCatalog(Catalog):
 
     @search_observer.wrap({"op": "catalog_facets"})
     async def facets(self, kbid: str, request: CatalogFacetsRequest) -> dict[str, int]:
-        async with _pg_driver()._get_connection() as conn, conn.cursor() as cur:
-            prefix_filters: list[sql.Composable] = []
-            prefix_params: dict[str, Any] = {}
-            for cnt, prefix in enumerate(request.prefixes):
-                prefix_sql = sql.SQL("facet LIKE {}").format(sql.Placeholder(f"prefix{cnt}"))
-                prefix_params[f"prefix{cnt}"] = f"{prefix.prefix}%"
-                if prefix.depth is not None:
-                    prefix_parts = len(prefix.prefix.split("/"))
-                    depth_sql = sql.SQL("SPLIT_PART(facet, '/', {}) = ''").format(
-                        sql.Placeholder(f"depth{cnt}")
-                    )
-                    prefix_params[f"depth{cnt}"] = prefix_parts + prefix.depth + 1
-                    prefix_sql = sql.SQL("({} AND {})").format(prefix_sql, depth_sql)
-                prefix_filters.append(prefix_sql)
+        prefix_filters: list[sql.Composable] = []
+        prefix_params: dict[str, Any] = {}
+        for cnt, prefix in enumerate(request.prefixes):
+            prefix_sql = sql.SQL("facet LIKE {}").format(sql.Placeholder(f"prefix{cnt}"))
+            prefix_params[f"prefix{cnt}"] = f"{prefix.prefix}%"
+            if prefix.depth is not None:
+                prefix_parts = len(prefix.prefix.split("/"))
+                depth_sql = sql.SQL("SPLIT_PART(facet, '/', {}) = ''").format(
+                    sql.Placeholder(f"depth{cnt}")
+                )
+                prefix_params[f"depth{cnt}"] = prefix_parts + prefix.depth + 1
+                prefix_sql = sql.SQL("({} AND {})").format(prefix_sql, depth_sql)
+            prefix_filters.append(prefix_sql)
 
-            filter_sql: sql.Composable
-            if prefix_filters:
-                filter_sql = sql.SQL("AND {}").format(sql.SQL(" OR ").join(prefix_filters))
-            else:
-                filter_sql = sql.SQL("")
+        filter_sql: sql.Composable
+        if prefix_filters:
+            filter_sql = sql.SQL("AND {}").format(sql.SQL(" OR ").join(prefix_filters))
+        else:
+            filter_sql = sql.SQL("")
 
-            await cur.execute(
-                sql.SQL(
-                    "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s {} GROUP BY facet"
-                ).format(filter_sql),
-                {"kbid": kbid, **prefix_params},
-            )
-            return {k: v for k, v in await cur.fetchall()}
+        async with _pg_driver()._get_connection() as conn:
+            async with conn.transaction(), conn.cursor() as cur:
+                # We really don't want sequential table scans here, set a high cost for the duration of the transaction
+                await cur.execute("SET LOCAL seq_page_cost = 5")
+                await cur.execute(
+                    sql.SQL(
+                        "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s {} GROUP BY facet"
+                    ).format(filter_sql),
+                    {"kbid": kbid, **prefix_params},
+                )
+                return {k: v for k, v in await cur.fetchall()}
 
 
 def _prepare_query_filters(catalog_query: CatalogQuery) -> tuple[sql.Composable, dict[str, Any]]:
