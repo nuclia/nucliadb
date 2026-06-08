@@ -200,10 +200,10 @@ pub struct MetadataSettings {
 }
 
 impl MetadataSettings {
-    fn default_idle_timeout() -> u64 {
+    pub fn default_idle_timeout() -> u64 {
         300
     }
-    fn default_max_lifetime() -> u64 {
+    pub fn default_max_lifetime() -> u64 {
         1800
     }
 }
