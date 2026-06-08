@@ -55,6 +55,30 @@ class DriverSettings(BaseSettings):
         default=1000,
         description="PostgreSQL pool acquire timeout in ms. The maximum time to wait until a connection becomes available.",
     )
+    driver_pg_connection_pool_max_idle_seconds: float = Field(
+        default=300.0,
+        description="PostgreSQL pool max idle time in seconds. Connections idle longer than this are closed.",
+    )
+    driver_pg_connection_pool_max_lifetime_seconds: float = Field(
+        default=1800.0,
+        description="PostgreSQL pool max connection lifetime in seconds. Connections older than this are recycled.",
+    )
+    driver_pg_keepalives: bool = Field(
+        default=True,
+        description="Enable TCP keepalives on PostgreSQL connections.",
+    )
+    driver_pg_keepalives_idle_seconds: int = Field(
+        default=30,
+        description="Seconds of idle time before sending a TCP keepalive probe.",
+    )
+    driver_pg_keepalives_interval_seconds: int = Field(
+        default=10,
+        description="Seconds between TCP keepalive probes.",
+    )
+    driver_pg_keepalives_count: int = Field(
+        default=3,
+        description="Number of missed TCP keepalive probes before the connection is considered dead.",
+    )
     driver_pg_log_on_select_for_update: bool = Field(
         default=False,
         description="If true, log a warning when a SELECT FOR UPDATE is executed. This is useful to detect potential deadlocks.",

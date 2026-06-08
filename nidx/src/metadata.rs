@@ -46,9 +46,17 @@ pub struct NidxMetadata {
 
 impl NidxMetadata {
     pub async fn new(settings: &MetadataSettings) -> sqlx::Result<Self> {
+        let connect_options: sqlx::postgres::PgConnectOptions = settings
+            .database_url
+            .parse()
+            .map_err(|e| sqlx::Error::Configuration(format!("Invalid database URL: {e}").into()))?;
+
         let pool = sqlx::postgres::PgPoolOptions::new()
             .acquire_timeout(Duration::from_secs(2))
-            .connect(&settings.database_url)
+            .idle_timeout(Duration::from_secs(settings.idle_timeout_seconds))
+            .max_lifetime(Duration::from_secs(settings.max_lifetime_seconds))
+            .test_before_acquire(true)
+            .connect_with(connect_options)
             .await?;
 
         if !settings.disable_migrations {

@@ -53,6 +53,12 @@ async def setup_driver() -> Driver:
             connection_pool_min_size=settings.driver_pg_connection_pool_min_size,
             connection_pool_max_size=settings.driver_pg_connection_pool_max_size,
             acquire_timeout_ms=settings.driver_pg_connection_pool_acquire_timeout_ms,
+            max_idle_seconds=settings.driver_pg_connection_pool_max_idle_seconds,
+            max_lifetime_seconds=settings.driver_pg_connection_pool_max_lifetime_seconds,
+            keepalives=settings.driver_pg_keepalives,
+            keepalives_idle_seconds=settings.driver_pg_keepalives_idle_seconds,
+            keepalives_interval_seconds=settings.driver_pg_keepalives_interval_seconds,
+            keepalives_count=settings.driver_pg_keepalives_count,
         )
         set_utility(Utility.MAINDB_DRIVER, pg_driver)
     else:
