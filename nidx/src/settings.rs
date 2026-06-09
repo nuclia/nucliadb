@@ -191,21 +191,10 @@ pub struct MetadataSettings {
     pub database_url: String,
     #[serde(default)]
     pub disable_migrations: bool,
-    /// Max idle time for pooled connections in seconds (default: 300s).
-    #[serde(default = "MetadataSettings::default_idle_timeout")]
-    pub idle_timeout_seconds: u64,
-    /// Max lifetime for pooled connections in seconds (default: 1800s).
-    #[serde(default = "MetadataSettings::default_max_lifetime")]
-    pub max_lifetime_seconds: u64,
-}
-
-impl MetadataSettings {
-    pub fn default_idle_timeout() -> u64 {
-        300
-    }
-    pub fn default_max_lifetime() -> u64 {
-        1800
-    }
+    /// Max idle time for pooled connections in seconds (empty for default).
+    pub idle_timeout_seconds: Option<u64>,
+    /// Max lifetime for pooled connections in seconds (empty for default).
+    pub max_lifetime_seconds: Option<u64>,
 }
 
 #[derive(Clone, Deserialize, Debug)]

@@ -51,13 +51,17 @@ impl NidxMetadata {
             .parse()
             .map_err(|e| sqlx::Error::Configuration(format!("Invalid database URL: {e}").into()))?;
 
-        let pool = sqlx::postgres::PgPoolOptions::new()
-            .acquire_timeout(Duration::from_secs(2))
-            .idle_timeout(Duration::from_secs(settings.idle_timeout_seconds))
-            .max_lifetime(Duration::from_secs(settings.max_lifetime_seconds))
-            .test_before_acquire(true)
-            .connect_with(connect_options)
-            .await?;
+        let mut pool_options = sqlx::postgres::PgPoolOptions::new().acquire_timeout(Duration::from_secs(2));
+
+        if let Some(idle_timeout_seconds) = settings.idle_timeout_seconds {
+            pool_options = pool_options.idle_timeout(Duration::from_secs(idle_timeout_seconds));
+        }
+
+        if let Some(max_lifetime_seconds) = settings.max_lifetime_seconds {
+            pool_options = pool_options.max_lifetime(Duration::from_secs(max_lifetime_seconds));
+        }
+
+        let pool = pool_options.connect_with(connect_options).await?;
 
         if !settings.disable_migrations {
             Self::run_migrations(&pool).await?;

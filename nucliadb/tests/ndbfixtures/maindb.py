@@ -126,7 +126,7 @@ async def pg_maindb_settings(request) -> AsyncIterator[DriverSettings]:
     yield DriverSettings(
         driver=DriverConfig.PG,
         driver_pg_url=url,
-        driver_pg_connection_pool_min_size=10,
+        driver_pg_connection_pool_min_size=2,
         driver_pg_connection_pool_max_size=10,
         driver_pg_connection_pool_acquire_timeout_ms=200,
     )

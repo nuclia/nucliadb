@@ -22,14 +22,6 @@ env: {}
   # DRIVER_PG_CONNECTION_POOL_MAX_IDLE_SECONDS: "300"
   # -- PostgreSQL connection pool max lifetime in seconds
   # DRIVER_PG_CONNECTION_POOL_MAX_LIFETIME_SECONDS: "1800"
-  # -- PostgreSQL TCP keepalive settings
-  # DRIVER_PG_KEEPALIVES: "true"
-  # -- PostgreSQL Idle time before first keepalive probe
-  # DRIVER_PG_KEEPALIVES_IDLE_SECONDS: "30"
-  # -- PostgreSQL interval between keepalive probes
-  # DRIVER_PG_KEEPALIVES_INTERVAL_SECONDS: "10"
-  # -- PostgreSQL count of keepalive probes before declaring the connection dead
-  # DRIVER_PG_KEEPALIVES_COUNT: "3"
 
 # Configmap and/or secrets to mount into the environment
 envFrom:

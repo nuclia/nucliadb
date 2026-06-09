@@ -62,8 +62,8 @@ impl NidxFixture {
                 metadata: Some(MetadataSettings {
                     database_url: "ignored".to_string(),
                     disable_migrations: false,
-                    idle_timeout_seconds: MetadataSettings::default_idle_timeout(),
-                    max_lifetime_seconds: MetadataSettings::default_max_lifetime(),
+                    idle_timeout_seconds: None,
+                    max_lifetime_seconds: None,
                 }),
                 telemetry: Default::default(),
                 work_path: None,
