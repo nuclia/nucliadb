@@ -167,8 +167,7 @@ fn data_merge() -> anyhow::Result<()> {
     let dp1 = segment::create(dp1_path.path(), elems1, &v1_config, HashSet::new()).unwrap();
     assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV1>().is_some());
 
-    let no_dels = HashSet::new();
-    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
+    let work = vec![&dp1, &dp0];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &v1_config).unwrap();
@@ -189,8 +188,7 @@ fn data_merge() -> anyhow::Result<()> {
     dp0.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
     dp1.apply_deletions(&[FieldKey::from_field_id(&key0).unwrap()].into());
     dp1.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
-    let no_dels = HashSet::new();
-    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
+    let work = vec![&dp1, &dp0];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &v1_config).unwrap();
@@ -217,8 +215,7 @@ fn data_merge_v2() -> anyhow::Result<()> {
     let dp1 = segment::create(dp1_path.path(), elems1, &CONFIG, HashSet::new()).unwrap();
     assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
 
-    let no_dels = HashSet::new();
-    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
+    let work = vec![&dp1, &dp0];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &CONFIG).unwrap();
@@ -239,8 +236,7 @@ fn data_merge_v2() -> anyhow::Result<()> {
     dp0.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
     dp1.apply_deletions(&[FieldKey::from_field_id(&key0).unwrap()].into());
     dp1.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
-    let no_dels = HashSet::new();
-    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
+    let work = vec![&dp1, &dp0];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &CONFIG).unwrap();
@@ -270,8 +266,7 @@ fn data_merge_mixed() -> anyhow::Result<()> {
     let dp1 = segment::create(dp1_path.path(), elems1, &CONFIG, HashSet::new()).unwrap();
     assert!(dp1.data_store.as_any().downcast_ref::<DataStoreV2>().is_some());
 
-    let no_dels = HashSet::new();
-    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
+    let work = vec![&dp1, &dp0];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &CONFIG).unwrap();
@@ -292,8 +287,7 @@ fn data_merge_mixed() -> anyhow::Result<()> {
     dp0.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
     dp1.apply_deletions(&[FieldKey::from_field_id(&key0).unwrap()].into());
     dp1.apply_deletions(&[FieldKey::from_field_id(&key1).unwrap()].into());
-    let no_dels = HashSet::new();
-    let work = vec![(&dp1, &no_dels), (&dp0, &no_dels)];
+    let work = vec![&dp1, &dp0];
 
     let dp_path = tempdir()?;
     let dp = segment::merge(dp_path.path(), work, &CONFIG).unwrap();
@@ -438,8 +432,7 @@ fn fast_data_merge() -> VectorR<()> {
     )?;
 
     // Merge without deletions
-    let no_dels = HashSet::new();
-    let work = vec![(&big_segment, &no_dels), (&small_segment, &no_dels)];
+    let work = vec![(&big_segment), (&small_segment)];
     let output_dir = tempfile::tempdir()?;
     let t = Instant::now();
     let dp = segment::merge(output_dir.path(), work, &CONFIG)?;
@@ -460,7 +453,7 @@ fn fast_data_merge() -> VectorR<()> {
         .apply_deletions(&[FieldKey::from_field_id("00000000000000000000000000000000/f/file/0-100").unwrap()].into());
     small_segment
         .apply_deletions(&[FieldKey::from_field_id("00000000000000000000000000000002/f/file/0-100").unwrap()].into());
-    let work = vec![(&big_segment, &no_dels), (&small_segment, &no_dels)];
+    let work = vec![(&big_segment), (&small_segment)];
     let output_dir = tempfile::tempdir()?;
     let t = Instant::now();
     let dp = segment::merge(output_dir.path(), work, &CONFIG)?;

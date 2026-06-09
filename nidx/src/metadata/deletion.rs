@@ -54,7 +54,7 @@ impl Deletion {
     ) -> Result<Vec<Deletion>, sqlx::Error> {
         sqlx::query_as!(
             Deletion,
-            "SELECT * FROM deletions WHERE index_id = $1 AND seq <= $2",
+            "SELECT * FROM deletions WHERE index_id = $1 AND seq <= $2 ORDER BY seq ASC",
             index_id as IndexId,
             i64::from(&seq)
         )

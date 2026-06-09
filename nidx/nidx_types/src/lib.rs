@@ -54,8 +54,8 @@ pub struct SegmentMetadata<T> {
 
 /// The metadata needed to open an index: a list of segments and deletions.
 pub trait OpenIndexMetadata<T> {
-    /// List of segments and Seq
+    /// Segments in ascending `Seq` order (oldest first).
     fn segments(&self) -> impl DoubleEndedIterator<Item = (SegmentMetadata<T>, Seq)>;
-    /// List of deletions and Seq
+    /// Deletions in ascending `Seq` order (oldest first).
     fn deletions(&self) -> impl DoubleEndedIterator<Item = (&String, Seq)>;
 }

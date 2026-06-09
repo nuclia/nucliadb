@@ -231,7 +231,9 @@ mod tests {
         indexer::{delete_resource, index_resource},
         metadata::{IndexConfig, NidxMetadata, Shard},
     };
+    use nidx_protos::StringList;
     use nidx_tests::*;
+    use nidx_vector::config::{VectorConfig, VectorType};
 
     #[sqlx::test]
     async fn test_merge_deleted_resource(pool: sqlx::PgPool) -> anyhow::Result<()> {
@@ -268,6 +270,78 @@ mod tests {
         // Results in no segments
         let segments = index.segments(&meta.pool).await.unwrap();
         assert_eq!(segments.len(), 0);
+
+        Ok(())
+    }
+
+    /// Regression test for a bug where merging two segments — when the database returns them in
+    /// descending ID order (newest ID first) — caused the newest resource's vectors to be
+    /// incorrectly deleted. This is because the nidx_vector opener was order sensitive.
+    #[sqlx::test]
+    async fn test_merge_keeps_new_resource_when_segment_order_is_reversed(pool: sqlx::PgPool) -> anyhow::Result<()> {
+        const VECTOR_CONFIG: VectorConfig = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: 3 });
+
+        let meta = NidxMetadata::new_with_pool(pool).await?;
+        let storage = Arc::new(object_store::memory::InMemory::new());
+        let work_dir = tempdir()?;
+
+        let kbid = Uuid::new_v4();
+        let shard = Shard::create(&meta.pool, kbid).await?;
+        let index = Index::create(&meta.pool, shard.id, "multilingual", VECTOR_CONFIG.into()).await?;
+
+        // Index resource2 FIRST so its segment gets a lower database ID. Postgres tends to return
+        // in insertion-order when there is no ORDER BY (might be affected by fragmentation in table)
+        let mut resource2 = little_prince(shard.id.to_string(), None);
+        let rid2 = resource2.resource.as_ref().unwrap().uuid.clone();
+        // Add same-seq deletion for resource2's own field — the atomic update pattern.
+        resource2.vector_prefixes_to_delete.insert(
+            "multilingual".to_string(),
+            StringList {
+                items: vec![format!("{rid2}/a/summary")],
+            },
+        );
+        index_resource(
+            &meta,
+            storage.clone(),
+            work_dir.path(),
+            &shard.id.to_string(),
+            resource2,
+            3i64.into(),
+        )
+        .await?;
+
+        let segments_after_r2 = index.segments(&meta.pool).await?;
+        assert_eq!(segments_after_r2.len(), 1);
+
+        // Index resource1 at seq=1
+        let resource1 = little_prince(shard.id.to_string(), None);
+        index_resource(
+            &meta,
+            storage.clone(),
+            work_dir.path(),
+            &shard.id.to_string(),
+            resource1,
+            1i64.into(),
+        )
+        .await?;
+
+        let segments_after_r1 = index.segments(&meta.pool).await?;
+        assert_eq!(segments_after_r1.len(), 2);
+
+        // Merge both segments together with job.seq = 3
+        let live_segments = index.segments(&meta.pool).await?;
+        let all_ids: Vec<_> = live_segments.iter().map(|s| s.id).collect();
+        let merge_job2 = MergeJob::create(&meta, index.id, &all_ids, 3i64.into(), 0).await?;
+        run_job(&meta, &merge_job2, storage.clone(), work_dir.path()).await?;
+
+        let final_segments = index.segments(&meta.pool).await?;
+        assert_eq!(final_segments.len(), 1, "merge should produce exactly one segment");
+
+        // Both resources must survive. The bug causes this to be 1 instead of 2.
+        assert_eq!(
+            final_segments[0].records, 2,
+            "merged segment must contain vectors from both resources"
+        );
 
         Ok(())
     }
