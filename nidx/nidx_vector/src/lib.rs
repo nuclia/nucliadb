@@ -43,7 +43,7 @@ use searcher::Searcher;
 use segment::OpenSegment;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::iter::Peekable;
+use std::iter::{Peekable, Rev};
 use std::path::Path;
 use thiserror::Error;
 use tracing::instrument;
@@ -168,37 +168,30 @@ fn open_segments(
     Ok(open_segments)
 }
 
-struct SegmentDeletions<'a, S, D>
-where
-    S: Iterator,
-    D: Iterator,
-{
-    segments: S,
-    deletions: Peekable<D>,
+struct SegmentDeletions<'a> {
+    segments: Rev<std::vec::IntoIter<(VectorSegmentMetadata, nidx_types::Seq)>>,
+    deletions: Peekable<Rev<std::vec::IntoIter<(&'a String, nidx_types::Seq)>>>,
     deletions_so_far: HashSet<FieldKey<'a>>,
 }
 
-/// Should be SegmentDeletions::new but this runs into less problems with type inference
-fn segment_deletions<'a>(
-    open_index: &'a impl OpenIndexMetadata<VectorSegmentMeta>,
-) -> SegmentDeletions<
-    'a,
-    impl Iterator<Item = (VectorSegmentMetadata, nidx_types::Seq)>,
-    impl Iterator<Item = (&'a String, nidx_types::Seq)>,
-> {
+fn segment_deletions<'a>(open_index: &'a impl OpenIndexMetadata<VectorSegmentMeta>) -> SegmentDeletions<'a> {
+    // The segments and deletions should come ordered here already, but given that sorting is fast
+    // compared to merge, and a wrong sorting can lead to incorrect merges, we sort again.
+    let mut segments: Vec<_> = open_index.segments().collect();
+    segments.sort_by_key(|(_, seq)| *seq);
+
+    let mut deletions: Vec<_> = open_index.deletions().collect();
+    deletions.sort_by_key(|(_, seq)| *seq);
+
     SegmentDeletions {
-        segments: open_index.segments().rev(),
-        deletions: open_index.deletions().rev().peekable(),
+        segments: segments.into_iter().rev(),
+        deletions: deletions.into_iter().rev().peekable(),
         deletions_so_far: HashSet::new(),
     }
 }
 
-impl<'a: 'b, 'b, S, D> SegmentDeletions<'a, S, D>
-where
-    S: Iterator<Item = (VectorSegmentMetadata, nidx_types::Seq)>,
-    D: Iterator<Item = (&'a String, nidx_types::Seq)>,
-{
-    fn next(&mut self) -> Option<(VectorSegmentMetadata, &HashSet<FieldKey<'b>>)> {
+impl<'a> SegmentDeletions<'a> {
+    fn next(&mut self) -> Option<(VectorSegmentMetadata, &HashSet<FieldKey<'a>>)> {
         let (segment, segment_seq) = self.segments.next()?;
         while let Some(d) = self.deletions.peek()
             && d.1 > segment_seq
