@@ -204,9 +204,13 @@ impl Segment {
         meta: impl Executor<'_, Database = Postgres>,
         merge_job_id: i64,
     ) -> sqlx::Result<Vec<Segment>> {
-        sqlx::query_as!(Segment, "SELECT * FROM segments WHERE merge_job_id = $1", merge_job_id)
-            .fetch_all(meta)
-            .await
+        sqlx::query_as!(
+            Segment,
+            "SELECT * FROM segments WHERE merge_job_id = $1 ORDER BY seq ASC",
+            merge_job_id
+        )
+        .fetch_all(meta)
+        .await
     }
 
     pub fn metadata<T: for<'de> Deserialize<'de>>(&self, path: PathBuf) -> SegmentMetadata<T> {
