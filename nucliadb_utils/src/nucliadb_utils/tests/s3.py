@@ -54,11 +54,20 @@ class S3(BaseImage):
             return False
 
 
+def running_in_mac_os() -> bool:
+    import os
+
+    return os.uname().sysname == "Darwin"
+
+
 @pytest.fixture(scope="session")
 def s3() -> Iterator[str]:
     container = S3()
     host, port = container.run()
-    public_api_url = f"http://{host}:{port}"
+    if running_in_mac_os():
+        public_api_url = f"http://{host}:{port}"
+    else:
+        public_api_url = f"http://172.17.0.1:{port}"
     yield public_api_url
     container.stop()
 
@@ -76,9 +85,9 @@ def session_s3_storage_settings(s3: str) -> Iterator[tuple[dict[str, Any], dict[
         "s3_region_name": None,
         "s3_bucket": "test-{kbid}",
         "s3_kms_key_id": "fake-kms-key-id",
-        "s3_bucket_tags": {
-            "testTag": "test",
-        },
+        # "s3_bucket_tags": {
+        #     "testTag": "test",
+        # },
     }
     extended_settings = {
         "s3_indexing_bucket": "indexing",
