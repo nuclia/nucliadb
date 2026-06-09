@@ -94,29 +94,25 @@ pub fn open(metadata: VectorSegmentMetadata, config: &VectorConfig) -> VectorR<O
     })
 }
 
-pub fn merge(
-    segment_path: &Path,
-    mut operants: Vec<(&OpenSegment, &HashSet<FieldKey>)>,
-    config: &VectorConfig,
-) -> VectorR<OpenSegment> {
+pub fn merge(segment_path: &Path, mut operants: Vec<&OpenSegment>, config: &VectorConfig) -> VectorR<OpenSegment> {
     // Sort largest operant first so we reuse as much of the HNSW as possible
-    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.0.metadata.records));
+    operants.sort_unstable_by_key(|o| std::cmp::Reverse(o.metadata.records));
 
     // Tags for all segments are the same (this should not happen, prepare_merge ensures it)
-    let tags = &operants[0].0.metadata.index_metadata.tags;
-    for (segment, _) in &operants {
+    let tags = &operants[0].metadata.index_metadata.tags;
+    for segment in &operants {
         if &segment.metadata.index_metadata.tags != tags {
             return Err(crate::VectorErr::InconsistentMergeSegmentTags);
         }
     }
 
-    let segments = operants.iter().map(|(s, _)| *s).collect();
+    let segments = operants.to_vec();
 
     // Creating the node store
     if config.flags.contains(&flags::FORCE_DATA_STORE_V1.to_string()) {
         // V1 can only merge from V1
         let mut node_producers = Vec::new();
-        for (segment, _) in &operants {
+        for segment in &operants {
             node_producers.push((
                 segment.alive_paragraphs(),
                 segment
@@ -133,7 +129,7 @@ pub fn merge(
     } else {
         let node_producers = operants
             .iter()
-            .map(|(s, _)| (s.alive_paragraphs(), s.data_store.as_ref()))
+            .map(|s| (s.alive_paragraphs(), s.data_store.as_ref()))
             .collect();
 
         DataStoreV2::merge(segment_path, node_producers, config)?;
@@ -586,6 +582,7 @@ impl OpenSegment {
         let mut scored_results = Vec::new();
 
         let t = Instant::now();
+
         for paragraph_addr in bitset.iter() {
             let paragraph = retriever.data_store.get_paragraph(paragraph_addr);
 
@@ -818,8 +815,7 @@ mod test {
             HashSet::new(),
         )?;
 
-        let no_dels = HashSet::new();
-        let work = vec![(&dp1, &no_dels), (&dp2, &no_dels)];
+        let work = vec![&dp1, &dp2];
         let path_merged = tempdir()?;
         let merged_dp = merge(path_merged.path(), work, &config)?;
 

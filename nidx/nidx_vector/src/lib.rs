@@ -105,17 +105,17 @@ impl VectorIndexer {
         config: VectorConfig,
         open_index: impl OpenIndexMetadata<VectorSegmentMeta>,
     ) -> anyhow::Result<VectorSegmentMetadata> {
-        let mut open_segments: Vec<(OpenSegment, HashSet<FieldKey>)> = Vec::new();
+        let mut open_segments: Vec<OpenSegment> = Vec::new();
 
         let mut segment_deletions = segment_deletions(&open_index);
         while let Some((segment, deletions)) = segment_deletions.next() {
             let mut open_segment = segment::open(segment, &config)?;
             open_segment.apply_deletions(deletions);
-            open_segments.push((open_segment, deletions.clone()));
+            open_segments.push(open_segment);
         }
 
         // Do the merge
-        let open_segments_ref = open_segments.iter().map(|(s, d)| (s, d)).collect();
+        let open_segments_ref = open_segments.iter().collect();
         let open_destination = segment::merge(work_dir, open_segments_ref, &config)?;
 
         Ok(open_destination.into_metadata())
