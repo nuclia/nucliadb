@@ -36,6 +36,7 @@ from nucliadb_telemetry import metrics
 
 RETRIABLE_EXCEPTIONS = (
     psycopg_pool.PoolTimeout,
+    psycopg.OperationalError,
     OSError,
     ConnectionResetError,
 )
@@ -278,25 +279,35 @@ class PGDriver(Driver):
     def __init__(
         self,
         url: str,
-        connection_pool_min_size: int = 10,
+        connection_pool_min_size: int = 2,
         connection_pool_max_size: int = 10,
         acquire_timeout_ms: int = 200,
+        max_idle_seconds: float | None = None,
+        max_lifetime_seconds: float | None = None,
     ):
         self.url = url
         self.connection_pool_min_size = connection_pool_min_size
         self.connection_pool_max_size = connection_pool_max_size
         self.acquire_timeout_ms = acquire_timeout_ms
+        self.max_idle_seconds = max_idle_seconds
+        self.max_lifetime_seconds = max_lifetime_seconds
         self._lock = asyncio.Lock()
 
     async def initialize(self):
         async with self._lock:
             if self.initialized is False:
+                optional_args: dict[str, Any] = {}
+                if self.max_idle_seconds is not None:
+                    optional_args["max_idle"] = self.max_idle_seconds
+                if self.max_lifetime_seconds is not None:
+                    optional_args["max_lifetime"] = self.max_lifetime_seconds
                 self.pool = psycopg_pool.AsyncConnectionPool(
                     self.url,
                     min_size=self.connection_pool_min_size,
                     max_size=self.connection_pool_max_size,
                     check=psycopg_pool.AsyncConnectionPool.check_connection,
                     open=False,
+                    **optional_args,
                 )
                 await self.pool.open()
 

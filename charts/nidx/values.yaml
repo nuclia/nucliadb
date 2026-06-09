@@ -39,6 +39,12 @@ env: {}
   # INDEXER__TIMEOUT: "120"
   # -- Azure storage account key for indexer.
   # INDEXER__ACCOUNT_KEY: "your-azure-account-key"
+  # -- Database URL for indexer metadata storage (e.g. PostgreSQL).
+  # METADATA__DATABASE_URL: postgres://user:password@host:port/dbname
+  # -- PostgreSQL Pool idle timeout in seconds for indexer metadata storage.
+  # METADATA__IDLE_TIMEOUT_SECONDS: "300"
+  # -- PostgreSQL Pool max lifetime in seconds for indexer metadata storage.
+  # METADATA__MAX_LIFETIME_SECONDS: "1800"
   # -- Object store backend type for storage.
   # STORAGE__OBJECT_STORE: s3
   # -- S3 bucket name used by storage.

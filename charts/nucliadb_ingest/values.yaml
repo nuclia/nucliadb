@@ -18,6 +18,10 @@ image: IMAGE_TO_REPLACE
 # settings not mapped directly through env
 env: {}
   # EXAMPLE: "VALUE"
+  # -- PostgreSQL connection pool max idle time in seconds
+  # DRIVER_PG_CONNECTION_POOL_MAX_IDLE_SECONDS: "300"
+  # -- PostgreSQL connection pool max lifetime in seconds
+  # DRIVER_PG_CONNECTION_POOL_MAX_LIFETIME_SECONDS: "1800"
 
 # Configmap and/or secrets to mount into the environment
 envFrom:

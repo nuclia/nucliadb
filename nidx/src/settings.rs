@@ -191,6 +191,10 @@ pub struct MetadataSettings {
     pub database_url: String,
     #[serde(default)]
     pub disable_migrations: bool,
+    /// Max idle time for pooled connections in seconds (empty for default).
+    pub idle_timeout_seconds: Option<u64>,
+    /// Max lifetime for pooled connections in seconds (empty for default).
+    pub max_lifetime_seconds: Option<u64>,
 }
 
 #[derive(Clone, Deserialize, Debug)]
