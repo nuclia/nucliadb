@@ -115,4 +115,8 @@ data:
   NIDX_SEARCHER_ADDRESS: "{{ .searcher_address }}"
 {{- end }}
 
+{{- range $key, $value := .Values.extraEnv }}
+  {{ $key }}: {{ $value | quote }}
+{{- end }}
+
 {{- end }}

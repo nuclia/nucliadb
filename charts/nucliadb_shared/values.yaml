@@ -107,6 +107,16 @@ flipt_server_url: null
 encryption:
   secret_key: XX
 
+# -- Extra environment variables to be added into the configmap --
+extraEnv: {}
+  # EXTRA_ENV_VAR_1: value1
+  # EXTRA_ENV_VAR_2: value2
+
+# -- Extra sensitive environment variables to be added into the secret --
+extraSecretEnv: {}
+  # EXTRA_SENSITIVE_VAR_1: value1
+  # EXTRA_SENSITIVE_VAR_2: value2
+
 # nidx:
 #   api_address:
 #   searcher_address:
