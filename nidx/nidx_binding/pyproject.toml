@@ -5,7 +5,7 @@ build-backend = "maturin"
 [project]
 name = "nidx_binding"
 description = "Bindings for nidx (part of nucliadb)"
-license = "AGPL-3.0-or-later"
+license = "Apache-2.0"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
 requires-python = ">=3.10, <4"
 classifiers = [
