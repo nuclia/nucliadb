@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nucliadb_utils"
 version = "6.15.0"
-license = "AGPL-3.0-or-later"
+license = "Apache-2.0"
 description = "NucliaDB util library"
 authors = [ { name = "Nuclia", email = "nucliadb@nuclia.com" }]
 readme = "README.md"
