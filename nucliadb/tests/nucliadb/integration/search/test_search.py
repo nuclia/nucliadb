@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import json
+import random
 from datetime import datetime
 from unittest import mock
 from unittest.mock import AsyncMock, Mock, patch
@@ -46,6 +47,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.exceptions import LimitsExceededError
 from nucliadb_utils.utilities import Utility, clean_utility, set_utility
+from tests.ndbfixtures.resources.smb_wonder import smb_wonder_resource
 from tests.utils import broker_resource, inject_message
 
 
@@ -1080,23 +1082,54 @@ async def test_search_two_logic_shards(
 @pytest.mark.deploy_modes("standalone")
 async def test_search_min_score(
     nucliadb_reader: AsyncClient,
-    standalone_knowledgebox,
+    nucliadb_ingest_grpc: WriterStub,
+    nucliadb_writer: AsyncClient,
+    philosophy_books_kb,
 ):
-    # When not specifying the min score on the request, it should default to 0.7
-    resp = await nucliadb_reader.post(f"/kb/{standalone_knowledgebox}/search", json={"query": "dummy"})
-    assert resp.status_code == 200
-    assert resp.json()["sentences"]["min_score"] == 0.7
+    kbid = philosophy_books_kb
 
-    # If we specify a min score, it should be used
+    await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    # When not specifying the min score on the request, it should default to 0.7
+    vector = [random.random() for _ in range(512)]
+    query = "Super Mario Bros"
     resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/search",
-        json={"query": "dummy", "min_score": {"bm25": 10, "semantic": 0.5}},
+        f"/kb/{kbid}/search",
+        json={
+            "query": query,
+            "vector": vector,
+            "top_k": 30,
+        },
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["sentences"]["min_score"] == 0.5
+    assert body["sentences"]["min_score"] == 0.7
+    assert len(body["sentences"]["results"]) > 0
+    assert body["paragraphs"]["min_score"] == 0.0
+    assert len(body["paragraphs"]["results"]) > 0
+    assert body["fulltext"]["min_score"] == 0.0
+    assert len(body["fulltext"]["results"]) > 0
+
+    # If we specify a min score, it should be used
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/search",
+        json={
+            "query": query,
+            "min_score": {"bm25": 10, "semantic": 10},
+            "vector": vector,
+            "top_k": 30,
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["sentences"]["min_score"] == 10
     assert body["paragraphs"]["min_score"] == 10
     assert body["fulltext"]["min_score"] == 10
+
+    # Make sure there are no results with score lower than min score
+    assert not any(p["score"] < 10 for p in body["paragraphs"]["results"])
+    assert not any(s["score"] < 10 for s in body["sentences"]["results"])
+    assert not any(f["score"] < 10 for f in body["fulltext"]["results"])
 
 
 @pytest.mark.parametrize(

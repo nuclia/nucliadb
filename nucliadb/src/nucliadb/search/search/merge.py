@@ -104,6 +104,7 @@ async def merge_documents_results(
     query: FulltextQuery,
     top_k: int,
     offset: int,
+    min_score: float,
 ) -> tuple[Resources, set[str]]:
     raw_resource_list: list[tuple[DocumentResult, SortValue]] = []
     facets: dict[str, Any] = {}
@@ -121,6 +122,12 @@ async def merge_documents_results(
         if document_response.next_page:
             next_page = True
         for result in document_response.results:
+            if result.score.bm25 < min_score:
+                logger.warning(
+                    f"Skipping document result with score {result.score.bm25} below min_score {min_score}. This should not happen, as nidx should have filtered it out.",
+                    extra={"kbid": kbid, "result_id": result.uuid},
+                )
+                continue
             sort_value: SortValue
             if query.order_by == SortField.SCORE:
                 sort_value = (result.score.bm25, result.score.booster)
@@ -254,6 +261,12 @@ async def merge_vectors_results(
     result_sentence_list: list[Sentence] = []
     result_resource_ids = set()
     for result in merged.documents:
+        if min_score is not None and result.score < min_score:
+            logger.warning(
+                f"Skipping vector result with score {result.score} below min_score {min_score}. This should not happen, as nidx should have filtered it out.",
+                extra={"kbid": kbid, "result_id": result.doc_id.id},
+            )
+            continue
         vector_id = VectorId.from_string(result.doc_id.id)
         # In case we have multiple vectors per paragraph, the vector id will
         # have its start-end referencing a portion of the paragraph. However, we
@@ -340,6 +353,12 @@ async def merge_paragraph_results(
         if paragraph_response.next_page:
             next_page = True
         for result in paragraph_response.results:
+            if result.score.bm25 < min_score:
+                logger.warning(
+                    f"Skipping paragraph result with score {result.score.bm25} below min_score {min_score}. This should not happen, as nidx should have filtered it out.",
+                    extra={"kbid": kbid, "result_id": result.paragraph},
+                )
+                continue
             paragraph_id = ParagraphId.from_string(result.paragraph)
 
             sort_value: SortValue
@@ -521,6 +540,7 @@ async def merge_results(
             query=retrieval.query.fulltext,
             top_k=retrieval.top_k,
             offset=offset,
+            min_score=retrieval.query.fulltext.min_score,
         )
         resources.update(matched_resources)
 
