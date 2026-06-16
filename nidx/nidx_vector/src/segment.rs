@@ -600,18 +600,10 @@ impl OpenSegment {
 
         let t = Instant::now();
         let results: Box<dyn Iterator<Item = _>> = if matches!(encoded_query, SearchVector::RabitQ(_)) {
-            // If using RabitQ, rerank top results using the raw vectors.
-            //
-            // The pre-filter above uses `upper_bound` (estimated score + error), which is
-            // intentionally higher than the real score so we don't prematurely discard candidates.
-            // However, `rerank_top` computes the exact real similarity scores and we must apply
-            // `min_score` again at this point: a vector whose `upper_bound >= min_score` but whose
-            // real score is below `min_score` would otherwise leak into the results.
-            let min_score = retriever.min_score;
+            // If using RabitQ, rerank top results using the raw vectors
             Box::new(
                 rabitq::rerank_top(scored_results, top_k, &retriever, raw_query)
                     .into_iter()
-                    .filter(move |Reverse(Cnx(_, score))| *score >= min_score)
                     .map(|Reverse(Cnx(addr, score))| ScoredVector::new(addr, self.data_store.as_ref(), score)),
             )
         } else {

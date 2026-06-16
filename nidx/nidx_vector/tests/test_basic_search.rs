@@ -88,6 +88,7 @@ fn test_basic_search(
         &VectorSearchRequest {
             vector: search_for.vector,
             result_per_page: 10,
+            min_score: -1.0,
             ..Default::default()
         },
         &PrefilterResult::All,
@@ -111,6 +112,7 @@ fn test_basic_search(
         &VectorSearchRequest {
             vector,
             result_per_page: 10,
+            min_score: -1.0,
             ..Default::default()
         },
         &PrefilterResult::All,

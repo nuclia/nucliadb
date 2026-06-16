@@ -231,7 +231,7 @@ pub fn rerank_top(
         if best.len() < top_k || best_k < upper_bound {
             // If the candidate score could be better than what we have so far, calculate the accurate similarity
             let real_score = retriever.similarity(addr, query);
-            if best.len() < top_k || best_k < real_score {
+            if real_score > retriever.min_score() && (best.len() < top_k || best_k < real_score) {
                 best.push(Reverse(Cnx(addr, real_score)));
                 if best.len() > top_k {
                     best.pop();
