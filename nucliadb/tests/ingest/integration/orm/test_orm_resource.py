@@ -26,6 +26,7 @@ from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.processor import Processor
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
@@ -93,7 +94,9 @@ async def test_create_resource_orm_with_basic(
     assert o2.source_id == "My Source"
 
 
-async def test_paragraphs_with_page(storage, txn, cache, dummy_nidx_utility, knowledgebox: str):
+async def test_paragraphs_with_page(
+    maindb_driver, storage, txn, cache, dummy_nidx_utility, knowledgebox: str
+):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
@@ -133,7 +136,10 @@ async def test_paragraphs_with_page(storage, txn, cache, dummy_nidx_utility, kno
     fcmw.metadata.metadata.paragraphs.append(p1)
     fcmw.metadata.metadata.paragraphs.append(p2)
     bm.field_metadata.append(fcmw)
-    await r.apply_extracted(bm)
+
+    proc = Processor(maindb_driver, storage)
+    await proc.apply_fields(bm, r)
+    await proc.apply_resource(bm, r, new_resource=False)
     index_message = await get_resource_index_message(r, reindex=False)
     for metadata in index_message.paragraphs["t/field1"].paragraphs.values():
         if metadata.start == 84:
@@ -219,8 +225,9 @@ async def test_vector_duplicate_fields(
                 )
             )
 
-        await resource.apply_fields(bm)
-        await resource.apply_extracted(bm)
+        proc = Processor(maindb_driver, storage)
+        await proc.apply_fields(bm, resource)
+        await proc.apply_resource(bm, resource, new_resource=False)
         index_message = await get_resource_index_message(resource, reindex=False)
         await txn.commit()
 

@@ -32,6 +32,7 @@ from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb.ingest.orm.exceptions import (
@@ -49,12 +50,25 @@ from nucliadb.ingest.orm.processor.data_augmentation import (
     get_generated_fields,
     send_generated_fields_to_process,
 )
-from nucliadb.ingest.orm.resource import Resource
+from nucliadb.ingest.orm.resource import (
+    Resource,
+    compute_resource_status,
+    delete_basic_computedmetadata_classifications,
+    extract_field_metadata_languages,
+    get_text_field_mimetype,
+    maybe_update_basic_icon,
+    maybe_update_basic_summary,
+    maybe_update_basic_thumbnail,
+    update_basic_computedmetadata_classifications,
+    update_basic_languages,
+)
 from nucliadb_protos import (
     knowledgebox_pb2,
     resources_pb2,
     writer_pb2,
 )
+from nucliadb_protos.resources_pb2 import Basic as PBBasic
+from nucliadb_protos.resources_pb2 import FieldID
 from nucliadb_telemetry import errors
 from nucliadb_utils import const
 from nucliadb_utils.cache.pubsub import PubSubDriver
@@ -350,8 +364,9 @@ class Processor:
                 else:  # pragma: no cover
                     raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
 
-                # apply changes from the broker message to the resource
-                await self.apply_resource(message, resource, update=(not created))
+                # apply changes from the broker message to the fields and the resource
+                await self.apply_fields(message, resource)
+                await self.apply_resource(message, resource, new_resource=created)
 
                 # index message
                 if resource.modified:
@@ -376,6 +391,10 @@ class Processor:
                         await resource.add_field_error(
                             e.field_id, e.message, writer_pb2.Error.Severity.ERROR
                         )
+                        # After an index error, recompute and persist resource status
+                        basic = await resource.get_basic()
+                        await compute_resource_status(txn, kbid, uuid, basic)
+                        await resource.set_basic(basic)
                         # Catalog takes status from index message labels, override it to error
                         current_status = [x for x in index_message.labels if x.startswith("/n/s/")]
                         if current_status:
@@ -591,45 +610,58 @@ class Processor:
         self,
         message: writer_pb2.BrokerMessage,
         resource: Resource,
-        update: bool = False,
+        new_resource: bool,
     ):
         """
-        Apply broker message to resource object in the persistence layers (maindb and storage).
-        DO NOT add any indexing logic here.
+        Apply all resource-level metadata from the broker message: basic (including
+        all mutations derived from extracted data), origin, extra, security and
+        user relations.
         """
-        if update:
-            await self.maybe_update_resource_basic(resource, message)
-
         tasks = []
-        if message.HasField("origin"):
+
+        # Load and update basic. For new resources basic was already set by
+        # kb.add_resource(); we still need to apply extracted-data mutations.
+        current_basic = await resource.get_basic()
+        previous_basic = PBBasic()
+        previous_basic.CopyFrom(current_basic)
+        resource._previous_status = current_basic.metadata.status
+
+        # Merge explicit basic payload for updates
+        if not new_resource and (message.HasField("basic") or len(message.delete_fields) > 0):
+            current_basic = _merge_basic(current_basic, message.basic, list(message.delete_fields))
+
+        # Apply all basic mutations derived from extracted data
+        _apply_extracted_basic_updates(message, current_basic, resource.uuid)
+
+        # Field statuses are up-to-date (apply_fields ran first); fold the
+        # computed resource status into basic before persisting.
+        await compute_resource_status(resource.txn, resource.kbid, resource.uuid, current_basic)
+
+        should_update = MessageInspector(message)
+        if current_basic != previous_basic:
+            tasks.append(resource.set_basic(current_basic))
+        if should_update.resource_origin:
             tasks.append(resource.set_origin(message.origin))
-
-        if message.HasField("extra"):
+        if should_update.resource_extra:
             tasks.append(resource.set_extra(message.extra))
-
-        if message.HasField("security"):
+        if should_update.resource_security:
             tasks.append(resource.set_security(message.security))
-
-        if message.HasField("user_relations"):
+        if should_update.resource_user_relations:
             tasks.append(resource.set_user_relations(message.user_relations))
 
-        tasks.append(resource.apply_fields(message))
         await asyncio.gather(*tasks)
 
-        await resource.apply_extracted(message)
-
-    async def maybe_update_resource_basic(
-        self, resource: Resource, message: writer_pb2.BrokerMessage
-    ) -> None:
-        basic_field_updates = message.HasField("basic")
-        deleted_fields = len(message.delete_fields) > 0
-        if not (basic_field_updates or deleted_fields):
-            return
-
-        await resource.set_basic(
-            message.basic,
-            deleted_fields=message.delete_fields,  # type: ignore
-        )
+    @processor_observer.wrap({"type": "apply_fields"})
+    async def apply_fields(
+        self,
+        message: writer_pb2.BrokerMessage,
+        resource: Resource,
+    ):
+        """
+        Apply field content and extracted data from the broker message.
+        """
+        await resource.apply_field_values(message)
+        await resource.apply_field_extracted_data(message)
 
     async def get_extended_audit_data(self, message: writer_pb2.BrokerMessage) -> writer_pb2.Audit:
         message_audit = writer_pb2.Audit()
@@ -760,3 +792,171 @@ def has_vectors_operation(index_message: PBBrainResource) -> bool:
                 if len(vectorset_sentences.sentences) > 0:
                     return True
     return False
+
+
+# Immutable basic fields that are already set should not be overwritten by incoming payloads.
+_BASIC_IMMUTABLE_FIELDS = ("icon",)
+
+
+def _merge_basic(
+    current: PBBasic,
+    payload: PBBasic,
+    deleted_fields: list[FieldID],
+) -> PBBasic:
+    """
+    Merge an incoming basic payload onto the existing basic, applying all
+    deduplication and immutability rules, then return the result ready to persist.
+    """
+    if not current.ByteSize():
+        # Brand-new resource — use payload as-is (after field deletions).
+        merged = PBBasic()
+        merged.CopyFrom(payload)
+    else:
+        merged = PBBasic()
+        merged.CopyFrom(current)
+
+        if merged != payload:
+            for field in _BASIC_IMMUTABLE_FIELDS:
+                # Immutable basic fields that are already set are cleared from
+                # the payload so that they are not overwritten.
+                if getattr(merged, field, "") != "":
+                    payload.ClearField(field)  # type: ignore[arg-type]
+
+            merged.MergeFrom(payload)
+
+            # Prevent duplicated languages
+            unique_languages = set(merged.metadata.languages)
+            merged.metadata.ClearField("languages")
+            merged.metadata.languages.extend(unique_languages)
+
+            # Prevent duplicated labels
+            unique_labels = set(merged.labels)
+            merged.ClearField("labels")
+            merged.labels.extend(unique_labels)
+
+            # Update processing status: only overwrite when the payload signals
+            # that the resource is useful (i.e. coming from a real processing run).
+            if payload.HasField("metadata") and payload.metadata.useful:
+                merged.metadata.status = payload.metadata.status
+
+            # We force the usermetadata classifications to be exactly what the
+            # payload defines (no merging).
+            if payload.HasField("usermetadata"):
+                merged.usermetadata.CopyFrom(payload.usermetadata)
+
+            if len(payload.fieldmetadata):
+                # Keep only the last fieldmetadata item for each field. API
+                # users are responsible to manage fieldmetadata properly.
+                fields: list[str] = []
+                positions: dict[str, int] = {}
+                for i, fieldmetadata in enumerate(merged.fieldmetadata):
+                    field_id = f"{FIELD_TYPE_PB_TO_STR[fieldmetadata.field.field_type]}/{fieldmetadata.field.field}"
+                    if field_id not in fields:
+                        fields.append(field_id)
+                    positions[field_id] = i
+
+                updated = [merged.fieldmetadata[positions[f]] for f in fields]
+                del merged.fieldmetadata[:]
+                merged.fieldmetadata.extend(updated)
+
+    # Some basic fields are computed off field metadata.
+    # Recompute upon field deletions.
+    if deleted_fields:
+        delete_basic_computedmetadata_classifications(merged, deleted_fields=deleted_fields)
+
+    return merged
+
+
+def _should_update_title_from_files(basic: PBBasic, resource_uuid: str) -> bool:
+    return basic.title in ("", resource_uuid) or basic.reset_title
+
+
+def _apply_extracted_basic_updates(
+    message: writer_pb2.BrokerMessage,
+    basic: PBBasic,
+    resource_uuid: str,
+) -> None:
+    """
+    Inspect the extracted-data sections of a broker message and apply all
+    side-effect mutations to basic (icon, thumbnail, summary, title, languages,
+    computed classifications). Does not persist — caller is responsible for that.
+    """
+    # Icon from text field format
+    maybe_update_basic_icon(basic, get_text_field_mimetype(message))
+
+    extracted_languages: list[str] = []
+
+    # Link extracted data
+    for led in message.link_extracted_data:
+        maybe_update_basic_thumbnail(basic, led.link_thumbnail, message.kbid)
+        maybe_update_basic_icon(basic, "application/stf-link")
+        maybe_update_basic_summary(basic, led.description)
+        extracted_languages.append(led.language)
+        # Update title from the first link that has one and current title looks auto-generated
+        if led.title and (
+            basic.title.startswith("http")
+            or basic.title == ""
+            or basic.title == resource_uuid
+            or basic.reset_title
+        ):
+            # FIXME: this doesn't properly index the new title. See sc-6088 for more details
+            basic.title = led.title
+            basic.reset_title = False
+
+    # File extracted data
+    for fed in message.file_extracted_data:
+        maybe_update_basic_icon(basic, fed.icon)
+        maybe_update_basic_thumbnail(basic, fed.file_thumbnail, message.kbid)
+        extracted_languages.append(fed.language)
+
+    # Update title from the first file that has one (if title looks auto-generated)
+    if _should_update_title_from_files(basic, resource_uuid):
+        for fed in message.file_extracted_data:
+            if fed.title:
+                basic.title = fed.title
+                basic.reset_title = False
+                break
+
+    # Field computed metadata
+    for fcmw in message.field_metadata:
+        maybe_update_basic_summary(basic, fcmw.metadata.metadata.summary)
+        maybe_update_basic_thumbnail(basic, fcmw.metadata.metadata.thumbnail, message.kbid)
+        update_basic_computedmetadata_classifications(basic, fcmw)
+        extracted_languages.extend(extract_field_metadata_languages(fcmw))
+
+    update_basic_languages(basic, extracted_languages)
+
+
+class MessageInspector:
+    """ """
+
+    def __init__(self, message: writer_pb2.BrokerMessage):
+        self.message = message
+
+    @property
+    def resource_security(self) -> bool:
+        return self.message.HasField("security")
+
+    @property
+    def resource_user_relations(self) -> bool:
+        return self.message.HasField("user_relations")
+
+    @property
+    def resource_origin(self) -> bool:
+        return self.message.HasField("origin")
+
+    @property
+    def resource_extra(self) -> bool:
+        return self.message.HasField("extra")
+
+    @property
+    def resource_fields(self) -> bool:
+        return (
+            len(self.message.texts) > 0
+            or len(self.message.links) > 0
+            or len(self.message.files) > 0
+            or len(self.message.conversations) > 0
+            or len(self.message.key_value_fields) > 0
+            or len(self.message.delete_fields) > 0
+            or len(self.message.delete_splits) > 0
+        )

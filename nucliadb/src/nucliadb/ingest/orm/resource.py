@@ -27,7 +27,7 @@ from typing import Any, cast
 
 from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB, FieldId
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
@@ -50,7 +50,6 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedVectorsWrapper,
     FieldClassifications,
     FieldComputedMetadataWrapper,
-    FieldFile,
     FieldID,
     FieldQuestionAnswerWrapper,
     FieldText,
@@ -59,7 +58,6 @@ from nucliadb_protos.resources_pb2 import (
     LargeComputedMetadataWrapper,
     LinkExtractedData,
     Metadata,
-    Paragraph,
     SemanticGraphEdgeVectors,
     SemanticGraphNodeVectors,
 )
@@ -94,8 +92,6 @@ PB_TEXT_FORMAT_TO_MIMETYPE = {
     FieldText.Format.JSONL: "application/x-ndjson",
     FieldText.Format.PLAIN_BLANKLINE_SPLIT: "text/plain+blankline",
 }
-
-BASIC_IMMUTABLE_FIELDS = ("icon",)
 
 
 class Resource:
@@ -155,78 +151,10 @@ class Resource:
             self.basic = basic if basic is not None else PBBasic()
         return self.basic
 
-    def set_processing_status(self, current_basic: PBBasic, basic_in_payload: PBBasic):
-        self._previous_status = current_basic.metadata.status
-        if basic_in_payload.HasField("metadata") and basic_in_payload.metadata.useful:
-            current_basic.metadata.status = basic_in_payload.metadata.status
-
-    async def title_marked_for_reset(self) -> bool:
-        basic = await self.get_basic()
-        return basic is not None and basic.reset_title
-
-    async def unmark_title_for_reset(self):
-        basic = await self.get_basic()
-        if basic:
-            basic.reset_title = False
-
     @processor_observer.wrap({"type": "set_basic"})
-    async def set_basic(
-        self,
-        payload: PBBasic,
-        deleted_fields: list[FieldID] | None = None,
-    ):
-        await self.get_basic()
-
-        if self.basic is None:
-            self.basic = payload
-
-        elif self.basic != payload:
-            for field in BASIC_IMMUTABLE_FIELDS:
-                # Immutable basic fields that are already set are cleared
-                # from the payload so that they are not overwritten
-                if getattr(self.basic, field, "") != "":
-                    payload.ClearField(field)  # type: ignore[arg-type]
-
-            self.basic.MergeFrom(payload)
-
-            # Prevent duplicated languages
-            unique_languages = set(self.basic.metadata.languages)
-            self.basic.metadata.ClearField("languages")
-            self.basic.metadata.languages.extend(unique_languages)
-
-            # Prevent duplicated labels
-            unique_labels = set(self.basic.labels)
-            self.basic.ClearField("labels")
-            self.basic.labels.extend(unique_labels)
-
-            self.set_processing_status(self.basic, payload)
-
-            # We force the usermetadata classification to be the one defined
-            if payload.HasField("usermetadata"):
-                self.basic.usermetadata.CopyFrom(payload.usermetadata)
-
-            if len(payload.fieldmetadata):
-                # keep only the last fieldmetadata item for each field. API
-                # users are responsible to manage fieldmetadata properly
-                fields = []
-                positions = {}
-                for i, fieldmetadata in enumerate(self.basic.fieldmetadata):
-                    field_id = self.generate_field_id(fieldmetadata.field)
-                    if field_id not in fields:
-                        fields.append(field_id)
-                    positions[field_id] = i
-
-                updated = [self.basic.fieldmetadata[positions[field]] for field in fields]
-
-                del self.basic.fieldmetadata[:]
-                self.basic.fieldmetadata.extend(updated)
-
-        # Some basic fields are computed off field metadata.
-        # This means we need to recompute upon field deletions.
-        if deleted_fields is not None and len(deleted_fields) > 0:
-            delete_basic_computedmetadata_classifications(self.basic, deleted_fields=deleted_fields)
-
-        await datamanagers.resources.set_basic(self.txn, kbid=self.kbid, rid=self.uuid, basic=self.basic)
+    async def set_basic(self, payload: PBBasic) -> None:
+        await datamanagers.resources.set_basic(self.txn, kbid=self.kbid, rid=self.uuid, basic=payload)
+        self.basic = payload
         self.modified = True
 
     # Origin
@@ -425,7 +353,7 @@ class Resource:
             await self.set_all_field_ids(all_fields)
 
     @processor_observer.wrap({"type": "apply_fields"})
-    async def apply_fields(self, message: BrokerMessage):
+    async def apply_field_values(self, message: BrokerMessage):
         message_updated_fields = []
         for field, text in message.texts.items():
             fid = FieldID(field_type=FieldType.TEXT, field=field)
@@ -546,36 +474,6 @@ class Resource:
             await field_obj.set_status(status)
             self.modified = True
 
-    async def update_status(self):
-        assert self.basic
-        field_ids = await self.get_all_field_ids(for_update=False)
-        if field_ids is None:
-            # No fields, it is processed
-            self.basic.metadata.status = PBMetadata.Status.PROCESSED
-            return
-
-        field_statuses = await datamanagers.fields.get_statuses(
-            self.txn, kbid=self.kbid, rid=self.uuid, fields=field_ids.fields
-        )
-
-        # If any field is processing -> PENDING
-        if any(f.status == writer_pb2.FieldStatus.Status.PENDING for f in field_statuses):
-            self.basic.metadata.status = PBMetadata.Status.PENDING
-        # If we have any non-DA error -> ERROR
-        elif any(
-            f.status == writer_pb2.FieldStatus.Status.ERROR
-            and any(
-                e.source_error.severity == writer_pb2.Error.Severity.ERROR
-                and e.source_error.code != writer_pb2.Error.ErrorCode.DATAAUGMENTATION
-                for e in f.errors
-            )
-            for f in field_statuses
-        ):
-            self.basic.metadata.status = PBMetadata.Status.ERROR
-        # Otherwise (everything processed or we only have DA errors) -> PROCESSED
-        else:
-            self.basic.metadata.status = PBMetadata.Status.PROCESSED
-
     async def add_field_error(
         self, field_id: str, message: str, severity: writer_pb2.Error.Severity.ValueType
     ):
@@ -598,23 +496,14 @@ class Resource:
             if severity == writer_pb2.Error.Severity.ERROR:
                 status.status = writer_pb2.FieldStatus.Status.ERROR
             await field.set_status(status)
-
-        # If it's an error, we may need to change the resource status
-        if severity == writer_pb2.Error.Severity.ERROR and self.basic:
-            await self.update_status()
-            await self.set_basic(self.basic)
+        self.modified = True
 
     @processor_observer.wrap({"type": "apply_extracted"})
-    async def apply_extracted(self, message: BrokerMessage):
-        await self.get_basic()
-        if self.basic is None:
-            raise KeyError("Resource Not Found")
-
-        previous_basic = Basic()
-        previous_basic.CopyFrom(self.basic)
-
-        maybe_update_basic_icon(self.basic, get_text_field_mimetype(message))
-
+    async def apply_field_extracted_data(self, message: BrokerMessage) -> None:
+        """
+        Apply extracted field data from a broker message (extracted text, vectors,
+        question answers, field metadata, large metadata). Does not touch basic.
+        """
         for question_answers in message.question_answers:
             await self._apply_question_answers(question_answers)
 
@@ -627,30 +516,18 @@ class Resource:
         await asyncio.gather(*tasks)
         tasks.clear()
 
-        # Update field and resource status depending on processing results
+        # Update field statuses depending on processing results
         await self.apply_fields_status(message, self._modified_extracted_text)
-
-        # Compute resource status based on all fields statuses
-        await self.update_status()
-
-        extracted_languages = []
 
         for link_extracted_data in message.link_extracted_data:
             await self._apply_link_extracted_data(link_extracted_data)
-            extracted_languages.append(link_extracted_data.language)
 
         for file_extracted_data in message.file_extracted_data:
             await self._apply_file_extracted_data(file_extracted_data)
-            extracted_languages.append(file_extracted_data.language)
-
-        await self.maybe_update_resource_title_from_file_extracted_data(message)
 
         # Metadata should go first
         for field_metadata in message.field_metadata:
             tasks.append(self._apply_field_computed_metadata(field_metadata))
-            extracted_languages.extend(extract_field_metadata_languages(field_metadata))
-
-        update_basic_languages(self.basic, extracted_languages)
 
         # Upload to binary storage
         if self.disable_vectors is False:
@@ -667,13 +544,6 @@ class Resource:
             tasks.append(self._apply_field_large_metadata(field_large_metadata))
 
         await asyncio.gather(*tasks)
-        tasks.clear()
-
-        # Basic proto may have been modified in some apply functions but we only
-        # want to set it once
-        if self.basic != previous_basic:
-            await self.set_basic(self.basic)
-            self.modified = True
 
     async def _apply_extracted_text(self, extracted_text: ExtractedTextWrapper):
         field_obj = await self.get_field(
@@ -697,80 +567,15 @@ class Resource:
         self.modified = True
 
     async def _apply_link_extracted_data(self, link_extracted_data: LinkExtractedData):
-        assert self.basic is not None
         field_link: Link = await self.get_field(
             link_extracted_data.field,
             FieldType.LINK,
             load=False,
         )
-        maybe_update_basic_thumbnail(self.basic, link_extracted_data.link_thumbnail, self.kbid)
-
         await field_link.set_link_extracted_data(link_extracted_data)
-
-        maybe_update_basic_icon(self.basic, "application/stf-link")
-
-        await self.maybe_update_resource_title_from_link(link_extracted_data)
-        maybe_update_basic_summary(self.basic, link_extracted_data.description)
-        self.modified = True
-
-    async def maybe_update_resource_title_from_link(self, link_extracted_data: LinkExtractedData):
-        """
-        When parsing link extracted data, we want to replace the resource title for the first link
-        that gets processed and has a title, and only if the current title is a URL, which we take
-        as a hint that the title was not set by the user.
-        """
-        assert self.basic is not None
-        if not link_extracted_data.title:
-            return
-        if not (
-            self.basic.title.startswith("http")
-            or self.basic.title == ""
-            or self.basic.title == self.uuid
-            or await self.title_marked_for_reset()
-        ):
-            return
-        logger.info(
-            "Updating resource title from link extracted data",
-            extra={"kbid": self.kbid, "field": link_extracted_data.field, "rid": self.uuid},
-        )
-        title = link_extracted_data.title
-        # FIXME: this doesn't properly index the new title. See sc-6088 for more details
-        await self.update_resource_title(title)
-        await self.unmark_title_for_reset()
-        self.modified = True
-
-    async def update_resource_title(self, computed_title: str) -> None:
-        assert self.basic is not None
-
-        field_id_pb = FieldID(field="title", field_type=FieldType.GENERIC)
-
-        # Extracted text
-        field = await self.get_field("title", FieldType.GENERIC, load=False)
-        await field.set_value(computed_title)
-
-        etw = ExtractedTextWrapper()
-        etw.field.CopyFrom(field_id_pb)
-        etw.body.text = computed_title
-        await field.set_extracted_text(etw)
-
-        # Field computed metadata
-        fcmw = FieldComputedMetadataWrapper()
-        fcmw.field.CopyFrom(field_id_pb)
-
-        # Merge with any existing field computed metadata
-        fcm = await field.get_field_metadata(force=True)
-        if fcm is not None:
-            fcmw.metadata.CopyFrom(fcm)
-        fcmw.metadata.metadata.ClearField("paragraphs")
-        paragraph = Paragraph(start=0, end=len(computed_title), kind=Paragraph.TypeParagraph.TITLE)
-        fcmw.metadata.metadata.paragraphs.append(paragraph)
-
-        await field.set_field_metadata(fcmw)
-        self._modified_extracted_text.append(field_id_pb)
         self.modified = True
 
     async def _apply_file_extracted_data(self, file_extracted_data: FileExtractedData):
-        assert self.basic is not None
         field_file: File = await self.get_field(
             file_extracted_data.field,
             FieldType.FILE,
@@ -778,75 +583,15 @@ class Resource:
         )
         # uri can change after extraction
         await field_file.set_file_extracted_data(file_extracted_data)
-        maybe_update_basic_icon(self.basic, file_extracted_data.icon)
-        maybe_update_basic_thumbnail(self.basic, file_extracted_data.file_thumbnail, self.kbid)
         self.modified = True
 
-    async def _should_update_resource_title_from_file_metadata(self) -> bool:
-        """
-        We only want to update resource title from file metadata if the title is empty,
-        equal to the resource uuid or equal to any of the file filenames in the resource.
-        """
-        basic = await self.get_basic()
-        if basic is None:
-            return True
-        current_title = basic.title
-        if current_title == "":
-            # If the title is empty, we should update it
-            return True
-        if current_title == self.uuid:
-            # If the title is the same as the resource uuid, we should update it
-            return True
-        fields = await self.get_fields(force=True)
-        filenames = set()
-        for (field_type, _), field_obj in fields.items():
-            if field_type == FieldType.FILE:
-                field_value: FieldFile | None = await field_obj.get_value()
-                if field_value is not None:
-                    if field_value.file.filename not in ("", None):
-                        filenames.add(field_value.file.filename)
-        if current_title in filenames:
-            # If the title is equal to any of the file filenames, we should update it
-            return True
-        if await self.title_marked_for_reset():
-            # If the title is marked for reset, we should update it
-            return True
-        return False
-
-    async def maybe_update_resource_title_from_file_extracted_data(self, message: BrokerMessage):
-        """
-        Update the resource title with the first file that has a title extracted.
-        """
-        if not await self._should_update_resource_title_from_file_metadata():
-            return
-        for fed in message.file_extracted_data:
-            if fed.title == "":
-                # Skip if the extracted title is empty
-                continue
-            fid = FieldId.from_pb(rid=self.uuid, field_type=FieldType.FILE, key=fed.field)
-            logger.info(
-                "Updating resource title from file extracted data",
-                extra={"kbid": self.kbid, "field": fid.full(), "new_title": fed.title},
-            )
-            await self.update_resource_title(fed.title)
-            await self.unmark_title_for_reset()
-            # Break after the first file with a title is found
-            break
-
     async def _apply_field_computed_metadata(self, field_metadata: FieldComputedMetadataWrapper):
-        assert self.basic is not None
-        maybe_update_basic_summary(self.basic, field_metadata.metadata.metadata.summary)
-
         field_obj = await self.get_field(
             field_metadata.field.field,
             field_metadata.field.field_type,
             load=False,
         )
         await field_obj.set_field_metadata(field_metadata)
-
-        maybe_update_basic_thumbnail(self.basic, field_metadata.metadata.metadata.thumbnail, self.kbid)
-
-        update_basic_computedmetadata_classifications(self.basic, field_metadata)
         self.modified = True
 
     async def _apply_extracted_vectors(
@@ -1124,3 +869,44 @@ def extract_field_metadata_languages(
     for _, splitted_metadata in field_metadata.metadata.split_metadata.items():
         languages.add(splitted_metadata.language)
     return list(languages)
+
+
+async def compute_resource_status(
+    txn: Transaction,
+    kbid: str,
+    uuid: str,
+    basic: PBBasic,
+) -> None:
+    """
+    Compute and set the resource-level processing status on basic by inspecting
+    the status of all individual fields.
+    """
+    field_ids = await datamanagers.resources.get_all_field_ids(
+        txn, kbid=kbid, rid=uuid, for_update=False
+    )
+    if field_ids is None:
+        # No fields, it is processed
+        basic.metadata.status = PBMetadata.Status.PROCESSED
+        return
+
+    field_statuses = await datamanagers.fields.get_statuses(
+        txn, kbid=kbid, rid=uuid, fields=field_ids.fields
+    )
+
+    # If any field is processing -> PENDING
+    if any(f.status == writer_pb2.FieldStatus.Status.PENDING for f in field_statuses):
+        basic.metadata.status = PBMetadata.Status.PENDING
+    # If we have any non-DA error -> ERROR
+    elif any(
+        f.status == writer_pb2.FieldStatus.Status.ERROR
+        and any(
+            e.source_error.severity == writer_pb2.Error.Severity.ERROR
+            and e.source_error.code != writer_pb2.Error.ErrorCode.DATAAUGMENTATION
+            for e in f.errors
+        )
+        for f in field_statuses
+    ):
+        basic.metadata.status = PBMetadata.Status.ERROR
+    # Otherwise (everything processed or we only have DA errors) -> PROCESSED
+    else:
+        basic.metadata.status = PBMetadata.Status.PROCESSED

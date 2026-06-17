@@ -277,7 +277,7 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
     bm.conversations = {"conversation": MagicMock()}
     bm.delete_fields.append(FieldID(field_type=FieldType.CONVERSATION, field="to_delete"))
 
-    await resource.apply_fields(bm)  # ty:ignore[invalid-argument-type]
+    await resource.apply_field_values(bm)  # ty:ignore[invalid-argument-type]
 
     resource.update_all_field_ids.assert_awaited_once()  # type: ignore[ty:unresolved-attribute]
 
