@@ -293,7 +293,7 @@ class Resource:
     async def _apply_delete_splits(self, payload: writer_pb2.DeleteSplits) -> None:
         if payload.field.field_type != FieldType.CONVERSATION:
             raise ValueError("_apply_delete_splits can only be applied to conversation fields")
-        field = await self.get_field(payload.field.field, FieldType.CONVERSATION)
+        field = await self.get_field(payload.field.field, FieldType.CONVERSATION, load=False)
         conv = cast(Conversation, field)
         await conv.delete_messages(payload.splits)
         self.modified = True
@@ -479,7 +479,7 @@ class Resource:
     ):
         (field_type_str, field_name) = field_id.split("/")
         field_type = FIELD_TYPE_STR_TO_PB[field_type_str]
-        field = await self.get_field(field_name, field_type)
+        field = await self.get_field(field_name, field_type, load=False)
         status = await field.get_status()
         if status is not None:
             field_error = writer_pb2.FieldError(
