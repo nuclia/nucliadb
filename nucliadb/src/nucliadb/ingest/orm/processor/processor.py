@@ -605,6 +605,20 @@ class Processor:
     async def deadletter(self, message: writer_pb2.BrokerMessage, partition: str, seqid: int) -> None:
         await self.storage.deadletter(message, 0, seqid, partition)
 
+    async def _get_resource_filenames(self, resource: Resource) -> list[str]:
+        """
+        Get all resource filenames from the resource file fields.
+        """
+        fields = await resource.get_fields(force=True)
+        filenames = set()
+        for (field_type, _), field_obj in fields.items():
+            if field_type == writer_pb2.FieldType.FILE:
+                field_value: resources_pb2.FieldFile | None = await field_obj.get_value()
+                if field_value is not None:
+                    if field_value.file.filename not in ("", None):
+                        filenames.add(field_value.file.filename)
+        return list(filenames)
+
     @processor_observer.wrap({"type": "apply_resource"})
     async def apply_resource(
         self,
@@ -631,7 +645,8 @@ class Processor:
             current_basic = _merge_basic(current_basic, message.basic, list(message.delete_fields))
 
         # Apply all basic mutations derived from extracted data
-        _apply_extracted_basic_updates(message, current_basic, resource.uuid)
+        filenames = await self._get_resource_filenames(resource)
+        _apply_extracted_basic_updates(message, current_basic, resource.uuid, filenames)
 
         # Field statuses are up-to-date (apply_fields ran first); fold the
         # computed resource status into basic before persisting.
@@ -867,14 +882,15 @@ def _merge_basic(
     return merged
 
 
-def _should_update_title_from_files(basic: PBBasic, resource_uuid: str) -> bool:
-    return basic.title in ("", resource_uuid) or basic.reset_title
+def _should_update_title_from_files(basic: PBBasic, resource_uuid: str, filenames: list[str]) -> bool:
+    return basic.title in ("", resource_uuid) or basic.reset_title or basic.title in filenames
 
 
 def _apply_extracted_basic_updates(
     message: writer_pb2.BrokerMessage,
     basic: PBBasic,
     resource_uuid: str,
+    filenames: list[str],
 ) -> None:
     """
     Inspect the extracted-data sections of a broker message and apply all
@@ -910,7 +926,7 @@ def _apply_extracted_basic_updates(
         extracted_languages.append(fed.language)
 
     # Update title from the first file that has one (if title looks auto-generated)
-    if _should_update_title_from_files(basic, resource_uuid):
+    if _should_update_title_from_files(basic, resource_uuid, filenames):
         for fed in message.file_extracted_data:
             if fed.title:
                 basic.title = fed.title
