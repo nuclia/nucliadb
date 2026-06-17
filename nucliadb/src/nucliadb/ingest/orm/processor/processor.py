@@ -668,8 +668,10 @@ class Processor:
         """
         Apply field content and extracted data from the broker message.
         """
-        await resource.apply_field_values(message)
-        await resource.apply_field_extracted_data(message)
+        with processor_observer({"type": "apply_field_values"}):
+            await resource.apply_field_values(message)
+        with processor_observer({"type": "apply_field_extracted_data"}):
+            await resource.apply_field_extracted_data(message)
 
     async def get_extended_audit_data(self, message: writer_pb2.BrokerMessage) -> writer_pb2.Audit:
         message_audit = writer_pb2.Audit()
