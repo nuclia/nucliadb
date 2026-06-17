@@ -37,22 +37,16 @@ from nucliadb.ingest.fields.key_value import KeyValue
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain_v2 import FilePagePositions
-from nucliadb.ingest.orm.metrics import processor_observer
-from nucliadb_models import content_types
-from nucliadb_models.common import CloudLink
-from nucliadb_models.content_types import GENERIC_MIME_TYPE
 from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
+from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import (
-    Basic,
     CloudFile,
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
-    FieldClassifications,
     FieldComputedMetadataWrapper,
     FieldID,
     FieldQuestionAnswerWrapper,
-    FieldText,
     FieldType,
     FileExtractedData,
     LargeComputedMetadataWrapper,
@@ -61,10 +55,8 @@ from nucliadb_protos.resources_pb2 import (
     SemanticGraphEdgeVectors,
     SemanticGraphNodeVectors,
 )
-from nucliadb_protos.resources_pb2 import Basic as PBBasic
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import Extra as PBExtra
-from nucliadb_protos.resources_pb2 import Metadata as PBMetadata
 from nucliadb_protos.resources_pb2 import Origin as PBOrigin
 from nucliadb_protos.resources_pb2 import Relations as PBRelations
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -80,17 +72,6 @@ KB_FIELDS: dict[int, type] = {
     FieldType.GENERIC: Generic,
     FieldType.CONVERSATION: Conversation,
     FieldType.KEY_VALUE: KeyValue,
-}
-
-PB_TEXT_FORMAT_TO_MIMETYPE = {
-    FieldText.Format.PLAIN: "text/plain",
-    FieldText.Format.HTML: "text/html",
-    FieldText.Format.RST: "text/x-rst",
-    FieldText.Format.MARKDOWN: "text/markdown",
-    FieldText.Format.JSON: "application/json",
-    FieldText.Format.KEEP_MARKDOWN: "text/markdown",
-    FieldText.Format.JSONL: "application/x-ndjson",
-    FieldText.Format.PLAIN_BLANKLINE_SPLIT: "text/plain+blankline",
 }
 
 
@@ -151,7 +132,6 @@ class Resource:
             self.basic = basic if basic is not None else PBBasic()
         return self.basic
 
-    @processor_observer.wrap({"type": "set_basic"})
     async def set_basic(self, payload: PBBasic) -> None:
         await datamanagers.resources.set_basic(self.txn, kbid=self.kbid, rid=self.uuid, basic=payload)
         self.basic = payload
@@ -352,7 +332,6 @@ class Resource:
         if needs_update:
             await self.set_all_field_ids(all_fields)
 
-    @processor_observer.wrap({"type": "apply_fields"})
     async def apply_field_values(self, message: BrokerMessage):
         message_updated_fields = []
         for field, text in message.texts.items():
@@ -414,7 +393,6 @@ class Resource:
         """
         await file_md5.delete(self.txn, kbid=self.kbid, rid=self.uuid, field_id=field_id)
 
-    @processor_observer.wrap({"type": "apply_fields_status"})
     async def apply_fields_status(self, message: BrokerMessage, updated_fields: list[FieldID]):
         # Dictionary of all errors per field (we may have several due to DA tasks)
         errors_by_field: dict[tuple[FieldType.ValueType, str], list[writer_pb2.Error]] = defaultdict(
@@ -498,7 +476,6 @@ class Resource:
             await field.set_status(status)
         self.modified = True
 
-    @processor_observer.wrap({"type": "apply_extracted"})
     async def apply_field_extracted_data(self, message: BrokerMessage) -> None:
         """
         Apply extracted field data from a broker message (extracted text, vectors,
@@ -736,177 +713,3 @@ async def get_file_page_positions(field: File) -> FilePagePositions:
     for index, position in enumerate(file_extracted_data.file_pages_previews.positions):
         positions[index] = (position.start, position.end)
     return positions
-
-
-def delete_basic_computedmetadata_classifications(basic: PBBasic, deleted_fields: list[FieldID]) -> bool:
-    """
-    We keep a copy of field classifications computed by the processing engine at the basic object
-    so that users can easily access them without having to load the field metadata from the storage.
-
-    This funcion removes the field classifications for the fields that have been deleted.
-    Returns whether the basic was modified.
-    """
-    if len(deleted_fields) == 0:
-        # Nothing to delete
-        return False
-    new_field_classifications = [
-        fc for fc in basic.computedmetadata.field_classifications if fc.field not in deleted_fields
-    ]
-    if len(new_field_classifications) == len(basic.computedmetadata.field_classifications):
-        # No changes
-        return False
-
-    basic.computedmetadata.ClearField("field_classifications")
-    basic.computedmetadata.field_classifications.extend(new_field_classifications)
-    return True
-
-
-def update_basic_computedmetadata_classifications(
-    basic: PBBasic, fcmw: FieldComputedMetadataWrapper
-) -> bool:
-    """
-    We keep a copy of field classifications computed by the processing engine at the basic object
-    so that users can easily access them without having to load the field metadata from the storage.
-
-    This function updates the basic object with the new field computed metadata.
-    Returns whether the basic was modified.
-    """
-    some_deleted = delete_basic_computedmetadata_classifications(basic, [fcmw.field])
-
-    fcfs = FieldClassifications()
-    fcfs.field.CopyFrom(fcmw.field)
-
-    some_added = False
-    if len(fcmw.metadata.metadata.classifications) > 0:
-        some_added = True
-        fcfs.classifications.extend(fcmw.metadata.metadata.classifications)
-
-    for split_id, split in fcmw.metadata.split_metadata.items():
-        if split_id not in fcmw.metadata.deleted_splits:
-            if len(split.classifications) > 0:
-                some_added = True
-                fcfs.classifications.extend(split.classifications)
-    if some_added:
-        basic.computedmetadata.field_classifications.append(fcfs)
-    return some_added or some_deleted
-
-
-def maybe_update_basic_summary(basic: PBBasic, summary_text: str) -> bool:
-    if basic.summary or not summary_text:
-        return False
-    basic.summary = summary_text
-    return True
-
-
-def maybe_update_basic_icon(basic: PBBasic, mimetype: str | None) -> bool:
-    if basic.icon not in (None, "", "application/octet-stream", GENERIC_MIME_TYPE):
-        # Icon already set or detected
-        return False
-
-    if not mimetype:
-        return False
-
-    if not content_types.valid(mimetype):
-        logger.warning(
-            "Invalid mimetype. Skipping icon update.",
-            extra={"mimetype": mimetype, "rid": basic.uuid, "slug": basic.slug},
-        )
-        return False
-
-    basic.icon = mimetype
-    return True
-
-
-def maybe_update_basic_thumbnail(basic: PBBasic, thumbnail: CloudFile | None, kbid: str) -> bool:
-    if basic.thumbnail or thumbnail is None:
-        return False
-    basic.thumbnail = CloudLink.format_reader_download_uri(thumbnail.uri)
-    fix_kbid_in_thumbnail(basic, kbid)
-    return True
-
-
-def fix_kbid_in_thumbnail(basic: PBBasic, kbid: str):
-    if basic.thumbnail.startswith("/kb/") and not basic.thumbnail.startswith(f"/kb/{kbid}/"):
-        # Replace the kbid in the thumbnail if it doesn't match the current kbid. This is necessary for
-        # resources that have been backed up and we are restoring them to a different kbid.
-        parts = basic.thumbnail.split("/", 3)
-        parts[2] = kbid
-        basic.thumbnail = "/".join(parts)
-
-
-def update_basic_languages(basic: Basic, languages: list[str]) -> bool:
-    if len(languages) == 0:
-        return False
-
-    updated = False
-    for language in languages:
-        if not language:
-            continue
-
-        if basic.metadata.language == "":
-            basic.metadata.language = language
-            updated = True
-
-        if language not in basic.metadata.languages:
-            basic.metadata.languages.append(language)
-            updated = True
-
-    return updated
-
-
-def get_text_field_mimetype(bm: BrokerMessage) -> str | None:
-    if len(bm.texts) == 0:
-        return None
-    text_format = next(iter(bm.texts.values())).format
-    return PB_TEXT_FORMAT_TO_MIMETYPE[text_format]
-
-
-def extract_field_metadata_languages(
-    field_metadata: FieldComputedMetadataWrapper,
-) -> list[str]:
-    languages: set[str] = set()
-    languages.add(field_metadata.metadata.metadata.language)
-    for _, splitted_metadata in field_metadata.metadata.split_metadata.items():
-        languages.add(splitted_metadata.language)
-    return list(languages)
-
-
-async def compute_resource_status(
-    txn: Transaction,
-    kbid: str,
-    uuid: str,
-    basic: PBBasic,
-) -> None:
-    """
-    Compute and set the resource-level processing status on basic by inspecting
-    the status of all individual fields.
-    """
-    field_ids = await datamanagers.resources.get_all_field_ids(
-        txn, kbid=kbid, rid=uuid, for_update=False
-    )
-    if field_ids is None:
-        # No fields, it is processed
-        basic.metadata.status = PBMetadata.Status.PROCESSED
-        return
-
-    field_statuses = await datamanagers.fields.get_statuses(
-        txn, kbid=kbid, rid=uuid, fields=field_ids.fields
-    )
-
-    # If any field is processing -> PENDING
-    if any(f.status == writer_pb2.FieldStatus.Status.PENDING for f in field_statuses):
-        basic.metadata.status = PBMetadata.Status.PENDING
-    # If we have any non-DA error -> ERROR
-    elif any(
-        f.status == writer_pb2.FieldStatus.Status.ERROR
-        and any(
-            e.source_error.severity == writer_pb2.Error.Severity.ERROR
-            and e.source_error.code != writer_pb2.Error.ErrorCode.DATAAUGMENTATION
-            for e in f.errors
-        )
-        for f in field_statuses
-    ):
-        basic.metadata.status = PBMetadata.Status.ERROR
-    # Otherwise (everything processed or we only have DA errors) -> PROCESSED
-    else:
-        basic.metadata.status = PBMetadata.Status.PROCESSED

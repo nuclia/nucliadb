@@ -23,7 +23,7 @@ from datetime import datetime
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.ingest.orm.resource import (
+from nucliadb.ingest.orm.processor.processor import (
     delete_basic_computedmetadata_classifications,
     update_basic_computedmetadata_classifications,
 )

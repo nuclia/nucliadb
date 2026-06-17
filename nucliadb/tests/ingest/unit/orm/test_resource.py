@@ -24,14 +24,16 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from nucliadb.ingest.orm.brain_v2 import ResourceBrain
-from nucliadb.ingest.orm.resource import (
-    Resource,
-    get_file_page_positions,
+from nucliadb.ingest.orm.processor.processor import (
     get_text_field_mimetype,
     maybe_update_basic_icon,
     maybe_update_basic_summary,
     maybe_update_basic_thumbnail,
     update_basic_languages,
+)
+from nucliadb.ingest.orm.resource import (
+    Resource,
+    get_file_page_positions,
 )
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.resources_pb2 import (
