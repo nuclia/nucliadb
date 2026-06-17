@@ -725,9 +725,10 @@ def _request_sync_builder(
 
     def _func(
         self: NucliaDB,
-        query_params: QUERY_PARAMS_TYPE | None = None,
         content: INPUT_TYPE | None = None,
         headers: dict[str, str] | None = None,
+        *,
+        query_params: QUERY_PARAMS_TYPE | None = None,
         **kwargs,
     ) -> OUTPUT_TYPE:
         path, data = prepare_request(
@@ -873,9 +874,10 @@ def _request_async_builder(
 
     async def _func(
         self: NucliaDBAsync,
-        query_params: QUERY_PARAMS_TYPE = None,
         content: INPUT_TYPE | None = None,
         headers: dict[str, str] | None = None,
+        *,
+        query_params: QUERY_PARAMS_TYPE = None,
         **kwargs,
     ):
         path, data = prepare_request(

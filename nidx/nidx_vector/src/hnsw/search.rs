@@ -228,7 +228,7 @@ impl<'a, DR: DataRetriever> HnswSearcher<'a, DR> {
                 if visited_nodes.insert(new_candidate.0 as usize) {
                     let new_similarity = self.retriever.similarity(new_candidate, query);
 
-                    if new_similarity > self.retriever.min_score() {
+                    if new_similarity >= self.retriever.min_score() {
                         candidates.push(Cnx(new_candidate, new_similarity));
                     }
                 }
