@@ -652,16 +652,15 @@ class Processor:
         # computed resource status into basic before persisting.
         await compute_resource_status(resource.txn, resource.kbid, resource.uuid, current_basic)
 
-        should_update = MessageInspector(message)
         if current_basic != previous_basic:
             tasks.append(resource.set_basic(current_basic))
-        if should_update.resource_origin:
+        if message.HasField("origin"):
             tasks.append(resource.set_origin(message.origin))
-        if should_update.resource_extra:
+        if message.HasField("extra"):
             tasks.append(resource.set_extra(message.extra))
-        if should_update.resource_security:
+        if message.HasField("security"):
             tasks.append(resource.set_security(message.security))
-        if should_update.resource_user_relations:
+        if message.HasField("user_relations"):
             tasks.append(resource.set_user_relations(message.user_relations))
 
         await asyncio.gather(*tasks)
@@ -882,7 +881,7 @@ def _merge_basic(
     return merged
 
 
-def _should_update_title_from_files(basic: PBBasic, resource_uuid: str, filenames: list[str]) -> bool:
+def _should_set_title_from_files(basic: PBBasic, resource_uuid: str, filenames: list[str]) -> bool:
     return basic.title in ("", resource_uuid) or basic.reset_title or basic.title in filenames
 
 
@@ -926,7 +925,7 @@ def _apply_extracted_basic_updates(
         extracted_languages.append(fed.language)
 
     # Update title from the first file that has one (if title looks auto-generated)
-    if _should_update_title_from_files(basic, resource_uuid, filenames):
+    if _should_set_title_from_files(basic, resource_uuid, filenames):
         for fed in message.file_extracted_data:
             if fed.title:
                 basic.title = fed.title
@@ -941,38 +940,3 @@ def _apply_extracted_basic_updates(
         extracted_languages.extend(extract_field_metadata_languages(fcmw))
 
     update_basic_languages(basic, extracted_languages)
-
-
-class MessageInspector:
-    """ """
-
-    def __init__(self, message: writer_pb2.BrokerMessage):
-        self.message = message
-
-    @property
-    def resource_security(self) -> bool:
-        return self.message.HasField("security")
-
-    @property
-    def resource_user_relations(self) -> bool:
-        return self.message.HasField("user_relations")
-
-    @property
-    def resource_origin(self) -> bool:
-        return self.message.HasField("origin")
-
-    @property
-    def resource_extra(self) -> bool:
-        return self.message.HasField("extra")
-
-    @property
-    def resource_fields(self) -> bool:
-        return (
-            len(self.message.texts) > 0
-            or len(self.message.links) > 0
-            or len(self.message.files) > 0
-            or len(self.message.conversations) > 0
-            or len(self.message.key_value_fields) > 0
-            or len(self.message.delete_fields) > 0
-            or len(self.message.delete_splits) > 0
-        )
