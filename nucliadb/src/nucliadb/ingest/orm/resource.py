@@ -44,7 +44,6 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
     FieldComputedMetadataWrapper,
-    FieldFile,
     FieldID,
     FieldQuestionAnswerWrapper,
     FieldType,
@@ -74,6 +73,20 @@ KB_FIELDS: dict[int, type] = {
     FieldType.KEY_VALUE: KeyValue,
 }
 
+<<<<<<< HEAD
+=======
+PB_TEXT_FORMAT_TO_MIMETYPE = {
+    FieldText.Format.PLAIN: "text/plain",
+    FieldText.Format.HTML: "text/html",
+    FieldText.Format.RST: "text/x-rst",
+    FieldText.Format.MARKDOWN: "text/markdown",
+    FieldText.Format.JSON: "application/json",
+    FieldText.Format.KEEP_MARKDOWN: "text/markdown",
+    FieldText.Format.JSONL: "application/x-ndjson",
+    FieldText.Format.PLAIN_BLANKLINE_SPLIT: "text/plain+blankline",
+}
+
+>>>>>>> c9d070a3e (refactor resource and fields processing)
 
 class Resource:
     def __init__(
