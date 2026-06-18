@@ -194,11 +194,13 @@ class Resource:
         self.user_relations = payload
 
     # Fields
-    async def get_fields(self, force: bool = False) -> dict[tuple[FieldType.ValueType, str], Field]:
+    async def get_fields(
+        self, force: bool = False, load_values: bool = False
+    ) -> dict[tuple[FieldType.ValueType, str], Field]:
         # Get all fields
         for type, field in await self.get_fields_ids(force=force):
             if (type, field) not in self.fields:
-                self.fields[(type, field)] = await self.get_field(field, type)
+                self.fields[(type, field)] = await self.get_field(field, type, load=load_values)
         return self.fields
 
     async def _inner_get_fields_ids(self) -> list[tuple[FieldType.ValueType, str]]:
@@ -238,6 +240,8 @@ class Resource:
                 if field not in self.fields:
                     field_obj: Field = KB_FIELDS[type](id=key, resource=self)
                     if load:
+                        # Fetch the field value from the database.
+                        # The value is cached in the field object for future use.
                         await field_obj.get_value()
                     self.fields[field] = field_obj
         return self.fields[field]

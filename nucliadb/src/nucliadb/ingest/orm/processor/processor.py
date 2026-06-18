@@ -603,7 +603,7 @@ class Processor:
         """
         Get all resource filenames from the resource file fields.
         """
-        fields = await resource.get_fields(force=True)
+        fields = await resource.get_fields(force=True, load_values=False)
         filenames = set()
         for (field_type, _), field_obj in fields.items():
             if field_type == writer_pb2.FieldType.FILE:
@@ -875,8 +875,22 @@ def _merge_basic(
     return merged
 
 
+def _should_reset_title(basic: PBBasic, resource_uuid: str) -> bool:
+    """
+    When a user creates a resource without a title, the system will try to set the title from
+    some extracted metadata like the title of a link field or the extracted title of a file field.
+    """
+    return basic.title in ("", resource_uuid) or basic.reset_title
+
+
 def _should_set_title_from_files(basic: PBBasic, resource_uuid: str, filenames: list[str]) -> bool:
-    return basic.title in ("", resource_uuid) or basic.reset_title or basic.title in filenames
+    return _should_reset_title(basic, resource_uuid) or basic.title in filenames
+
+
+def _should_set_title_from_link(basic: PBBasic, resource_uuid: str, extracted_title: str) -> bool:
+    return extracted_title != "" and (
+        _should_reset_title(basic, resource_uuid) or basic.title.startswith("http")
+    )
 
 
 def _apply_extracted_basic_updates(
@@ -902,12 +916,7 @@ def _apply_extracted_basic_updates(
         maybe_update_basic_summary(basic, led.description)
         extracted_languages.append(led.language)
         # Update title from the first link that has one and current title looks auto-generated
-        if led.title and (
-            basic.title.startswith("http")
-            or basic.title == ""
-            or basic.title == resource_uuid
-            or basic.reset_title
-        ):
+        if _should_set_title_from_link(basic, resource_uuid, led.title):
             # FIXME: this doesn't properly index the new title. See sc-6088 for more details
             basic.title = led.title
             basic.reset_title = False
