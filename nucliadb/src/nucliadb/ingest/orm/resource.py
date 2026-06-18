@@ -485,15 +485,16 @@ class Resource:
         Apply extracted field data from a broker message (extracted text, vectors,
         question answers, field metadata, large metadata). Does not touch basic.
         """
+        tasks = []
         for question_answers in message.question_answers:
-            await self._apply_question_answers(question_answers)
+            tasks.append(self._apply_question_answers(question_answers))
 
         for field_id in message.delete_question_answers:
-            await self._delete_question_answers(field_id)
+            tasks.append(self._delete_question_answers(field_id))
 
-        tasks = []
         for extracted_text in message.extracted_text:
             tasks.append(self._apply_extracted_text(extracted_text))
+
         await asyncio.gather(*tasks)
         tasks.clear()
 
@@ -501,16 +502,14 @@ class Resource:
         await self.apply_fields_status(message, self._modified_extracted_text)
 
         for link_extracted_data in message.link_extracted_data:
-            await self._apply_link_extracted_data(link_extracted_data)
+            tasks.append(self._apply_link_extracted_data(link_extracted_data))
 
         for file_extracted_data in message.file_extracted_data:
-            await self._apply_file_extracted_data(file_extracted_data)
+            tasks.append(self._apply_file_extracted_data(file_extracted_data))
 
-        # Metadata should go first
         for field_metadata in message.field_metadata:
             tasks.append(self._apply_field_computed_metadata(field_metadata))
 
-        # Upload to binary storage
         if self.disable_vectors is False:
             tasks.append(self._apply_extracted_vectors(message.field_vectors))
             tasks.append(
@@ -520,7 +519,6 @@ class Resource:
                 self._apply_semantic_graph_edge_vectors(message.field_semantic_graph_edge_vectors)
             )
 
-        # Only uploading to binary storage
         for field_large_metadata in message.field_large_metadata:
             tasks.append(self._apply_field_large_metadata(field_large_metadata))
 
