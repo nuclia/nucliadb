@@ -106,6 +106,10 @@ message ActivityLogMatch {
     ActivityLogMatchType type = 2;
 }
 
+enum TokenType {
+    NUA = 0;
+}
+
 message KbUsage {
     // Identifiers
     Service service = 1;
@@ -113,6 +117,8 @@ message KbUsage {
     optional string account_id = 3;
     optional string kb_id = 4;
     KBSource kb_source = 5;
+    optional string token_id = 11;
+    optional TokenType token_type = 12;
 
     optional ActivityLogMatch activity_log_match = 10;
 
