@@ -10,7 +10,7 @@ license-fix:
 protos: proto-py
 
 proto-py:
-	uv sync --reinstall-package nucliadb_protos --reinstall-package nidx_protos
+	uv sync --reinstall-package nucliadb_protos --reinstall-package nidx_protos --inexact
 
 python-code-lint:
 	make -C nucliadb_dataset/ format
