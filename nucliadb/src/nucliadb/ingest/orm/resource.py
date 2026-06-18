@@ -290,10 +290,6 @@ class Resource:
                 return True
         return False
 
-    def has_field(self, type: FieldType.ValueType, field: str) -> bool:
-        # REVIEW: are we sure we don't want to actually check this?
-        return (type, field) in self.fields
-
     async def get_all_field_ids(self, *, for_update: bool) -> PBAllFieldIDs | None:
         return await datamanagers.resources.get_all_field_ids(
             self.txn, kbid=self.kbid, rid=self.uuid, for_update=for_update
@@ -577,7 +573,6 @@ class Resource:
         self,
         fields_vectors: Sequence[ExtractedVectorsWrapper],
     ):
-        await self.get_fields(force=True)
         vectorsets = {
             vectorset_id: vs
             async for vectorset_id, vs in datamanagers.vectorsets.iter(self.txn, kbid=self.kbid)
@@ -603,7 +598,7 @@ class Resource:
 
             # Store vectors in the resource
 
-            if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
+            if not await self.field_exists(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
                 continue
@@ -624,7 +619,6 @@ class Resource:
         self,
         fields_vectors: Sequence[SemanticGraphNodeVectors],
     ):
-        await self.get_fields(force=True)
         vectorset_ids = [
             vs.vectorset_id
             for vs in await datamanagers.graph_vectorsets.node.get_all(self.txn, kbid=self.kbid)
@@ -641,7 +635,7 @@ class Resource:
             vectorset_id = field_vectors.vectorset_id
 
             # Store vectors in the resource
-            if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
+            if not await self.field_exists(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
                 continue
@@ -658,7 +652,6 @@ class Resource:
         self,
         fields_vectors: Sequence[SemanticGraphEdgeVectors],
     ):
-        await self.get_fields(force=True)
         vectorset_ids = [
             vs.vectorset_id
             for vs in await datamanagers.graph_vectorsets.edge.get_all(self.txn, kbid=self.kbid)
@@ -675,7 +668,7 @@ class Resource:
             vectorset_id = field_vectors.vectorset_id
 
             # Store vectors in the resource
-            if not self.has_field(field_vectors.field.field_type, field_vectors.field.field):
+            if not await self.field_exists(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
                 logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
                 continue
