@@ -603,7 +603,7 @@ class Processor:
         """
         Get all resource filenames from the resource file fields.
         """
-        fields = await resource.get_fields(force=True)
+        fields = await resource.get_fields(force=True, load_values=False)
         filenames = set()
         for (field_type, _), field_obj in fields.items():
             if field_type == writer_pb2.FieldType.FILE:
