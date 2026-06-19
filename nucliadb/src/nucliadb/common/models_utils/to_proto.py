@@ -48,14 +48,14 @@ def field_type_name(obj: FieldTypeName) -> resources_pb2.FieldType.ValueType:
 
 
 @overload
-def field_type(obj: str) -> resources_pb2.FieldType.ValueType: ...
+def field_type(enum: FieldID.FieldType, /) -> resources_pb2.FieldType.ValueType: ...
 
 
 @overload
-def field_type(obj: FieldID.FieldType) -> resources_pb2.FieldType.ValueType: ...
+def field_type(abbr: str, /) -> resources_pb2.FieldType.ValueType: ...
 
 
-def field_type(obj: FieldID.FieldType | str) -> resources_pb2.FieldType.ValueType:
+def field_type(abbr_or_enum: str | FieldID.FieldType, /) -> resources_pb2.FieldType.ValueType:
     return {
         FieldTypeName.LINK.abbreviation(): resources_pb2.FieldType.LINK,
         FieldTypeName.FILE.abbreviation(): resources_pb2.FieldType.FILE,
@@ -69,7 +69,7 @@ def field_type(obj: FieldID.FieldType | str) -> resources_pb2.FieldType.ValueTyp
         FieldID.FieldType.GENERIC: resources_pb2.FieldType.GENERIC,
         FieldID.FieldType.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
         FieldID.FieldType.KEY_VALUE: resources_pb2.FieldType.KEY_VALUE,
-    }[obj]
+    }[abbr_or_enum]
 
 
 def kb_synonyms(obj: KnowledgeBoxSynonyms) -> knowledgebox_pb2.Synonyms:

@@ -24,6 +24,8 @@ from google.protobuf.message import Message
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 PB_TYPE = TypeVar("PB_TYPE", bound=Message)
 
@@ -55,3 +57,17 @@ async def with_ro_transaction():
     driver = get_driver()
     async with driver.ro_transaction() as ro_txn:
         yield ro_txn
+
+
+def datamanagers_v2_migrating(kbid: str) -> bool:
+    """
+    Check if the knowledge box is currently being migrated to the v2 datamanagers.
+    """
+    return has_feature(const.Features.DATAMANAGERS_V2_MIGRATING, context={"kbid": kbid})
+
+
+def datamanagers_v2_read(kbid: str) -> bool:
+    """
+    Check if the knowledge box has already been migrated and has datamanagers v2 reads enabled.
+    """
+    return has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid})

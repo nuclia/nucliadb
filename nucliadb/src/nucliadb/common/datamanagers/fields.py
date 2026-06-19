@@ -23,7 +23,8 @@ from typing import Sequence
 
 from google.protobuf.message import Message
 
-from nucliadb.common.datamanagers.utils import get_kv_pb
+from nucliadb.common.datamanagers import fields_v2
+from nucliadb.common.datamanagers.utils import datamanagers_v2_migrating, datamanagers_v2_read, get_kv_pb
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import writer_pb2
@@ -49,13 +50,31 @@ async def set(
     field_id: str,
     value: Message,
 ):
+    if datamanagers_v2_read(kbid):
+        await fields_v2.set(
+            txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id, value=value
+        )
+        return
+
     key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     await txn.set(key, value.SerializeToString())
 
+    if datamanagers_v2_migrating(kbid):
+        await fields_v2.set(
+            txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id, value=value
+        )
+
 
 async def delete(txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str):
+    if datamanagers_v2_read(kbid):
+        await fields_v2.delete(txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id)
+        return
+
     base_key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     await txn.delete_by_prefix(base_key)
+
+    if datamanagers_v2_migrating(kbid):
+        await fields_v2.delete(txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id)
 
 
 # Error
@@ -87,6 +106,11 @@ async def set_error(
 async def get_status(
     txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
 ) -> writer_pb2.FieldStatus | None:
+    if datamanagers_v2_read(kbid):
+        return await fields_v2.get_status(
+            txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id
+        )
+
     key = KB_RESOURCE_FIELD_STATUS.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     return await get_kv_pb(txn, key, writer_pb2.FieldStatus)
 
@@ -94,6 +118,9 @@ async def get_status(
 async def get_statuses(
     txn: Transaction, *, kbid: str, rid: str, fields: Sequence[writer_pb2.FieldID]
 ) -> list[writer_pb2.FieldStatus]:
+    if datamanagers_v2_read(kbid):
+        return await fields_v2.get_statuses(txn, kbid=kbid, rid=rid, fields=fields)
+
     keys = [
         KB_RESOURCE_FIELD_STATUS.format(
             kbid=kbid, uuid=rid, type=FIELD_TYPE_PB_TO_STR[fid.field_type], field=fid.field
@@ -122,5 +149,16 @@ async def set_status(
     field_id: str,
     status: writer_pb2.FieldStatus,
 ):
+    if datamanagers_v2_read(kbid):
+        await fields_v2.set_status(
+            txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id, status=status
+        )
+        return
+
     key = KB_RESOURCE_FIELD_STATUS.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     await txn.set(key, status.SerializeToString())
+
+    if datamanagers_v2_migrating(kbid):
+        await fields_v2.set_status(
+            txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id, status=status
+        )

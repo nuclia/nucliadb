@@ -40,6 +40,7 @@ class Features:
     # Flipt features
     KEY_VALUE_FIELDS = "nucliadb_key_value_fields"
     DATAMANAGERS_V2_READ = "nucliadb_datamanagers_v2_read"
+    DATAMANAGERS_V2_MIGRATING = "nucliadb_datamanagers_v2_migrating"
 
 
 _FliptFeatures = set(

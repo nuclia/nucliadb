@@ -57,8 +57,8 @@ async def migrate(txn: PGTransaction) -> None:
       - field_type Single-char abbreviation: t=text, f=file, u=link,
                    c=conversation, a=generic, k=key_value
       - field_id   User-defined field name
-      - status     Processing status matching FieldStatus.Status in writer.proto:
-                   0=PENDING, 1=PROCESSED, 2=ERROR
+      - status     Serialised writer_pb2.FieldStatus protobuf bytes; NULL when
+                   not yet set
       - value      Serialised protobuf bytes (excludes object-store data)
       - md5        Optional content hash; NULL when not provided; used for
                    duplicate detection within a knowledge box
@@ -103,9 +103,10 @@ async def migrate(txn: PGTransaction) -> None:
             );
         """)
 
-        # Fast slug-based lookups within a knowledge box
+        # Unique slug lookups within a knowledge box (NULL slugs are excluded
+        # so that resources without a slug can coexist freely)
         await cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_kb_resources_slug
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_kb_resources_slug
             ON kb_resources(kbid, slug)
             WHERE slug IS NOT NULL;
         """)
@@ -119,7 +120,7 @@ async def migrate(txn: PGTransaction) -> None:
                 rid        UUID     NOT NULL,
                 field_type TEXT     NOT NULL,
                 field_id   TEXT     NOT NULL,
-                status     SMALLINT NOT NULL DEFAULT 0,
+                status     BYTEA,
                 value      BYTEA,
                 md5        TEXT,
                 PRIMARY KEY (kbid, rid, field_type, field_id),

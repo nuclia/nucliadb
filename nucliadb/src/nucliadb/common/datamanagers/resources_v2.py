@@ -36,8 +36,11 @@ import dataclasses
 from collections.abc import AsyncIterator
 from typing import cast
 
+import psycopg.errors
+
 from nucliadb.common.datamanagers.utils import with_ro_transaction
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb_protos import resources_pb2
 
@@ -225,22 +228,43 @@ async def set_user_relations(
         )
 
 
+async def get_slug(txn: Transaction, kbid: str, rid: str) -> str | None:
+    """Get the slug of a resource."""
+    async with _pg(txn).connection.cursor() as cur:
+        await cur.execute(
+            """
+            SELECT slug FROM kb_resources
+            WHERE kbid = %(kbid)s AND rid = %(rid)s
+            """,
+            {"kbid": kbid, "rid": rid},
+        )
+        row = await cur.fetchone()
+        return str(row[0]) if row is not None else None
+
+
 async def set_slug(
     txn: Transaction,
     *,
     kbid: str,
     rid: str,
-    slug: str | None,
+    slug: str,
 ) -> None:
-    """Update only the slug column of an existing resource row."""
+    """Update only the slug column of an existing resource row.
+
+    Raises ConflictError if the slug already belongs to another resource in
+    the same knowledge box.
+    """
     async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            """
-            UPDATE kb_resources SET slug = %(slug)s
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-            """,
-            {"kbid": kbid, "rid": rid, "slug": slug},
-        )
+        try:
+            await cur.execute(
+                """
+                UPDATE kb_resources SET slug = %(slug)s
+                WHERE kbid = %(kbid)s AND rid = %(rid)s
+                """,
+                {"kbid": kbid, "rid": rid, "slug": slug},
+            )
+        except psycopg.errors.UniqueViolation:
+            raise ConflictError(f"Slug '{slug}' already exists")
 
 
 async def set_shard(
@@ -426,7 +450,7 @@ async def get_user_relations(txn: Transaction, *, kbid: str, rid: str) -> resour
         return pb
 
 
-async def iter_resource_ids(*, kbid: str) -> AsyncIterator[str]:
+async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
     """Iterate over all resource UUIDs in a knowledge box."""
     async with with_ro_transaction() as txn:
         async with _pg(txn).connection.cursor() as cur:
@@ -438,7 +462,7 @@ async def iter_resource_ids(*, kbid: str) -> AsyncIterator[str]:
                 yield str(rid)
 
 
-async def count(txn: Transaction, *, kbid: str) -> int:
+async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
     """Return the total number of resources in a knowledge box."""
     async with _pg(txn).connection.cursor() as cur:
         await cur.execute(
@@ -454,11 +478,10 @@ async def get_resource_shard_id(
 ) -> str | None:
     """Return the shard ID for a resource, or None."""
     async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            "SELECT shard FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
-            {"kbid": kbid, "rid": rid},
-            for_update=for_update,
-        )
+        sql = "SELECT shard FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s"
+        if for_update:
+            sql += " FOR UPDATE"
+        await cur.execute(sql, {"kbid": kbid, "rid": rid})
         row = await cur.fetchone()
         return row[0] if row is not None else None
 

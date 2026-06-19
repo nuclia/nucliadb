@@ -26,8 +26,7 @@ Each row represents one field in a resource and stores:
   - field_type - single-char abbreviation: t=text, f=file, u=link,
                  c=conversation, a=generic, k=key_value
   - field_id   - user-defined field name
-  - status     - processing status matching FieldStatus.Status in writer.proto:
-                 0=PENDING, 1=PROCESSED, 2=ERROR
+  - status     - serialised writer_pb2.FieldStatus protobuf bytes; NULL when not yet set
   - value      - serialised protobuf bytes (field payload, excluding
                  anything stored in object storage)
   - md5        - optional content hash; NULL when not provided; used for
@@ -40,12 +39,15 @@ there is no need for explicit bulk-delete helpers here.
 
 import dataclasses
 from collections.abc import AsyncIterator
-from typing import cast
+from typing import Sequence, cast
+
+from google.protobuf.message import Message
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGTransaction
-from nucliadb.common.models_utils import to_proto
+from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb_protos import resources_pb2 as rpb2
+from nucliadb_protos import writer_pb2 as wpb2
 
 # ---------------------------------------------------------------------------
 # Row model
@@ -58,7 +60,7 @@ class FieldRow:
     rid: str
     field_type: str  # single-char abbreviation: t, f, u, c, a, k
     field_id: str
-    status: int  # writer_pb2.FieldStatus.Status value
+    status: bytes | None  # serialised writer_pb2.FieldStatus
     value: bytes | None
     md5: str | None
 
@@ -79,7 +81,7 @@ def _row_to_field(row: tuple) -> FieldRow:
         rid=str(rid),
         field_type=field_type,
         field_id=field_id,
-        status=status,
+        status=bytes(status) if status is not None else None,
         value=bytes(value) if value is not None else None,
         md5=md5,
     )
@@ -100,7 +102,7 @@ async def upsert(
     rid: str,
     field_type: str,
     field_id: str,
-    status: int = 0,
+    status: bytes | None = None,
     value: bytes | None = None,
     md5: str | None = None,
 ) -> None:
@@ -134,7 +136,7 @@ async def set_status(
     rid: str,
     field_type: str,
     field_id: str,
-    status: int,
+    status: wpb2.FieldStatus,
 ) -> None:
     """Update only the status column. Does nothing if the row does not exist."""
     async with _pg(txn).connection.cursor() as cur:
@@ -149,36 +151,28 @@ async def set_status(
                 "rid": rid,
                 "field_type": field_type,
                 "field_id": field_id,
-                "status": status,
+                "status": status.SerializeToString(),
             },
         )
 
 
-async def set_value(
+async def set(
     txn: Transaction,
     *,
     kbid: str,
     rid: str,
     field_type: str,
     field_id: str,
-    value: bytes,
+    value: Message,
 ) -> None:
-    """Update only the value column. Does nothing if the row does not exist."""
-    async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            """
-            UPDATE kb_fields SET value = %(value)s
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_type = %(field_type)s AND field_id = %(field_id)s
-            """,
-            {
-                "kbid": kbid,
-                "rid": rid,
-                "field_type": field_type,
-                "field_id": field_id,
-                "value": value,
-            },
-        )
+    await upsert(
+        txn,
+        kbid=kbid,
+        rid=rid,
+        field_type=field_type,
+        field_id=field_id,
+        value=value.SerializeToString(),
+    )
 
 
 async def delete(
@@ -275,8 +269,8 @@ async def get_status(
     rid: str,
     field_type: str,
     field_id: str,
-) -> int | None:
-    """Return only the status integer for a field, or None if the row does not exist."""
+) -> wpb2.FieldStatus | None:
+    """Return the deserialised FieldStatus for a field, or None if the row does not exist."""
     async with _pg(txn).connection.cursor() as cur:
         await cur.execute(
             """
@@ -292,7 +286,53 @@ async def get_status(
             },
         )
         row = await cur.fetchone()
-        return row[0] if row is not None else None
+        if row is None or row[0] is None:
+            return None
+        pb = wpb2.FieldStatus()
+        pb.ParseFromString(bytes(row[0]))
+        return pb
+
+
+async def get_statuses(
+    txn: Transaction,
+    *,
+    kbid: str,
+    rid: str,
+    fields: Sequence[rpb2.FieldID],
+) -> list[wpb2.FieldStatus]:
+    """Return the deserialised FieldStatus for a list of fields, in the same order."""
+    if not fields:
+        return []
+
+    async with _pg(txn).connection.cursor() as cur:
+        await cur.execute(
+            f"""
+            SELECT field_type, field_id, status
+            FROM kb_fields
+            WHERE kbid = %(kbid)s AND rid = %(rid)s
+              AND (field_type, field_id) IN (
+                {",".join(["(%s, %s)"] * len(fields))}
+              )
+            """,
+            [kbid, rid]
+            + [(from_proto.field_type_name(f.field_type).abbreviation(), f.field) for f in fields],
+        )
+        rows = await cur.fetchall()
+
+    # Build a lookup dict for fast access
+    status_lookup = {(row[0], row[1]): bytes(row[2]) if row[2] is not None else None for row in rows}
+
+    result = []
+    for f in fields:
+        status_bytes = status_lookup.get((f.field_type, f.field))
+        if status_bytes is None:
+            result.append(wpb2.FieldStatus())  # Default empty status
+        else:
+            pb = wpb2.FieldStatus()
+            pb.ParseFromString(status_bytes)
+            result.append(pb)
+
+    return result
 
 
 async def get_all_for_resource(
@@ -382,13 +422,12 @@ async def get_all_field_ids(
         return pb
 
 
-async def exists(
+async def has_field(
     txn: Transaction,
     *,
     kbid: str,
     rid: str,
-    field_type: str,
-    field_id: str,
+    field_id: rpb2.FieldID,
 ) -> bool:
     """Return True if a field row exists, False otherwise."""
     async with _pg(txn).connection.cursor() as cur:
@@ -401,8 +440,8 @@ async def exists(
             {
                 "kbid": kbid,
                 "rid": rid,
-                "field_type": field_type,
-                "field_id": field_id,
+                "field_type": from_proto.field_type_name(field_id.field_type).abbreviation(),
+                "field_id": field_id.field,
             },
         )
         return await cur.fetchone() is not None
