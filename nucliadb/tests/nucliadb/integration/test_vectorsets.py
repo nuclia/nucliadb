@@ -83,7 +83,7 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
 
     for dimension, vectorset in test_cases:
         query_pb = nodereader_pb2.SearchRequest(
-            shard=shard_id,
+            shard_ids=[shard_id],
             body="this is a query for my vectorset",
             vector=[1.23] * dimension,
             vectorset=vectorset,
@@ -99,7 +99,7 @@ async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
     ]
     for dimension, vectorset in test_cases:
         query_pb = nodereader_pb2.SearchRequest(
-            shard=shard_id,
+            shard_ids=[shard_id],
             body="this is a query for my vectorset",
             vector=[1.23] * dimension,
             vectorset=vectorset,

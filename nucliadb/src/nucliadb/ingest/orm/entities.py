@@ -32,7 +32,7 @@ from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.settings import settings
-from nucliadb.search.search.shards import graph_search_shard, query_shard
+from nucliadb.search.search.shards import graph_search_shard, query_shards
 from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroup,
     EntitiesGroupSummary,
@@ -135,37 +135,29 @@ class EntitiesManager:
             yield group
             visited_groups.add(group)
 
-    async def get_indexed_entities_groups_names(
-        self,
-    ) -> set[str]:
+    async def get_indexed_entities_groups_names(self) -> set[str]:
         shard_manager = get_shard_manager()
+        shard_ids = [
+            shard_obj.nidx_shard_id for shard_obj in await shard_manager.get_shards_by_kbid(self.kbid)
+        ]
 
-        async def query_indexed_entities_group_names(shard_id: str) -> set[str]:
-            """Search all relation types"""
-            request = SearchRequest(
-                shard=shard_id,
-                result_per_page=0,
-                body="",
-                document=True,
-                paragraph=False,
-                faceted=Faceted(labels=["/e"]),
-            )
-            response: SearchResponse = await query_shard(shard_id, request)
-            try:
-                facetresults = response.document.facets["/e"].facetresults
-            except KeyError:
-                # No entities found
-                return set()
-            else:
-                return {facet.tag.split("/")[-1] for facet in facetresults}
-
-        results = await shard_manager.apply_for_all_shards(
-            self.kbid, query_indexed_entities_group_names, settings.relation_types_timeout
+        # search all relation types
+        request = SearchRequest(
+            shard_ids=shard_ids,
+            result_per_page=0,
+            body="",
+            document=True,
+            paragraph=False,
+            faceted=Faceted(labels=["/e"]),
         )
-
-        if not results:
+        response: SearchResponse = await query_shards(shard_ids, request)
+        try:
+            facetresults = response.document.facets["/e"].facetresults
+        except KeyError:
+            # No entities found
             return set()
-        return set.union(*results)
+        else:
+            return {facet.tag.split("/")[-1] for facet in facetresults}
 
     @staticmethod
     def merge_entities_groups(indexed: EntitiesGroup, stored: EntitiesGroup):
