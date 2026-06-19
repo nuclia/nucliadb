@@ -45,6 +45,7 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
     FieldComputedMetadataWrapper,
+    FieldFile,
     FieldID,
     FieldQuestionAnswerWrapper,
     FieldType,
@@ -197,7 +198,12 @@ class Resource:
     async def get_fields(
         self, force: bool = False, load_values: bool = False
     ) -> dict[tuple[FieldType.ValueType, str], Field]:
-        # Get all fields
+        """
+        Get all fields of the resource.
+        Params:
+            force: If True, forces a refresh of the fields from the database, ignoring any cached values.
+            load_values: If True, loads the values of the fields from the database. If False, only the field orm objects are created and cached.
+        """
         for type, field in await self.get_fields_ids(force=force):
             if (type, field) not in self.fields:
                 self.fields[(type, field)] = await self.get_field(field, type, load=load_values)
@@ -482,20 +488,11 @@ class Resource:
         question answers, field metadata, large metadata). Does not touch basic.
         """
         tasks = []
-        for question_answers in message.question_answers:
-            tasks.append(self._apply_question_answers(question_answers))
-
-        for field_id in message.delete_question_answers:
-            tasks.append(self._delete_question_answers(field_id))
+        if message.question_answers or message.delete_question_answers:
+            tasks.append(self._apply_question_answers_ops(message))
 
         for extracted_text in message.extracted_text:
             tasks.append(self._apply_extracted_text(extracted_text))
-
-        await asyncio.gather(*tasks)
-        tasks.clear()
-
-        # Update field statuses depending on processing results
-        await self.apply_fields_status(message, self._modified_extracted_text)
 
         for link_extracted_data in message.link_extracted_data:
             tasks.append(self._apply_link_extracted_data(link_extracted_data))
@@ -518,6 +515,21 @@ class Resource:
         for field_large_metadata in message.field_large_metadata:
             tasks.append(self._apply_field_large_metadata(field_large_metadata))
 
+        await asyncio.gather(*tasks)
+        tasks.clear()
+
+        # Update field statuses depending on processing results. This depends on the extracted text being applied first
+        await self.apply_fields_status(message, self._modified_extracted_text)
+
+    async def _apply_question_answers_ops(self, message: BrokerMessage):
+        tasks = []
+        updated = [qa.field for qa in message.question_answers]
+        for question_answers in message.question_answers:
+            tasks.append(self._apply_question_answers(question_answers))
+        for field_id in message.delete_question_answers:
+            if field_id not in updated:
+                # Only delete those question answers that we are not adding/updating, just to be safe.
+                tasks.append(self._delete_question_answers(field_id))
         await asyncio.gather(*tasks)
 
     async def _apply_extracted_text(self, extracted_text: ExtractedTextWrapper):
@@ -689,6 +701,20 @@ class Resource:
         )
         await field_obj.set_large_field_metadata(field_large_metadata)
         self.modified = True
+
+    async def get_filenames(self) -> list[str]:
+        """
+        Get all filenames from the resource file fields.
+        """
+        fields = await self.get_fields(force=True, load_values=False)
+        filenames = set()
+        for (field_type, _), field_obj in fields.items():
+            if field_type == FieldType.FILE:
+                field_value: FieldFile | None = await field_obj.get_value()
+                if field_value is not None:
+                    if field_value.file.filename not in ("", None):
+                        filenames.add(field_value.file.filename)
+        return list(filenames)
 
     def generate_field_id(self, field: FieldID) -> str:
         return f"{FIELD_TYPE_PB_TO_STR[field.field_type]}/{field.field}"
