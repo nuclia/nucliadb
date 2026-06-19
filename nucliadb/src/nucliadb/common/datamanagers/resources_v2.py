@@ -40,7 +40,7 @@ import psycopg.errors
 
 from nucliadb.common.datamanagers.utils import with_ro_transaction
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.exceptions import ConflictError
+from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb_protos import resources_pb2
 
@@ -265,6 +265,37 @@ async def set_slug(
             )
         except psycopg.errors.UniqueViolation:
             raise ConflictError(f"Slug '{slug}' already exists")
+
+
+async def modify_slug(
+    txn: Transaction,
+    *,
+    kbid: str,
+    rid: str,
+    new_slug: str,
+) -> str:
+    """Update only the slug column of an existing resource row.
+
+    Returns the old slug value.
+    Raises NotFoundError if the resource does not exist.
+    Raises ConflictError if the slug already belongs to another resource in
+    the same knowledge box.
+    """
+    old_slug = await get_slug(txn, kbid=kbid, rid=rid)
+    if old_slug is None:
+        raise NotFoundError()
+    async with _pg(txn).connection.cursor() as cur:
+        try:
+            await cur.execute(
+                """
+                UPDATE kb_resources SET slug = %(slug)s
+                WHERE kbid = %(kbid)s AND rid = %(rid)s
+                """,
+                {"kbid": kbid, "rid": rid, "slug": new_slug},
+            )
+            return old_slug
+        except psycopg.errors.UniqueViolation:
+            raise ConflictError(f"Slug '{new_slug}' already exists")
 
 
 async def set_shard(

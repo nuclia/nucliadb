@@ -140,6 +140,14 @@ async def list_resources(
             first_wanted_item_index = (page * size) + 1  # 1-based index
             current_key_index = 0
 
+            async def rids_generator(count: int):
+                iterated = 0
+                async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+                    if iterated >= count:
+                        break
+                    yield rid
+                    iterated += 1
+
             # ask for one item more than we need, in order to know if it's the last page
             async def _rids_generator(count: int):
                 iterated = 0

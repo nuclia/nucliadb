@@ -37,6 +37,9 @@ KB_RESOURCE_FIELD_STATUS = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/status"
 async def get_raw(
     txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
 ) -> bytes | None:
+    if datamanagers_v2_read(kbid):
+        return await fields_v2.get_raw(txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id)
+
     key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     return await txn.get(key)
 

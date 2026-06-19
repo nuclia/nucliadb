@@ -37,8 +37,6 @@ removes all related field rows via the ON DELETE CASCADE foreign key —
 there is no need for explicit bulk-delete helpers here.
 """
 
-import dataclasses
-from collections.abc import AsyncIterator
 from typing import Sequence, cast
 
 from google.protobuf.message import Message
@@ -50,44 +48,12 @@ from nucliadb_protos import resources_pb2 as rpb2
 from nucliadb_protos import writer_pb2 as wpb2
 
 # ---------------------------------------------------------------------------
-# Row model
-# ---------------------------------------------------------------------------
-
-
-@dataclasses.dataclass
-class FieldRow:
-    kbid: str
-    rid: str
-    field_type: str  # single-char abbreviation: t, f, u, c, a, k
-    field_id: str
-    status: bytes | None  # serialised writer_pb2.FieldStatus
-    value: bytes | None
-    md5: str | None
-
-
-# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
 
 def _pg(txn: Transaction) -> PGTransaction:
     return cast(PGTransaction, txn)
-
-
-def _row_to_field(row: tuple) -> FieldRow:
-    kbid, rid, field_type, field_id, status, value, md5 = row
-    return FieldRow(
-        kbid=str(kbid),
-        rid=str(rid),
-        field_type=field_type,
-        field_id=field_id,
-        status=bytes(status) if status is not None else None,
-        value=bytes(value) if value is not None else None,
-        md5=md5,
-    )
-
-
-_SELECT_COLUMNS = "kbid, rid, field_type, field_id, status, value, md5"
 
 
 # ---------------------------------------------------------------------------
@@ -205,35 +171,7 @@ async def delete(
 # ---------------------------------------------------------------------------
 
 
-async def get(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    field_type: str,
-    field_id: str,
-) -> FieldRow | None:
-    """Return the full row for a single field, or None if it does not exist."""
-    async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            f"""
-            SELECT {_SELECT_COLUMNS}
-            FROM kb_fields
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_type = %(field_type)s AND field_id = %(field_id)s
-            """,
-            {
-                "kbid": kbid,
-                "rid": rid,
-                "field_type": field_type,
-                "field_id": field_id,
-            },
-        )
-        row = await cur.fetchone()
-        return _row_to_field(row) if row is not None else None
-
-
-async def get_value(
+async def get_raw(
     txn: Transaction,
     *,
     kbid: str,
@@ -333,67 +271,6 @@ async def get_statuses(
             result.append(pb)
 
     return result
-
-
-async def get_all_for_resource(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-) -> list[FieldRow]:
-    """Return all field rows for a resource, ordered by (field_type, field_id)."""
-    async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            f"""
-            SELECT {_SELECT_COLUMNS}
-            FROM kb_fields
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-            ORDER BY field_type, field_id
-            """,
-            {"kbid": kbid, "rid": rid},
-        )
-        return [_row_to_field(row) for row in await cur.fetchall()]
-
-
-async def iter_by_type(
-    txn: Transaction,
-    *,
-    kbid: str,
-    field_type: str,
-) -> AsyncIterator[FieldRow]:
-    """Iterate over all fields of a given type within a knowledge box."""
-    async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            f"""
-            SELECT {_SELECT_COLUMNS}
-            FROM kb_fields
-            WHERE kbid = %(kbid)s AND field_type = %(field_type)s
-            ORDER BY rid, field_id
-            """,
-            {"kbid": kbid, "field_type": field_type},
-        )
-        async for row in cur:
-            yield _row_to_field(row)
-
-
-async def get_by_md5(
-    txn: Transaction,
-    *,
-    kbid: str,
-    md5: str,
-) -> list[FieldRow]:
-    """Return all fields in a KB that match the given MD5 (duplicate detection)."""
-    async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            f"""
-            SELECT {_SELECT_COLUMNS}
-            FROM kb_fields
-            WHERE kbid = %(kbid)s AND md5 = %(md5)s
-            ORDER BY rid, field_type, field_id
-            """,
-            {"kbid": kbid, "md5": md5},
-        )
-        return [_row_to_field(row) for row in await cur.fetchall()]
 
 
 async def get_all_field_ids(

@@ -80,17 +80,20 @@ async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
 
 
 async def set_slug(txn: Transaction, *, kbid: str, rid: str, slug: str) -> None:
-    """Write the slug → resource-uuid mapping for a resource."""
+    if datamanagers_v2_read(kbid):
+        await resources_v2.set_slug(txn, kbid=kbid, rid=rid, slug=slug)
+        return
+
     key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
     await txn.set(key, rid.encode())
+
+    if datamanagers_v2_migrating(kbid):
+        await resources_v2.set_slug(txn, kbid=kbid, rid=rid, slug=slug)
 
 
 async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -> str:
     if datamanagers_v2_read(kbid):
-        old_slug = await resources_v2.get_slug(txn, kbid=kbid, rid=rid)
-        if old_slug is None:
-            raise NotFoundError()
-        await resources_v2.set_slug(txn, kbid=kbid, rid=rid, slug=new_slug)
+        old_slug = await resources_v2.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
         return old_slug
 
     basic = await get_basic(txn, kbid=kbid, rid=rid)
@@ -105,6 +108,7 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
             return old_slug
         else:
             raise ConflictError(f"Slug {new_slug} already exists")
+
     key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=old_slug)
     await txn.delete(key)
     key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=new_slug)
@@ -113,7 +117,7 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
     await set_basic(txn, kbid=kbid, rid=rid, basic=basic)
 
     if datamanagers_v2_migrating(kbid):
-        await resources_v2.set_slug(txn, kbid=kbid, rid=rid, slug=new_slug)
+        await resources_v2.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
 
     return old_slug
 
