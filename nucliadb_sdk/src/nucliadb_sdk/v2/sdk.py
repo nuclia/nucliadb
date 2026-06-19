@@ -57,6 +57,7 @@ from nucliadb_models.graph.responses import (
     GraphRelationsSearchResponse,
     GraphSearchResponse,
 )
+from nucliadb_models.kv_schemas import KBKVSchemas, KVSchema, UpdateKVSchema
 from nucliadb_models.labels import KnowledgeBoxLabels, LabelSet
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
@@ -315,6 +316,32 @@ SDK_DEFINITION = {
         path_template="/v1/kb/{kbid}/labelset/{labelset}",
         method="GET",
         path_params=("kbid", "labelset"),
+    ),
+    # KV Schemas
+    "create_kv_schema": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/kv-schemas",
+        method="POST",
+        path_params=("kbid",),
+    ),
+    "update_kv_schema": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/kv-schemas/{schema_id}",
+        method="PUT",
+        path_params=("kbid", "schema_id"),
+    ),
+    "delete_kv_schema": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/kv-schemas/{schema_id}",
+        method="DELETE",
+        path_params=("kbid", "schema_id"),
+    ),
+    "list_kv_schemas": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/kv-schemas",
+        method="GET",
+        path_params=("kbid",),
+    ),
+    "get_kv_schema": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/kv-schemas/{schema_id}",
+        method="GET",
+        path_params=("kbid", "schema_id"),
     ),
     # Entity Groups
     "get_entitygroups": SdkEndpointDefinition(
@@ -1199,6 +1226,12 @@ class NucliaDB(_NucliaDBBase):
     delete_labelset = _request_sync_builder("delete_labelset", type(None), type(None))
     get_labelsets = _request_sync_builder("get_labelsets", type(None), KnowledgeBoxLabels)
     get_labelset = _request_sync_builder("get_labelset", type(None), LabelSet)
+    # KV Schemas
+    create_kv_schema = _request_sync_builder("create_kv_schema", KVSchema, KVSchema)
+    update_kv_schema = _request_sync_builder("update_kv_schema", UpdateKVSchema, KVSchema)
+    delete_kv_schema = _request_sync_builder("delete_kv_schema", type(None), type(None))
+    list_kv_schemas = _request_sync_builder("list_kv_schemas", type(None), KBKVSchemas)
+    get_kv_schema = _request_sync_builder("get_kv_schema", type(None), KVSchema)
     # Entity Groups
     get_entitygroups = _request_sync_builder("get_entitygroups", type(None), KnowledgeBoxEntities)
     get_entitygroup = _request_sync_builder("get_entitygroup", type(None), EntitiesGroup)
@@ -1418,6 +1451,12 @@ class NucliaDBAsync(_NucliaDBBase):
     delete_labelset = _request_async_builder("delete_labelset", type(None), type(None))
     get_labelsets = _request_async_builder("get_labelsets", type(None), KnowledgeBoxLabels)
     get_labelset = _request_async_builder("get_labelset", type(None), LabelSet)
+    # KV Schemas
+    create_kv_schema = _request_async_builder("create_kv_schema", KVSchema, KVSchema)
+    update_kv_schema = _request_async_builder("update_kv_schema", UpdateKVSchema, KVSchema)
+    delete_kv_schema = _request_async_builder("delete_kv_schema", type(None), type(None))
+    list_kv_schemas = _request_async_builder("list_kv_schemas", type(None), KBKVSchemas)
+    get_kv_schema = _request_async_builder("get_kv_schema", type(None), KVSchema)
     # Entity Groups
     get_entitygroups = _request_async_builder("get_entitygroups", type(None), KnowledgeBoxEntities)
     get_entitygroup = _request_async_builder("get_entitygroup", type(None), EntitiesGroup)
