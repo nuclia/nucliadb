@@ -80,6 +80,7 @@ class FieldID(BaseModel):
         TEXT = "text"
         GENERIC = "generic"
         CONVERSATION = "conversation"
+        KEY_VALUE = "key_value"
 
     field_type: FieldType
     field: str

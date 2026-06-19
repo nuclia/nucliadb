@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from typing import overload
+
 from nucliadb_models.common import FieldID, FieldTypeName
 from nucliadb_models.conversation import MessageFormat
 from nucliadb_models.search import FeedbackTasks, NucliaDBClientType
@@ -45,13 +47,28 @@ def field_type_name(obj: FieldTypeName) -> resources_pb2.FieldType.ValueType:
     }[obj]
 
 
-def field_type(obj: FieldID.FieldType) -> resources_pb2.FieldType.ValueType:
+@overload
+def field_type(obj: str) -> resources_pb2.FieldType.ValueType: ...
+
+
+@overload
+def field_type(obj: FieldID.FieldType) -> resources_pb2.FieldType.ValueType: ...
+
+
+def field_type(obj: FieldID.FieldType | str) -> resources_pb2.FieldType.ValueType:
     return {
+        FieldTypeName.LINK.abbreviation(): resources_pb2.FieldType.LINK,
+        FieldTypeName.FILE.abbreviation(): resources_pb2.FieldType.FILE,
+        FieldTypeName.TEXT.abbreviation(): resources_pb2.FieldType.TEXT,
+        FieldTypeName.GENERIC.abbreviation(): resources_pb2.FieldType.GENERIC,
+        FieldTypeName.CONVERSATION.abbreviation(): resources_pb2.FieldType.CONVERSATION,
+        FieldTypeName.KEY_VALUE.abbreviation(): resources_pb2.FieldType.KEY_VALUE,
         FieldID.FieldType.LINK: resources_pb2.FieldType.LINK,
         FieldID.FieldType.FILE: resources_pb2.FieldType.FILE,
         FieldID.FieldType.TEXT: resources_pb2.FieldType.TEXT,
         FieldID.FieldType.GENERIC: resources_pb2.FieldType.GENERIC,
         FieldID.FieldType.CONVERSATION: resources_pb2.FieldType.CONVERSATION,
+        FieldID.FieldType.KEY_VALUE: resources_pb2.FieldType.KEY_VALUE,
     }[obj]
 
 

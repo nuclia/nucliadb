@@ -21,13 +21,17 @@ from collections.abc import AsyncGenerator
 
 import backoff
 
+from nucliadb.common.datamanagers import fields_v2, resources_v2
 from nucliadb.common.datamanagers.utils import get_kv_pb
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 
 # These should be refactored
+from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb_protos import resources_pb2
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 from .utils import with_ro_transaction
 
@@ -49,6 +53,9 @@ KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 
 
 async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        return await resources_v2.exists(txn, kbid=kbid, rid=rid)
+
     basic = await get_basic_raw(txn, kbid=kbid, rid=rid)
     return basic is not None
 
@@ -57,6 +64,9 @@ async def resource_exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
 
 
 async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str) -> str | None:
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        return await resources_v2.get_resource_uuid_from_slug(txn, kbid=kbid, slug=slug)
+
     encoded_uuid = await txn.get(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug, for_update=False))
     if not encoded_uuid:
         return None
@@ -64,6 +74,9 @@ async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str)
 
 
 async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        return await resources_v2.slug_exists(txn, kbid=kbid, slug=slug)
+
     key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
     encoded_slug: bytes | None = await txn.get(key)
     return encoded_slug not in (None, b"")
@@ -94,6 +107,9 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
     await txn.set(key, rid.encode())
     basic.slug = new_slug
     await set_basic(txn, kbid=kbid, rid=rid, basic=basic)
+
+    await resources_v2.set_slug(txn, kbid=kbid, rid=rid, slug=new_slug)
+
     return old_slug
 
 
@@ -104,6 +120,10 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
 async def get_resource_shard_id(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
 ) -> str | None:
+
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        return await resources_v2.get_resource_shard_id(txn, kbid=kbid, rid=rid, for_update=for_update)
+
     key = KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid)
     shard = await txn.get(key, for_update=for_update)
     if shard is not None:
@@ -115,11 +135,16 @@ async def get_resource_shard_id(
 async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard: str):
     await txn.set(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid), shard.encode())
 
+    await resources_v2.set_resource_shard_id(txn, kbid=kbid, rid=rid, shard=shard)
+
 
 # Basic
 
 
 async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Basic | None:
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        return await resources_v2.get_basic(txn, kbid=kbid, rid=rid)
+
     raw = await get_basic_raw(txn, kbid=kbid, rid=rid)
     if raw is None:
         return None
@@ -148,11 +173,16 @@ async def set_basic(txn: Transaction, *, kbid: str, rid: str, basic: resources_p
             basic.SerializeToString(),
         )
 
+    await resources_v2.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
+
 
 # Origin
 
 
 async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Origin | None:
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        return await resources_v2.get_origin(txn, kbid=kbid, rid=rid)
+
     key = KB_RESOURCE_ORIGIN.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Origin)
 
@@ -161,11 +191,16 @@ async def set_origin(txn: Transaction, *, kbid: str, rid: str, origin: resources
     key = KB_RESOURCE_ORIGIN.format(kbid=kbid, uuid=rid)
     await txn.set(key, origin.SerializeToString())
 
+    await resources_v2.set_origin(txn, kbid=kbid, rid=rid, origin=origin)
+
 
 # Extra
 
 
 async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Extra | None:
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        return await resources_v2.get_extra(txn, kbid=kbid, rid=rid)
+
     key = KB_RESOURCE_EXTRA.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Extra)
 
@@ -174,11 +209,16 @@ async def set_extra(txn: Transaction, *, kbid: str, rid: str, extra: resources_p
     key = KB_RESOURCE_EXTRA.format(kbid=kbid, uuid=rid)
     await txn.set(key, extra.SerializeToString())
 
+    await resources_v2.set_extra(txn, kbid=kbid, rid=rid, extra=extra)
+
 
 # Security
 
 
 async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Security | None:
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        return await resources_v2.get_security(txn, kbid=kbid, rid=rid)
+
     key = KB_RESOURCE_SECURITY.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.Security)
 
@@ -186,6 +226,8 @@ async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb
 async def set_security(txn: Transaction, *, kbid: str, rid: str, security: resources_pb2.Security):
     key = KB_RESOURCE_SECURITY.format(kbid=kbid, uuid=rid)
     await txn.set(key, security.SerializeToString())
+
+    await resources_v2.set_security(txn, kbid=kbid, rid=rid, security=security)
 
 
 # KB resource ids (this functions use internal transactions, breaking the
@@ -200,6 +242,11 @@ async def iterate_resource_ids(*, kbid: str) -> AsyncGenerator[str, None]:
 
     For this reason, it is not using the `txn` argument passed in.
     """
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        async for rid in resources_v2.iter_resource_ids(kbid=kbid):
+            yield rid
+        return
+
     batch = []
     async for slug in _iter_resource_slugs(kbid=kbid):
         batch.append(slug)
@@ -244,6 +291,9 @@ async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
     it is not the source of truth for the value so it is not ideal
     to move it to the node.
     """
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        return await resources_v2.count(txn, kbid=kbid)
+
     return await txn.count(KB_RESOURCE_SLUG_BASE.format(kbid=kbid))
 
 
@@ -267,6 +317,9 @@ async def set_number_of_resources(txn: Transaction, kbid: str, value: int) -> No
 async def get_all_field_ids(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
 ) -> resources_pb2.AllFieldIDs | None:
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        return await fields_v2.get_all_field_ids(txn, kbid=kbid, rid=rid)
+
     key = KB_RESOURCE_ALL_FIELDS.format(kbid=kbid, uuid=rid)
     return await get_kv_pb(txn, key, resources_pb2.AllFieldIDs, for_update=for_update)
 
@@ -279,6 +332,15 @@ async def set_all_field_ids(
 
 
 async def has_field(txn: Transaction, *, kbid: str, rid: str, field_id: resources_pb2.FieldID) -> bool:
+    if has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid}):
+        return await fields_v2.exists(
+            txn,
+            kbid=kbid,
+            rid=rid,
+            field_id=field_id.field,
+            field_type=from_proto.field_type_name(field_id.field_type).abbreviation(),
+        )
+
     fields = await get_all_field_ids(txn, kbid=kbid, rid=rid)
     if fields is None:
         return False
