@@ -152,15 +152,74 @@ macro_rules! shard_request {
 impl NidxSearcher for SearchServer {
     async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
         let message = request.get_ref();
-        let shard_id = uuid::Uuid::parse_str(&message.shard).map_err(NidxError::from)?;
-        shard_request! {
-            "search",
-            self,
-            request,
-            shard_id,
-            LOCAL => shard_search::search(Arc::clone(&self.index_cache), message.clone()).await,
-            REMOTE => search
+
+        let mut errors = Vec::new();
+        let mut responses = Vec::with_capacity(message.shard_ids.len());
+
+        let local_only = request.metadata().contains_key(HEADER_LOCAL_ONLY);
+        for shard_id in &message.shard_ids {
+            let shard_id = uuid::Uuid::parse_str(shard_id).map_err(NidxError::from)?;
+
+            let nodes = if local_only {
+                vec![SearcherNode::This]
+            } else {
+                self.shard_selector.nodes_for_shard(&shard_id)
+            };
+
+            for node in &nodes {
+                debug!(?node, ?shard_id, "Attempting search");
+                let result = match node {
+                    SearcherNode::This => {
+                        shard_search::search(shard_id, Arc::clone(&self.index_cache), message.clone())
+                            .await
+                            .map(Response::new)
+                    }
+                    SearcherNode::Remote(hostname) => match self.get_client(hostname).await {
+                        Ok(mut client) => {
+                            let mut request = Request::new(message.clone());
+                            request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
+                            client.search(request).await.map_err(|e| match e.code() {
+                                tonic::Code::NotFound => NidxError::NotFound,
+                                _ => NidxError::Unknown(anyhow::Error::from(e)),
+                            })
+                        }
+                        Err(e) => Err(e),
+                    },
+                };
+                match result {
+                    Ok(response) => {
+                        responses.push(response);
+                        break;
+                    }
+                    Err(e) => {
+                        warn!(
+                            ?node,
+                            ?shard_id,
+                            concat!("Error in search, trying with next node: {:?}"),
+                            e
+                        );
+                        errors.push(e);
+                    }
+                }
+            }
+
+            if !errors.is_empty() {
+                error!(
+                    ?errors,
+                    ?nodes,
+                    ?shard_id,
+                    "Error in search, exhausted all availabled nodes"
+                );
+                if let Some(reported_error) = errors.pop() {
+                    return Err(reported_error.into());
+                } else {
+                    return Err(Status::internal("Unknown search error"));
+                }
+            }
         }
+
+        let merged = shard_search::merge(responses.into_iter().map(|r| r.into_inner()).collect());
+        Ok(Response::new(merged))
     }
 
     async fn suggest(&self, request: Request<SuggestRequest>) -> Result<Response<SuggestResponse>> {
