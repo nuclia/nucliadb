@@ -599,20 +599,6 @@ class Processor:
     async def deadletter(self, message: writer_pb2.BrokerMessage, partition: str, seqid: int) -> None:
         await self.storage.deadletter(message, 0, seqid, partition)
 
-    async def _get_resource_filenames(self, resource: Resource) -> list[str]:
-        """
-        Get all resource filenames from the resource file fields.
-        """
-        fields = await resource.get_fields(force=True, load_values=False)
-        filenames = set()
-        for (field_type, _), field_obj in fields.items():
-            if field_type == writer_pb2.FieldType.FILE:
-                field_value: resources_pb2.FieldFile | None = await field_obj.get_value()
-                if field_value is not None:
-                    if field_value.file.filename not in ("", None):
-                        filenames.add(field_value.file.filename)
-        return list(filenames)
-
     @processor_observer.wrap({"type": "apply_resource"})
     async def apply_resource(
         self,

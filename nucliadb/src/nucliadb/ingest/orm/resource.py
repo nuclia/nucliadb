@@ -44,6 +44,7 @@ from nucliadb_protos.resources_pb2 import (
     ExtractedTextWrapper,
     ExtractedVectorsWrapper,
     FieldComputedMetadataWrapper,
+    FieldFile,
     FieldID,
     FieldQuestionAnswerWrapper,
     FieldType,
