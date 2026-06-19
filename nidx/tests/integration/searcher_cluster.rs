@@ -102,7 +102,7 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
             NidxSearcherClient::connect(format!("http://{searcher}"))
                 .await?
                 .search(Request::new(SearchRequest {
-                    shard: shard.to_string(),
+                    shard_ids: vec![shard.to_string()],
                     result_per_page: 20,
                     body: "Hola".into(),
                     paragraph: true,
@@ -120,7 +120,7 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
             NidxSearcherClient::connect(format!("http://{searcher}"))
                 .await?
                 .search(Request::new(SearchRequest {
-                    shard: shard.to_string(),
+                    shard_ids: vec![shard.to_string()],
                     result_per_page: 20,
                     body: "Hola".into(),
                     paragraph: true,
@@ -195,7 +195,7 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
             let result = NidxSearcherClient::connect(format!("http://{searcher}"))
                 .await?
                 .search(Request::new(SearchRequest {
-                    shard: shard.to_string(),
+                    shard_ids: vec![shard.to_string()],
                     result_per_page: 20,
                     body: "Hola".into(),
                     paragraph: true,
@@ -225,7 +225,7 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
             let result = NidxSearcherClient::connect(format!("http://{searcher}"))
                 .await?
                 .search(Request::new(SearchRequest {
-                    shard: shard.to_string(),
+                    shard_ids: vec![shard.to_string()],
                     result_per_page: 20,
                     body: "Hola".into(),
                     paragraph: true,
@@ -263,7 +263,7 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
             let result = NidxSearcherClient::connect(format!("http://{searcher}"))
                 .await?
                 .search(Request::new(SearchRequest {
-                    shard: shard.to_string(),
+                    shard_ids: vec![shard.to_string()],
                     result_per_page: 20,
                     body: "Hola".into(),
                     paragraph: true,
@@ -348,7 +348,7 @@ async fn test_search_cluster_shards_not_accessible(pool: PgPool) -> anyhow::Resu
     let fake_uuid = Uuid::new_v4();
     for searcher in &searchers {
         let mut request = Request::new(SearchRequest {
-            shard: fake_uuid.to_string(),
+            shard_ids: vec![fake_uuid.to_string()],
             result_per_page: 20,
             body: "Hola".into(),
             paragraph: true,

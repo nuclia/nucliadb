@@ -182,7 +182,7 @@ async fn test_json_exact_match(pool: PgPool) -> Result<(), Box<dyn std::error::E
     let results = fixture
         .searcher_client
         .search(Request::new(nodereader::SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             paragraph: true,
             body: String::new(),
             result_per_page: 10,
@@ -212,7 +212,7 @@ async fn test_json_no_match(pool: PgPool) -> Result<(), Box<dyn std::error::Erro
     let results = fixture
         .searcher_client
         .search(Request::new(nodereader::SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             paragraph: true,
             body: String::new(),
             result_per_page: 10,
@@ -240,7 +240,7 @@ async fn test_json_int_range(pool: PgPool) -> Result<(), Box<dyn std::error::Err
     let results = fixture
         .searcher_client
         .search(Request::new(nodereader::SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             paragraph: true,
             body: String::new(),
             result_per_page: 10,
@@ -275,7 +275,7 @@ async fn test_json_bool_match(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let results = fixture
         .searcher_client
         .search(Request::new(nodereader::SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             paragraph: true,
             body: String::new(),
             result_per_page: 10,
@@ -305,7 +305,7 @@ async fn test_json_and_filter(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let results = fixture
         .searcher_client
         .search(Request::new(nodereader::SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             paragraph: true,
             body: String::new(),
             result_per_page: 10,
@@ -340,7 +340,7 @@ async fn test_json_or_filter(pool: PgPool) -> Result<(), Box<dyn std::error::Err
     let results = fixture
         .searcher_client
         .search(Request::new(nodereader::SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             paragraph: true,
             body: String::new(),
             result_per_page: 10,
@@ -410,7 +410,7 @@ async fn test_json_filter_combined_with_security(pool: PgPool) -> Result<(), Box
     let results = fixture
         .searcher_client
         .search(Request::new(nodereader::SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             paragraph: true,
             body: String::new(),
             result_per_page: 10,
@@ -451,7 +451,7 @@ async fn test_json_not_filter(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let results = fixture
         .searcher_client
         .search(Request::new(nodereader::SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             paragraph: true,
             body: String::new(),
             result_per_page: 10,

@@ -68,7 +68,7 @@ async fn test_vector_normalization_shard(pool: PgPool) -> Result<(), Box<dyn std
     let query_vector = vec![17.0 / magnitude; VECTOR_DIMENSION];
 
     let search_request = nodereader::SearchRequest {
-        shard: shard.id.clone(),
+        shard_ids: vec![shard.id.clone()],
         vector: query_vector,
         vectorset: "english".to_string(),
         with_duplicates: true,

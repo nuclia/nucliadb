@@ -269,7 +269,7 @@ async fn test_relation_path_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let results = fixture
         .searcher_client
         .search(SearchRequest {
-            shard: shard_id,
+            shard_ids: vec![shard_id],
             graph_search: Some(nidx_protos::search_request::GraphSearch {
                 query: Some(graph_query),
             }),

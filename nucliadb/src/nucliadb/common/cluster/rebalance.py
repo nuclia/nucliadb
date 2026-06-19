@@ -364,7 +364,7 @@ async def get_resource_paragraphs_count(resource_id: str, nidx_shard_id: str) ->
     # Do a search on the fields (paragraph) index and return the number of paragraphs this resource has
     try:
         request = nodereader_pb2.SearchRequest(
-            shard=nidx_shard_id,
+            shard_ids=[nidx_shard_id],
             paragraph=True,
             document=False,
             result_per_page=0,
@@ -427,7 +427,7 @@ async def get_shard_paragraph_count(nidx_shard_id: str) -> int:
     # Do a search on the fields (paragraph) index
     try:
         request = nodereader_pb2.SearchRequest(
-            shard=nidx_shard_id,
+            shard_ids=[nidx_shard_id],
             paragraph=True,
             document=False,
             result_per_page=0,
