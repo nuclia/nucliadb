@@ -36,10 +36,12 @@ use super::{
     query_planner::{self, QueryPlan},
 };
 
-#[instrument(skip_all, fields(shard_id = search_request.shard))]
-pub async fn search(index_cache: Arc<IndexCache>, search_request: SearchRequest) -> NidxResult<SearchResponse> {
-    let shard_id = uuid::Uuid::parse_str(&search_request.shard)?;
-
+#[instrument(skip_all, fields(shard_id = shard_id.to_string()))]
+pub async fn search(
+    shard_id: uuid::Uuid,
+    index_cache: Arc<IndexCache>,
+    search_request: SearchRequest,
+) -> NidxResult<SearchResponse> {
     let query_plan = query_planner::build_query_plan(search_request.clone())?;
 
     let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
@@ -427,4 +429,8 @@ fn run_semantic_graph_queries(
 
         Ok(context)
     })
+}
+
+pub fn merge(_shard_responses: Vec<SearchResponse>) -> SearchResponse {
+    todo!("merge multiple shard responses into one")
 }
