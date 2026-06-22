@@ -35,7 +35,6 @@ async def get_page(
     field_id: str,
     page: int,
 ) -> PBConversation | None:
-    """Return the conversation page proto for the given page number, or None if it doesn't exist."""
     if page <= 0:
         raise ValueError("Conversation pages start at index 1")
     key = KB_CONVERSATION_PAGE.format(kbid=kbid, uuid=rid, type=field_type, field=field_id, page=page)
@@ -57,7 +56,6 @@ async def set_page(
     page: int,
     value: PBConversation,
 ) -> None:
-    """Persist a single conversation page."""
     key = KB_CONVERSATION_PAGE.format(kbid=kbid, uuid=rid, type=field_type, field=field_id, page=page)
     await txn.set(key, value.SerializeToString())
 
@@ -70,7 +68,6 @@ async def get_metadata(
     field_type: str,
     field_id: str,
 ) -> FieldConversation | None:
-    """Return the FieldConversation metadata proto, or None if it doesn't exist yet."""
     key = KB_CONVERSATION_METADATA.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     payload = await txn.get(key)
     if payload is None:
@@ -89,7 +86,6 @@ async def set_metadata(
     field_id: str,
     metadata: FieldConversation,
 ) -> None:
-    """Persist the FieldConversation metadata."""
     key = KB_CONVERSATION_METADATA.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     await txn.set(key, metadata.SerializeToString())
 
@@ -102,7 +98,6 @@ async def delete_field(
     field_type: str,
     field_id: str,
 ) -> None:
-    """Delete all keys belonging to this conversation field (metadata + all pages)."""
     base_key = KB_CONVERSATION_METADATA.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     await txn.delete_by_prefix(base_key)
 
@@ -115,7 +110,6 @@ async def get_splits_metadata(
     field_type: str,
     field_id: str,
 ) -> SplitsMetadata | None:
-    """Return the SplitsMetadata proto, or None if it doesn't exist yet."""
     key = KB_CONVERSATION_SPLITS_METADATA.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     payload = await txn.get(key)
     if payload is None:
@@ -134,6 +128,5 @@ async def set_splits_metadata(
     field_id: str,
     splits_metadata: SplitsMetadata,
 ) -> None:
-    """Persist the SplitsMetadata."""
     key = KB_CONVERSATION_SPLITS_METADATA.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     await txn.set(key, splits_metadata.SerializeToString())
