@@ -23,7 +23,6 @@ from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.common import datamanagers
-from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.conversation import Conversation
@@ -142,11 +141,18 @@ async def list_resources(
             current_key_index = 0
 
             # ask for one item more than we need, in order to know if it's the last page
-            keys_generator = txn.keys(
-                match=KB_RESOURCE_SLUG_BASE.format(kbid=kbid),
+            async def _rids_generator(count: int):
+                iterated = 0
+                async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+                    if iterated >= count:
+                        break
+                    yield rid
+                    iterated += 1
+
+            rids_generator = _rids_generator(
                 count=max_items_to_iterate + 1,
             )
-            async for key in keys_generator:
+            async for rid in rids_generator:
                 current_key_index += 1
 
                 # First of all, we need to skip keys, in case we are on a +1 page
@@ -155,23 +161,21 @@ async def list_resources(
 
                 # Don't fetch keys once we got all items for this
                 if len(resources) == size:
-                    await keys_generator.aclose()
+                    await rids_generator.aclose()
                     break
 
                 # Fetch and Add wanted item
-                rid = await txn.get(key, for_update=False)
-                if rid:
-                    result = await managed_serialize(
-                        txn,
-                        kbid,
-                        rid.decode(),
-                        show,
-                        field_types,
-                        extracted,
-                        service_name=SERVICE_NAME,
-                    )
-                    if result is not None:
-                        resources.append(result)
+                result = await managed_serialize(
+                    txn,
+                    kbid,
+                    rid,
+                    show,
+                    field_types,
+                    extracted,
+                    service_name=SERVICE_NAME,
+                )
+                if result is not None:
+                    resources.append(result)
 
             is_last_page = current_key_index <= max_items_to_iterate
 

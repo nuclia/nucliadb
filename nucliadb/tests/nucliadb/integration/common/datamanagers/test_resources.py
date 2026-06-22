@@ -20,8 +20,8 @@
 import pytest
 
 from nucliadb.common import datamanagers
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.resource import KB_RESOURCE_SLUG
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import Basic
 

@@ -20,8 +20,9 @@
 import uuid
 from unittest.mock import Mock, patch
 
+from nucliadb.common.datamanagers.conversations import KB_CONVERSATION_SPLITS_METADATA
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.fields.conversation import CONVERSATION_SPLITS_METADATA, Conversation
+from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.migrator.models import Migration
 from nucliadb_protos import resources_pb2
@@ -52,7 +53,7 @@ async def test_migration_0039(maindb_driver: Driver):
 
         # Delete the key simulating as it wasn't there
         async with maindb_driver.rw_transaction() as txn:
-            splits_metadata_key = CONVERSATION_SPLITS_METADATA.format(
+            splits_metadata_key = KB_CONVERSATION_SPLITS_METADATA.format(
                 kbid=kbid, uuid=rid, type="c", field=field_id
             )
             await txn.delete(splits_metadata_key)

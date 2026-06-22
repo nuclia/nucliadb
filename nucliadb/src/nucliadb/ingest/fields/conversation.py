@@ -21,6 +21,7 @@ import uuid
 from collections import defaultdict
 from typing import Any, Iterable
 
+from nucliadb.common import datamanagers
 from nucliadb.ingest import logger
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
@@ -31,10 +32,6 @@ from nucliadb_utils.storages.storage import StorageField
 MAX_CONVERSATION_MESSAGES = None  # No limit
 
 PAGE_SIZE = 200
-
-CONVERSATION_PAGE_VALUE = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
-CONVERSATION_SPLITS_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/splits_metadata"
-CONVERSATION_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 
 
 class PageNotFound(Exception):
@@ -56,10 +53,14 @@ class Conversation(Field[PBConversation]):
         self.metadata = None
 
     async def delete_value(self):
-        await self.resource.txn.delete_by_prefix(
-            CONVERSATION_METADATA.format(kbid=self.kbid, uuid=self.rid, type=self.type, field=self.id)
+        await datamanagers.conversations.delete_field(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.rid,
+            field_type=self.type,
+            field_id=self.id,
         )
-        self._split_metadata = None
+        self._splits_metadata = None
         self.metadata = None
         self.value.clear()
 
@@ -175,15 +176,15 @@ class Conversation(Field[PBConversation]):
 
     async def get_metadata(self) -> FieldConversation:
         if self.metadata is None:
-            payload = await self.resource.txn.get(
-                CONVERSATION_METADATA.format(
-                    kbid=self.kbid, uuid=self.rid, type=self.type, field=self.id
-                )
+            self.metadata = await datamanagers.conversations.get_metadata(
+                self.resource.txn,
+                kbid=self.kbid,
+                rid=self.rid,
+                field_type=self.type,
+                field_id=self.id,
             )
-            self.metadata = FieldConversation()
-            if payload:
-                self.metadata.ParseFromString(payload)
-            else:
+            if self.metadata is None:
+                self.metadata = FieldConversation()
                 self.metadata.size = PAGE_SIZE
                 self.metadata.pages = 0
                 self.metadata.total = 0
@@ -192,38 +193,43 @@ class Conversation(Field[PBConversation]):
 
     async def db_get_value(self, page: int = 1):
         if page == 0:
-            raise ValueError(f"Conversation pages start at index 1")
+            raise ValueError("Conversation pages start at index 1")
 
         if self.value.get(page) is None:
-            field_key = CONVERSATION_PAGE_VALUE.format(
+            pb = await datamanagers.conversations.get_page(
+                self.resource.txn,
                 kbid=self.kbid,
-                uuid=self.rid,
-                type=self.type,
-                field=self.id,
+                rid=self.rid,
+                field_type=self.type,
+                field_id=self.id,
                 page=page,
             )
-            payload = await self.resource.txn.get(field_key)
-            if payload is None:
+            if pb is None:
                 raise PageNotFound()
-            self.value[page] = PBConversation()
-            self.value[page].ParseFromString(payload)
+            self.value[page] = pb
         return self.value[page]
 
     async def db_set_value(self, payload: PBConversation, page: int = 0):
-        field_key = CONVERSATION_PAGE_VALUE.format(
-            kbid=self.kbid, uuid=self.rid, type=self.type, field=self.id, page=page
-        )
-        await self.resource.txn.set(
-            field_key,
-            payload.SerializeToString(),
+        await datamanagers.conversations.set_page(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.rid,
+            field_type=self.type,
+            field_id=self.id,
+            page=page,
+            value=payload,
         )
         self.value[page] = payload
         self.resource.modified = True
 
     async def db_set_metadata(self, payload: FieldConversation):
-        await self.resource.txn.set(
-            CONVERSATION_METADATA.format(kbid=self.kbid, uuid=self.rid, type=self.type, field=self.id),
-            payload.SerializeToString(),
+        await datamanagers.conversations.set_metadata(
+            self.resource.txn,
+            kbid=self.kbid,
+            rid=self.rid,
+            field_type=self.type,
+            field_id=self.id,
+            metadata=payload,
         )
         self.metadata = payload
         self.resource.modified = True
@@ -231,28 +237,28 @@ class Conversation(Field[PBConversation]):
 
     async def get_splits_metadata(self) -> SplitsMetadata:
         if self._splits_metadata is None:
-            field_key = CONVERSATION_SPLITS_METADATA.format(
+            pb = await datamanagers.conversations.get_splits_metadata(
+                self.resource.txn,
                 kbid=self.kbid,
-                uuid=self.rid,
-                type=self.type,
-                field=self.id,
+                rid=self.rid,
+                field_type=self.type,
+                field_id=self.id,
             )
-            payload = await self.resource.txn.get(field_key)
-            if payload is None:
+            if pb is None:
                 return SplitsMetadata()
-            self._splits_metadata = SplitsMetadata()
-            self._splits_metadata.ParseFromString(payload)
+            self._splits_metadata = pb
         return self._splits_metadata
 
     async def set_splits_metadata(self, payload: SplitsMetadata) -> None:
-        key = CONVERSATION_SPLITS_METADATA.format(
+        await datamanagers.conversations.set_splits_metadata(
+            self.resource.txn,
             kbid=self.kbid,
-            uuid=self.rid,
-            type=self.type,
-            field=self.id,
+            rid=self.rid,
+            field_type=self.type,
+            field_id=self.id,
+            splits_metadata=payload,
         )
-        await self.resource.txn.set(key, payload.SerializeToString())
-        self._split_metadata = payload
+        self._splits_metadata = payload
         self.resource.modified = True
 
     async def delete_messages(self, message_idents: Iterable[str]) -> int:

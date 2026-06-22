@@ -69,6 +69,12 @@ async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
     return encoded_slug not in (None, b"")
 
 
+async def set_slug(txn: Transaction, *, kbid: str, rid: str, slug: str) -> None:
+    """Write the slug → resource-uuid mapping for a resource."""
+    key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
+    await txn.set(key, rid.encode())
+
+
 async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -> str:
     basic = await get_basic(txn, kbid=kbid, rid=rid)
     if basic is None:
