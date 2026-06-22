@@ -430,7 +430,3 @@ fn run_semantic_graph_queries(
         Ok(context)
     })
 }
-
-pub fn merge(_shard_responses: Vec<SearchResponse>) -> SearchResponse {
-    todo!("merge multiple shard responses into one")
-}
