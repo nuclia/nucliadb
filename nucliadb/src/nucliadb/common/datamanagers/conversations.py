@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from nucliadb.common.datamanagers import conversations_v2
+from nucliadb.common.datamanagers.utils import datamanagers_v2_migrating, datamanagers_v2_read
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import FieldConversation, SplitsMetadata
@@ -37,6 +39,10 @@ async def get_page(
 ) -> PBConversation | None:
     if page <= 0:
         raise ValueError("Conversation pages start at index 1")
+
+    if datamanagers_v2_read(kbid):
+        return await conversations_v2.get_page(txn, kbid=kbid, rid=rid, field_id=field_id, page=page)
+
     key = KB_CONVERSATION_PAGE.format(kbid=kbid, uuid=rid, type=field_type, field=field_id, page=page)
     payload = await txn.get(key)
     if payload is None:
@@ -56,8 +62,19 @@ async def set_page(
     page: int,
     value: PBConversation,
 ) -> None:
+    if datamanagers_v2_read(kbid):
+        await conversations_v2.set_page(
+            txn, kbid=kbid, rid=rid, field_id=field_id, page=page, value=value
+        )
+        return
+
     key = KB_CONVERSATION_PAGE.format(kbid=kbid, uuid=rid, type=field_type, field=field_id, page=page)
     await txn.set(key, value.SerializeToString())
+
+    if datamanagers_v2_migrating(kbid):
+        await conversations_v2.set_page(
+            txn, kbid=kbid, rid=rid, field_id=field_id, page=page, value=value
+        )
 
 
 async def get_metadata(
@@ -68,6 +85,9 @@ async def get_metadata(
     field_type: str,
     field_id: str,
 ) -> FieldConversation | None:
+    if datamanagers_v2_read(kbid):
+        return await conversations_v2.get_metadata(txn, kbid=kbid, rid=rid, field_id=field_id)
+
     key = KB_CONVERSATION_METADATA.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     payload = await txn.get(key)
     if payload is None:
@@ -86,8 +106,19 @@ async def set_metadata(
     field_id: str,
     metadata: FieldConversation,
 ) -> None:
+    if datamanagers_v2_read(kbid):
+        await conversations_v2.set_metadata(
+            txn, kbid=kbid, rid=rid, field_id=field_id, metadata=metadata
+        )
+        return
+
     key = KB_CONVERSATION_METADATA.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     await txn.set(key, metadata.SerializeToString())
+
+    if datamanagers_v2_migrating(kbid):
+        await conversations_v2.set_metadata(
+            txn, kbid=kbid, rid=rid, field_id=field_id, metadata=metadata
+        )
 
 
 async def delete_field(
@@ -98,8 +129,15 @@ async def delete_field(
     field_type: str,
     field_id: str,
 ) -> None:
+    if datamanagers_v2_read(kbid):
+        await conversations_v2.delete_field(txn, kbid=kbid, rid=rid, field_id=field_id)
+        return
+
     base_key = KB_CONVERSATION_METADATA.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     await txn.delete_by_prefix(base_key)
+
+    if datamanagers_v2_migrating(kbid):
+        await conversations_v2.delete_field(txn, kbid=kbid, rid=rid, field_id=field_id)
 
 
 async def get_splits_metadata(
@@ -110,6 +148,9 @@ async def get_splits_metadata(
     field_type: str,
     field_id: str,
 ) -> SplitsMetadata | None:
+    if datamanagers_v2_read(kbid):
+        return await conversations_v2.get_splits_metadata(txn, kbid=kbid, rid=rid, field_id=field_id)
+
     key = KB_CONVERSATION_SPLITS_METADATA.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     payload = await txn.get(key)
     if payload is None:
@@ -128,5 +169,16 @@ async def set_splits_metadata(
     field_id: str,
     splits_metadata: SplitsMetadata,
 ) -> None:
+    if datamanagers_v2_read(kbid):
+        await conversations_v2.set_splits_metadata(
+            txn, kbid=kbid, rid=rid, field_id=field_id, splits_metadata=splits_metadata
+        )
+        return
+
     key = KB_CONVERSATION_SPLITS_METADATA.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
     await txn.set(key, splits_metadata.SerializeToString())
+
+    if datamanagers_v2_migrating(kbid):
+        await conversations_v2.set_splits_metadata(
+            txn, kbid=kbid, rid=rid, field_id=field_id, splits_metadata=splits_metadata
+        )

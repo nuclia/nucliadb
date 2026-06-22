@@ -31,6 +31,7 @@ from google.protobuf.message import DecodeError, Message
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import FieldId
 from nucliadb.ingest.fields.exceptions import InvalidFieldClass
+from nucliadb_models.common import FieldTypeName
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import (
     CloudFile,
@@ -188,6 +189,14 @@ class Field(Generic[PbType]):
             field_type=self.type,
             field_id=self.id,
         )
+        if self.type == FieldTypeName.CONVERSATION.abbreviation():
+            await datamanagers.conversations.delete_field(
+                self.resource.txn,
+                kbid=self.kbid,
+                rid=self.rid,
+                field_type=self.type,
+                field_id=self.id,
+            )
         await self.delete_extracted_text()
         async for vectorset_id, vs in datamanagers.vectorsets.iter(self.resource.txn, kbid=self.kbid):
             await self.delete_vectors(vectorset_id, vs.storage_key_kind)

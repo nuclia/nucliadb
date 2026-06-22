@@ -23,7 +23,7 @@ from nucliadb.common.maindb.pg import PGTransaction
 
 async def migrate(txn: PGTransaction) -> None:
     """
-    Create kbs, kb_resources and kb_fields tables.
+    Create kbs, kb_resources, kb_fields and kb_conversations tables.
 
     kbs
     ---
@@ -49,7 +49,7 @@ async def migrate(txn: PGTransaction) -> None:
       - user_relations Serialised resources_pb2.Relations
 
     kb_fields
-    ------
+    ---------
     One row per field in a resource.  Foreign-keyed to kb_resources so that
     deleting a resource (or its parent KB) cascades into kb_fields automatically.
       - kbid       FK → kb_resources.kbid
@@ -59,9 +59,27 @@ async def migrate(txn: PGTransaction) -> None:
       - field_id   User-defined field name
       - status     Serialised writer_pb2.FieldStatus protobuf bytes; NULL when
                    not yet set
-      - value      Serialised protobuf bytes (excludes object-store data)
+      - value      Serialised protobuf bytes (excludes object-store data); for
+                   conversation fields this holds the FieldConversation metadata
+                   (page count, total messages, page size, extract/split strategy)
       - md5        Optional content hash; NULL when not provided; used for
                    duplicate detection within a knowledge box
+
+    kb_conversations
+    ----------------
+    One row per page of a conversation field.  Foreign-keyed to kb_resources so
+    that deleting a resource (or its parent KB) cascades automatically.
+    The FieldConversation metadata is kept in kb_fields.value; this table holds
+    only the paginated message data and the splits index.
+      - kbid       FK → kb_resources.kbid
+      - rid        FK → kb_resources.rid
+      - field_id   User-defined conversation field name
+      - page       Page number (1-based).  The sentinel value 0 stores the
+                   serialised SplitsMetadata protobuf (maps message ident →
+                   page number, tracks deleted splits).
+      - value      Serialised protobuf bytes:
+                     page = 0  → resources_pb2.SplitsMetadata
+                     page >= 1 → resources_pb2.Conversation (~200 messages each)
     """
     async with txn.connection.cursor() as cur:
         # ------------------------------------------------------------------
@@ -146,4 +164,26 @@ async def migrate(txn: PGTransaction) -> None:
             CREATE INDEX IF NOT EXISTS idx_kb_fields_md5
             ON kb_fields(kbid, md5)
             WHERE md5 IS NOT NULL;
+        """)
+
+        # ------------------------------------------------------------------
+        # kb_conversations
+        # ------------------------------------------------------------------
+        await cur.execute("""
+            CREATE TABLE IF NOT EXISTS kb_conversations (
+                kbid     UUID    NOT NULL,
+                rid      UUID    NOT NULL,
+                field_id TEXT    NOT NULL,
+                page     INTEGER NOT NULL,
+                value    BYTEA,
+                PRIMARY KEY (kbid, rid, field_id, page),
+                FOREIGN KEY (kbid, rid)
+                    REFERENCES kb_resources (kbid, rid) ON DELETE CASCADE
+            );
+        """)
+
+        # Fast lookup / deletion of all pages belonging to a conversation field
+        await cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_kb_conversations_field
+            ON kb_conversations(kbid, rid, field_id);
         """)
