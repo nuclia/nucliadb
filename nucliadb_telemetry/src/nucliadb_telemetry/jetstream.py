@@ -104,8 +104,11 @@ async def _traced_callback(origin_cb: Callable[[Msg], Awaitable[None]], tracer: 
             set_span_exception(span, error)
             raise error
         finally:
+            timestamp = msg.metadata.timestamp
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=timezone.utc)
             msg_consume_time_histo.observe(
-                (datetime.now(timezone.utc) - msg.metadata.timestamp).total_seconds(),
+                (datetime.now(timezone.utc) - timestamp).total_seconds(),
                 {
                     "stream": msg.metadata.stream,
                     "consumer": msg.metadata.consumer or "",
@@ -205,8 +208,11 @@ class JetStreamContextTelemetry:
                 set_span_exception(span, error)
                 raise error
             finally:
+                timestamp = message.metadata.timestamp
+                if timestamp.tzinfo is None:
+                    timestamp = timestamp.replace(tzinfo=timezone.utc)
                 msg_consume_time_histo.observe(
-                    (datetime.now(timezone.utc) - message.metadata.timestamp).total_seconds(),
+                    (datetime.now(timezone.utc) - timestamp).total_seconds(),
                     {
                         "stream": message.metadata.stream,
                         "consumer": message.metadata.consumer or "",
