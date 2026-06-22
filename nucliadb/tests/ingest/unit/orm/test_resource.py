@@ -24,14 +24,16 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from nucliadb.ingest.orm.brain_v2 import ResourceBrain
-from nucliadb.ingest.orm.resource import (
-    Resource,
-    get_file_page_positions,
+from nucliadb.ingest.orm.processor.processor import (
     get_text_field_mimetype,
     maybe_update_basic_icon,
     maybe_update_basic_summary,
     maybe_update_basic_thumbnail,
     update_basic_languages,
+)
+from nucliadb.ingest.orm.resource import (
+    Resource,
+    get_file_page_positions,
 )
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.resources_pb2 import (
@@ -277,7 +279,7 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
     bm.conversations = {"conversation": MagicMock()}
     bm.delete_fields.append(FieldID(field_type=FieldType.CONVERSATION, field="to_delete"))
 
-    await resource.apply_fields(bm)  # ty:ignore[invalid-argument-type]
+    await resource.apply_field_values(bm)  # ty:ignore[invalid-argument-type]
 
     resource.update_all_field_ids.assert_awaited_once()  # type: ignore[ty:unresolved-attribute]
 

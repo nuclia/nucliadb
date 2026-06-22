@@ -124,7 +124,7 @@ async def test_iterate_paragraphs(storage, txn, cache, dummy_nidx_utility, knowl
     fcmw.metadata.metadata.paragraphs.append(p1)
     fcmw.metadata.metadata.paragraphs.append(p2)
     bm.field_metadata.append(fcmw)
-    await r.apply_extracted(bm)
+    await r.apply_field_extracted_data(bm)
 
     # Check iterate paragraphs
     async for paragraph in iterate_paragraphs(r, EnabledMetadata(labels=True)):

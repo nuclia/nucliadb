@@ -537,15 +537,13 @@ async def create_resource(storage: Storage, driver: Driver, knowledgebox: str) -
 
         # 1.  ROOT ELEMENTS
         # 1.1 BASIC
-
-        basic = rpb.Basic(
-            title="My title",
-            summary="My summary",
-            icon="text/plain",
-            thumbnail="/file",
-            last_seqid=1,
-            last_account_seq=2,
-        )
+        basic = await test_resource.get_basic()
+        basic.title = "My title"
+        basic.summary = "My summary"
+        basic.icon = "text/plain"
+        basic.thumbnail = "/file"
+        basic.last_seqid = 1
+        basic.last_account_seq = 2
         basic.metadata.metadata["key"] = "value"
         basic.metadata.language = "ca"
         basic.metadata.useful = True
