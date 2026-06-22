@@ -27,10 +27,10 @@ Backfill splits metadata on conversation fields
 import logging
 from typing import cast
 
+from nucliadb.common.datamanagers.conversations import KB_CONVERSATION_SPLITS_METADATA
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.ingest.fields.conversation import (
-    CONVERSATION_SPLITS_METADATA,
     Conversation,
 )
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
@@ -82,7 +82,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                 splits_metadata = await build_splits_metadata(
                     txn2, context.blob_storage, kbid, rid, field_id
                 )
-                splits_metadata_key = CONVERSATION_SPLITS_METADATA.format(
+                splits_metadata_key = KB_CONVERSATION_SPLITS_METADATA.format(
                     kbid=kbid, uuid=rid, type="c", field=field_id
                 )
                 await txn2.set(splits_metadata_key, splits_metadata.SerializeToString())

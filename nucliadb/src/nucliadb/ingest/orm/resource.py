@@ -26,7 +26,6 @@ from collections.abc import Sequence
 from typing import Any, cast
 
 from nucliadb.common import datamanagers, file_md5
-from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
@@ -123,8 +122,7 @@ class Resource:
 
     async def set_slug(self):
         basic = await self.get_basic()
-        new_key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=basic.slug)
-        await self.txn.set(new_key, self.uuid.encode())
+        await datamanagers.resources.set_slug(self.txn, kbid=self.kbid, rid=self.uuid, slug=basic.slug)
 
     # Basic
     async def get_basic(self) -> PBBasic:

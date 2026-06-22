@@ -31,6 +31,7 @@
 from . import (
     atomic,
     cluster,
+    conversations,
     exceptions,
     fields,
     graph_vectorsets,
@@ -48,6 +49,7 @@ from .utils import with_ro_transaction, with_rw_transaction, with_transaction
 __all__ = (
     "atomic",
     "cluster",
+    "conversations",
     "exceptions",
     "fields",
     "graph_vectorsets",
