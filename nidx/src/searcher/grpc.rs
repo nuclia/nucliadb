@@ -27,11 +27,12 @@ use tonic::transport::Channel;
 use tonic::{Request, Response, Result, Status, service::Routes};
 
 use crate::errors::{NidxError, NidxResult};
+use crate::searcher::shard_merge::{Limit, OrderBy};
 use crate::searcher::shard_selector::SearcherNode;
 
 use super::shard_selector::ShardSelector;
 use super::streams;
-use super::{index_cache::IndexCache, shard_search, shard_suggest, shard_text};
+use super::{index_cache::IndexCache, shard_merge, shard_search, shard_suggest, shard_text};
 use tracing::*;
 
 /// When this header is set, we only try to serve the request from the local node
@@ -218,7 +219,11 @@ impl NidxSearcher for SearchServer {
             }
         }
 
-        let merged = shard_search::merge(responses.into_iter().map(|r| r.into_inner()).collect());
+        let merged = shard_merge::merge(
+            responses.into_iter().map(|r| r.into_inner()).collect(),
+            OrderBy::from(message),
+            Limit(message.result_per_page as usize),
+        );
         Ok(Response::new(merged))
     }
 
