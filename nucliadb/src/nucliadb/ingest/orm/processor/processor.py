@@ -327,8 +327,6 @@ class Processor:
                 handled_exception = None
                 created = False
 
-                breakpoint()
-
                 if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
                     resource = await kb.get(uuid)
                     if resource is None:
