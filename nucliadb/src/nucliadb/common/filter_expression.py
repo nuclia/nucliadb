@@ -143,7 +143,7 @@ async def parse_expression(
             f.date.until.FromDatetime(expr.until)
     elif isinstance(expr, FacetFilter):
         f.facet.facet = facet_from_filter(expr)
-    else:
+    else:  # pragma: no cover
         assert_never(expr)
 
     return f
@@ -266,7 +266,7 @@ def _set_range_bound(
             path.date_range.lower.FromDatetime(value)
         else:
             path.date_range.upper.FromDatetime(value)
-    else:
+    else:  # pragma: no cover
         assert_never(value)
 
 
@@ -306,7 +306,7 @@ def _parse_kv_expression(
                 json_filter.path.int = expr.eq
             case datetime():
                 json_filter.path.date.FromDatetime(expr.eq)
-            case _:
+            case _:  # pragma: no cover
                 assert_never(expr.eq)
 
     elif isinstance(expr, Inequalities):
@@ -343,7 +343,7 @@ def _parse_kv_expression(
 
             json_filter.bool_and.operands.extend([lower_bound, upper_bound])
 
-    else:
+    else:  # pragma: no cover
         assert_never(expr)
 
     return json_filter
@@ -397,7 +397,7 @@ def facet_from_filter(expr: FacetFilter) -> str:
             facet += f"/{expr.id}"
     elif isinstance(expr, Status):
         facet = f"/n/s/{expr.status.value}"
-    else:
+    else:  # pragma: no cover
         assert_never(expr)
 
     return facet

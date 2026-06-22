@@ -299,7 +299,7 @@ class GarbageCollectorObserver:
             gc_collection_time.observe(collection_time_s)
             self.collection_start = None
 
-        else:
+        else:  # pragma: no cover
             assert_never(phase)
 
 

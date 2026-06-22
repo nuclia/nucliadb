@@ -423,5 +423,5 @@ def _extract_semantic_terms(
             pass
         case None:
             pass
-        case _:
+        case _:  # pragma: no cover
             assert_never(query)
