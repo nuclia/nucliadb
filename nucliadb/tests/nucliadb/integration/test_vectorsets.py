@@ -239,10 +239,10 @@ async def test_querying_kb_with_vectorsets(
     """
     query: tuple[Any, nodereader_pb2.SearchResponse | None, Exception | None] = (None, None, None)
 
-    async def query_shard_wrapper(shard: str, pb_query: nodereader_pb2.SearchRequest):
+    async def query_shards_wrapper(shards: list[str], pb_query: nodereader_pb2.SearchRequest):
         nonlocal query
 
-        from nucliadb.search.search.shards import query_shard
+        from nucliadb.search.search.shards import query_shards
 
         # this avoids problems with spying an object twice
         nidx = get_nidx_searcher_client()
@@ -252,7 +252,7 @@ async def test_querying_kb_with_vectorsets(
             spy = nidx.Search
 
         try:
-            result = await query_shard(shard, pb_query)
+            result = await query_shards(shards, pb_query)
         except Exception as exc:
             query = (spy, None, exc)
             raise
@@ -290,7 +290,7 @@ async def test_querying_kb_with_vectorsets(
     await inject_message(nucliadb_ingest_grpc, bm)
 
     with (
-        patch("nucliadb.search.requesters.utils.query_shard", query_shard_wrapper),
+        patch("nucliadb.search.requesters.utils.query_shards", query_shards_wrapper),
         patch.object(
             dummy_predict,
             "query",
@@ -355,7 +355,7 @@ async def test_querying_kb_with_vectorsets(
     )
     await inject_message(nucliadb_ingest_grpc, bm)
 
-    with patch("nucliadb.search.requesters.utils.query_shard", query_shard_wrapper):
+    with patch("nucliadb.search.requesters.utils.query_shards", query_shards_wrapper):
         with (
             patch.object(
                 dummy_predict,
