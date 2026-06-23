@@ -155,82 +155,27 @@ impl NidxSearcher for SearchServer {
         let message = request.get_ref();
 
         if !message.multi_shard_search {
+            // Former single-shard request
+
             if message.shard_ids.is_empty() {
                 return Err(NidxError::invalid("requests must contain at least a shard id").into());
             }
             let shard_id = uuid::Uuid::parse_str(&message.shard_ids[0]).map_err(NidxError::from)?;
-            shard_request! {
-                "search",
-                self,
-                request,
-                shard_id,
-                LOCAL => shard_search::search(shard_id, Arc::clone(&self.index_cache), message.clone()).await,
-                REMOTE => search
-            }
+            self.shard_search(shard_id, &request).await
         } else {
-            let mut errors = Vec::new();
+            // New multi-shard request. gRPC call contains the list of all
+            // shards we have to search. We now can decide the most efficient
+            // way to perform the distributed query
+
             let mut responses = Vec::with_capacity(message.shard_ids.len());
 
-            let local_only = request.metadata().contains_key(HEADER_LOCAL_ONLY);
             for shard_id in &message.shard_ids {
                 let shard_id = uuid::Uuid::parse_str(shard_id).map_err(NidxError::from)?;
 
-                let nodes = if local_only {
-                    vec![SearcherNode::This]
-                } else {
-                    self.shard_selector.nodes_for_shard(&shard_id)
-                };
-
-                for node in &nodes {
-                    debug!(?node, ?shard_id, "Attempting search");
-                    let result = match node {
-                        SearcherNode::This => {
-                            shard_search::search(shard_id, Arc::clone(&self.index_cache), message.clone())
-                                .await
-                                .map(Response::new)
-                        }
-                        SearcherNode::Remote(hostname) => match self.get_client(hostname).await {
-                            Ok(mut client) => {
-                                let mut request = Request::new(message.clone());
-                                request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
-                                client.search(request).await.map_err(|e| match e.code() {
-                                    tonic::Code::NotFound => NidxError::NotFound,
-                                    _ => NidxError::Unknown(anyhow::Error::from(e)),
-                                })
-                            }
-                            Err(e) => Err(e),
-                        },
-                    };
-                    match result {
-                        Ok(response) => {
-                            responses.push(response);
-                            break;
-                        }
-                        Err(e) => {
-                            warn!(
-                                ?node,
-                                ?shard_id,
-                                concat!("Error in search, trying with next node: {:?}"),
-                                e
-                            );
-                            errors.push(e);
-                        }
-                    }
-                }
-
-                if !errors.is_empty() {
-                    error!(
-                        ?errors,
-                        ?nodes,
-                        ?shard_id,
-                        "Error in search, exhausted all availabled nodes"
-                    );
-                    if let Some(reported_error) = errors.pop() {
-                        return Err(reported_error.into());
-                    } else {
-                        return Err(Status::internal("Unknown search error"));
-                    }
-                }
+                // When searching a shard fails, we can't provide results. We
+                // return the error and fail the whole request
+                let response = self.shard_search(shard_id, &request).await?;
+                responses.push(response);
             }
 
             let merged = shard_merge::merge(
@@ -317,6 +262,24 @@ impl NidxSearcher for SearchServer {
             LOCAL => streams::document_iterator(Arc::clone(&self.index_cache), message.clone()).await,
             REMOTE => documents,
             STREAM => Self::DocumentsStream
+        }
+    }
+}
+
+impl SearchServer {
+    async fn shard_search(
+        &self,
+        shard_id: uuid::Uuid,
+        request: &Request<SearchRequest>,
+    ) -> Result<Response<SearchResponse>> {
+        let message = request.get_ref();
+        shard_request! {
+            "search",
+            self,
+            request,
+            shard_id,
+            LOCAL => shard_search::search(shard_id, Arc::clone(&self.index_cache), message.clone()).await,
+            REMOTE => search
         }
     }
 }
