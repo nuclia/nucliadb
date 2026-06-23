@@ -39,10 +39,12 @@ class Features:
     AUDIT_RETRIEVE_AND_AUGMENT = "nucliadb_audit_retrieve_and_augment"
     # Flipt features
     KEY_VALUE_FIELDS = "nucliadb_key_value_fields"
+    BETTER_MULTI_SHARD_SEARCH = "nucliadb_better_multi_shard_search"
 
 
 _FliptFeatures = set(
     [
         Features.KEY_VALUE_FIELDS,
+        Features.BETTER_MULTI_SHARD_SEARCH,
     ]
 )
