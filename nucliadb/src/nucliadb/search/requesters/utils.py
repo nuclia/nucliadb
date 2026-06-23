@@ -40,7 +40,7 @@ from typing_extensions import assert_never
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.search import logger
-from nucliadb.search.search.shards import graph_search_shard, query_shard, suggest_shard
+from nucliadb.search.search.shards import graph_search_shard, query_shard, query_shards, suggest_shard
 from nucliadb.search.settings import settings
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_telemetry import errors
@@ -119,15 +119,20 @@ async def nidx_query(
     if method == Method.SEARCH:
         assert isinstance(pb_query, SearchRequest), "type checked constraint"
 
-        # TODO: refactor this to send 1 request for N shards
-        multi_shard_search = has_feature(
-            const.Features.BETTER_MULTI_SHARD_SEARCH, context={"kbid": kbid}
-        )
-        for shard_obj in shard_groups:
-            if shard_obj.nidx_shard_id is not None:
-                pb_query.multi_shard_search = multi_shard_search
-                ops.append(query_shard(shard_obj.nidx_shard_id, pb_query))
-                queried_shards.append(shard_obj.nidx_shard_id)
+        if has_feature(const.Features.BETTER_MULTI_SHARD_SEARCH, context={"kbid": kbid}):
+            for shard_obj in shard_groups:
+                if shard_obj.nidx_shard_id is not None:
+                    queried_shards.append(shard_obj.nidx_shard_id)
+
+            pb_query.multi_shard_search = True
+            ops.append(query_shards(queried_shards, pb_query))
+
+        else:
+            for shard_obj in shard_groups:
+                if shard_obj.nidx_shard_id is not None:
+                    ops.append(query_shard(shard_obj.nidx_shard_id, pb_query))
+                    queried_shards.append(shard_obj.nidx_shard_id)
+
     else:
         if method == Method.SUGGEST:
             func = suggest_shard
