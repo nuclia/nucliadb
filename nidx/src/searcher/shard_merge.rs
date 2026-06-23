@@ -289,7 +289,7 @@ impl From<&SearchRequest> for OrderBy {
             Some(order) => {
                 let descending = match order.r#type() {
                     order_by::OrderType::Desc => true,
-                    order_by::OrderType::Asc => true,
+                    order_by::OrderType::Asc => false,
                 };
                 Self {
                     expr: SortExpr::Date,
