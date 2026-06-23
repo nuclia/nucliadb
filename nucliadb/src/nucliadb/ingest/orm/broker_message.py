@@ -73,7 +73,7 @@ class _BrokerMessageBuilder:
         if relations is not None:
             self.bm.user_relations.CopyFrom(relations)
 
-        fields = await resource.get_fields(force=True)
+        fields = await resource.get_fields(force=True, load_values=True)
         for (type_id, field_id), field in fields.items():
             # Value
             await self.generate_field(type_id, field_id, field)
@@ -145,13 +145,16 @@ class _BrokerMessageBuilder:
         # Used for exporting a field
         if type_id == FieldType.TEXT:
             value = await field.get_value()
-            self.bm.texts[field_id].CopyFrom(value)
+            if value is not None:
+                self.bm.texts[field_id].CopyFrom(value)
         elif type_id == FieldType.LINK:
             value = await field.get_value()
-            self.bm.links[field_id].CopyFrom(value)
+            if value is not None:
+                self.bm.links[field_id].CopyFrom(value)
         elif type_id == FieldType.FILE:
             value = await field.get_value()
-            self.bm.files[field_id].CopyFrom(value)
+            if value is not None:
+                self.bm.files[field_id].CopyFrom(value)
         elif type_id == FieldType.CONVERSATION:
             field = cast(Conversation, field)
             value = await field.get_full_conversation()
