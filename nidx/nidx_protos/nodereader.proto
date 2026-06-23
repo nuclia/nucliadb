@@ -419,6 +419,8 @@ message SearchRequest {
     GraphSearch graph_search = 29;
 
     optional JsonFilterExpression json_filter = 32;
+
+    bool multi_shard_search = 35;
 }
 
 enum SuggestFeatures {
