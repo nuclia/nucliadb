@@ -47,6 +47,10 @@ spec:
             regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/conversation/[^/]+/messages'
           method:
             regex: "PUT|OPTIONS"
+        - uri:
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/conversation/[^/]+/messages/[^/]+$'
+          method:
+            regex: "DELETE|OPTIONS"
 
         # upload
         - uri:
