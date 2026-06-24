@@ -130,7 +130,7 @@ pub async fn search(
         };
 
     let current = Span::current();
-    let search_results = tokio::task::spawn_blocking(move || {
+    let mut search_results = tokio::task::spawn_blocking(move || {
         current.in_scope(|| {
             blocking_search(
                 query_plan,
@@ -145,6 +145,7 @@ pub async fn search(
         })
     })
     .await??;
+    search_results.shard_ids.push(shard_id.to_string());
     Ok(search_results)
 }
 
@@ -250,6 +251,7 @@ fn run_index_searches(
     });
 
     Ok(SearchResponse {
+        shard_ids: vec![], // populated later
         document: rtext.transpose()?,
         paragraph: rparagraph.transpose()?,
         vector: rvector.transpose()?,
