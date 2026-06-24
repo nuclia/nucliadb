@@ -44,12 +44,15 @@ pub struct Limit(pub usize);
 /// (this is validated before searching, so we don't care much here)
 ///
 pub fn merge(shard_responses: Vec<SearchResponse>, order_by: OrderBy, limit: Limit) -> SearchResponse {
+    let mut shard_ids = vec![];
     let mut document_responses = Vec::with_capacity(shard_responses.len());
     let mut paragraph_responses = Vec::with_capacity(shard_responses.len());
     let mut vector_responses = Vec::with_capacity(shard_responses.len());
     let mut graph_responses = Vec::with_capacity(shard_responses.len());
 
     for response in shard_responses {
+        shard_ids.extend(response.shard_ids);
+
         if let Some(document) = response.document {
             document_responses.push(document);
         }
@@ -72,6 +75,7 @@ pub fn merge(shard_responses: Vec<SearchResponse>, order_by: OrderBy, limit: Lim
     let graph = (!graph_responses.is_empty()).then(|| merge_graph_responses(graph_responses, limit));
 
     SearchResponse {
+        shard_ids,
         document,
         paragraph,
         vector,
@@ -334,6 +338,7 @@ mod tests {
         assert!(merged.graph.is_none());
 
         let empty = SearchResponse {
+            shard_ids: vec![],
             document: None,
             paragraph: None,
             vector: None,
