@@ -21,6 +21,7 @@ import asyncio
 import base64
 import io
 import os
+import uuid
 from typing import cast
 
 import pytest
@@ -533,8 +534,9 @@ async def test_file_tus_upload_urls_field_by_resource_id(
         "upload-defer-length": "1",
     }
 
+    idonotexist = uuid.uuid4().hex
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{kbid}/resource/idonotexist/file/field1/{TUSUPLOAD}",
+        f"/{KB_PREFIX}/{kbid}/resource/{idonotexist}/file/field1/{TUSUPLOAD}",
         headers=headers,
     )
     assert resp.status_code == 404

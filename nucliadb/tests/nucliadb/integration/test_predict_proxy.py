@@ -19,6 +19,8 @@
 #
 
 
+import uuid
+
 import pytest
 from httpx import AsyncClient
 
@@ -87,8 +89,9 @@ async def test_predict_proxy_not_proxied_returns_422(
 async def test_predict_proxy_returns_404_on_non_existing_kb(
     nucliadb_reader: AsyncClient,
 ):
+    idonotexist_kb = uuid.uuid4().hex
     resp = await nucliadb_reader.post(
-        f"/kb/idonotexist-kb/predict/chat",
+        f"/kb/{idonotexist_kb}/predict/chat",
         json={"question": "foo", "query_context": ["foobar"], "user_id": "foo"},
     )
     assert resp.status_code == 404
