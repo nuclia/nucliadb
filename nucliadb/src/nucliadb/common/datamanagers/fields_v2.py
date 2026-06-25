@@ -260,7 +260,7 @@ async def get_all_field_ids(
     *,
     kbid: str,
     rid: str,
-) -> rpb2.AllFieldIDs | None:
+) -> rpb2.AllFieldIDs:
     """Return the AllFieldIDs protobuf for a resource, or None if not set."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
@@ -270,10 +270,8 @@ async def get_all_field_ids(
             """,
             {"kbid": kbid, "rid": rid},
         )
-        rows = await cur.fetchall()
-        if not rows:
-            return None
         pb = rpb2.AllFieldIDs()
+        rows = await cur.fetchall()
         for row in rows:
             field = pb.fields.add()
             field.field_type = to_proto.field_type(row[0])

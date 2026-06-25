@@ -174,8 +174,10 @@ async def set_slug(
         try:
             await cur.execute(
                 """
-                UPDATE kb_resources SET slug = %(slug)s
-                WHERE kbid = %(kbid)s AND rid = %(rid)s
+                INSERT INTO kb_resources (kbid, rid, slug)
+                VALUES (%(kbid)s, %(rid)s, %(slug)s)
+                ON CONFLICT (kbid, rid) DO UPDATE SET
+                    slug = EXCLUDED.slug
                 """,
                 {"kbid": kbid, "rid": rid, "slug": slug},
             )
