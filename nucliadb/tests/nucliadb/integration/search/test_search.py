@@ -36,6 +36,7 @@ from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.ingest.consumer import shard_creator
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.tests.vectors import V1
 from nucliadb_models.search import FindOptions
@@ -1288,8 +1289,9 @@ async def test_search_by_path_filter(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_search_kb_not_found(nucliadb_reader: AsyncClient):
+    nonexistent_kbid = KnowledgeBox.new_unique_kbid()
     resp = await nucliadb_reader.get(
-        "/kb/00000000000000/search?query=own+text",
+        f"/kb/{nonexistent_kbid}/search?query=own+text",
     )
     assert resp.status_code == 404
 
