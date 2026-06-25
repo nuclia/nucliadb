@@ -115,7 +115,7 @@ def kbid(
 
 
 async def test_ingest_messages_autocommit(kbid: str, processor, dummy_nidx_utility):
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     message1: BrokerMessage = BrokerMessage(
         kbid=kbid,
         uuid=rid,
@@ -381,7 +381,7 @@ async def test_ingest_audit_stream_files_only(
     await jetstream.add_stream(name=audit_settings.audit_stream, subjects=[subject])
     psub = await jetstream.pull_subscribe(subject, "psub")
 
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
 
     # We use the same file multiple times, so the size will be the same
     test_png_size = getsize(f"{dirname(__file__)}/assets/file.png")
@@ -653,7 +653,7 @@ async def test_ingest_processor_handles_missing_kb(
 async def test_ingest_autocommit_deadletter_marks_resource(
     kbid: str, processor: Processor, storage, maindb_driver: Driver
 ):
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     message = make_message(kbid, rid)
 
     with (
@@ -742,7 +742,7 @@ async def test_ingest_delete_field(
         mock.side_effect = extract_brain
         return new_mock
 
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
 
     message = make_message(knowledgebox, rid)
     await processor.process(message=message, seqid=0)
@@ -796,7 +796,7 @@ async def test_ingest_update_labels(
         mock.side_effect = extract_brain
         return new_mock
 
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
 
     message = make_message(knowledgebox, rid)
     await processor.process(message=message, seqid=0)

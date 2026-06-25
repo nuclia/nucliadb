@@ -67,7 +67,7 @@ async def test_modify_slug(resource_with_slug, maindb_driver: Driver):
 
 async def test_all_fields(maindb_driver: Driver):
     kbid = str(uuid.uuid4())
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     field = resources_pb2.FieldID(field="myfield", field_type=resources_pb2.FieldType.LINK)
 
     async with maindb_driver.ro_transaction() as txn:

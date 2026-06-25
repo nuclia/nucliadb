@@ -79,7 +79,7 @@ def qa_kb(sdk: NucliaDB, kb: KnowledgeBoxObj, ingest_stub_sync: WriterStub) -> K
 
 
 def smb_wonder_bm(kbid: str) -> BrokerMessage:
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     now = datetime.now()
 
     bm = BrokerMessage()

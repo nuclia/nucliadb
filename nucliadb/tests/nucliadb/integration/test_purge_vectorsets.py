@@ -85,7 +85,7 @@ async def create_broker_message_with_vectorset(
     kbid: str,
     driver: Driver,
 ):
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     field_id = f"{rid}-text-field"
     bm = writer_pb2.BrokerMessage(kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT)
 

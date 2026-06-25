@@ -119,7 +119,7 @@ async def test_local_driver(local_storage_tus: LocalBlobStore):
 async def storage_test(storage: BlobStore, file_storage_manager: FileStorageManager):
     example = b"mytestinfo"
     field = "myfield"
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     kbid = str(uuid.uuid4())
 
     metadata: dict[str, str] = {"filename": "non-ascii is problematic - Ôñ"}

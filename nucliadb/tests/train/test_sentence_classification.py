@@ -77,7 +77,7 @@ async def inject_resource_with_sentence_classification(knowledgebox, writer):
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     bmb = BrokerMessageBuilder(kbid=knowledgebox, rid=rid)
     bmb.with_title("Title Resource")
     bmb.with_summary("Summary of document")

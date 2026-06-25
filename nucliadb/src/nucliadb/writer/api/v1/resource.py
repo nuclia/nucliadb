@@ -109,6 +109,7 @@ async def create_resource(
     partitioning = get_partitioning()
 
     # Create resource message
+    # resource ids are always UUIDs in hex format (32 chars, no hyphens)
     uuid = uuid4().hex
     partition = partitioning.generate_partition(kbid, uuid)
 

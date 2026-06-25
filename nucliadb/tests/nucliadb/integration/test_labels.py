@@ -48,7 +48,7 @@ from tests.utils import inject_message
 
 
 def broker_resource(standalone_knowledgebox: str) -> BrokerMessage:
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     slug = f"{rid}slug1"
 
     bm: BrokerMessage = BrokerMessage(

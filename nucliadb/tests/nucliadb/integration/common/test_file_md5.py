@@ -41,7 +41,7 @@ def kbid() -> str:
 
 
 def rid() -> str:
-    return str(uuid.uuid4())
+    return uuid.uuid4().hex
 
 
 async def test_set_and_exists(driver: PGDriver):
@@ -180,7 +180,7 @@ async def test_performance(driver: PGDriver):
                 for batch_start in range(0, count, batch_size):
                     batch_end = min(batch_start + batch_size, count)
                     rows = [
-                        (kb, f"md5_{row_idx + i}", str(uuid.uuid4()), f"f/field_{i % 10}")
+                        (kb, f"md5_{row_idx + i}", uuid.uuid4().hex, f"f/field_{i % 10}")
                         for i in range(batch_end - batch_start)
                     ]
                     await cur.executemany(

@@ -36,7 +36,7 @@ from nucliadb_utils.utilities import get_storage
 async def test_ingest_relations_indexing(
     dummy_nidx_utility, local_files, storage, knowledgebox, processor
 ):
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     bm = BrokerMessage(kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
 
     e0 = RelationNode(value="E0", ntype=RelationNode.NodeType.ENTITY, subtype="")
@@ -63,7 +63,7 @@ async def test_ingest_relations_indexing(
 async def test_ingest_label_relation_extraction(
     dummy_nidx_utility, local_files, storage, knowledgebox, processor
 ):
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     bm = BrokerMessage(kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
 
     labels = [
@@ -92,7 +92,7 @@ async def test_ingest_label_relation_extraction(
 async def test_ingest_colab_relation_extraction(
     dummy_nidx_utility, local_files, storage, knowledgebox, processor
 ):
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     bm = BrokerMessage(kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
 
     collaborators = ["Alice", "Bob", "Trudy"]
@@ -114,7 +114,7 @@ async def test_ingest_colab_relation_extraction(
 async def test_ingest_field_metadata_relation_extraction(
     dummy_nidx_utility, local_files, storage, knowledgebox, processor
 ):
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     bm_writer = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,
@@ -210,7 +210,7 @@ async def test_ingest_field_metadata_relation_extraction(
 async def test_ingest_field_relations_relation_extraction(
     dummy_nidx_utility, local_files, storage, knowledgebox, processor
 ):
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     bm = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,

@@ -147,7 +147,7 @@ async def knowledgebox_with_labels(nucliadb_writer: AsyncClient, knowledgebox: s
 
 
 def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
-    rid = str(uuid.uuid4())
+    rid = uuid.uuid4().hex
     message1: BrokerMessage = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,
