@@ -54,7 +54,7 @@ from nucliadb_protos.utils_pb2 import (
     RelationNodeVectors,
     VectorObject,
 )
-from nucliadb_protos.writer_pb2 import Error, FieldStatus
+from nucliadb_protos.writer_pb2 import FieldStatus
 from nucliadb_utils.storages.exceptions import CouldNotCopyNotFound
 from nucliadb_utils.storages.storage import Storage, StorageField
 
@@ -265,25 +265,6 @@ class Field(Generic[PbType]):
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
             pass
-
-    async def get_error(self) -> Error | None:
-        return await datamanagers.fields.get_error(
-            self.resource.txn,
-            kbid=self.kbid,
-            rid=self.rid,
-            field_type=self.type,
-            field_id=self.id,
-        )
-
-    async def set_error(self, error: Error) -> None:
-        await datamanagers.fields.set_error(
-            self.resource.txn,
-            kbid=self.kbid,
-            rid=self.rid,
-            field_type=self.type,
-            field_id=self.id,
-            error=error,
-        )
 
     async def get_status(self) -> FieldStatus | None:
         return await datamanagers.fields.get_status(

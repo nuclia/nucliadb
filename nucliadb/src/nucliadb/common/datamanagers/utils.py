@@ -59,11 +59,11 @@ async def with_ro_transaction():
         yield ro_txn
 
 
-def datamanagers_v2_migrating(kbid: str) -> bool:
+def datamanagers_v2_write(kbid: str) -> bool:
     """
     Check if the knowledge box is currently being migrated to the v2 datamanagers.
     """
-    return has_feature(const.Features.DATAMANAGERS_V2_MIGRATING, context={"kbid": kbid})
+    return has_feature(const.Features.DATAMANAGERS_V2_WRITE, context={"kbid": kbid})
 
 
 def datamanagers_v2_read(kbid: str) -> bool:

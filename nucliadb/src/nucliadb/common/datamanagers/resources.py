@@ -22,7 +22,7 @@ from collections.abc import AsyncGenerator
 import backoff
 
 from nucliadb.common.datamanagers import fields_v2, resources_v2
-from nucliadb.common.datamanagers.utils import datamanagers_v2_migrating, datamanagers_v2_read, get_kv_pb
+from nucliadb.common.datamanagers.utils import datamanagers_v2_read, datamanagers_v2_write, get_kv_pb
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 
@@ -80,22 +80,14 @@ async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
 
 
 async def set_slug(txn: Transaction, *, kbid: str, rid: str, slug: str) -> None:
-    if datamanagers_v2_read(kbid):
-        await resources_v2.set_slug(txn, kbid=kbid, rid=rid, slug=slug)
-        return
-
     key = KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug)
     await txn.set(key, rid.encode())
 
-    if datamanagers_v2_migrating(kbid):
+    if datamanagers_v2_write(kbid):
         await resources_v2.set_slug(txn, kbid=kbid, rid=rid, slug=slug)
 
 
 async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -> str:
-    if datamanagers_v2_read(kbid):
-        old_slug = await resources_v2.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
-        return old_slug
-
     basic = await get_basic(txn, kbid=kbid, rid=rid)
     if basic is None:
         raise NotFoundError()
@@ -116,7 +108,7 @@ async def modify_slug(txn: Transaction, *, kbid: str, rid: str, new_slug: str) -
     basic.slug = new_slug
     await set_basic(txn, kbid=kbid, rid=rid, basic=basic)
 
-    if datamanagers_v2_migrating(kbid):
+    if datamanagers_v2_write(kbid):
         await resources_v2.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
 
     return old_slug
@@ -142,13 +134,9 @@ async def get_resource_shard_id(
 
 
 async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard: str):
-    if datamanagers_v2_read(kbid):
-        await resources_v2.set_resource_shard_id(txn, kbid=kbid, rid=rid, shard=shard)
-        return
-
     await txn.set(KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid), shard.encode())
 
-    if datamanagers_v2_migrating(kbid):
+    if datamanagers_v2_write(kbid):
         await resources_v2.set_resource_shard_id(txn, kbid=kbid, rid=rid, shard=shard)
 
 
@@ -176,10 +164,6 @@ async def get_basic_raw(txn: Transaction, *, kbid: str, rid: str) -> bytes | Non
 
 
 async def set_basic(txn: Transaction, *, kbid: str, rid: str, basic: resources_pb2.Basic):
-    if datamanagers_v2_read(kbid):
-        await resources_v2.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
-        return
-
     if ingest_settings.driver == "local":
         await txn.set(
             KB_RESOURCE_BASIC_FS.format(kbid=kbid, uuid=rid),
@@ -190,7 +174,7 @@ async def set_basic(txn: Transaction, *, kbid: str, rid: str, basic: resources_p
             KB_RESOURCE_BASIC.format(kbid=kbid, uuid=rid),
             basic.SerializeToString(),
         )
-    if datamanagers_v2_migrating(kbid):
+    if datamanagers_v2_write(kbid):
         await resources_v2.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
 
 
@@ -206,14 +190,10 @@ async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.
 
 
 async def set_origin(txn: Transaction, *, kbid: str, rid: str, origin: resources_pb2.Origin):
-    if datamanagers_v2_read(kbid):
-        await resources_v2.set_origin(txn, kbid=kbid, rid=rid, origin=origin)
-        return
-
     key = KB_RESOURCE_ORIGIN.format(kbid=kbid, uuid=rid)
     await txn.set(key, origin.SerializeToString())
 
-    if datamanagers_v2_migrating(kbid):
+    if datamanagers_v2_write(kbid):
         await resources_v2.set_origin(txn, kbid=kbid, rid=rid, origin=origin)
 
 
@@ -229,14 +209,10 @@ async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.E
 
 
 async def set_extra(txn: Transaction, *, kbid: str, rid: str, extra: resources_pb2.Extra):
-    if datamanagers_v2_read(kbid):
-        await resources_v2.set_extra(txn, kbid=kbid, rid=rid, extra=extra)
-        return
-
     key = KB_RESOURCE_EXTRA.format(kbid=kbid, uuid=rid)
     await txn.set(key, extra.SerializeToString())
 
-    if datamanagers_v2_migrating(kbid):
+    if datamanagers_v2_write(kbid):
         await resources_v2.set_extra(txn, kbid=kbid, rid=rid, extra=extra)
 
 
@@ -252,14 +228,10 @@ async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb
 
 
 async def set_security(txn: Transaction, *, kbid: str, rid: str, security: resources_pb2.Security):
-    if datamanagers_v2_read(kbid):
-        await resources_v2.set_security(txn, kbid=kbid, rid=rid, security=security)
-        return
-
     key = KB_RESOURCE_SECURITY.format(kbid=kbid, uuid=rid)
     await txn.set(key, security.SerializeToString())
 
-    if datamanagers_v2_migrating(kbid):
+    if datamanagers_v2_write(kbid):
         await resources_v2.set_security(txn, kbid=kbid, rid=rid, security=security)
 
 

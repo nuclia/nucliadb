@@ -32,7 +32,6 @@ Each row represents one resource in a knowledge box and stores:
   - user_relations - serialised resources_pb2.Relations
 """
 
-import dataclasses
 from collections.abc import AsyncIterator
 from typing import cast
 
@@ -44,98 +43,14 @@ from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb_protos import resources_pb2
 
-# ---------------------------------------------------------------------------
-# Row model
-# ---------------------------------------------------------------------------
-
-
-@dataclasses.dataclass
-class ResourceRow:
-    kbid: str
-    rid: str
-    slug: str | None
-    shard: str | None
-    basic: bytes | None
-    origin: bytes | None
-    security: bytes | None
-    extra: bytes | None
-    user_relations: bytes | None
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
 
 def _pg(txn: Transaction) -> PGTransaction:
     return cast(PGTransaction, txn)
 
 
-def _row_to_resource(row: tuple) -> ResourceRow:
-    kbid, rid, slug, shard, basic, origin, security, extra, user_relations = row
-    return ResourceRow(
-        kbid=str(kbid),
-        rid=str(rid),
-        slug=slug,
-        shard=shard,
-        basic=bytes(basic) if basic is not None else None,
-        origin=bytes(origin) if origin is not None else None,
-        security=bytes(security) if security is not None else None,
-        extra=bytes(extra) if extra is not None else None,
-        user_relations=bytes(user_relations) if user_relations is not None else None,
-    )
-
-
 # ---------------------------------------------------------------------------
 # Write operations
 # ---------------------------------------------------------------------------
-
-
-async def upsert(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    slug: str | None = None,
-    shard: str | None = None,
-    basic: resources_pb2.Basic | None = None,
-    origin: resources_pb2.Origin | None = None,
-    security: resources_pb2.Security | None = None,
-    extra: resources_pb2.Extra | None = None,
-    user_relations: resources_pb2.Relations | None = None,
-) -> None:
-    """Insert or fully replace a resource row."""
-    async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_resources
-                (kbid, rid, slug, shard, basic, origin, security, extra, user_relations)
-            VALUES
-                (%(kbid)s, %(rid)s, %(slug)s, %(shard)s, %(basic)s, %(origin)s,
-                 %(security)s, %(extra)s, %(user_relations)s)
-            ON CONFLICT (kbid, rid) DO UPDATE SET
-                slug           = EXCLUDED.slug,
-                shard          = EXCLUDED.shard,
-                basic          = EXCLUDED.basic,
-                origin         = EXCLUDED.origin,
-                security       = EXCLUDED.security,
-                extra          = EXCLUDED.extra,
-                user_relations = EXCLUDED.user_relations
-            """,
-            {
-                "kbid": kbid,
-                "rid": rid,
-                "slug": slug,
-                "shard": shard,
-                "basic": basic.SerializeToString() if basic is not None else None,
-                "origin": origin.SerializeToString() if origin is not None else None,
-                "security": security.SerializeToString() if security is not None else None,
-                "extra": extra.SerializeToString() if extra is not None else None,
-                "user_relations": user_relations.SerializeToString()
-                if user_relations is not None
-                else None,
-            },
-        )
 
 
 async def set_basic(
@@ -145,12 +60,14 @@ async def set_basic(
     rid: str,
     basic: resources_pb2.Basic,
 ) -> None:
-    """Update only the basic column of an existing resource row."""
+    """Upsert the basic column of a resource row, creating the row if it does not exist."""
     async with _pg(txn).connection.cursor() as cur:
         await cur.execute(
             """
-            UPDATE kb_resources SET basic = %(basic)s
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
+            INSERT INTO kb_resources (kbid, rid, basic)
+            VALUES (%(kbid)s, %(rid)s, %(basic)s)
+            ON CONFLICT (kbid, rid) DO UPDATE SET
+                basic = EXCLUDED.basic
             """,
             {"kbid": kbid, "rid": rid, "basic": basic.SerializeToString()},
         )
@@ -329,23 +246,6 @@ async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
 # Read operations
 # ---------------------------------------------------------------------------
 
-_SELECT_COLUMNS = "kbid, rid, slug, shard, basic, origin, security, extra, user_relations"
-
-
-async def get(txn: Transaction, *, kbid: str, rid: str) -> ResourceRow | None:
-    """Return the row for a single resource, or None if it does not exist."""
-    async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            f"""
-            SELECT {_SELECT_COLUMNS}
-            FROM kb_resources
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-            """,
-            {"kbid": kbid, "rid": rid},
-        )
-        row = await cur.fetchone()
-        return _row_to_resource(row) if row is not None else None
-
 
 async def exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
     """Return True if the resource exists."""
@@ -376,32 +276,6 @@ async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
             {"kbid": kbid, "slug": slug},
         )
         return await cur.fetchone() is not None
-
-
-async def get_by_slug(txn: Transaction, *, kbid: str, slug: str) -> ResourceRow | None:
-    """Return the resource row matching the given slug within a KB, or None."""
-    async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            f"""
-            SELECT {_SELECT_COLUMNS}
-            FROM kb_resources
-            WHERE kbid = %(kbid)s AND slug = %(slug)s
-            """,
-            {"kbid": kbid, "slug": slug},
-        )
-        row = await cur.fetchone()
-        return _row_to_resource(row) if row is not None else None
-
-
-async def get_shard(txn: Transaction, *, kbid: str, rid: str) -> str | None:
-    """Return the shard ID for a resource, or None."""
-    async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            "SELECT shard FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
-            {"kbid": kbid, "rid": rid},
-        )
-        row = await cur.fetchone()
-        return row[0] if row is not None else None
 
 
 async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Basic | None:

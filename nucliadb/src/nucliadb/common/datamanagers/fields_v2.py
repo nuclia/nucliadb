@@ -61,40 +61,6 @@ def _pg(txn: Transaction) -> PGTransaction:
 # ---------------------------------------------------------------------------
 
 
-async def upsert(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    field_type: str,
-    field_id: str,
-    status: bytes | None = None,
-    value: bytes | None = None,
-    md5: str | None = None,
-) -> None:
-    """Insert or fully replace a field row."""
-    async with _pg(txn).connection.cursor() as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_fields (kbid, rid, field_type, field_id, status, value, md5)
-            VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(status)s, %(value)s, %(md5)s)
-            ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
-                status = EXCLUDED.status,
-                value  = EXCLUDED.value,
-                md5    = EXCLUDED.md5
-            """,
-            {
-                "kbid": kbid,
-                "rid": rid,
-                "field_type": field_type,
-                "field_id": field_id,
-                "status": status,
-                "value": value,
-                "md5": md5,
-            },
-        )
-
-
 async def set_status(
     txn: Transaction,
     *,
@@ -131,14 +97,25 @@ async def set(
     field_id: str,
     value: Message,
 ) -> None:
-    await upsert(
-        txn,
-        kbid=kbid,
-        rid=rid,
-        field_type=field_type,
-        field_id=field_id,
-        value=value.SerializeToString(),
-    )
+    """
+    Set the value of a field row, creating it if it does not exist. This is an upsert operation.
+    """
+    async with _pg(txn).connection.cursor() as cur:
+        await cur.execute(
+            """
+            INSERT INTO kb_fields (kbid, rid, field_type, field_id, value)
+            VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(value)s)
+            ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
+                value = EXCLUDED.value
+            """,
+            {
+                "kbid": kbid,
+                "rid": rid,
+                "field_type": field_type,
+                "field_id": field_id,
+                "value": value.SerializeToString(),
+            },
+        )
 
 
 async def delete(
