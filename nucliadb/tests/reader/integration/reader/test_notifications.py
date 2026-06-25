@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import uuid
 from unittest import mock
 
 import pytest
@@ -48,7 +49,8 @@ async def pubsub(natsd):
 
 
 async def test_kb_notifications(pubsub):
-    kbid = "testkb"
+    kbid = uuid.uuid4().hex
+    other_kb = uuid.uuid4().hex
     activity = []
 
     async def read_activity(kbid):
@@ -63,10 +65,12 @@ async def test_kb_notifications(pubsub):
     await asyncio.sleep(0.1)
 
     # Publish some notifications
-    await resource_notification(pubsub, kbid, uuid="resource1", seqid=1)
-    await resource_notification(pubsub, kbid, uuid="resource2", seqid=2)
+    resource_1 = uuid.uuid4().hex
+    await resource_notification(pubsub, kbid, uuid=resource_1, seqid=1)
+    resource_2 = uuid.uuid4().hex
+    await resource_notification(pubsub, kbid, uuid=resource_2, seqid=2)
     # This notification should not be read as it is for a different kbid
-    await resource_notification(pubsub, "other-kb")
+    await resource_notification(pubsub, other_kb)
 
     # Wait for the reader task to process the notifications
     await asyncio.sleep(1)
@@ -77,9 +81,9 @@ async def test_kb_notifications(pubsub):
 
     # Check that the activity was read
     assert len(activity) == 2
-    assert activity[0].uuid == "resource1"
+    assert activity[0].uuid == resource_1
     assert activity[0].seqid == 1
-    assert activity[1].uuid == "resource2"
+    assert activity[1].uuid == resource_2
     assert activity[1].seqid == 2
 
 

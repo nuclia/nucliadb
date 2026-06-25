@@ -269,8 +269,9 @@ async def test_knowledgebox_file_tus_upload_field(
     filename = base64.b64encode(b"image.jpg").decode()
     md5 = base64.b64encode(b"7af0916dba8b70e29d99e72941923529").decode()
 
+    invalid_resource = uuid.uuid4().hex
     resp = await nucliadb_writer.post(
-        f"/{KB_PREFIX}/{kbid}/resource/invalidresource/file/field1/{TUSUPLOAD}",
+        f"/{KB_PREFIX}/{kbid}/resource/{invalid_resource}/file/field1/{TUSUPLOAD}",
         headers={
             "tus-resumable": "1.0.0",
             "upload-metadata": f"filename {filename},language {language},md5 {md5}",
