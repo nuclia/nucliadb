@@ -17,13 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import uuid
 
 import pytest
 
 from nucliadb.common import datamanagers
 from nucliadb.common.ids import ParagraphId
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.search.search import paragraphs
 from nucliadb_protos.resources_pb2 import Basic, ExtractedTextWrapper, FieldType
 from nucliadb_protos.utils_pb2 import ExtractedText
@@ -31,7 +31,7 @@ from nucliadb_protos.utils_pb2 import ExtractedText
 
 async def test_get_paragraph_text(storage, cache, txn, dummy_nidx_utility, processor, knowledgebox):
     kbid = knowledgebox
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     basic = Basic(slug="slug", uuid=rid)
     await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
     kb = KnowledgeBox(txn, storage, kbid)

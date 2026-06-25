@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import uuid
 from datetime import datetime
 
 import pytest
@@ -27,6 +26,7 @@ from nucliadb.ingest.orm.processor.processor import (
     delete_basic_computedmetadata_classifications,
     update_basic_computedmetadata_classifications,
 )
+from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_models.common import UserClassification
 from nucliadb_models.extracted import Classification
@@ -48,7 +48,7 @@ from tests.utils import inject_message
 
 
 def broker_resource(standalone_knowledgebox: str) -> BrokerMessage:
-    rid = uuid.uuid4().hex
+    rid = ORMResource.new_unique_rid()
     slug = f"{rid}slug1"
 
     bm: BrokerMessage = BrokerMessage(

@@ -22,6 +22,7 @@ import uuid
 
 import pytest
 
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import get_dm
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
@@ -119,7 +120,7 @@ async def test_local_driver(local_storage_tus: LocalBlobStore):
 async def storage_test(storage: BlobStore, file_storage_manager: FileStorageManager):
     example = b"mytestinfo"
     field = "myfield"
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     kbid = str(uuid.uuid4())
 
     metadata: dict[str, str] = {"filename": "non-ascii is problematic - Ôñ"}

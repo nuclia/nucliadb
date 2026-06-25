@@ -20,7 +20,6 @@
 import asyncio
 import base64
 import time
-import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from unittest.mock import AsyncMock, patch
@@ -42,6 +41,7 @@ from nucliadb.common.http_clients.processing import (
 )
 from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.consumer.pull import PullV2Worker
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_utils.fastapi.run import start_server
 from nucliadb_utils.nats import NatsConnectionManager
@@ -50,7 +50,7 @@ from nucliadb_utils.tests import free_port
 
 def create_broker_message(kbid: str) -> BrokerMessage:
     bm = BrokerMessage()
-    bm.uuid = uuid.uuid4().hex
+    bm.uuid = Resource.new_unique_rid()
     bm.kbid = kbid
     bm.texts["text1"].body = "My text1"
     bm.basic.title = "My Title"

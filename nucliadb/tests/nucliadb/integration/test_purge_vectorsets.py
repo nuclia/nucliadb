@@ -19,7 +19,6 @@
 #
 
 import random
-import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -30,6 +29,7 @@ from nucliadb.ingest.orm.knowledgebox import (
     KB_VECTORSET_TO_DELETE,
     KnowledgeBox,
 )
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.purge import purge_kb_vectorsets
 from nucliadb_protos import resources_pb2, utils_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig, VectorSetPurge
@@ -85,7 +85,7 @@ async def create_broker_message_with_vectorset(
     kbid: str,
     driver: Driver,
 ):
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     field_id = f"{rid}-text-field"
     bm = writer_pb2.BrokerMessage(kbid=kbid, uuid=rid, type=writer_pb2.BrokerMessage.AUTOCOMMIT)
 

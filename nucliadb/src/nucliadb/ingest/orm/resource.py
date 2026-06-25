@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any, cast
@@ -104,6 +105,10 @@ class Resource:
         self._previous_status: Metadata.Status.ValueType | None = None
         self.user_relations: PBRelations | None = None
         self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+    @staticmethod
+    def new_unique_rid() -> str:
+        return uuid.uuid4().hex
 
     @classmethod
     async def get(cls, txn: Transaction, kbid: str, rid: str) -> Resource | None:

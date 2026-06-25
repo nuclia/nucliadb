@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import uuid
 from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import AsyncMock
@@ -202,7 +201,7 @@ async def test_resource_crud_sync(nucliadb_writer: AsyncClient, knowledgebox: st
     assert resp.status_code == 200
 
     # Test delete resource
-    non_existing_rid = uuid.uuid4().hex
+    non_existing_rid = Resource.new_unique_rid()
     resp = await nucliadb_writer.delete(
         f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{non_existing_rid}",
     )

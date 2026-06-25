@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -36,6 +35,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.standalone.settings import Settings
 from nucliadb.train.settings import settings as train_settings
 from nucliadb.train.utils import (
@@ -147,7 +147,7 @@ async def knowledgebox_with_labels(nucliadb_writer: AsyncClient, knowledgebox: s
 
 
 def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     message1: BrokerMessage = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,

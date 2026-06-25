@@ -495,6 +495,8 @@ class KnowledgeBox:
             except Exception:
                 logger.exception("Error deleting slug")
 
+        await datamanagers.resources.resources_v2.delete(self.txn, kbid=self.kbid, rid=uuid)
+
     async def storage_delete_resource(self, uuid: str):
         if is_onprem_nucliadb():
             await self.storage.delete_resource(self.kbid, uuid)

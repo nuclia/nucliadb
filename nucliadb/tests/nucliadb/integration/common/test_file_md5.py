@@ -26,6 +26,7 @@ import pytest
 
 from nucliadb.common import file_md5
 from nucliadb.common.maindb.pg import PGDriver
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_utils.utilities import Utility
 from tests.ndbfixtures.utils import global_utility
 
@@ -180,7 +181,7 @@ async def test_performance(driver: PGDriver):
                 for batch_start in range(0, count, batch_size):
                     batch_end = min(batch_start + batch_size, count)
                     rows = [
-                        (kb, f"md5_{row_idx + i}", uuid.uuid4().hex, f"f/field_{i % 10}")
+                        (kb, f"md5_{row_idx + i}", Resource.new_unique_rid(), f"f/field_{i % 10}")
                         for i in range(batch_end - batch_start)
                     ]
                     await cur.executemany(

@@ -24,6 +24,7 @@ from nucliadb.common.datamanagers.conversations import KB_CONVERSATION_SPLITS_ME
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.migrator.models import Migration
 from nucliadb_protos import resources_pb2
 from tests.nucliadb.migrations import get_migration
@@ -38,7 +39,7 @@ async def test_migration_0039(maindb_driver: Driver):
     execution_context.blob_storage = storage
 
     kbid = str(uuid.uuid4())
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     field_id = "faq"
 
     with patch("nucliadb.ingest.orm.resource.get_storage"):

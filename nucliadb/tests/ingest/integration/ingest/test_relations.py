@@ -17,9 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import uuid
 
 from nucliadb.ingest import SERVICE_NAME
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.resources_pb2 import (
     Classification,
     FieldComputedMetadataWrapper,
@@ -36,7 +36,7 @@ from nucliadb_utils.utilities import get_storage
 async def test_ingest_relations_indexing(
     dummy_nidx_utility, local_files, storage, knowledgebox, processor
 ):
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     bm = BrokerMessage(kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
 
     e0 = RelationNode(value="E0", ntype=RelationNode.NodeType.ENTITY, subtype="")
@@ -63,7 +63,7 @@ async def test_ingest_relations_indexing(
 async def test_ingest_label_relation_extraction(
     dummy_nidx_utility, local_files, storage, knowledgebox, processor
 ):
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     bm = BrokerMessage(kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
 
     labels = [
@@ -92,7 +92,7 @@ async def test_ingest_label_relation_extraction(
 async def test_ingest_colab_relation_extraction(
     dummy_nidx_utility, local_files, storage, knowledgebox, processor
 ):
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     bm = BrokerMessage(kbid=knowledgebox, uuid=rid, slug="slug-1", type=BrokerMessage.AUTOCOMMIT)
 
     collaborators = ["Alice", "Bob", "Trudy"]
@@ -114,7 +114,7 @@ async def test_ingest_colab_relation_extraction(
 async def test_ingest_field_metadata_relation_extraction(
     dummy_nidx_utility, local_files, storage, knowledgebox, processor
 ):
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     bm_writer = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,
@@ -210,7 +210,7 @@ async def test_ingest_field_metadata_relation_extraction(
 async def test_ingest_field_relations_relation_extraction(
     dummy_nidx_utility, local_files, storage, knowledgebox, processor
 ):
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     bm = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,

@@ -44,7 +44,7 @@ async def test_migration_0018_global(maindb_driver: Driver):
         # setup some orphan /kbslugs keys and some real ones
         async with maindb_driver.rw_transaction() as txn:
             fake_kb_slug = "fake-kb-slug"
-            fake_kb_id = "fake-kb-id"
+            fake_kb_id = KnowledgeBox.new_unique_kbid()
             key = KB_SLUGS.format(slug=fake_kb_slug)
             await txn.set(key, fake_kb_id.encode())
             assert not await datamanagers.kb.exists_kb(txn, kbid=fake_kb_id)

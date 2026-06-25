@@ -24,6 +24,8 @@ import pytest
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import Basic
 
@@ -39,8 +41,8 @@ async def check_slug(driver: Driver, kbid, rid, slug):
 
 @pytest.fixture(scope="function")
 async def resource_with_slug(maindb_driver: Driver):
-    kbid = "kbid"
-    rid = "rid"
+    kbid = KnowledgeBox.new_unique_kbid()
+    rid = Resource.new_unique_rid()
     slug = "slug"
 
     async with maindb_driver.rw_transaction() as txn:
@@ -67,7 +69,7 @@ async def test_modify_slug(resource_with_slug, maindb_driver: Driver):
 
 async def test_all_fields(maindb_driver: Driver):
     kbid = str(uuid.uuid4())
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     field = resources_pb2.FieldID(field="myfield", field_type=resources_pb2.FieldType.LINK)
 
     async with maindb_driver.ro_transaction() as txn:
