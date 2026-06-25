@@ -18,11 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import contextlib
-from typing import TypeVar
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator, TypeVar, cast
 
+import psycopg
 from google.protobuf.message import Message
 
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.pg import PGTransaction, ReadOnlyPGTransaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
@@ -71,3 +74,19 @@ def datamanagers_v2_read(kbid: str) -> bool:
     Check if the knowledge box has already been migrated and has datamanagers v2 reads enabled.
     """
     return has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid})
+
+
+def _pg(txn: Transaction) -> PGTransaction:
+    return cast(PGTransaction, txn)
+
+
+@asynccontextmanager
+async def _pg_cursor(txn: Transaction) -> AsyncGenerator[psycopg.AsyncCursor]:
+    if isinstance(txn, PGTransaction):
+        async with _pg(txn).connection.cursor() as cur:
+            yield cur
+    elif isinstance(txn, ReadOnlyPGTransaction):
+        async with txn.driver._get_connection() as conn, conn.cursor() as cur:
+            yield cur
+    else:
+        raise TypeError(f"Unsupported transaction type: {type(txn)}")

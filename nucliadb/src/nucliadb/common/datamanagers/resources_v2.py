@@ -33,20 +33,13 @@ Each row represents one resource in a knowledge box and stores:
 """
 
 from collections.abc import AsyncIterator
-from typing import cast
 
 import psycopg.errors
 
-from nucliadb.common.datamanagers.utils import with_ro_transaction
+from nucliadb.common.datamanagers.utils import _pg_cursor, with_ro_transaction
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
-from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb_protos import resources_pb2
-
-
-def _pg(txn: Transaction) -> PGTransaction:
-    return cast(PGTransaction, txn)
-
 
 # ---------------------------------------------------------------------------
 # Write operations
@@ -61,7 +54,7 @@ async def set_basic(
     basic: resources_pb2.Basic,
 ) -> None:
     """Upsert the basic column of a resource row, creating the row if it does not exist."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             INSERT INTO kb_resources (kbid, rid, basic)
@@ -81,7 +74,7 @@ async def set_origin(
     origin: resources_pb2.Origin,
 ) -> None:
     """Update only the origin column of an existing resource row."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             UPDATE kb_resources SET origin = %(origin)s
@@ -99,7 +92,7 @@ async def set_security(
     security: resources_pb2.Security,
 ) -> None:
     """Update only the security column of an existing resource row."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             UPDATE kb_resources SET security = %(security)s
@@ -117,7 +110,7 @@ async def set_extra(
     extra: resources_pb2.Extra,
 ) -> None:
     """Update only the extra column of an existing resource row."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             UPDATE kb_resources SET extra = %(extra)s
@@ -135,7 +128,7 @@ async def set_user_relations(
     user_relations: resources_pb2.Relations,
 ) -> None:
     """Update only the user_relations column of an existing resource row."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             UPDATE kb_resources SET user_relations = %(user_relations)s
@@ -147,7 +140,7 @@ async def set_user_relations(
 
 async def get_slug(txn: Transaction, kbid: str, rid: str) -> str | None:
     """Get the slug of a resource."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             SELECT slug FROM kb_resources
@@ -171,7 +164,7 @@ async def set_slug(
     Raises ConflictError if the slug already belongs to another resource in
     the same knowledge box.
     """
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         try:
             await cur.execute(
                 """
@@ -201,7 +194,7 @@ async def modify_slug(
     old_slug = await get_slug(txn, kbid=kbid, rid=rid)
     if old_slug is None:
         raise NotFoundError()
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         try:
             await cur.execute(
                 """
@@ -223,7 +216,7 @@ async def set_shard(
     shard: str,
 ) -> None:
     """Update only the shard column of an existing resource row."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             UPDATE kb_resources SET shard = %(shard)s
@@ -235,7 +228,7 @@ async def set_shard(
 
 async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
     """Delete a resource row (cascades to fields)."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             "DELETE FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
             {"kbid": kbid, "rid": rid},
@@ -249,7 +242,7 @@ async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
 
 async def exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
     """Return True if the resource exists."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT 1 FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
             {"kbid": kbid, "rid": rid},
@@ -259,7 +252,7 @@ async def exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
 
 async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str) -> str | None:
     """Return the resource UUID for the given slug within a KB, or None."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT rid FROM kb_resources WHERE kbid = %(kbid)s AND slug = %(slug)s",
             {"kbid": kbid, "slug": slug},
@@ -270,7 +263,7 @@ async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str)
 
 async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
     """Return True if a resource with the given slug exists within a KB."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT 1 FROM kb_resources WHERE kbid = %(kbid)s AND slug = %(slug)s",
             {"kbid": kbid, "slug": slug},
@@ -280,7 +273,7 @@ async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
 
 async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Basic | None:
     """Return the deserialised Basic for a resource, or None."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT slug, basic FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
             {"kbid": kbid, "rid": rid},
@@ -297,7 +290,7 @@ async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.B
 
 async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Origin | None:
     """Return the deserialised Origin for a resource, or None."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT origin FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
             {"kbid": kbid, "rid": rid},
@@ -312,7 +305,7 @@ async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.
 
 async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Security | None:
     """Return the deserialised Security for a resource, or None."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT security FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
             {"kbid": kbid, "rid": rid},
@@ -327,7 +320,7 @@ async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb
 
 async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Extra | None:
     """Return the deserialised Extra for a resource, or None."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT extra FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
             {"kbid": kbid, "rid": rid},
@@ -342,7 +335,7 @@ async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.E
 
 async def get_user_relations(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Relations | None:
     """Return the deserialised Relations for a resource, or None."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT user_relations FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
             {"kbid": kbid, "rid": rid},
@@ -358,7 +351,7 @@ async def get_user_relations(txn: Transaction, *, kbid: str, rid: str) -> resour
 async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
     """Iterate over all resource UUIDs in a knowledge box."""
     async with with_ro_transaction() as txn:
-        async with _pg(txn).connection.cursor() as cur:
+        async with _pg_cursor(txn) as cur:
             await cur.execute(
                 "SELECT rid FROM kb_resources WHERE kbid = %(kbid)s ORDER BY rid",
                 {"kbid": kbid},
@@ -369,7 +362,7 @@ async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
 
 async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
     """Return the total number of resources in a knowledge box."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT COUNT(*) FROM kb_resources WHERE kbid = %(kbid)s",
             {"kbid": kbid},
@@ -382,7 +375,7 @@ async def get_resource_shard_id(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
 ) -> str | None:
     """Return the shard ID for a resource, or None."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         sql = "SELECT shard FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s"
         if for_update:
             sql += " FOR UPDATE"
@@ -393,7 +386,7 @@ async def get_resource_shard_id(
 
 async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard: str) -> None:
     """Set the shard ID for a resource."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             "UPDATE kb_resources SET shard = %(shard)s WHERE kbid = %(kbid)s AND rid = %(rid)s",
             {"kbid": kbid, "rid": rid, "shard": shard},

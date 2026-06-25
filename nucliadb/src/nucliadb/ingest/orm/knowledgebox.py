@@ -372,6 +372,9 @@ class KnowledgeBox:
             if not exists:
                 return
 
+            # Delete from kbs table
+            await datamanagers.kb.kb_v2.delete(txn, kbid=kbid)
+
             # Delete main anchor
             kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
             if kb_config is not None:

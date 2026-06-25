@@ -41,6 +41,7 @@ from typing import Sequence, cast
 
 from google.protobuf.message import Message
 
+from nucliadb.common.datamanagers.utils import _pg_cursor
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.common.models_utils import from_proto, to_proto
@@ -71,7 +72,7 @@ async def set_status(
     status: wpb2.FieldStatus,
 ) -> None:
     """Update only the status column. Does nothing if the row does not exist."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             UPDATE kb_fields SET status = %(status)s
@@ -100,7 +101,7 @@ async def set(
     """
     Set the value of a field row, creating it if it does not exist. This is an upsert operation.
     """
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             INSERT INTO kb_fields (kbid, rid, field_type, field_id, value)
@@ -127,7 +128,7 @@ async def delete(
     field_id: str,
 ) -> None:
     """Delete a single field row."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             DELETE FROM kb_fields
@@ -157,7 +158,7 @@ async def get_raw(
     field_id: str,
 ) -> bytes | None:
     """Return only the serialised value bytes for a field, or None."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             SELECT value FROM kb_fields
@@ -186,7 +187,7 @@ async def get_status(
     field_id: str,
 ) -> wpb2.FieldStatus | None:
     """Return the deserialised FieldStatus for a field, or None if the row does not exist."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             SELECT status FROM kb_fields
@@ -219,18 +220,22 @@ async def get_statuses(
     if not fields:
         return []
 
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             f"""
             SELECT field_type, field_id, status
             FROM kb_fields
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
+            WHERE kbid = %s AND rid = %s
               AND (field_type, field_id) IN (
                 {",".join(["(%s, %s)"] * len(fields))}
               )
             """,
             [kbid, rid]
-            + [(from_proto.field_type_name(f.field_type).abbreviation(), f.field) for f in fields],
+            + [
+                item
+                for f in fields
+                for item in (from_proto.field_type_name(f.field_type).abbreviation(), f.field)
+            ],
         )
         rows = await cur.fetchall()
 
@@ -257,7 +262,7 @@ async def get_all_field_ids(
     rid: str,
 ) -> rpb2.AllFieldIDs | None:
     """Return the AllFieldIDs protobuf for a resource, or None if not set."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             SELECT field_type, field_id FROM kb_fields
@@ -284,7 +289,7 @@ async def has_field(
     field_id: rpb2.FieldID,
 ) -> bool:
     """Return True if a field row exists, False otherwise."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             SELECT 1 FROM kb_fields

@@ -41,6 +41,7 @@ because there is no FK from kb_conversations to kb_fields.
 
 from typing import cast
 
+from nucliadb.common.datamanagers.utils import _pg_cursor
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
@@ -68,7 +69,7 @@ async def get_metadata(
     field_id: str,
 ) -> FieldConversation | None:
     """Return the FieldConversation metadata for a conversation field, or None."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             SELECT value FROM kb_fields
@@ -94,7 +95,7 @@ async def set_metadata(
     metadata: FieldConversation,
 ) -> None:
     """Upsert the FieldConversation metadata row in kb_fields."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             INSERT INTO kb_fields (kbid, rid, field_type, field_id, value)
@@ -127,7 +128,7 @@ async def get_page(
     """Return one page of a conversation field, or None if not found."""
     if page <= 0:
         raise ValueError("Conversation pages start at index 1")
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             SELECT value FROM kb_conversations
@@ -156,7 +157,7 @@ async def set_page(
     """Upsert one page of a conversation field."""
     if page <= 0:
         raise ValueError("Conversation pages start at index 1")
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             INSERT INTO kb_conversations (kbid, rid, field_id, page, value)
@@ -187,7 +188,7 @@ async def get_splits_metadata(
     field_id: str,
 ) -> SplitsMetadata | None:
     """Return the SplitsMetadata for a conversation field, or None."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             SELECT value FROM kb_conversations
@@ -213,7 +214,7 @@ async def set_splits_metadata(
     splits_metadata: SplitsMetadata,
 ) -> None:
     """Upsert the SplitsMetadata sentinel row (page = 0) for a conversation field."""
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             INSERT INTO kb_conversations (kbid, rid, field_id, page, value)
@@ -249,7 +250,7 @@ async def delete_field(
     is handled by the fields datamanager; cascading from kb_resources only
     fires when the whole resource or KB is deleted.
     """
-    async with _pg(txn).connection.cursor() as cur:
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
             DELETE FROM kb_conversations
