@@ -119,16 +119,16 @@ async def test_local_driver(local_storage_tus: LocalBlobStore):
 async def storage_test(storage: BlobStore, file_storage_manager: FileStorageManager):
     example = b"mytestinfo"
     field = "myfield"
-    rid = "myrid"
-    kbid = "mykb_tus_test"
+    rid = str(uuid.uuid4())
+    kbid = str(uuid.uuid4())
 
     metadata: dict[str, str] = {"filename": "non-ascii is problematic - Ôñ"}
     bucket_name = storage.get_bucket_name(kbid)
     assert bucket_name in [
-        "test_mykb_tus_test",
-        "test-mykb-tus-test",
-        "ndb_mykb_tus_test",
-        "mykb_tus_test",
+        f"test_{kbid}",
+        f"test-{kbid}",
+        f"ndb_{kbid}",
+        kbid,
     ]
 
     assert await storage.check_exists(bucket_name) is False

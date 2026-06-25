@@ -19,6 +19,7 @@ applying to NucliaDB.
 
 """
 
+import uuid
 from unittest.mock import AsyncMock
 
 import botocore.exceptions
@@ -90,7 +91,8 @@ async def test_delete_bucket_conflict_string_code():
     )
     storage._s3aioclient.delete_bucket.side_effect = make_client_error("BucketNotEmpty", 409)
 
-    deleted, conflict = await storage.delete_kb("mykb")
+    mykb = str(uuid.uuid4())
+    deleted, conflict = await storage.delete_kb(mykb)
 
     assert deleted is False
     assert conflict is True
@@ -103,7 +105,8 @@ async def test_delete_bucket_conflict_numeric_string_code():
     )
     storage._s3aioclient.delete_bucket.side_effect = make_client_error("409", 409)
 
-    deleted, conflict = await storage.delete_kb("mykb")
+    mykb = str(uuid.uuid4())
+    deleted, conflict = await storage.delete_kb(mykb)
 
     assert deleted is False
     assert conflict is True
@@ -116,7 +119,8 @@ async def test_delete_bucket_nosuchbucket():
     )
     storage._s3aioclient.delete_bucket.side_effect = make_client_error("NoSuchBucket", 404)
 
-    deleted, conflict = await storage.delete_kb("mykb")
+    mykb = str(uuid.uuid4())
+    deleted, conflict = await storage.delete_kb(mykb)
 
     assert deleted is False
     assert conflict is False

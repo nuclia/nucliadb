@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import uuid
+
 import pytest
 
 from nucliadb.common import datamanagers
@@ -64,8 +66,8 @@ async def test_modify_slug(resource_with_slug, maindb_driver: Driver):
 
 
 async def test_all_fields(maindb_driver: Driver):
-    kbid = "mykb"
-    rid = "myresource"
+    kbid = str(uuid.uuid4())
+    rid = str(uuid.uuid4())
     field = resources_pb2.FieldID(field="myfield", field_type=resources_pb2.FieldType.LINK)
 
     async with maindb_driver.ro_transaction() as txn:
