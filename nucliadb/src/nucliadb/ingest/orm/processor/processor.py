@@ -945,7 +945,7 @@ async def compute_resource_status(
     field_ids = await datamanagers.resources.get_all_field_ids(
         txn, kbid=kbid, rid=uuid, for_update=False
     )
-    if field_ids is None:
+    if field_ids is None or not has_some_processed_fields(field_ids):
         # No fields, it is processed
         basic.metadata.status = resources_pb2.Metadata.Status.PROCESSED
         return
@@ -971,6 +971,20 @@ async def compute_resource_status(
     # Otherwise (everything processed or we only have DA errors) -> PROCESSED
     else:
         basic.metadata.status = resources_pb2.Metadata.Status.PROCESSED
+
+
+def has_some_processed_fields(field_ids: resources_pb2.AllFieldIDs) -> bool:
+    """
+    Returns True if the resource has at least one field. Title and summary fields are not considered fields for this purpose.
+    """
+    return any(
+        f
+        not in (
+            resources_pb2.FieldID(field="title", field_type=resources_pb2.FieldType.GENERIC),
+            resources_pb2.FieldID(field="summary", field_type=resources_pb2.FieldType.GENERIC),
+        )
+        for f in field_ids.fields
+    )
 
 
 def delete_basic_computedmetadata_classifications(basic: PBBasic, deleted_fields: list[FieldID]) -> bool:

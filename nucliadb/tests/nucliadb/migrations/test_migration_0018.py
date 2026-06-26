@@ -19,6 +19,8 @@
 #
 from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.kb import KB_SLUGS
 from nucliadb.common.maindb.driver import Driver
@@ -30,6 +32,7 @@ from tests.nucliadb.migrations import get_migration
 migration: Migration = get_migration(18)
 
 
+@pytest.mark.skip(reason="This migration is not needed anymore")
 async def test_migration_0018_global(maindb_driver: Driver):
     execution_context = Mock()
     execution_context.kv_driver = maindb_driver
