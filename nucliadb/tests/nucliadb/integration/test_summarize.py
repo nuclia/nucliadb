@@ -21,6 +21,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_models.search import SummarizedResponse
 
 
@@ -54,8 +55,9 @@ async def test_summarize(
     resources = resource_uuids[0:9] + resource_slugs[10:]
 
     # Summarize all of them
+    non_existent = Resource.new_unique_rid()
     resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/summarize", json={"resources": [*resources, "non-existent"]}
+        f"/kb/{kbid}/summarize", json={"resources": [*resources, non_existent]}
     )
     assert resp.status_code == 200, resp.text
 

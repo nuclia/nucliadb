@@ -17,13 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import Any
 
 import pytest
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
-from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.driver import Driver, Transaction
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import writer_pb2
 
 
@@ -34,7 +34,7 @@ async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
     update the information about writable shards.
 
     """
-    kbid = f"kbid:{test_shard_creation.__name__}"
+    kbid = KnowledgeBox.new_unique_kbid()
     sm = manager.KBShardManager()
 
     # Fake KB shards instead of creating a KB to generate it
@@ -82,15 +82,6 @@ async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
 
 
 @pytest.fixture
-def txn():
-    class MockTransaction:
-        def __init__(self):
-            self.store = {}
-
-        async def get(self, key: str, for_update=False) -> Any | None:
-            return self.store.get(key, None)
-
-        async def set(self, key: str, value: Any):
-            self.store[key] = value
-
-    yield MockTransaction()
+async def txn(maindb_driver: Driver):
+    async with maindb_driver.rw_transaction() as txn:
+        yield txn

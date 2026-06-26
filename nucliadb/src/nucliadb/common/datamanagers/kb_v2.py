@@ -45,12 +45,14 @@ async def set_config(
     kbid: str,
     config: knowledgebox_pb2.KnowledgeBoxConfig,
 ) -> None:
-    """Update only the config column of an existing KB row."""
+    """Upsert the config column, creating the KB row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            UPDATE kbs SET config = %(config)s
-            WHERE kbid = %(kbid)s
+            INSERT INTO kbs (kbid, config)
+            VALUES (%(kbid)s, %(config)s)
+            ON CONFLICT (kbid) DO UPDATE SET
+                config = EXCLUDED.config
             """,
             {"kbid": kbid, "config": config.SerializeToString()},
         )
@@ -85,12 +87,14 @@ async def update_kb_shards(
     kbid: str,
     shards: writer_pb2.Shards,
 ) -> None:
-    """Update the shards column of a KB row."""
+    """Upsert the shards column, creating the KB row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            UPDATE kbs SET shards = %(shards)s
-            WHERE kbid = %(kbid)s
+            INSERT INTO kbs (kbid, shards)
+            VALUES (%(kbid)s, %(shards)s)
+            ON CONFLICT (kbid) DO UPDATE SET
+                shards = EXCLUDED.shards
             """,
             {"kbid": kbid, "shards": shards.SerializeToString()},
         )
