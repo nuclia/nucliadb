@@ -26,6 +26,7 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.processing import DummyProcessingEngine
 from nucliadb.models.internal.processing import PushMessageFormat, PushPayload
 from nucliadb.reader.api.models import ResourceField
@@ -1156,8 +1157,9 @@ async def test_delete_conversation_message_lambs_resource(
     # Verify error cases
 
     # Non-existent resource
+    nonexistent_rid = ORMResource.new_unique_rid()
     resp = await nucliadb_writer.delete(
-        f"/kb/{kbid}/resource/nonexistent-rid/conversation/lambs/messages/6",
+        f"/kb/{kbid}/resource/{nonexistent_rid}/conversation/lambs/messages/6",
     )
     assert resp.status_code == 404
 
