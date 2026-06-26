@@ -411,7 +411,6 @@ class Resource:
         errors_by_field: dict[tuple[FieldType.ValueType, str], list[writer_pb2.Error]] = defaultdict(
             list
         )
-
         # Make sure if a file is updated without errors, it ends up in errors_by_field
         for field_id in updated_fields:
             errors_by_field[(field_id.field_type, field_id.field)] = []
