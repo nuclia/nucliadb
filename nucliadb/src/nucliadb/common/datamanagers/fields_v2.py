@@ -75,9 +75,10 @@ async def set_status(
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            UPDATE kb_fields SET status = %(status)s
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_type = %(field_type)s AND field_id = %(field_id)s
+            INSERT INTO kb_fields (kbid, rid, field_type, field_id, status)
+            VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(status)s)
+            ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
+                status = EXCLUDED.status
             """,
             {
                 "kbid": kbid,
@@ -230,12 +231,7 @@ async def get_statuses(
                 {",".join(["(%s, %s)"] * len(fields))}
               )
             """,
-            [kbid, rid]
-            + [
-                item
-                for f in fields
-                for item in (from_proto.field_type_name(f.field_type).abbreviation(), f.field)
-            ],
+            [kbid, rid] + [item for f in fields for item in (_to_abbr(f.field_type), f.field)],
         )
         rows = await cur.fetchall()
 
@@ -244,7 +240,7 @@ async def get_statuses(
 
     result = []
     for f in fields:
-        status_bytes = status_lookup.get((f.field_type, f.field))
+        status_bytes = status_lookup.get((_to_abbr(f.field_type), f.field))
         if status_bytes is None:
             result.append(wpb2.FieldStatus())  # Default empty status
         else:
@@ -253,6 +249,11 @@ async def get_statuses(
             result.append(pb)
 
     return result
+
+
+def _to_abbr(field_type: rpb2.FieldType.ValueType) -> str:
+    """Convert a FieldType enum to its single-character abbreviation."""
+    return from_proto.field_type_name(field_type).abbreviation()
 
 
 async def get_all_field_ids(

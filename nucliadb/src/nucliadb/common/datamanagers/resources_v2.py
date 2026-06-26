@@ -79,12 +79,14 @@ async def set_origin(
     rid: str,
     origin: resources_pb2.Origin,
 ) -> None:
-    """Update only the origin column of an existing resource row."""
+    """Upsert the origin column, creating the row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            UPDATE kb_resources SET origin = %(origin)s
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
+            INSERT INTO kb_resources (kbid, rid, origin)
+            VALUES (%(kbid)s, %(rid)s, %(origin)s)
+            ON CONFLICT (kbid, rid) DO UPDATE SET
+                origin = EXCLUDED.origin
             """,
             {"kbid": kbid, "rid": rid, "origin": origin.SerializeToString()},
         )
@@ -97,12 +99,14 @@ async def set_security(
     rid: str,
     security: resources_pb2.Security,
 ) -> None:
-    """Update only the security column of an existing resource row."""
+    """Upsert the security column, creating the row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            UPDATE kb_resources SET security = %(security)s
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
+            INSERT INTO kb_resources (kbid, rid, security)
+            VALUES (%(kbid)s, %(rid)s, %(security)s)
+            ON CONFLICT (kbid, rid) DO UPDATE SET
+                security = EXCLUDED.security
             """,
             {"kbid": kbid, "rid": rid, "security": security.SerializeToString()},
         )
@@ -115,12 +119,14 @@ async def set_extra(
     rid: str,
     extra: resources_pb2.Extra,
 ) -> None:
-    """Update only the extra column of an existing resource row."""
+    """Upsert the extra column, creating the row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            UPDATE kb_resources SET extra = %(extra)s
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
+            INSERT INTO kb_resources (kbid, rid, extra)
+            VALUES (%(kbid)s, %(rid)s, %(extra)s)
+            ON CONFLICT (kbid, rid) DO UPDATE SET
+                extra = EXCLUDED.extra
             """,
             {"kbid": kbid, "rid": rid, "extra": extra.SerializeToString()},
         )
@@ -133,12 +139,14 @@ async def set_user_relations(
     rid: str,
     user_relations: resources_pb2.Relations,
 ) -> None:
-    """Update only the user_relations column of an existing resource row."""
+    """Upsert the user_relations column, creating the row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            UPDATE kb_resources SET user_relations = %(user_relations)s
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
+            INSERT INTO kb_resources (kbid, rid, user_relations)
+            VALUES (%(kbid)s, %(rid)s, %(user_relations)s)
+            ON CONFLICT (kbid, rid) DO UPDATE SET
+                user_relations = EXCLUDED.user_relations
             """,
             {"kbid": kbid, "rid": rid, "user_relations": user_relations.SerializeToString()},
         )
@@ -216,19 +224,21 @@ async def modify_slug(
             raise ConflictError(f"Slug '{new_slug}' already exists")
 
 
-async def set_shard(
+async def set_resource_shard_id(
     txn: Transaction,
     *,
     kbid: str,
     rid: str,
     shard: str,
 ) -> None:
-    """Update only the shard column of an existing resource row."""
+    """Upsert the shard column, creating the row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            UPDATE kb_resources SET shard = %(shard)s
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
+            INSERT INTO kb_resources (kbid, rid, shard)
+            VALUES (%(kbid)s, %(rid)s, %(shard)s)
+            ON CONFLICT (kbid, rid) DO UPDATE SET
+                shard = EXCLUDED.shard
             """,
             {"kbid": kbid, "rid": rid, "shard": shard},
         )
@@ -390,12 +400,3 @@ async def get_resource_shard_id(
         await cur.execute(sql, {"kbid": kbid, "rid": rid})
         row = await cur.fetchone()
         return row[0] if row is not None else None
-
-
-async def set_resource_shard_id(txn: Transaction, *, kbid: str, rid: str, shard: str) -> None:
-    """Set the shard ID for a resource."""
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            "UPDATE kb_resources SET shard = %(shard)s WHERE kbid = %(kbid)s AND rid = %(rid)s",
-            {"kbid": kbid, "rid": rid, "shard": shard},
-        )

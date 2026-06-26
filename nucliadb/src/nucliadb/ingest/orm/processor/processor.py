@@ -656,6 +656,7 @@ class Processor:
         """
         with processor_observer({"type": "apply_field_values"}):
             await resource.apply_field_values(message)
+
         with processor_observer({"type": "apply_field_extracted_data"}):
             await resource.apply_field_extracted_data(message)
 
