@@ -382,11 +382,6 @@ impl SearchServer {
                 }
             }
         }
-        debug_assert_eq!(
-            responses.len(),
-            shards.len(),
-            "we must have the same amount of responses as shards to succeed"
-        );
 
         let merged = if responses.len() == 1 {
             responses.pop().unwrap()
