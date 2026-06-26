@@ -14,6 +14,7 @@
 //
 
 mod date_range_search;
+mod distributed_search;
 mod initial_sync;
 mod search_filtering;
 mod search_json_filter;
