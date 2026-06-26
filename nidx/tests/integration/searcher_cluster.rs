@@ -13,40 +13,18 @@
 // limitations under the License.
 //
 
-use crate::common::services::NidxFixture;
-use nidx::Settings;
-use nidx::grpc_server::GrpcServer;
-use nidx::searcher::{ListNodes, SyncedSearcher, grpc::SearchServer, shard_selector::ShardSelector};
-use nidx::settings::SearcherSettings;
 use nidx_protos::SearchRequest;
 use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
-use nidx_protos::nidx_api_client::NidxApiClient;
-use nidx_protos::{NewShardRequest, VectorIndexConfig};
 
 use sqlx::PgPool;
 use std::collections::HashMap;
-use std::sync::Mutex;
-use std::{sync::Arc, time::Duration};
-use tempfile::tempdir;
-use tokio_util::sync::CancellationToken;
+use std::time::Duration;
 use tonic::Request;
-use tonic::transport::Channel;
 use uuid::Uuid;
 
-#[derive(Debug)]
-struct ManualListNodes(Arc<Mutex<Vec<String>>>, usize);
-impl ListNodes for ManualListNodes {
-    fn list_nodes(&self) -> Vec<String> {
-        self.0.lock().unwrap().clone()
-    }
-
-    fn this_node(&self) -> String {
-        self.list_nodes()
-            .get(self.1)
-            .cloned()
-            .unwrap_or("out_of_cluster".to_string())
-    }
-}
+use crate::common::cluster::{NetworkAvailability, SearcherCluster, Topology};
+use crate::common::services::NidxFixture;
+use crate::common::utils::create_shards;
 
 #[sqlx::test]
 async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Result<()> {
@@ -292,172 +270,4 @@ async fn test_search_cluster_shards_not_accessible(pool: PgPool) -> anyhow::Resu
     }
 
     Ok(())
-}
-
-struct SearcherCluster {
-    pub searchers: Vec<Option<Searcher>>,
-    nodes: Arc<Mutex<Vec<String>>>,
-    settings: Settings,
-    shard_replication: usize,
-}
-
-type SearcherId = usize;
-
-// Each searcher has it's own view on the cluster, not shared with the rest
-#[derive(Debug)]
-struct Searcher {
-    port: u16,
-    shutdown: CancellationToken,
-}
-
-struct Topology {
-    // Number of nodes in the cluster
-    nodes: usize,
-
-    // Number of nodes that have a replica of a shard
-    shard_replication: usize,
-
-    // When defined, the network describes which nodes are reachable from every
-    // node in the cluster. By default, everyone sees everyone.
-    //
-    // Changes on the network can be used to simluate network partitions, nodes
-    // being down...
-    network: Vec<NetworkAvailability>,
-}
-
-#[derive(Clone, Debug)]
-enum NetworkAvailability {
-    Connected,
-    Isolated,
-}
-
-impl SearcherCluster {
-    pub async fn new(settings: Settings, topology: Topology) -> anyhow::Result<Self> {
-        assert_eq!(
-            topology.nodes,
-            topology.network.len(),
-            "number of nodes and network configurations mismatch"
-        );
-
-        let mut cluster = Self {
-            searchers: Vec::new(),
-            nodes: Arc::new(Mutex::new(Vec::new())),
-            settings,
-            shard_replication: topology.shard_replication,
-        };
-
-        for availability in topology.network {
-            cluster.grow(availability).await?;
-        }
-        tokio::time::sleep(cluster.refresh_interval()).await;
-
-        Ok(cluster)
-    }
-
-    pub fn size(&self) -> usize {
-        self.searchers.len()
-    }
-
-    pub async fn grow(&mut self, availability: NetworkAvailability) -> anyhow::Result<()> {
-        let server = GrpcServer::new("localhost:0").await?;
-        let port = server.port()?;
-
-        let work_dir = tempdir()?;
-        let searcher = SyncedSearcher::new(self.settings.metadata.clone(), work_dir.path());
-
-        let address = match availability {
-            NetworkAvailability::Connected => format!("localhost:{port}"),
-            NetworkAvailability::Isolated => format!("unreachable:{port}"),
-        };
-        let node_id = {
-            let mut nodes = self.nodes.lock().unwrap();
-            nodes.push(address);
-            nodes.len() - 1
-        };
-        let list_nodes = Arc::new(ManualListNodes(self.nodes.clone(), node_id));
-
-        let searcher_api = SearchServer::new(
-            searcher.index_cache(),
-            ShardSelector::new(Arc::clone(&list_nodes) as Arc<dyn ListNodes>, self.shard_replication),
-        );
-        let shutdown = CancellationToken::new();
-        {
-            let settings = self.settings.clone();
-            let shutdown = shutdown.clone();
-            let num_replicas = self.shard_replication;
-            tokio::task::spawn(server.serve(searcher_api.into_router(), shutdown.clone()));
-            tokio::task::spawn(async move {
-                searcher
-                    .run(
-                        settings.storage.as_ref().unwrap().object_store.clone(),
-                        settings.searcher.clone().unwrap_or_default(),
-                        shutdown,
-                        ShardSelector::new(Arc::clone(&list_nodes) as Arc<dyn ListNodes>, num_replicas),
-                        None,
-                        None,
-                    )
-                    .await
-            });
-        }
-
-        self.searchers.push(Some(Searcher { port, shutdown }));
-        Ok(())
-    }
-
-    /// Grow the cluster adding a fake node. This will cause shards to be repartitioned with the new
-    /// node, but it's not accessible (there's no gRPC server)
-    pub fn grow_fake(&mut self, name: String) {
-        self.nodes.lock().unwrap().push(name);
-        self.searchers.push(None);
-    }
-
-    /// Gracefully shutdown a searcher node. This will keep it part of the cluster but unavailable
-    /// to the rest. This operation can't be reversed
-    pub async fn shutdown(&mut self, id: SearcherId) {
-        todo!()
-    }
-
-    /// Shrink the cluster by scaling down. This will remove a node from the cluster and shards will
-    /// be repartitioned across the rest.
-    pub fn shrink(&mut self) -> Option<Searcher> {
-        assert!(!self.searchers.is_empty(), "can't shrink an empty cluster");
-        let searcher = self.searchers.pop().unwrap();
-        self.nodes.lock().unwrap().pop().unwrap();
-        searcher
-    }
-
-    pub fn refresh_interval(&self) -> Duration {
-        let refresh_interval = self.settings.searcher.as_ref().map_or_else(
-            || SearcherSettings::default().metadata_refresh_interval,
-            |s| s.metadata_refresh_interval,
-        );
-        Duration::from_secs_f32(refresh_interval + 0.1)
-    }
-}
-
-impl Searcher {
-    pub fn address(&self) -> String {
-        format!("localhost:{}", self.port)
-    }
-}
-
-async fn create_shards(api_client: &mut NidxApiClient<Channel>, count: usize) -> anyhow::Result<Vec<Uuid>> {
-    let mut shards = Vec::with_capacity(count);
-    for _ in 0..count {
-        let response = api_client
-            .new_shard(Request::new(NewShardRequest {
-                kbid: "aabbccddeeff11223344556677889900".to_string(),
-                vectorsets_configs: HashMap::from([(
-                    "english".to_string(),
-                    VectorIndexConfig {
-                        vector_dimension: Some(3),
-                        ..Default::default()
-                    },
-                )]),
-                ..Default::default()
-            }))
-            .await?;
-        shards.push(uuid::Uuid::parse_str(&response.into_inner().id).unwrap());
-    }
-    Ok(shards)
 }
