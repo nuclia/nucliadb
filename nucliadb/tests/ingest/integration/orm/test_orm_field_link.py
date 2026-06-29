@@ -20,6 +20,7 @@
 from datetime import datetime
 from uuid import uuid4
 
+from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import FieldLink as PBFieldLink
@@ -28,7 +29,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_field_link(
-    storage: Storage, cache, dummy_nidx_utility, knowledgebox: str, maindb_driver
+    storage: Storage, cache, dummy_nidx_utility, knowledgebox: str, maindb_driver: Driver
 ):
     async with maindb_driver.rw_transaction() as txn:
         uuid = str(uuid4())

@@ -23,12 +23,9 @@ from functools import partial
 from typing import Any
 from uuid import uuid4
 
-from grpc import StatusCode
-from grpc.aio import AioRpcError
 from nidx_protos import nidx_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers, file_md5
-from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 
 # XXX: this keys shouldn't be exposed outside datamanagers
@@ -372,9 +369,6 @@ class KnowledgeBox:
             if not exists:
                 return
 
-            # Delete from kbs table
-            await datamanagers.kb.kb_v2.delete(txn, kbid=kbid)
-
             # Delete main anchor
             kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
             if kb_config is not None:
@@ -389,6 +383,8 @@ class KnowledgeBox:
             await txn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
 
             shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+
+            await datamanagers.kb.kb_v2.soft_delete(txn, kbid=kbid)
 
             await txn.commit()
 
@@ -433,44 +429,23 @@ class KnowledgeBox:
         exists = await storage.schedule_delete_kb(kbid)
         if exists is False:
             logger.error(f"{kbid} KB does not exists on Storage")
-
-        nidx_api = get_nidx_api_client()
-
         async with driver.rw_transaction() as txn:
             storage_to_delete = KB_TO_DELETE_STORAGE.format(kbid=kbid)
             await txn.set(storage_to_delete, b"")
-
             await catalog_delete_kb(txn, kbid)
-
             await file_md5.delete(txn, kbid=kbid)
-
-            # Delete KB Shards
-            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-            if shards_obj is None:
-                logger.warning(f"Shards not found for KB while purging it", extra={"kbid": kbid})
-            else:
-                for shard in shards_obj.shards:
-                    if shard.nidx_shard_id:
-                        try:
-                            await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
-                            logger.debug(
-                                f"Succeded deleting shard",
-                                extra={"kbid": kbid, "shard_id": shard.nidx_shard_id},
-                            )
-                        except AioRpcError as exc:
-                            if exc.code() == StatusCode.NOT_FOUND:
-                                continue
-                            raise ShardNotFound(f"{exc.details()} @ shard {shard.nidx_shard_id}")
-
             await txn.commit()
-        await cls.delete_all_kb_keys(driver, kbid)
+
+        # Delete by prefix in another transaction, as it can be slow and we don't want to block the previous one
+        async with driver.rw_transaction() as txn:
+            await cls.delete_all_kb_keys(txn, kbid)
+            await txn.commit()
 
     @classmethod
-    async def delete_all_kb_keys(cls, driver: Driver, kbid: str, chunk_size: int = 1_000):
+    async def delete_all_kb_keys(cls, txn: Transaction, kbid: str):
         prefix = KB_KEYS.format(kbid=kbid)
-        async with driver.rw_transaction() as txn:
-            await txn.delete_by_prefix(prefix)
-            await txn.commit()
+        await txn.delete_by_prefix(prefix)
+        await datamanagers.kb.kb_v2.delete(txn, kbid=kbid)
 
     async def get_resource_shard(self, shard_id: str) -> writer_pb2.ShardObject | None:
         async with datamanagers.with_ro_transaction() as txn:

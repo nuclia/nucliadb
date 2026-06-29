@@ -233,7 +233,7 @@ async def test_knowledgebox_delete_all_kb_keys(
     storage,
     cache,
     dummy_nidx_utility,
-    maindb_driver,
+    maindb_driver: Driver,
     knowledgebox: str,
 ):
     async with maindb_driver.rw_transaction() as txn:
@@ -262,7 +262,9 @@ async def test_knowledgebox_delete_all_kb_keys(
         await txn.abort()
 
     # Now delete all kb keys
-    await KnowledgeBox.delete_all_kb_keys(maindb_driver, kbid, chunk_size=10)
+    async with maindb_driver.rw_transaction() as txn:
+        await KnowledgeBox.delete_all_kb_keys(txn, kbid)
+        await txn.commit()
 
     # Check that all of them were deleted
     async with maindb_driver.ro_transaction() as txn:

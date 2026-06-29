@@ -67,6 +67,15 @@ async def delete(txn: Transaction, *, kbid: str) -> None:
         )
 
 
+async def soft_delete(txn: Transaction, *, kbid: str) -> None:
+    """Soft delete a KB row by setting its slug to NULL"""
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(
+            "UPDATE kbs SET slug = NULL WHERE kbid = %(kbid)s",
+            {"kbid": kbid},
+        )
+
+
 async def set_kbid_for_slug(txn: Transaction, *, slug: str, kbid: str) -> None:
     """Set the slug for a given kbid, overwriting any existing slug. This is used when migrating from the old slug-based system to the new kbid-based system."""
     async with _pg_cursor(txn) as cur:
@@ -109,10 +118,12 @@ async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
     """Return True if a KB with the given kbid exists."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
-            "SELECT 1 FROM kbs WHERE kbid = %(kbid)s",
+            "SELECT slug FROM kbs WHERE kbid = %(kbid)s",
             {"kbid": kbid},
         )
-        return await cur.fetchone() is not None
+        row = await cur.fetchone()
+        # Return False if row does not exist or if slug is NULL (KB has been deleted)
+        return row is not None and row[0] is not None
 
 
 async def get_config(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.KnowledgeBoxConfig | None:
@@ -154,7 +165,8 @@ async def get_kbs(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[t
                 "SELECT kbid, slug FROM kbs ORDER BY kbid",
             )
         async for row in cur:
-            yield (str(row[0]), row[1])
+            if row[1] is not None:  # Only yield KBs that have a slug (i.e., not soft-deleted)
+                yield (str(row[0]), row[1])
 
 
 async def get_kb_shards(
