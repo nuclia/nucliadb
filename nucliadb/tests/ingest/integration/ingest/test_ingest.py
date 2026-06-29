@@ -642,9 +642,9 @@ async def test_ingest_processor_handles_missing_kb(
     processor,
     test_resource: Resource,
 ):
-    kbid = str(uuid4())
-    rid = str(uuid4())
-    message = make_message(kbid, rid)
+    unexisting_kbid = KnowledgeBox.new_unique_kbid()
+    unexisting_rid = str(uuid4())
+    message = make_message(unexisting_kbid, unexisting_rid)
     message.account_seq = 1
     await processor.process(message=message, seqid=1)
 
