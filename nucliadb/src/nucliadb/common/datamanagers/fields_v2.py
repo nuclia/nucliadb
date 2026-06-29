@@ -268,6 +268,7 @@ async def get_all_field_ids(
             """
             SELECT field_type, field_id FROM kb_fields
             WHERE kbid = %(kbid)s AND rid = %(rid)s
+              AND NOT (field_type = 'a' AND field_id IN ('title', 'summary'))
             """,
             {"kbid": kbid, "rid": rid},
         )
