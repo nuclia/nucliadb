@@ -34,6 +34,7 @@ async def test_get_paragraph_text(storage, cache, txn, dummy_nidx_utility, proce
     rid = Resource.new_unique_rid()
     basic = Basic(slug="slug", uuid=rid)
     await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
+    await datamanagers.resources.set_slug(txn, kbid=kbid, rid=rid, slug="slug")
     kb = KnowledgeBox(txn, storage, kbid)
     orm_resource = await kb.get(rid)
     assert orm_resource
