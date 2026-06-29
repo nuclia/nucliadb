@@ -27,7 +27,7 @@ This avoids a separate table and keeps the hash co-located with the field data,
 relying on the existing index on (kbid, md5) in kb_fields for efficient lookups.
 """
 
-from typing import cast
+from typing import cast, overload
 
 from nucliadb.common.datamanagers.utils import _pg_cursor
 from nucliadb.common.maindb.driver import Transaction
@@ -50,18 +50,60 @@ async def exists(*, kbid: str, md5: str) -> bool:
         return cur.rowcount > 0
 
 
-async def set(txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str) -> None:
-    """Set the MD5 hash on the kb_fields row for the given file field.
-
-    The field row is expected to already exist (created by fields_v2.set in the
-    same transaction). If it does not exist for any reason the UPDATE is a no-op.
-    """
+async def set(
+    txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str, field_type: str = "f"
+) -> None:
+    """Set the MD5 hash on the kb_fields row for the given file field."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            UPDATE kb_fields SET md5 = %(md5)s
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_type = 'f' AND field_id = %(field_id)s
+            INSERT INTO kb_fields (kbid, rid, field_type, field_id, md5)
+            VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(md5)s)
+            ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
+                md5 = EXCLUDED.md5
             """,
-            {"kbid": kbid, "md5": md5, "rid": rid, "field_id": field_id},
+            {"kbid": kbid, "md5": md5, "rid": rid, "field_id": field_id, "field_type": field_type},
+        )
+
+
+@overload
+async def delete(txn: Transaction, *, kbid: str) -> None: ...
+
+
+@overload
+async def delete(txn: Transaction, *, kbid: str, rid: str) -> None: ...
+
+
+@overload
+async def delete(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None: ...
+
+
+async def delete(
+    txn: Transaction,
+    *,
+    kbid: str,
+    rid: str | None = None,
+    field_id: str | None = None,
+    field_type: str = "f",
+) -> None:
+    """Clear the MD5 hash for a specific file field.
+
+    - kbid + rid + field_id: nulls out the md5 column for that field row.
+    - kbid only / kbid + rid: no-op — when a KB or resource is being deleted,
+      the kb_fields rows are removed by ON DELETE CASCADE, so there is no need
+      to UPDATE them first (doing so would write a new MVCC row version for
+      every matching field only for it to be immediately dead-tupled away).
+    """
+    if field_id is None:
+        # Rows will be removed by CASCADE; nothing to do.
+        return
+
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(
+            """
+            UPDATE kb_fields SET md5 = NULL
+            WHERE kbid = %(kbid)s AND rid = %(rid)s
+              AND field_type = %(field_type)s AND field_id = %(field_id)s
+            """,
+            {"kbid": kbid, "rid": rid, "field_id": field_id, "field_type": field_type},
         )

@@ -67,12 +67,15 @@ async def migrate(txn: PGTransaction) -> None:
 
     kb_conversations
     ----------------
-    One row per page of a conversation field.  Foreign-keyed to kb_resources so
-    that deleting a resource (or its parent KB) cascades automatically.
+    One row per page of a conversation field.  Foreign-keyed to kb_fields on
+    (kbid, rid, field_type, field_id) so that deleting a conversation field row
+    from kb_fields automatically removes all its pages (ON DELETE CASCADE).
     The FieldConversation metadata is kept in kb_fields.value; this table holds
     only the paginated message data and the splits index.
-      - kbid       FK → kb_resources.kbid
-      - rid        FK → kb_resources.rid
+      - kbid       FK → kb_fields.kbid
+      - rid        FK → kb_fields.rid
+      - field_type Always 'c' (enforced by CHECK constraint); included so the
+                   FK can reference the full kb_fields primary key
       - field_id   User-defined conversation field name
       - page       Page number (1-based).  The sentinel value 0 stores the
                    serialised SplitsMetadata protobuf (maps message ident →
@@ -171,14 +174,15 @@ async def migrate(txn: PGTransaction) -> None:
         # ------------------------------------------------------------------
         await cur.execute("""
             CREATE TABLE IF NOT EXISTS kb_conversations (
-                kbid     UUID    NOT NULL,
-                rid      UUID    NOT NULL,
-                field_id TEXT    NOT NULL,
-                page     INTEGER NOT NULL,
-                value    BYTEA,
+                kbid       UUID    NOT NULL,
+                rid        UUID    NOT NULL,
+                field_type TEXT    NOT NULL DEFAULT 'c' CHECK (field_type = 'c'),
+                field_id   TEXT    NOT NULL,
+                page       INTEGER NOT NULL,
+                value      BYTEA,
                 PRIMARY KEY (kbid, rid, field_id, page),
-                FOREIGN KEY (kbid, rid)
-                    REFERENCES kb_resources (kbid, rid) ON DELETE CASCADE
+                FOREIGN KEY (kbid, rid, field_type, field_id)
+                    REFERENCES kb_fields (kbid, rid, field_type, field_id) ON DELETE CASCADE
             );
         """)
 
