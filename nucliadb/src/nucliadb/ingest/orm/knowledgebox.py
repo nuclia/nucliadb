@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from collections.abc import AsyncGenerator, Callable, Coroutine, Sequence
+from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import datetime
 from functools import partial
 from typing import Any
@@ -602,10 +602,6 @@ class KnowledgeBox:
         stored: StoredExternalIndexProviderMetadata,
     ) -> None:
         return
-
-
-def chunker(seq: Sequence, size: int):
-    return (seq[pos : pos + size] for pos in range(0, len(seq), size))
 
 
 def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:
