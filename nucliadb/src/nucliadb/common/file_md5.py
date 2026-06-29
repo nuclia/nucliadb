@@ -21,6 +21,8 @@
 import logging
 from typing import cast, overload
 
+from nucliadb.common import file_md5_v2
+from nucliadb.common.datamanagers.utils import datamanagers_v2_read, datamanagers_v2_write
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.common.maindb.utils import get_driver
@@ -42,6 +44,9 @@ def _pg_transaction(txn: Transaction) -> PGTransaction:
 @observer.wrap({"op": "check"})
 async def exists(*, kbid: str, md5: str) -> bool:
     """Check if a file with the given MD5 hash already exists in the KB."""
+    if datamanagers_v2_read(kbid):
+        return await file_md5_v2.exists(kbid=kbid, md5=md5)
+
     pg = _pg_driver()
     async with pg._get_connection() as conn, conn.cursor() as cur:
         await cur.execute(
@@ -64,6 +69,9 @@ async def set(txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str)
             """,
             {"kbid": kbid, "md5": md5, "rid": rid, "field_id": f"f/{field_id}"},
         )
+
+    if datamanagers_v2_write(kbid):
+        await file_md5_v2.set(txn, kbid=kbid, md5=md5, rid=rid, field_id=field_id)
 
 
 @overload
