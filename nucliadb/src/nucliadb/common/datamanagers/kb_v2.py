@@ -59,7 +59,7 @@ async def set_config(
 
 
 async def delete(txn: Transaction, *, kbid: str) -> None:
-    """Delete a KB row (cascades to kb_resources and fields)."""
+    """Fully delete a KB row and all its associated resources, fields, and conversations."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "DELETE FROM kbs WHERE kbid = %(kbid)s",
@@ -68,10 +68,10 @@ async def delete(txn: Transaction, *, kbid: str) -> None:
 
 
 async def soft_delete(txn: Transaction, *, kbid: str) -> None:
-    """Soft delete a KB row by setting its slug to NULL"""
+    """Soft delete a KB row by clearing its slug and stamping deleted_at with the current time."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
-            "UPDATE kbs SET slug = NULL WHERE kbid = %(kbid)s",
+            "UPDATE kbs SET slug = NULL, deleted_at = NOW() WHERE kbid = %(kbid)s",
             {"kbid": kbid},
         )
 
@@ -115,15 +115,18 @@ async def update_kb_shards(
 
 
 async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
-    """Return True if a KB with the given kbid exists."""
+    """Return True if a KB with the given kbid exists, has a slug, and has not been soft-deleted."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
-            "SELECT slug FROM kbs WHERE kbid = %(kbid)s",
+            """
+            SELECT 1 FROM kbs
+            WHERE kbid = %(kbid)s
+              AND slug IS NOT NULL
+              AND deleted_at IS NULL
+            """,
             {"kbid": kbid},
         )
-        row = await cur.fetchone()
-        # Return False if row does not exist or if slug is NULL (KB has been deleted)
-        return row is not None and row[0] is not None
+        return await cur.fetchone() is not None
 
 
 async def get_config(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.KnowledgeBoxConfig | None:

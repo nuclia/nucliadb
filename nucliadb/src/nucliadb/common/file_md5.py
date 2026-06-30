@@ -107,12 +107,18 @@ async def delete(
                 "DELETE FROM file_md5 WHERE kbid = %(kbid)s",
                 {"kbid": kbid},
             )
+        if datamanagers_v2_write(kbid):
+            await file_md5_v2.delete(txn, kbid=kbid)
+
     elif field_id is None:
         async with pg_txn.connection.cursor() as cur:
             await cur.execute(
                 "DELETE FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s",
                 {"kbid": kbid, "rid": rid},
             )
+        if datamanagers_v2_write(kbid):
+            await file_md5_v2.delete(txn, kbid=kbid, rid=rid)
+
     else:
         async with pg_txn.connection.cursor() as cur:
             await cur.execute(
@@ -123,3 +129,5 @@ async def delete(
                     "field_id": f"f/{field_id}",
                 },
             )
+        if datamanagers_v2_write(kbid):
+            await file_md5_v2.delete(txn, kbid=kbid, rid=rid, field_id=field_id)

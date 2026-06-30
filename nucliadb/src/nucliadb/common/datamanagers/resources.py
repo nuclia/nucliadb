@@ -347,3 +347,13 @@ async def has_field(txn: Transaction, *, kbid: str, rid: str, field_id: resource
         if field_id == resource_field_id:
             return True
     return False
+
+
+async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
+    basic = await get_basic(txn, kbid=kbid, rid=rid)
+    if basic and basic.slug:
+        await txn.delete(KB_RESOURCE_SLUG.format(kbid=kbid, slug=basic.slug))
+    await txn.delete_by_prefix(KB_RESOURCE_BASIC.format(kbid=kbid, uuid=rid))
+
+    if datamanagers_v2_write(kbid):
+        await resources_v2.delete(txn, kbid=kbid, rid=rid)

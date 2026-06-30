@@ -21,7 +21,7 @@
 Datamanager for the `kb_resources` PostgreSQL table (migration 0016).
 
 Each row represents one resource in a knowledge box and stores:
-  - kbid           - FK → kbs.kbid (ON DELETE CASCADE)
+  - kbid           - FK → kbs.kbid (ON DELETE RESTRICT)
   - rid            - resource UUID
   - slug           - optional human-readable identifier
   - shard          - shard ID the resource belongs to
@@ -32,6 +32,7 @@ Each row represents one resource in a knowledge box and stores:
   - user_relations - serialised resources_pb2.Relations
 """
 
+import uuid
 from collections.abc import AsyncIterator
 
 import psycopg.errors
@@ -42,9 +43,9 @@ from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb_protos import resources_pb2
 
 
-def _uuid(value) -> str:
-    """Convert a UUID returned by psycopg to the 32-char hex form (no hyphens)."""
-    return str(value).replace("-", "")
+def _to_rid(value: uuid.UUID) -> str:
+    """Return the 32-char hex form (no hyphens) of a UUID column value."""
+    return value.hex
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +277,7 @@ async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str)
             {"kbid": kbid, "slug": slug},
         )
         row = await cur.fetchone()
-        return _uuid(row[0]) if row is not None else None
+        return _to_rid(row[0]) if row is not None else None
 
 
 async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
@@ -375,7 +376,7 @@ async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
                 {"kbid": kbid},
             )
             async for (rid,) in cur:
-                yield _uuid(rid)
+                yield _to_rid(rid)
 
 
 async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:

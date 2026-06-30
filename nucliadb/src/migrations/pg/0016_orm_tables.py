@@ -30,14 +30,16 @@ async def migrate(txn: PGTransaction) -> None:
     One row per knowledge box.
       - kbid          Primary key
       - slug          Human-readable unique identifier (unique, nullable)
-      - title         Display name
       - shards        Serialised protobuf — list of shard IDs
       - config        Serialised protobuf — KnowledgeBoxConfig
+      - deleted_at    Set when the KB is soft-deleted; NULL means active
+                    Indexed (partial, WHERE deleted_at IS NOT NULL) so that
+                    the purge command can efficiently find stale deleted KBs
 
     kb_resources
     ------------
-    One row per resource.  Foreign-keyed to kbs so that deleting a KB row
-    removes all its resources automatically (ON DELETE CASCADE).
+    One row per resource.  Foreign-keyed to kbs; deleting a KB row removes all
+    its resources automatically (ON DELETE CASCADE).
       - kbid          FK → kbs.kbid
       - rid           Resource UUID
       - slug          Optional human-readable slug
@@ -50,8 +52,8 @@ async def migrate(txn: PGTransaction) -> None:
 
     kb_fields
     ---------
-    One row per field in a resource.  Foreign-keyed to kb_resources so that
-    deleting a resource (or its parent KB) cascades into kb_fields automatically.
+    One row per field in a resource.  Foreign-keyed to kb_resources; deleting a
+    resource (or its parent KB) cascades into kb_fields automatically (ON DELETE CASCADE).
       - kbid       FK → kb_resources.kbid
       - rid        FK → kb_resources.rid
       - field_type Single-char abbreviation: t=text, f=file, u=link,
@@ -68,8 +70,8 @@ async def migrate(txn: PGTransaction) -> None:
     kb_conversations
     ----------------
     One row per page of a conversation field.  Foreign-keyed to kb_fields on
-    (kbid, rid, field_type, field_id) so that deleting a conversation field row
-    from kb_fields automatically removes all its pages (ON DELETE CASCADE).
+    (kbid, rid, field_type, field_id); deleting a conversation field row cascades
+    into all its pages automatically (ON DELETE CASCADE).
     The FieldConversation metadata is kept in kb_fields.value; this table holds
     only the paginated message data and the splits index.
       - kbid       FK → kb_fields.kbid
@@ -90,11 +92,11 @@ async def migrate(txn: PGTransaction) -> None:
         # ------------------------------------------------------------------
         await cur.execute("""
             CREATE TABLE IF NOT EXISTS kbs (
-                kbid   UUID NOT NULL,
-                slug   TEXT,
-                title  TEXT,
-                shards BYTEA,
-                config BYTEA,
+                kbid       UUID NOT NULL,
+                slug       TEXT,
+                shards     BYTEA,
+                config     BYTEA,
+                deleted_at TIMESTAMPTZ,
                 PRIMARY KEY (kbid)
             );
         """)
@@ -103,6 +105,16 @@ async def migrate(txn: PGTransaction) -> None:
             CREATE UNIQUE INDEX IF NOT EXISTS idx_kbs_slug
             ON kbs(slug)
             WHERE slug IS NOT NULL;
+        """)
+
+        # Partial index used by the purge command to efficiently find
+        # soft-deleted KBs (deleted_at IS NOT NULL AND deleted_at < threshold).
+        # Only indexes the small subset of deleted rows, so maintenance cost
+        # is negligible.
+        await cur.execute("""
+            CREATE INDEX IF NOT EXISTS idx_kbs_deleted_at
+            ON kbs(deleted_at)
+            WHERE deleted_at IS NOT NULL;
         """)
 
         # ------------------------------------------------------------------
@@ -150,18 +162,6 @@ async def migrate(txn: PGTransaction) -> None:
             );
         """)
 
-        # Fast lookup / deletion of all fields belonging to a resource
-        await cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_kb_fields_resource
-            ON kb_fields(kbid, rid);
-        """)
-
-        # Fast lookup of fields by type within a knowledge box
-        await cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_kb_fields_kbid_type
-            ON kb_fields(kbid, field_type);
-        """)
-
         # Fast duplicate detection by MD5 within a knowledge box
         await cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_kb_fields_md5
@@ -180,14 +180,30 @@ async def migrate(txn: PGTransaction) -> None:
                 field_id   TEXT    NOT NULL,
                 page       INTEGER NOT NULL,
                 value      BYTEA,
-                PRIMARY KEY (kbid, rid, field_id, page),
+                PRIMARY KEY (kbid, rid, field_type, field_id, page),
                 FOREIGN KEY (kbid, rid, field_type, field_id)
                     REFERENCES kb_fields (kbid, rid, field_type, field_id) ON DELETE CASCADE
             );
         """)
 
-        # Fast lookup / deletion of all pages belonging to a conversation field
-        await cur.execute("""
-            CREATE INDEX IF NOT EXISTS idx_kb_conversations_field
-            ON kb_conversations(kbid, rid, field_id);
-        """)
+
+"""
+@Javitonino:
+
+- Why not DELETE CASCADE on the foreign keys?  It would simplify the code and avoid orphaned rows.
+- For KB deletion:
+  - Delete the KB row (kbs) → cascades to kb_resources → cascades to kb_fields → cascades to kb_conversations.
+  - Storage bucket is managed via lifecycle and the purge cronjob.
+
+- For Resource deletion:
+  - Delete the resource row (kb_resources) → cascades to kb_fields → cascades to kb_conversations.
+  - Objects in storage are deleted via the purge cronjob.
+  - File_md5 are simply deleted by the ON DELETE CASCADE on kb_fields.
+
+- For Field deletion:
+  - Delete the field row (kb_fields) → cascades to kb_conversations.
+  - Objects in storage are deleted synchronously in the processor transaction.
+
+- Conversation pages are append only for now. Deletions are simply annotations on the splits metadata.
+
+"""
