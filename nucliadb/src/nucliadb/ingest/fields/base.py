@@ -64,6 +64,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from nucliadb.ingest.orm.resource import Resource
 
 
+# These are the field types that support splits (a.k.a. subfields).
 SUBFIELDFIELDS = ("c",)
 
 
@@ -182,6 +183,7 @@ class Field(Generic[PbType]):
         self.resource.modified = True
 
     async def delete(self):
+        # Delete from maindb
         await datamanagers.fields.delete(
             self.resource.txn,
             kbid=self.kbid,
@@ -197,17 +199,22 @@ class Field(Generic[PbType]):
                 field_type=self.type,
                 field_id=self.id,
             )
-        await self.delete_extracted_text()
+        # Delete from storage
+        tasks = [
+            self.delete_extracted_text(),
+            self.delete_question_answers(),
+            self.delete_metadata(),
+            self.delete_field_metadata(),
+            self.delete_large_computed_metadata(),
+            self.delete_thumbnail(),
+        ]
         async for vectorset_id, vs in datamanagers.vectorsets.iter(self.resource.txn, kbid=self.kbid):
-            await self.delete_vectors(vectorset_id, vs.storage_key_kind)
-
+            tasks.append(self.delete_vectors(vectorset_id, vs.storage_key_kind))
         for model in await datamanagers.graph_vectorsets.node.get_all(self.resource.txn, kbid=self.kbid):
-            await self.delete_relation_node_vectors(model.vectorset_id)
+            tasks.append(self.delete_relation_node_vectors(model.vectorset_id))
         for model in await datamanagers.graph_vectorsets.edge.get_all(self.resource.txn, kbid=self.kbid):
-            await self.delete_relation_edge_vectors(model.vectorset_id)
-
-        await self.delete_metadata()
-        await self.delete_question_answers()
+            tasks.append(self.delete_relation_edge_vectors(model.vectorset_id))
+        await asyncio.gather(*tasks)
 
     async def delete_question_answers(self) -> None:
         sf = self.get_storage_field(FieldTypes.QUESTION_ANSWERS)
@@ -261,6 +268,27 @@ class Field(Generic[PbType]):
 
     async def delete_metadata(self) -> None:
         sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
+        try:
+            await self.storage.delete_upload(sf.key, sf.bucket)
+        except KeyError:
+            pass
+
+    async def delete_thumbnail(self) -> None:
+        sf = self.get_storage_field(FieldTypes.THUMBNAIL)
+        try:
+            await self.storage.delete_upload(sf.key, sf.bucket)
+        except KeyError:
+            pass
+
+    async def delete_field_metadata(self) -> None:
+        sf = self.get_storage_field(FieldTypes.FIELD_METADATA)
+        try:
+            await self.storage.delete_upload(sf.key, sf.bucket)
+        except KeyError:
+            pass
+
+    async def delete_large_computed_metadata(self) -> None:
+        sf = self.get_storage_field(FieldTypes.FIELD_LARGE_METADATA)
         try:
             await self.storage.delete_upload(sf.key, sf.bucket)
         except KeyError:
@@ -656,10 +684,6 @@ class Field(Generic[PbType]):
         author = FieldAuthor()
         author.user.SetInParent()
         return author
-
-    def serialize(self) -> str:
-        assert self.value
-        return self.value.SerializeToString()
 
     async def set_value(self, payload: Any):
         raise NotImplementedError()
