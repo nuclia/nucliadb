@@ -29,7 +29,6 @@ Each row represents one resource in a knowledge box and stores:
   - origin         - serialised resources_pb2.Origin
   - security       - serialised resources_pb2.Security
   - extra          - serialised resources_pb2.Extra
-  - user_relations - serialised resources_pb2.Relations
 """
 
 import uuid
@@ -130,26 +129,6 @@ async def set_extra(
                 extra = EXCLUDED.extra
             """,
             {"kbid": kbid, "rid": rid, "extra": extra.SerializeToString()},
-        )
-
-
-async def set_user_relations(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    user_relations: resources_pb2.Relations,
-) -> None:
-    """Upsert the user_relations column, creating the row if it does not exist."""
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_resources (kbid, rid, user_relations)
-            VALUES (%(kbid)s, %(rid)s, %(user_relations)s)
-            ON CONFLICT (kbid, rid) DO UPDATE SET
-                user_relations = EXCLUDED.user_relations
-            """,
-            {"kbid": kbid, "rid": rid, "user_relations": user_relations.SerializeToString()},
         )
 
 
@@ -348,21 +327,6 @@ async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.E
         if row is None or row[0] is None:
             return None
         pb = resources_pb2.Extra()
-        pb.ParseFromString(bytes(row[0]))
-        return pb
-
-
-async def get_user_relations(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Relations | None:
-    """Return the deserialised Relations for a resource, or None."""
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            "SELECT user_relations FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
-            {"kbid": kbid, "rid": rid},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = resources_pb2.Relations()
         pb.ParseFromString(bytes(row[0]))
         return pb
 

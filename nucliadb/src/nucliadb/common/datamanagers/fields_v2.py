@@ -97,7 +97,7 @@ async def set(
     rid: str,
     field_type: str,
     field_id: str,
-    value: Message,
+    value: Message | bytes,
 ) -> None:
     """
     Set the value of a field row, creating it if it does not exist. This is an upsert operation.
@@ -115,7 +115,7 @@ async def set(
                 "rid": rid,
                 "field_type": field_type,
                 "field_id": field_id,
-                "value": value.SerializeToString(),
+                "value": value.SerializeToString() if isinstance(value, Message) else value,
             },
         )
 

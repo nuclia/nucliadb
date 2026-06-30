@@ -130,7 +130,6 @@ async def migrate(txn: PGTransaction) -> None:
                 origin         BYTEA,
                 security       BYTEA,
                 extra          BYTEA,
-                user_relations BYTEA,
                 PRIMARY KEY (kbid, rid),
                 FOREIGN KEY (kbid) REFERENCES kbs (kbid) ON DELETE CASCADE
             );
