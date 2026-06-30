@@ -62,8 +62,10 @@ from nucliadb.common.datamanagers.utils import with_ro_transaction, with_rw_tran
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto
 from nucliadb_protos import resources_pb2
+from nucliadb_telemetry.logs import setup_logging
+from nucliadb_telemetry.settings import LogLevel, LogSettings
 
-logger = logging.getLogger()
+logger = logging.getLogger("backfill_orm_tables")
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +110,7 @@ async def backfill_kb(*, kbid: str, minimal: bool) -> None:
         except Exception:
             logger.exception(f"Failed to backfill resource {kbid}/{rid}, continuing")
     elapsed = asyncio.get_event_loop().time() - start_time
-    logger.info(f"Backfilled KB {kbid} in {elapsed} seconds")
+    logger.info(f"Backfilled KB {kbid} in {elapsed:.2f} seconds")
 
 
 async def backfill_kb_metadata(txn: Transaction, *, kbid: str, minimal: bool) -> None:
@@ -333,8 +335,15 @@ async def _main():
         help="Skip heavy fields (config, shards, origin, extra, security, conversation pages). Default: True",
     )
     args = parser.parse_args()
-
-    logger.setLevel(logging.DEBUG)
+    setup_logging(
+        settings=LogSettings(
+            debug=True,
+            log_level=LogLevel.INFO,
+            logger_levels={
+                "backfill_orm_tables": LogLevel.INFO,
+            },
+        )
+    )
     context = ApplicationContext(
         kv_driver=True,
         blob_storage=False,
