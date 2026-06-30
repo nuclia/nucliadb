@@ -89,6 +89,7 @@ async def cleanup_maindb(driver: Driver):
                 async with txn.connection.cursor() as cur:
                     await cur.execute("TRUNCATE kbs CASCADE")
         except Exception:
+            logger.exception("Could not truncate kbs table")
             pass
 
 
