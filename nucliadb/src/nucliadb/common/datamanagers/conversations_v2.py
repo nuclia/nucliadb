@@ -160,9 +160,9 @@ async def set_page(
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            INSERT INTO kb_conversations (kbid, rid, field_id, page, value)
-            VALUES (%(kbid)s, %(rid)s, %(field_id)s, %(page)s, %(value)s)
-            ON CONFLICT (kbid, rid, field_id, page) DO UPDATE SET
+            INSERT INTO kb_conversations (kbid, rid, field_type, field_id, page, value)
+            VALUES (%(kbid)s, %(rid)s, 'c', %(field_id)s, %(page)s, %(value)s)
+            ON CONFLICT (kbid, rid, field_type, field_id, page) DO UPDATE SET
                 value = EXCLUDED.value
             """,
             {
@@ -217,9 +217,9 @@ async def set_splits_metadata(
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            INSERT INTO kb_conversations (kbid, rid, field_id, page, value)
-            VALUES (%(kbid)s, %(rid)s, %(field_id)s, %(page)s, %(value)s)
-            ON CONFLICT (kbid, rid, field_id, page) DO UPDATE SET
+            INSERT INTO kb_conversations (kbid, rid, field_type, field_id, page, value)
+            VALUES (%(kbid)s, %(rid)s, 'c', %(field_id)s, %(page)s, %(value)s)
+            ON CONFLICT (kbid, rid, field_type, field_id, page) DO UPDATE SET
                 value = EXCLUDED.value
             """,
             {
