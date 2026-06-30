@@ -66,11 +66,11 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
     },
     const.Features.DATAMANAGERS_V2_WRITE: {
         "rollout": 0,
-        "variants": {"environment": ["none"]},
+        "variants": {"environment": ["local"]},
     },
     const.Features.DATAMANAGERS_V2_READ: {
         "rollout": 0,
-        "variants": {"environment": ["none"]},
+        "variants": {"environment": ["local"]},
     },
 }
 
