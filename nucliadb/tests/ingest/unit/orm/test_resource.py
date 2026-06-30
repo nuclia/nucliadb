@@ -296,7 +296,13 @@ async def test_update_all_fields_key(txn, storage, kb, rid):
 
     result = await resource.get_all_field_ids(for_update=False)
     assert result is not None
-    assert list(result.fields) == [*list(all_fields.fields), file_field]
+    assert len(result.fields) == 3
+    # Sort them by field_type and field to ensure consistent ordering for the assertion
+    obtained = list(result.fields)
+    obtained.sort(key=lambda x: (x.field_type, x.field))
+    expected = [*list(all_fields.fields), file_field]
+    expected.sort(key=lambda x: (x.field_type, x.field))
+    assert obtained == expected
 
     # Check deletes
     await datamanagers.fields.fields_v2.delete(txn, kbid=kb, rid=rid, field_type="f", field_id="file")
