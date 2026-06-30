@@ -65,12 +65,22 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "variants": {"environment": ["local"]},
     },
     const.Features.DATAMANAGERS_V2_WRITE: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
+        "rollout": 100,
+        "variants": {
+            "environment": ["none"],
+            "kbid": [
+                "458c57f3-d207-4843-b8f2-17cb8cbf3ece",
+            ],
+        },
     },
     const.Features.DATAMANAGERS_V2_READ: {
-        "rollout": 0,
-        "variants": {"environment": ["local"]},
+        "rollout": 100,
+        "variants": {
+            "environment": ["none"],
+            "kbid": [
+                "458c57f3-d207-4843-b8f2-17cb8cbf3ece",
+            ],
+        },
     },
 }
 
