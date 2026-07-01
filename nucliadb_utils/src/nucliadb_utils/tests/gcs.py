@@ -23,8 +23,9 @@ import requests
 from pytest_docker_fixtures import images
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore[import-untyped]
 
-from nucliadb_utils.settings import FileBackendConfig, storage_settings
+from nucliadb_utils.settings import FileBackendConfig, StorageSettings, storage_settings
 from nucliadb_utils.storages.gcs import GCSStorage
+from nucliadb_utils.storages.settings import Settings as ExtendedSettings
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 from nucliadb_utils.tests import free_port
 
@@ -92,8 +93,8 @@ def running_in_mac_os() -> bool:
 
 
 @pytest.fixture(scope="session")
-def session_gcs_storage_settings(gcs: str) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
-    settings = {
+async def session_gcs_storage_settings(gcs: str) -> AsyncIterator[tuple[dict[str, Any], dict[str, Any]]]:
+    settings: dict[str, Any] = {
         "file_backend": FileBackendConfig.GCS,
         "gcs_endpoint_url": gcs,
         "gcs_base64_creds": None,
@@ -101,11 +102,17 @@ def session_gcs_storage_settings(gcs: str) -> Iterator[tuple[dict[str, Any], dic
         "gcs_location": "location",
         "gcs_anonymous": True,
     }
-    extended_settings = {
+    extended_settings: dict[str, Any] = {
         "gcs_deadletter_bucket": "deadletter",
         "gcs_indexing_bucket": "indexing",
         "gcs_threads": 1,
     }
+
+    storage = create_storage(StorageSettings(**settings), ExtendedSettings(**extended_settings))
+    await storage.initialize()
+    await storage.create_bucket("nidx")
+    await storage.finalize()
+
     yield settings, extended_settings
 
 
@@ -125,21 +132,24 @@ def gcs_storage_settings(
         yield settings | extended_settings
 
 
+def create_storage(settings, extended_settings):
+    return GCSStorage(
+        url=settings.gcs_endpoint_url,
+        account_credentials=settings.gcs_base64_creds,
+        bucket=settings.gcs_bucket,
+        location=settings.gcs_location,
+        project=settings.gcs_project,
+        executor=ThreadPoolExecutor(extended_settings.gcs_threads),
+        deadletter_bucket=extended_settings.gcs_deadletter_bucket,
+        indexing_bucket=extended_settings.gcs_indexing_bucket,
+        labels=settings.gcs_bucket_labels,
+        anonymous=settings.gcs_anonymous,
+    )
+
+
 @pytest.fixture(scope="function")
 async def gcs_storage(gcs: str, gcs_storage_settings: dict[str, Any]) -> AsyncIterator[GCSStorage]:
-    storage = GCSStorage(
-        url=storage_settings.gcs_endpoint_url,
-        account_credentials=storage_settings.gcs_base64_creds,
-        bucket=storage_settings.gcs_bucket,
-        location=storage_settings.gcs_location,
-        project=storage_settings.gcs_project,
-        executor=ThreadPoolExecutor(extended_storage_settings.gcs_threads),
-        deadletter_bucket=extended_storage_settings.gcs_deadletter_bucket,
-        indexing_bucket=extended_storage_settings.gcs_indexing_bucket,
-        labels=storage_settings.gcs_bucket_labels,
-        anonymous=storage_settings.gcs_anonymous,
-    )
+    storage = create_storage(storage_settings, extended_storage_settings)
     await storage.initialize()
-    await storage.create_bucket("nidx")
     yield storage
     await storage.finalize()
