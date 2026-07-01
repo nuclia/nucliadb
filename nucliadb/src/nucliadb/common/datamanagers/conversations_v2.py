@@ -133,7 +133,7 @@ async def get_page(
             """
             SELECT value FROM kb_conversations
             WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_id = %(field_id)s AND page = %(page)s
+              AND field_type = 'c' AND field_id = %(field_id)s AND page = %(page)s
             """,
             {"kbid": kbid, "rid": rid, "field_id": field_id, "page": page},
         )
@@ -193,7 +193,7 @@ async def get_splits_metadata(
             """
             SELECT value FROM kb_conversations
             WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_id = %(field_id)s AND page = %(page)s
+              AND field_type = 'c' AND field_id = %(field_id)s AND page = %(page)s
             """,
             {"kbid": kbid, "rid": rid, "field_id": field_id, "page": _SPLITS_METADATA_PAGE},
         )
@@ -254,7 +254,7 @@ async def delete_field(
         await cur.execute(
             """
             DELETE FROM kb_conversations
-            WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_id = %(field_id)s
+            WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_type = 'c' AND field_id = %(field_id)s
             """,
             {"kbid": kbid, "rid": rid, "field_id": field_id},
         )
