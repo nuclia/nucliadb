@@ -27,6 +27,7 @@ use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Channel;
 use tonic::{Request, Response, Result, Status, service::Routes};
 
+use crate::NidxMetadata;
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::shard_merge::{Limit, OrderBy};
 use crate::searcher::shard_selector::SearcherNode;
@@ -57,14 +58,16 @@ impl Interceptor for TelemetryInterceptor {
 type SearcherClient = NidxSearcherClient<InterceptedService<Channel, TelemetryInterceptor>>;
 
 pub struct SearchServer {
+    meta: NidxMetadata,
     index_cache: Arc<IndexCache>,
     shard_selector: ShardSelector,
     clients: Arc<RwLock<HashMap<String, SearcherClient>>>,
 }
 
 impl SearchServer {
-    pub fn new(index_cache: Arc<IndexCache>, shard_selector: ShardSelector) -> Self {
+    pub fn new(meta: NidxMetadata, index_cache: Arc<IndexCache>, shard_selector: ShardSelector) -> Self {
         SearchServer {
+            meta,
             index_cache,
             shard_selector,
             clients: Arc::new(RwLock::new(HashMap::new())),
@@ -168,7 +171,17 @@ impl NidxSearcher for SearchServer {
             // We won't hop to any other node
             self.local_query(request, shards).await?
         } else {
-            // A query may need to be distributed across nodes in order to search in all partitions.
+            // A query that may need to be distributed across nodes in order to search in all partitions.
+
+            // Before doing any work, validate shards exist
+            let existing_shards = crate::metadata::Shard::exist_many(&self.meta.pool, &shards)
+                .await
+                .map_err(NidxError::from)?;
+            for shard_id in &shards {
+                if !existing_shards.contains(shard_id) {
+                    return Err(NidxError::NotFound.into());
+                }
+            }
             self.distributed_query(request, shards).await?
         };
         Ok(Response::new(response))

@@ -203,7 +203,7 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
     let searcher = SyncedSearcher::new(meta.clone(), work_path);
 
     let shard_selector = ShardSelector::new(list_nodes.clone(), searcher_settings.shard_partitioning.replicas);
-    let api = grpc::SearchServer::new(searcher.index_cache(), shard_selector);
+    let api = grpc::SearchServer::new(meta, searcher.index_cache(), shard_selector);
     let server = GrpcServer::new("0.0.0.0:10001").await?;
 
     let api_task = tasks.spawn(server.serve(api.into_router(), shutdown.clone())).id();
