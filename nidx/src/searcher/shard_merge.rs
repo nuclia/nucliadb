@@ -93,27 +93,30 @@ fn merge_document_responses(
     let mut merged = DocumentSearchResponse::default();
 
     let mut facets = vec![];
+    let mut results = vec![];
     for response in responses {
         merged.total += response.total;
-        merged.results.extend(response.results);
         merged.query = response.query;
         merged.next_page = merged.next_page || response.next_page;
 
+        results.push(response.results.into_iter());
         facets.push(response.facets);
     }
+    merged.results = results
+        .into_iter()
+        .kmerge_by(sort_documents_fn(order_by))
+        .take(limit.0)
+        .collect();
     merged.facets = merge_facets(facets);
-
-    sort_documents(&mut merged.results, order_by);
-    merged.results.truncate(limit.0);
-
     merged
 }
 
-fn sort_documents(items: &mut [DocumentResult], order_by: OrderBy) {
+#[allow(clippy::type_complexity)]
+fn sort_documents_fn(order_by: OrderBy) -> Box<dyn Fn(&DocumentResult, &DocumentResult) -> bool> {
     match order_by.expr {
         SortExpr::Score => {
             debug_assert!(order_by.descending, "order by ascending score is not implemented");
-            items.sort_by(|a, b| match (a.sort_value, b.sort_value) {
+            Box::new(|a, b| match (a.sort_value, b.sort_value) {
                 (
                     Some(document_result::SortValue::Score(nidx_protos::ResultScore {
                         bm25: a_bm25,
@@ -123,26 +126,26 @@ fn sort_documents(items: &mut [DocumentResult], order_by: OrderBy) {
                         bm25: b_bm25,
                         booster: b_booster,
                     })),
-                ) => b_bm25.total_cmp(&a_bm25).then(b_booster.total_cmp(&a_booster)),
+                ) => a_bm25.total_cmp(&b_bm25).then(a_booster.total_cmp(&b_booster)).is_gt(),
                 _ => {
-                    unreachable!("index must return values with the same order_by as we have")
+                    unreachable!("index always return values with the same order_by as we have")
                 }
-            });
+            })
         }
-        SortExpr::Date => {
-            items.sort_by(|a, b| match (a.sort_value, b.sort_value) {
-                (Some(document_result::SortValue::Date(a)), Some(document_result::SortValue::Date(b))) => {
-                    if order_by.descending {
-                        b.seconds.cmp(&a.seconds).then(b.nanos.cmp(&a.nanos))
-                    } else {
-                        a.seconds.cmp(&b.seconds).then(a.nanos.cmp(&b.nanos))
-                    }
+        SortExpr::Date => Box::new(move |a, b| match (a.sort_value, b.sort_value) {
+            (Some(document_result::SortValue::Date(a)), Some(document_result::SortValue::Date(b))) => {
+                if order_by.descending {
+                    // Descending order: from future to past
+                    a.seconds.cmp(&b.seconds).then(a.nanos.cmp(&b.nanos)).is_gt()
+                } else {
+                    // Ascending order: from past to future
+                    a.seconds.cmp(&b.seconds).then(a.nanos.cmp(&b.nanos)).is_lt()
                 }
-                _ => {
-                    unreachable!("nidx_texts always indexes dates");
-                }
-            });
-        }
+            }
+            _ => {
+                unreachable!("index always return dates as always indexes them");
+            }
+        }),
     }
 }
 
@@ -154,31 +157,35 @@ fn merge_paragraph_responses(
     debug_assert!(!responses.is_empty(), "must pass at least 1 shard response");
     let mut merged = ParagraphSearchResponse::default();
 
+    let mut results = vec![];
     let mut facets = vec![];
     let mut ematches = HashSet::new();
     for response in responses {
         merged.total += response.total;
-        merged.results.extend(response.results);
         merged.query = response.query;
         merged.next_page = merged.next_page || response.next_page;
 
+        results.push(response.results.into_iter());
         ematches.extend(response.ematches);
         facets.push(response.facets);
     }
+    merged.results = results
+        .into_iter()
+        .kmerge_by(sort_paragraphs_fn(order_by))
+        .take(limit.0)
+        .collect();
     merged.facets = merge_facets(facets);
     merged.ematches = ematches.into_iter().collect();
-
-    sort_paragraphs(&mut merged.results, order_by);
-    merged.results.truncate(limit.0);
 
     merged
 }
 
-fn sort_paragraphs(items: &mut [ParagraphResult], order_by: OrderBy) {
+#[allow(clippy::type_complexity)]
+fn sort_paragraphs_fn(order_by: OrderBy) -> Box<dyn Fn(&ParagraphResult, &ParagraphResult) -> bool> {
     match order_by.expr {
         SortExpr::Score => {
             debug_assert!(order_by.descending, "order by ascending score is not implemented");
-            items.sort_by(|a, b| match (a.sort_value, b.sort_value) {
+            Box::new(|a, b| match (a.sort_value, b.sort_value) {
                 (
                     Some(paragraph_result::SortValue::Score(nidx_protos::ResultScore {
                         bm25: a_bm25,
@@ -188,25 +195,27 @@ fn sort_paragraphs(items: &mut [ParagraphResult], order_by: OrderBy) {
                         bm25: b_bm25,
                         booster: b_booster,
                     })),
-                ) => b_bm25.total_cmp(&a_bm25).then(b_booster.total_cmp(&a_booster)),
+                ) => a_bm25.total_cmp(&b_bm25).then(a_booster.total_cmp(&b_booster)).is_gt(),
                 _ => {
-                    unreachable!("index must return values with the same order_by as we have")
+                    unreachable!("index always return values with the same order_by as we have")
                 }
-            });
+            })
         }
         SortExpr::Date => {
-            items.sort_by(|a, b| match (a.sort_value, b.sort_value) {
+            Box::new(move |a, b| match (a.sort_value, b.sort_value) {
                 (Some(paragraph_result::SortValue::Date(a)), Some(paragraph_result::SortValue::Date(b))) => {
                     if order_by.descending {
-                        b.seconds.cmp(&a.seconds).then(b.nanos.cmp(&a.nanos))
+                        // Descending order: from future to past
+                        a.seconds.cmp(&b.seconds).then(a.nanos.cmp(&b.nanos)).is_gt()
                     } else {
-                        a.seconds.cmp(&b.seconds).then(a.nanos.cmp(&b.nanos))
+                        // Ascending order: from past to future
+                        a.seconds.cmp(&b.seconds).then(a.nanos.cmp(&b.nanos)).is_lt()
                     }
                 }
                 _ => {
-                    unreachable!("nidx_paragraph always indexes dates");
+                    unreachable!("index always return dates as always indexes them");
                 }
-            });
+            })
         }
     }
 }
@@ -564,13 +573,11 @@ mod tests {
                 ..Default::default()
             };
 
-            let shards = vec![
-                response(vec![document("foo", 3, 1), document("bar", 2, 2)]),
-                response(vec![document("baz", 4, 1), document("quux", 2, 1)]),
-            ];
-
             let merged = merge(
-                shards.clone(),
+                vec![
+                    response(vec![document("foo", 3, 1), document("bar", 2, 2)]),
+                    response(vec![document("baz", 4, 1), document("quux", 2, 1)]),
+                ],
                 OrderBy {
                     expr: SortExpr::Date,
                     descending: true,
@@ -586,7 +593,10 @@ mod tests {
             assert_eq!(merged.results[3].uuid, "quux");
 
             let merged = merge(
-                shards,
+                vec![
+                    response(vec![document("bar", 2, 2), document("foo", 3, 1)]),
+                    response(vec![document("quux", 2, 1), document("baz", 4, 1)]),
+                ],
                 OrderBy {
                     expr: SortExpr::Date,
                     descending: false,
@@ -851,13 +861,11 @@ mod tests {
                 ..Default::default()
             };
 
-            let shards = vec![
-                response(vec![paragraph("foo", 3, 1), paragraph("bar", 2, 2)]),
-                response(vec![paragraph("baz", 4, 1), paragraph("quux", 2, 1)]),
-            ];
-
             let merged = merge(
-                shards.clone(),
+                vec![
+                    response(vec![paragraph("foo", 3, 1), paragraph("bar", 2, 2)]),
+                    response(vec![paragraph("baz", 4, 1), paragraph("quux", 2, 1)]),
+                ],
                 OrderBy {
                     expr: SortExpr::Date,
                     descending: true,
@@ -873,7 +881,10 @@ mod tests {
             assert_eq!(merged.results[3].uuid, "quux");
 
             let merged = merge(
-                shards,
+                vec![
+                    response(vec![paragraph("bar", 2, 2), paragraph("foo", 3, 1)]),
+                    response(vec![paragraph("quux", 2, 1), paragraph("baz", 4, 1)]),
+                ],
                 OrderBy {
                     expr: SortExpr::Date,
                     descending: false,
