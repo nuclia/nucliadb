@@ -206,11 +206,32 @@ async fn test_searchers_partial_results(pool: PgPool) -> anyhow::Result<()> {
         },
     )
     .await?;
-    // but one is not available
+
+    let mut counts = Vec::with_capacity(2);
+    for searcher in &cluster.searchers {
+        let searcher = searcher.as_ref().expect("we don't have any fake node configured");
+        let mut request = Request::new(SearchRequest {
+            shard_ids: shards.clone(),
+            result_per_page: 20,
+            body: "Hola".into(),
+            paragraph: true,
+            ..Default::default()
+        });
+        request.metadata_mut().insert("nidx-local-only", "1".parse().unwrap());
+        let response = NidxSearcherClient::connect(format!("http://{}", searcher.address()))
+            .await?
+            .search(request)
+            .await?
+            .into_inner();
+        counts.push(response.shard_ids.len());
+    }
+    assert_eq!(counts.iter().sum::<usize>(), 10);
+
+    // Make a one unavailable
     cluster.shutdown_node(1);
 
-    // The remaining searcher has only 1/2 of the shards. Performing a Search for all shards will
-    // fail
+    // The remaining searcher has only ~1/2 of the shards. Performing a Search
+    // for all shards will fail
     let searcher = cluster.searchers[0]
         .as_ref()
         .expect("we don't have any fake node configured");
@@ -233,7 +254,7 @@ async fn test_searchers_partial_results(pool: PgPool) -> anyhow::Result<()> {
             .contains("Error in search, exhausted all available nodes for shard")
     );
 
-    // But a local-only request will return partial results
+    // But a local-only request will return partial results for all its shards
     let mut request = Request::new(SearchRequest {
         shard_ids: shards.clone(),
         result_per_page: 20,
@@ -243,7 +264,7 @@ async fn test_searchers_partial_results(pool: PgPool) -> anyhow::Result<()> {
     });
     request.metadata_mut().insert("nidx-local-only", "1".parse().unwrap());
     let response = client.search(request).await?.into_inner();
-    assert_eq!(response.shard_ids.len(), 5);
+    assert_eq!(response.shard_ids.len(), counts[0]);
 
     Ok(())
 }
