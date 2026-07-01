@@ -419,10 +419,6 @@ message SearchRequest {
     GraphSearch graph_search = 29;
 
     optional JsonFilterExpression json_filter = 32;
-
-    // FF to decide whether to run the former single-shard query or a
-    // multi-shard query
-    bool multi_shard_search = 35;
 }
 
 enum SuggestFeatures {

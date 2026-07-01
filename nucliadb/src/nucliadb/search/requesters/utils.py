@@ -123,8 +123,6 @@ async def nidx_query(
             for shard_obj in shard_groups:
                 if shard_obj.nidx_shard_id is not None:
                     queried_shards.append(shard_obj.nidx_shard_id)
-
-            pb_query.multi_shard_search = True
             ops.append(query_shards(queried_shards, pb_query))
 
         else:

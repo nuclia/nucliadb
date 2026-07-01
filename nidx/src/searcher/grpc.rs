@@ -154,19 +154,11 @@ impl NidxSearcher for SearchServer {
     async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
         let message = request.get_ref();
 
-        if !message.multi_shard_search {
-            // Former single-shard request
-
-            if message.shard_ids.is_empty() {
-                return Err(NidxError::invalid("requests must contain at least a shard id").into());
-            }
+        if message.shard_ids.len() == 1 {
             let shard_id = uuid::Uuid::parse_str(&message.shard_ids[0]).map_err(NidxError::from)?;
             self.shard_search(shard_id, &request).await
         } else {
-            // New multi-shard request. gRPC call contains the list of all
-            // shards we have to search. We now can decide the most efficient
-            // way to perform the distributed query
-
+            // Distributed query across multiple shards
             let mut responses = Vec::with_capacity(message.shard_ids.len());
 
             for shard_id in &message.shard_ids {
