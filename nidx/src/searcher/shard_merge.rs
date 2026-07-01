@@ -112,7 +112,7 @@ fn sort_documents(items: &mut [DocumentResult], order_by: OrderBy) {
     match order_by.expr {
         SortExpr::Score => {
             debug_assert!(order_by.descending, "order by ascending score is not implemented");
-            items.sort_unstable_by(|a, b| match (a.sort_value, b.sort_value) {
+            items.sort_by(|a, b| match (a.sort_value, b.sort_value) {
                 (
                     Some(document_result::SortValue::Score(nidx_protos::ResultScore {
                         bm25: a_bm25,
@@ -129,7 +129,7 @@ fn sort_documents(items: &mut [DocumentResult], order_by: OrderBy) {
             });
         }
         SortExpr::Date => {
-            items.sort_unstable_by(|a, b| match (a.sort_value, b.sort_value) {
+            items.sort_by(|a, b| match (a.sort_value, b.sort_value) {
                 (Some(document_result::SortValue::Date(a)), Some(document_result::SortValue::Date(b))) => {
                     if order_by.descending {
                         b.seconds.cmp(&a.seconds).then(b.nanos.cmp(&a.nanos))
@@ -177,7 +177,7 @@ fn sort_paragraphs(items: &mut [ParagraphResult], order_by: OrderBy) {
     match order_by.expr {
         SortExpr::Score => {
             debug_assert!(order_by.descending, "order by ascending score is not implemented");
-            items.sort_unstable_by(|a, b| match (a.sort_value, b.sort_value) {
+            items.sort_by(|a, b| match (a.sort_value, b.sort_value) {
                 (
                     Some(paragraph_result::SortValue::Score(nidx_protos::ResultScore {
                         bm25: a_bm25,
@@ -194,7 +194,7 @@ fn sort_paragraphs(items: &mut [ParagraphResult], order_by: OrderBy) {
             });
         }
         SortExpr::Date => {
-            items.sort_unstable_by(|a, b| match (a.sort_value, b.sort_value) {
+            items.sort_by(|a, b| match (a.sort_value, b.sort_value) {
                 (Some(paragraph_result::SortValue::Date(a)), Some(paragraph_result::SortValue::Date(b))) => {
                     if order_by.descending {
                         b.seconds.cmp(&a.seconds).then(b.nanos.cmp(&a.nanos))
