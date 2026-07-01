@@ -21,8 +21,9 @@ import pytest
 from pytest_docker_fixtures import images
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore[import-untyped]
 
-from nucliadb_utils.settings import FileBackendConfig, storage_settings
+from nucliadb_utils.settings import FileBackendConfig, StorageSettings, storage_settings
 from nucliadb_utils.storages.azure import AzureStorage
+from nucliadb_utils.storages.settings import Settings as ExtendedSettings
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
 
 images.settings = cast(dict[str, Any], images.settings)
@@ -113,16 +114,26 @@ def azurite() -> Generator[AzuriteFixture, None, None]:
 def session_azure_storage_settings(
     azurite: AzuriteFixture,
 ) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
-    settings = {
+    settings: dict[str, Any] = {
         "file_backend": FileBackendConfig.AZURE,
         "azure_account_url": azurite.account_url,
         "azure_connection_string": azurite.connection_string,
     }
-    extended_settings = {
+    extended_settings: dict[str, Any] = {
         "azure_deadletter_bucket": "deadletter",
         "azure_indexing_bucket": "indexing",
     }
+
     yield settings, extended_settings
+
+
+@pytest.fixture(scope="session")
+async def session_azure_storage_buckets(session_azure_storage_settings):
+    settings, extended_settings = session_azure_storage_settings
+    storage = create_storage(StorageSettings(**settings), ExtendedSettings(**extended_settings))
+    await storage.initialize()
+    await storage.create_bucket("nidx")
+    await storage.finalize()
 
 
 @pytest.fixture(scope="function")
@@ -140,16 +151,20 @@ def azure_storage_settings(
         yield settings | extended_settings
 
 
-@pytest.fixture(scope="function")
-async def azure_storage(azurite, azure_storage_settings: dict[str, Any]) -> AsyncIterator[AzureStorage]:
-    assert storage_settings.azure_account_url is not None
-
-    storage = AzureStorage(
-        account_url=storage_settings.azure_account_url,
-        kb_account_url=storage_settings.azure_kb_account_url or storage_settings.azure_account_url,
-        connection_string=storage_settings.azure_connection_string,
+def create_storage(settings, extended_settings):
+    assert settings.azure_account_url is not None
+    return AzureStorage(
+        account_url=settings.azure_account_url,
+        kb_account_url=settings.azure_kb_account_url or settings.azure_account_url,
+        connection_string=settings.azure_connection_string,
     )
+
+
+@pytest.fixture(scope="function")
+async def azure_storage(
+    azurite, azure_storage_settings: dict[str, Any], session_azure_storage_buckets
+) -> AsyncIterator[AzureStorage]:
+    storage = create_storage(storage_settings, extended_storage_settings)
     await storage.initialize()
-    await storage.create_bucket("nidx")
     yield storage
     await storage.finalize()
