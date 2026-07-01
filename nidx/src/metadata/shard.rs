@@ -43,6 +43,12 @@ impl Shard {
             .await
     }
 
+    pub async fn exist_many(meta: impl Executor<'_, Database = Postgres>, ids: &[Uuid]) -> sqlx::Result<Vec<Uuid>> {
+        sqlx::query_scalar!("SELECT id FROM shards WHERE id = ANY($1) AND deleted_at IS NULL", ids)
+            .fetch_all(meta)
+            .await
+    }
+
     pub async fn mark_delete(&self, meta: impl Executor<'_, Database = Postgres>) -> sqlx::Result<()> {
         sqlx::query!("UPDATE shards SET deleted_at = NOW() WHERE id = $1", self.id)
             .execute(meta)
