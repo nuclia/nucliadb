@@ -111,9 +111,9 @@ def azurite() -> Generator[AzuriteFixture, None, None]:
 
 
 @pytest.fixture(scope="session")
-async def session_azure_storage_settings(
+def session_azure_storage_settings(
     azurite: AzuriteFixture,
-) -> AsyncIterator[tuple[dict[str, Any], dict[str, Any]]]:
+) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
     settings: dict[str, Any] = {
         "file_backend": FileBackendConfig.AZURE,
         "azure_account_url": azurite.account_url,
@@ -124,12 +124,16 @@ async def session_azure_storage_settings(
         "azure_indexing_bucket": "indexing",
     }
 
+    yield settings, extended_settings
+
+
+@pytest.fixture(scope="session")
+async def session_azure_storage_buckets(session_azure_storage_settings):
+    settings, extended_settings = session_azure_storage_settings
     storage = create_storage(StorageSettings(**settings), ExtendedSettings(**extended_settings))
     await storage.initialize()
     await storage.create_bucket("nidx")
     await storage.finalize()
-
-    yield settings, extended_settings
 
 
 @pytest.fixture(scope="function")
@@ -157,7 +161,9 @@ def create_storage(settings, extended_settings):
 
 
 @pytest.fixture(scope="function")
-async def azure_storage(azurite, azure_storage_settings: dict[str, Any]) -> AsyncIterator[AzureStorage]:
+async def azure_storage(
+    azurite, azure_storage_settings: dict[str, Any], session_azure_storage_buckets
+) -> AsyncIterator[AzureStorage]:
     storage = create_storage(storage_settings, extended_storage_settings)
     await storage.initialize()
     yield storage

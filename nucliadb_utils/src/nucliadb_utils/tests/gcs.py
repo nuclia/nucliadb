@@ -93,7 +93,7 @@ def running_in_mac_os() -> bool:
 
 
 @pytest.fixture(scope="session")
-async def session_gcs_storage_settings(gcs: str) -> AsyncIterator[tuple[dict[str, Any], dict[str, Any]]]:
+def session_gcs_storage_settings(gcs: str) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
     settings: dict[str, Any] = {
         "file_backend": FileBackendConfig.GCS,
         "gcs_endpoint_url": gcs,
@@ -108,12 +108,16 @@ async def session_gcs_storage_settings(gcs: str) -> AsyncIterator[tuple[dict[str
         "gcs_threads": 1,
     }
 
+    yield settings, extended_settings
+
+
+@pytest.fixture(scope="session")
+async def session_gcs_storage_buckets(session_gcs_storage_settings):
+    settings, extended_settings = session_gcs_storage_settings
     storage = create_storage(StorageSettings(**settings), ExtendedSettings(**extended_settings))
     await storage.initialize()
     await storage.create_bucket("nidx")
     await storage.finalize()
-
-    yield settings, extended_settings
 
 
 @pytest.fixture(scope="function")
@@ -148,7 +152,9 @@ def create_storage(settings, extended_settings):
 
 
 @pytest.fixture(scope="function")
-async def gcs_storage(gcs: str, gcs_storage_settings: dict[str, Any]) -> AsyncIterator[GCSStorage]:
+async def gcs_storage(
+    gcs: str, gcs_storage_settings: dict[str, Any], session_gcs_storage_buckets
+) -> AsyncIterator[GCSStorage]:
     storage = create_storage(storage_settings, extended_storage_settings)
     await storage.initialize()
     yield storage
