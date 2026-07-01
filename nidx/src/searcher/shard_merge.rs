@@ -15,6 +15,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use itertools::Itertools;
 use nidx_protos::{
     DocumentResult, DocumentSearchResponse, FacetResult, FacetResults, GraphSearchResponse, ParagraphResult,
     ParagraphSearchResponse, SearchRequest, SearchResponse, VectorSearchResponse, document_result, order_by,
@@ -212,16 +213,13 @@ fn sort_paragraphs(items: &mut [ParagraphResult], order_by: OrderBy) {
 
 fn merge_vector_responses(responses: Vec<VectorSearchResponse>, limit: Limit) -> VectorSearchResponse {
     debug_assert!(!responses.is_empty(), "must pass at least 1 shard response");
-    let mut merged = VectorSearchResponse::default();
-
-    // TODO: sort-merge and stop when limit is reached would be faster
-    for response in responses {
-        merged.documents.extend(response.documents);
-    }
-    merged.documents.sort_unstable_by(|a, b| b.score.total_cmp(&a.score));
-    merged.documents.truncate(limit.0);
-
-    merged
+    let merged = responses
+        .into_iter()
+        .map(|response| response.documents)
+        .kmerge_by(|a, b| a.score >= b.score)
+        .take(limit.0)
+        .collect();
+    VectorSearchResponse { documents: merged }
 }
 
 fn merge_graph_responses(responses: Vec<GraphSearchResponse>, _limit: Limit) -> GraphSearchResponse {
