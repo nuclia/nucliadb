@@ -46,5 +46,7 @@ class Features:
 _FliptFeatures = set(
     [
         Features.KEY_VALUE_FIELDS,
+        Features.DATAMANAGERS_V2_READ,
+        Features.DATAMANAGERS_V2_WRITE,
     ]
 )

@@ -74,7 +74,17 @@ logger = logging.getLogger("backfill_orm_tables")
 
 
 async def backfill_all_kbs(minimal: bool) -> None:
-    """Iterate every KB in v1 and backfill it into the ORM tables."""
+    """Iterate every KB in v1 and backfill it into the ORM tables.
+
+    Args:
+        minimal: When True, only the bare-minimum rows are written (slug, status).
+            Use this mode to safely activate the write feature flag: it ensures every
+            existing resource and field already has an entry in the ORM tables, so an
+            in-flight write that arrives before the full backfill completes will not
+            fail due to a missing row.  Heavy data (config, shards, origin, extra,
+            security, conversation pages) can then be populated in a follow-up run
+            with minimal=False.
+    """
     kbids_and_slugs = []
     async with with_ro_transaction() as txn:
         async for kbid, slug in kb_v1.get_kbs(txn):
@@ -92,7 +102,15 @@ async def backfill_all_kbs(minimal: bool) -> None:
 
 
 async def backfill_kb(*, kbid: str, minimal: bool) -> None:
-    """Backfill one KB row and all of its resources."""
+    """Backfill one KB row and all of its resources.
+
+    Args:
+        minimal: See :func:`backfill_all_kbs` for a full description.  In short,
+            set this to True when populating the ORM tables just before enabling the
+            write feature flag, so that any concurrent write for an already-existing
+            resource or field finds a row to update instead of failing with a
+            missing-entry error.
+    """
     logger.info(f"Backfilling KB {kbid}")
     start_time = asyncio.get_event_loop().time()
     async with with_rw_transaction() as txn:
@@ -332,7 +350,13 @@ async def _main():
         "--minimal",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Skip heavy fields (config, shards, origin, extra, security, conversation pages). Default: True",
+        help=(
+            "When set, write only the bare-minimum rows (slug, status) needed to activate the "
+            "write feature flag safely. Any in-flight write for an already-existing resource or "
+            "field will find an ORM entry to update instead of failing. "
+            "Heavy data (config, shards, origin, extra, security, conversation pages) is skipped "
+            "and must be backfilled in a follow-up run with --no-minimal. Default: True"
+        ),
     )
     args = parser.parse_args()
     setup_logging(
