@@ -21,6 +21,7 @@ use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use nidx_protos::nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
 use nidx_protos::*;
 use tokio::sync::RwLock;
+use tokio::task::JoinSet;
 use tonic::service::Interceptor;
 use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Channel;
@@ -152,31 +153,25 @@ macro_rules! shard_request {
 #[tonic::async_trait]
 impl NidxSearcher for SearchServer {
     async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
-        let message = request.get_ref();
+        let local_only = request.metadata().contains_key(HEADER_LOCAL_ONLY);
+        let request = request.into_inner();
 
-        if message.shard_ids.len() == 1 {
-            let shard_id = uuid::Uuid::parse_str(&message.shard_ids[0]).map_err(NidxError::from)?;
-            self.shard_search(shard_id, &request).await
-        } else {
-            // Distributed query across multiple shards
-            let mut responses = Vec::with_capacity(message.shard_ids.len());
-
-            for shard_id in &message.shard_ids {
-                let shard_id = uuid::Uuid::parse_str(shard_id).map_err(NidxError::from)?;
-
-                // When searching a shard fails, we can't provide results. We
-                // return the error and fail the whole request
-                let response = self.shard_search(shard_id, &request).await?;
-                responses.push(response);
-            }
-
-            let merged = shard_merge::merge(
-                responses.into_iter().map(|r| r.into_inner()).collect(),
-                OrderBy::from(message),
-                Limit(message.result_per_page as usize),
-            );
-            Ok(Response::new(merged))
+        let mut shards = vec![];
+        for shard_id in &request.shard_ids {
+            let shard_id = uuid::Uuid::parse_str(shard_id).map_err(NidxError::from)?;
+            shards.push(shard_id);
         }
+
+        let response = if local_only {
+            // This is a hopped node, i.e., another searcher has delegated this part of the query to
+            // us. We must query our shards and return either a full or partial response or an error.
+            // We won't hop to any other node
+            self.local_query(request, shards).await?
+        } else {
+            // A query may need to be distributed across nodes in order to search in all partitions.
+            self.distributed_query(request, shards).await?
+        };
+        Ok(Response::new(response))
     }
 
     async fn suggest(&self, request: Request<SuggestRequest>) -> Result<Response<SuggestResponse>> {
@@ -259,19 +254,188 @@ impl NidxSearcher for SearchServer {
 }
 
 impl SearchServer {
-    async fn shard_search(
-        &self,
-        shard_id: uuid::Uuid,
-        request: &Request<SearchRequest>,
-    ) -> Result<Response<SearchResponse>> {
-        let message = request.get_ref();
-        shard_request! {
-            "search",
-            self,
-            request,
-            shard_id,
-            LOCAL => shard_search::search(shard_id, Arc::clone(&self.index_cache), message.clone()).await,
-            REMOTE => search
+    /// Perform a distributed query over a partitioned dataset across a cluster of nodes.
+    ///
+    /// The whole dataset is partitioned and distributed (with replication) across nidx-searcher
+    /// nodes. To answer a query, we must query all partitions (shards) and merge the results into a
+    /// single respose.
+    ///
+    /// This function is responsible for partial failure handling and retry. As a node can be
+    /// requested to query several partitions and one or more can fail, it will then return a
+    /// partial result and is our responsibility to retry on other nodes.
+    ///
+    async fn distributed_query(&self, request: SearchRequest, shards: Vec<uuid::Uuid>) -> NidxResult<SearchResponse> {
+        // Locate which nodes contain each shard and get a list by preference
+        let mut shard_nodes = HashMap::new();
+        for shard_id in &shards {
+            let nodes = self.shard_selector.nodes_for_shard(shard_id);
+            if nodes.is_empty() {
+                // We haven't found any node with this shard. As we'll never be able to return a
+                // full result, we fail fast
+                return Err(NidxError::NotFound);
+            }
+
+            shard_nodes.insert(*shard_id, nodes);
         }
+
+        // Now, we'll do scatter-gather cycles using the most preferred node per shard. Grouping
+        // cycles is less time-efficient, as we wait for the slowest request, but we minimize the
+        // amount of requests through the cluster.
+        let mut responses = vec![];
+        while !shard_nodes.is_empty() {
+            let mut shard_groups = HashMap::new();
+            for (shard_id, nodes) in shard_nodes.iter_mut() {
+                if nodes.is_empty() {
+                    // A shard doesn't have more nodes to query but we haven't finished yet. We
+                    // won't be able to complete the request in all partitions, so we abort
+                    return Err(NidxError::QueryError(format!(
+                        "Error in search, exhausted all available nodes for shard {shard_id}"
+                    )));
+                }
+
+                let node = nodes.remove(0);
+                shard_groups
+                    .entry(node)
+                    .and_modify(|shards: &mut Vec<uuid::Uuid>| shards.push(*shard_id))
+                    .or_insert(vec![*shard_id]);
+            }
+
+            let mut tasks = JoinSet::new();
+            for (node, shard_ids) in shard_groups {
+                match node {
+                    SearcherNode::This => {
+                        // TODO: if we pass down the list of shard ids, we'll be able to reuse the
+                        // query plan for all of them
+                        for shard_id in shard_ids.into_iter() {
+                            tasks.spawn(shard_search::search(
+                                shard_id,
+                                Arc::clone(&self.index_cache),
+                                request.clone(),
+                            ));
+                        }
+                    }
+                    SearcherNode::Remote(ref hostname) => {
+                        match self.get_client(hostname).await {
+                            Ok(mut client) => {
+                                // Send the query to a different node specifying only a subset of shards
+                                let mut search_request = request.clone();
+                                search_request.shard_ids = shard_ids.into_iter().map(|x| x.to_string()).collect();
+
+                                // We do include a marker header to indicate we already hopped in
+                                // the cluster. This avoids an infinite loop across nodes
+                                let mut request = Request::new(search_request);
+                                request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
+                                tasks.spawn(async move {
+                                    client.search(request).await.map(|resp| resp.into_inner()).map_err(|e| {
+                                        match e.code() {
+                                            tonic::Code::NotFound => NidxError::NotFound,
+                                            _ => NidxError::Unknown(anyhow::Error::from(e)),
+                                        }
+                                    })
+                                });
+                            }
+                            Err(e) => {
+                                // A client for this shard is not available. This is probably a bad
+                                // sign, as we haven't connected to it yet, so it's a problem on our
+                                // side. However, if we manage to get a client for another node for
+                                // this shards, we can still complete the request
+                                warn!(
+                                    ?node,
+                                    ?shard_ids,
+                                    concat!("Error in search, trying with next node: {:?}"),
+                                    e
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            if tasks.is_empty() {
+                // All requests failed, keep iterating and wish more luck on the next round of
+                continue;
+            }
+
+            while let Some(join) = tasks.join_next().await {
+                match join {
+                    Ok(Ok(response)) => {
+                        responses.push(response);
+                    }
+                    Ok(Err(search_error)) => {
+                        warn!("An error occurred while searching: {search_error:?}");
+                    }
+                    Err(join_error) => {
+                        // Either a panic or a cancellation happened while searching
+                        warn!("A shard query failed in tokio: {:?}", join_error.to_string());
+                    }
+                }
+            }
+
+            for response in &responses {
+                // The response includes a list of successful shards, that may be a subset of the
+                // requested ones. This is the way we communicate partial failures.
+                for shard_id in &response.shard_ids {
+                    let shard_id =
+                        uuid::Uuid::parse_str(shard_id).expect("we always populates queried shards with valid UUIDs");
+                    // We now remove successful shards from the set of shards we want to query
+                    shard_nodes.remove(&shard_id);
+                }
+            }
+        }
+        debug_assert_eq!(
+            responses.len(),
+            shards.len(),
+            "we must have the same amount of responses as shards to succeed"
+        );
+
+        let merged = if responses.len() == 1 {
+            responses.pop().unwrap()
+        } else {
+            shard_merge::merge(
+                responses,
+                OrderBy::from(&request),
+                Limit(request.result_per_page as usize),
+            )
+        };
+        Ok(merged)
+    }
+
+    async fn local_query(&self, request: SearchRequest, shards: Vec<uuid::Uuid>) -> Result<SearchResponse> {
+        let mut tasks = JoinSet::new();
+
+        for shard_id in shards {
+            tasks.spawn(shard_search::search(
+                shard_id,
+                Arc::clone(&self.index_cache),
+                request.clone(),
+            ));
+        }
+
+        let mut responses = vec![];
+        while let Some(join) = tasks.join_next().await {
+            match join {
+                Ok(Ok(response)) => {
+                    responses.push(response);
+                }
+                Ok(Err(search_error)) => {
+                    warn!("An error occurred while searching {search_error:?}");
+                }
+                Err(join_error) => {
+                    // Either a panic or a cancellation happened while searching
+                    warn!("A shard query failed in tokio: {:?}", join_error.to_string());
+                }
+            }
+        }
+
+        let merged = if responses.len() == 1 {
+            responses.pop().unwrap()
+        } else {
+            shard_merge::merge(
+                responses,
+                OrderBy::from(&request),
+                Limit(request.result_per_page as usize),
+            )
+        };
+        Ok(merged)
     }
 }

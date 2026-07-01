@@ -187,7 +187,7 @@ impl Scored<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum SearcherNode {
     This,
     Remote(String),
