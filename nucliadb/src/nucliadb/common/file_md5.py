@@ -74,6 +74,20 @@ async def set(txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str)
         await file_md5_v2.set(txn, kbid=kbid, md5=md5, rid=rid, field_id=field_id)
 
 
+@observer.wrap({"op": "get"})
+async def get(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> str | None:
+    """Get the MD5 hash for a resource field, or None if not found."""
+    async with _pg_transaction(txn).connection.cursor() as cur:
+        await cur.execute(
+            "SELECT md5 FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_id = %(field_id)s",
+            {"kbid": kbid, "rid": rid, "field_id": f"f/{field_id}"},
+        )
+        row = await cur.fetchone()
+        if row is None:
+            return None
+        return row[0]
+
+
 @overload
 async def delete(txn: Transaction, *, kbid: str) -> None: ...
 

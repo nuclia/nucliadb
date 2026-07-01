@@ -24,30 +24,26 @@ Backfill: copy data from the v1 key-value store into the new ORM tables
 Hierarchy
 ---------
   backfill_all_kbs
-  └── backfill_kb                  (shards, slug, config)
-      └── backfill_resource        (basic, slug, shard, origin, extra,
-      │                             security)
-          └── backfill_field       (value, status, md5)
-              └── backfill_conversation_field  (metadata + every page
-                                               + splits_metadata)
+  └── backfill_kb                  (slug, config, shards)
+      └── backfill_resource        (slug, shard, basic, origin, extra, security,
+                                    all fields, all conversation pages)
+          └── [reconciliation]     compare v1 vs v2 resource listings and
+                                   backfill any resource added during migration
 
-Each level reads from v1 (raw KV) and writes to v2 (pg tables) inside its own
-read-write transaction, so a failure in one resource/field does not roll back
-the whole KB.
+Each KB's metadata is written in its own transaction.  Each resource (and all of
+its fields and conversation pages) is migrated in a single transaction under a
+distributed lock.  After all resources are processed, a reconciliation pass
+catches any resource created concurrently between the initial v1 snapshot and the
+end of the migration run.
 """
 
+import asyncio
 import logging
 
-from nucliadb.common import datamanagers, file_md5_v2, locking
+from nucliadb.common import datamanagers, file_md5, locking
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers import (
     conversations as conversations_v1,
-)
-from nucliadb.common.datamanagers import (
-    conversations_v2,
-    fields_v2,
-    kb_v2,
-    resources_v2,
 )
 from nucliadb.common.datamanagers import (
     fields as fields_v1,
@@ -58,7 +54,10 @@ from nucliadb.common.datamanagers import (
 from nucliadb.common.datamanagers import (
     resources as resources_v1,
 )
-from nucliadb.common.datamanagers.utils import with_ro_transaction, with_rw_transaction
+from nucliadb.common.datamanagers import (
+    resources_v2,
+)
+from nucliadb.common.datamanagers.utils import _pg_cursor, with_ro_transaction, with_rw_transaction
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto
 from nucliadb_protos import resources_pb2
@@ -67,31 +66,26 @@ from nucliadb_telemetry.settings import LogLevel, LogSettings
 
 logger = logging.getLogger("backfill_orm_tables")
 
+# Maximum number of resources migrated concurrently within a single KB backfill.
+# Each slot holds one distributed lock + one PG transaction, so keep this
+# conservative enough not to saturate the connection pool.
+_MAX_CONCURRENT_RESOURCES = 10
+
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 
-async def backfill_all_kbs(minimal: bool) -> None:
-    """Iterate every KB in v1 and backfill it into the ORM tables.
-
-    Args:
-        minimal: When True, only the bare-minimum rows are written (slug, status).
-            Use this mode to safely activate the write feature flag: it ensures every
-            existing resource and field already has an entry in the ORM tables, so an
-            in-flight write that arrives before the full backfill completes will not
-            fail due to a missing row.  Heavy data (config, shards, origin, extra,
-            security, conversation pages) can then be populated in a follow-up run
-            with minimal=False.
-    """
+async def backfill_all_kbs() -> None:
+    """Iterate every KB in v1 and backfill it into the ORM tables."""
     kbids_and_slugs = []
     async with with_ro_transaction() as txn:
         async for kbid, slug in kb_v1.get_kbs(txn):
             kbids_and_slugs.append((kbid, slug))
-    for kbid, _ in kbids_and_slugs:
+    for kbid, slug in kbids_and_slugs:
         try:
-            await backfill_kb(kbid=kbid, minimal=minimal)
+            await backfill_kb(kbid=kbid)
         except Exception:
             logger.exception("Failed to backfill KB %s (%s), continuing", kbid, slug)
 
@@ -101,58 +95,97 @@ async def backfill_all_kbs(minimal: bool) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def backfill_kb(*, kbid: str, minimal: bool) -> None:
+async def backfill_kb(*, kbid: str) -> None:
     """Backfill one KB row and all of its resources.
 
-    Args:
-        minimal: See :func:`backfill_all_kbs` for a full description.  In short,
-            set this to True when populating the ORM tables just before enabling the
-            write feature flag, so that any concurrent write for an already-existing
-            resource or field finds a row to update instead of failing with a
-            missing-entry error.
+    After migrating all resources, a reconciliation pass compares the v1 and v2
+    resource listings to catch any resources created concurrently during the
+    migration run.
     """
     logger.info(f"Backfilling KB {kbid}")
     start_time = asyncio.get_event_loop().time()
+
     async with with_rw_transaction() as txn:
         try:
-            await backfill_kb_metadata(txn, kbid=kbid, minimal=minimal)
+            await _backfill_kb_metadata(txn, kbid=kbid)
             await txn.commit()
         except Exception:
             logger.exception(f"Failed to backfill KB metadata for {kbid}, skipping")
             return
 
-    # Iterate resources in their own transactions
+    # Snapshot v1 resource IDs before starting the migration
+    v1_rids: set[str] = set()
     async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
-        try:
-            await backfill_resource(kbid=kbid, rid=rid, minimal=minimal)
-        except Exception:
-            logger.exception(f"Failed to backfill resource {kbid}/{rid}, continuing")
+        v1_rids.add(rid)
+
+    await _backfill_resources(kbid=kbid, rids=v1_rids)
+
+    while True:
+        # Reconciliation: find resources present in v1 but absent from v2.
+        # These are resources that were created after our initial v1 snapshot was
+        # taken and would have been missed by the main loop above.
+        v2_rids: set[str] = set()
+        async for rid in resources_v2.iterate_resource_ids(kbid=kbid):
+            v2_rids.add(rid)
+
+        v1_rids_now: set[str] = set()
+        async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+            v1_rids_now.add(rid)
+
+        missed = v1_rids_now - v2_rids
+        if missed:
+            logger.info(
+                f"Reconciliation: {len(missed)} resource(s) missing from v2 for KB {kbid}, backfilling"
+            )
+            await _backfill_resources(kbid=kbid, rids=missed)
+        else:
+            break
+
     elapsed = asyncio.get_event_loop().time() - start_time
     logger.info(f"Backfilled KB {kbid} in {elapsed:.2f} seconds")
 
 
-async def backfill_kb_metadata(txn: Transaction, *, kbid: str, minimal: bool) -> None:
+async def _backfill_kb_metadata(txn: Transaction, *, kbid: str) -> None:
+    """Read all KB metadata from v1 and write it to the kbs table in a single INSERT."""
     config = await datamanagers.kb.get_config(txn, kbid=kbid, for_update=True)
     if config is None:
-        raise ValueError(f"KB {kbid} has no config, skipping backfill of config and shards")
+        raise ValueError(f"KB {kbid} has no config, skipping backfill")
 
-    # slug
-    slug = config.slug
-    await kb_v2.set_kbid_for_slug(txn, kbid=kbid, slug=slug)
-
-    if minimal:
-        logger.info(f"Minimal backfill for KB {kbid}, skipping config and shards")
-        return
-
-    # config
-    await kb_v2.set_config(txn, kbid=kbid, config=config)
-
-    # shards
     shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
     if shards is None:
-        raise ValueError(f"KB {kbid} has no shards, skipping backfill of shards")
+        raise ValueError(f"KB {kbid} has no shards, skipping backfill")
 
-    await kb_v2.update_kb_shards(txn, kbid=kbid, shards=shards)
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(
+            """
+            INSERT INTO kbs (kbid, slug, config, shards)
+            VALUES (%(kbid)s, %(slug)s, %(config)s, %(shards)s)
+            ON CONFLICT (kbid) DO UPDATE SET
+                slug   = EXCLUDED.slug,
+                config = EXCLUDED.config,
+                shards = EXCLUDED.shards
+            """,
+            {
+                "kbid": kbid,
+                "slug": config.slug,
+                "config": config.SerializeToString(),
+                "shards": shards.SerializeToString(),
+            },
+        )
+
+
+async def _backfill_resources(*, kbid: str, rids: set[str]) -> None:
+    """Backfill a set of resources concurrently, bounded by _MAX_CONCURRENT_RESOURCES."""
+    semaphore = asyncio.Semaphore(_MAX_CONCURRENT_RESOURCES)
+
+    async def _guarded(rid: str) -> None:
+        async with semaphore:
+            try:
+                await backfill_resource(kbid=kbid, rid=rid)
+            except Exception:
+                logger.exception(f"Failed to backfill resource {kbid}/{rid}, continuing")
+
+    await asyncio.gather(*(_guarded(rid) for rid in rids))
 
 
 # ---------------------------------------------------------------------------
@@ -160,204 +193,160 @@ async def backfill_kb_metadata(txn: Transaction, *, kbid: str, minimal: bool) ->
 # ---------------------------------------------------------------------------
 
 
-async def backfill_resource(*, kbid: str, rid: str, minimal: bool) -> None:
-    """Backfill one kb_resources row and all of its fields."""
+async def backfill_resource(*, kbid: str, rid: str) -> None:
+    """Backfill one kb_resources row and all of its fields in a single transaction."""
     logger.info(f"Backfilling resource {kbid}/{rid}")
-
     async with locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=rid)):
         async with with_rw_transaction() as txn:
-            await backfill_resource_metadata(txn, kbid=kbid, rid=rid, minimal=minimal)
+            await _backfill_resource_in_txn(txn, kbid=kbid, rid=rid)
             await txn.commit()
 
-        async with with_ro_transaction() as txn:
-            all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
-            for field in all_fields.fields if all_fields is not None else []:
-                field_type_str = from_proto.field_type_name(field.field_type).abbreviation()
-                try:
-                    await backfill_field(
-                        kbid=kbid,
-                        rid=rid,
-                        field_type=field_type_str,
-                        field_id=field.field,
-                        minimal=minimal,
-                    )
-                except Exception:
-                    logger.exception(
-                        f"Failed to backfill field {kbid}/{rid}/{field_type_str}/{field.field}, continuing"
-                    )
 
-
-async def backfill_resource_metadata(txn: Transaction, *, kbid: str, rid: str, minimal: bool) -> None:
+async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) -> None:
+    """
+    Read all data for a resource from v1 (metadata, fields, conversation pages)
+    and write everything to the ORM tables in one shot:
+      - one INSERT for the kb_resources row
+      - one executemany for all kb_fields rows
+      - one executemany for all kb_conversations rows (pages + splits sentinel)
+    """
+    # --- Resource row ---
     basic = await resources_v1.get_basic(txn, kbid=kbid, rid=rid)
     if basic is None:
         raise ValueError(f"Resource {kbid}/{rid} has no basic metadata, skipping backfill")
 
-    # slug
-    await resources_v2.set_slug(txn, kbid=kbid, rid=rid, slug=basic.slug)
-    if minimal:
-        logger.info(
-            f"Minimal backfill for resource {kbid}/{rid}, skipping shard, origin, extra, and security"
-        )
-        return
-
-    # basic
-    await resources_v2.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
-
-    # shard
     shard = await resources_v1.get_resource_shard_id(txn, kbid=kbid, rid=rid)
     if shard is None:
         raise ValueError(f"Resource {kbid}/{rid} has no shard, skipping backfill")
 
-    await resources_v2.set_resource_shard_id(txn, kbid=kbid, rid=rid, shard=shard)
-
-    # origin
     origin = await resources_v1.get_origin(txn, kbid=kbid, rid=rid)
-    if origin is not None:
-        await resources_v2.set_origin(txn, kbid=kbid, rid=rid, origin=origin)
-
-    # extra
     extra = await resources_v1.get_extra(txn, kbid=kbid, rid=rid)
-    if extra is not None:
-        await resources_v2.set_extra(txn, kbid=kbid, rid=rid, extra=extra)
-
-    # security
     security = await resources_v1.get_security(txn, kbid=kbid, rid=rid)
-    if security is not None:
-        await resources_v2.set_security(txn, kbid=kbid, rid=rid, security=security)
 
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(
+            """
+            INSERT INTO kb_resources (kbid, rid, slug, shard, basic, origin, extra, security)
+            VALUES (%(kbid)s, %(rid)s, %(slug)s, %(shard)s, %(basic)s, %(origin)s, %(extra)s, %(security)s)
+            ON CONFLICT (kbid, rid) DO UPDATE SET
+                slug     = EXCLUDED.slug,
+                shard    = EXCLUDED.shard,
+                basic    = EXCLUDED.basic,
+                origin   = EXCLUDED.origin,
+                extra    = EXCLUDED.extra,
+                security = EXCLUDED.security
+            """,
+            {
+                "kbid": kbid,
+                "rid": rid,
+                "slug": basic.slug,
+                "shard": shard,
+                "basic": basic.SerializeToString(),
+                "origin": origin.SerializeToString() if origin is not None else None,
+                "extra": extra.SerializeToString() if extra is not None else None,
+                "security": security.SerializeToString() if security is not None else None,
+            },
+        )
 
-# ---------------------------------------------------------------------------
-# Field
-# ---------------------------------------------------------------------------
+    # --- Collect all field and conversation rows ---
+    all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
+    if all_fields is None:
+        return
 
+    for field in all_fields.fields:
+        field_type_str = from_proto.field_type_name(field.field_type).abbreviation()
+        field_id = field.field
 
-async def backfill_field(*, kbid: str, rid: str, field_type: str, field_id: str, minimal: bool) -> None:
-    """Backfill one kb_fields row (value, status, md5)."""
-    logger.info(f"Backfilling field {kbid}/{rid}/{field_type}/{field_id}")
-
-    async with with_rw_transaction() as txn:
-        # status
         status = await fields_v1.get_status(
-            txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id
+            txn, kbid=kbid, rid=rid, field_type=field_type_str, field_id=field_id
         )
-        if status is not None:
-            await fields_v2.set_status(
-                txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id, status=status
-            )
-            if minimal:
-                logger.info(
-                    f"Minimal backfill for field {kbid}/{rid}/{field_type}/{field_id}, skipping value and md5"
-                )
-                await txn.commit()
-                return
-
-        # value
         value = await fields_v1.get_raw(
-            txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id
+            txn, kbid=kbid, rid=rid, field_type=field_type_str, field_id=field_id
         )
-        if value is not None:
-            await fields_v2.set(
-                txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id, value=value
-            )
-            if minimal:
-                logger.info(
-                    f"Minimal backfill for field {kbid}/{rid}/{field_type}/{field_id}, skipping md5"
-                )
-                await txn.commit()
-                return
 
-        # md5 — only file fields (field_type == 'f') have an md5 in the v1 table
-        if field_type == "f" and value is not None:
-            field_file = resources_pb2.FieldFile()
-            field_file.ParseFromString(value)
-            if field_file.file.md5:
-                await file_md5_v2.set(
-                    txn, kbid=kbid, md5=field_file.file.md5, rid=rid, field_id=field_id
-                )
-                if minimal:
-                    logger.info(
-                        f"Minimal backfill for field {kbid}/{rid}/{field_type}/{field_id}, skipping md5"
+        md5 = None
+        if field_type_str == "f":
+            md5 = await file_md5.get(txn, kbid=kbid, rid=rid, field_id=field_id)
+
+        async with _pg_cursor(txn) as cur:
+            await cur.execute(
+                """
+                INSERT INTO kb_fields (kbid, rid, field_type, field_id, value, status)
+                VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(value)s, %(status)s)
+                ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
+                    value  = EXCLUDED.value,
+                    status = EXCLUDED.status
+                """,
+                {
+                    "kbid": kbid,
+                    "rid": rid,
+                    "field_type": field_type_str,
+                    "field_id": field_id,
+                    "value": value,
+                    "md5": md5,
+                    "status": status.SerializeToString() if status is not None else None,
+                },
+            )
+
+        # Conversation fields: insert splits metadata sentinel + each page individually
+        if field_type_str == "c" and value is not None:
+            # Parse page count directly from the already-fetched field value
+            # (FieldConversation is stored at the same KV key as the field value)
+            conv_metadata = resources_pb2.FieldConversation()
+            conv_metadata.ParseFromString(value)
+
+            splits_metadata = await conversations_v1.get_splits_metadata(
+                txn, kbid=kbid, rid=rid, field_type="c", field_id=field_id
+            )
+            if splits_metadata is not None:
+                async with _pg_cursor(txn) as cur:
+                    await cur.execute(
+                        """
+                        INSERT INTO kb_conversations (kbid, rid, field_type, field_id, page, value)
+                        VALUES (%(kbid)s, %(rid)s, 'c', %(field_id)s, 0, %(value)s)
+                        ON CONFLICT (kbid, rid, field_type, field_id, page) DO UPDATE SET
+                            value = EXCLUDED.value
+                        """,
+                        {
+                            "kbid": kbid,
+                            "rid": rid,
+                            "field_id": field_id,
+                            "value": splits_metadata.SerializeToString(),
+                        },
                     )
-                    await txn.commit()
-                    return
 
-        await txn.commit()
-
-    # Conversation fields need their own dedicated backfill
-    if field_type == "c":
-        await backfill_conversation_field(kbid=kbid, rid=rid, field_id=field_id, minimal=minimal)
-
-
-# ---------------------------------------------------------------------------
-# Conversation field
-# ---------------------------------------------------------------------------
-
-
-async def backfill_conversation_field(*, kbid: str, rid: str, field_id: str, minimal: bool) -> None:
-    """
-    Backfill FieldConversation metadata, all pages, and SplitsMetadata
-
-    Conversation metadata has already been backfilled in backfill_field in the kb_fields table.
-    We need to backfill the conversation pages and splits metadata into the kb_conversations table.
-    """
-    logger.info(f"Backfilling conversation {kbid}/{rid}/c/{field_id}")
-
-    async with with_rw_transaction() as txn:
-        metadata = await conversations_v1.get_metadata(
-            txn, kbid=kbid, rid=rid, field_type="c", field_id=field_id
-        )
-        if metadata is None:
-            raise ValueError(
-                f"Conversation {kbid}/{rid}/c/{field_id} has no metadata, skipping backfill"
-            )
-        splits_metadata = await conversations_v1.get_splits_metadata(
-            txn, kbid=kbid, rid=rid, field_type="c", field_id=field_id
-        )
-        if splits_metadata is not None:
-            await conversations_v2.set_splits_metadata(
-                txn, kbid=kbid, rid=rid, field_id=field_id, splits_metadata=splits_metadata
-            )
-        await txn.commit()
-
-        if minimal:
-            logger.info(f"Minimal backfill for conversation {kbid}/{rid}/c/{field_id}, skipping pages")
-            return
-
-    async with with_rw_transaction() as txn:
-        for page_n in range(1, metadata.pages + 1):
-            page = await conversations_v1.get_page(
-                txn, kbid=kbid, rid=rid, field_type="c", field_id=field_id, page=page_n
-            )
-            if page is None:
-                logger.warning(
-                    f"Conversation {kbid}/{rid}/c/{field_id} page {page_n} is missing, skipping"
+            for page_n in range(1, conv_metadata.pages + 1):
+                page = await conversations_v1.get_page(
+                    txn, kbid=kbid, rid=rid, field_type="c", field_id=field_id, page=page_n
                 )
-                continue
-            await conversations_v2.set_page(
-                txn, kbid=kbid, rid=rid, field_id=field_id, page=page_n, value=page
-            )
-            await txn.commit()
+                if page is None:
+                    logger.warning(
+                        f"Conversation {kbid}/{rid}/c/{field_id} page {page_n} missing, skipping"
+                    )
+                    continue
+                async with _pg_cursor(txn) as cur:
+                    await cur.execute(
+                        """
+                        INSERT INTO kb_conversations (kbid, rid, field_type, field_id, page, value)
+                        VALUES (%(kbid)s, %(rid)s, 'c', %(field_id)s, %(page)s, %(value)s)
+                        ON CONFLICT (kbid, rid, field_type, field_id, page) DO UPDATE SET
+                            value = EXCLUDED.value
+                        """,
+                        {
+                            "kbid": kbid,
+                            "rid": rid,
+                            "field_id": field_id,
+                            "page": page_n,
+                            "value": page.SerializeToString(),
+                        },
+                    )
 
 
 async def _main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Backfill ORM tables from the v1 KV store")
-    parser.add_argument(
-        "--kbid", help="Backfill a single KB by its UUID (default: all KBs)", required=True
-    )
-    parser.add_argument(
-        "--minimal",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help=(
-            "When set, write only the bare-minimum rows (slug, status) needed to activate the "
-            "write feature flag safely. Any in-flight write for an already-existing resource or "
-            "field will find an ORM entry to update instead of failing. "
-            "Heavy data (config, shards, origin, extra, security, conversation pages) is skipped "
-            "and must be backfilled in a follow-up run with --no-minimal. Default: True"
-        ),
-    )
+    parser.add_argument("--kbid", help="Backfill a single KB by its UUID", required=True)
     args = parser.parse_args()
     setup_logging(
         settings=LogSettings(
@@ -380,12 +369,10 @@ async def _main():
     await context.initialize()
 
     try:
-        await backfill_kb(kbid=args.kbid, minimal=args.minimal)
+        await backfill_kb(kbid=args.kbid)
     finally:
         await context.finalize()
 
 
 if __name__ == "__main__":
-    import asyncio
-
     asyncio.run(_main())
