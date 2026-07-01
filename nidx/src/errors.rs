@@ -33,6 +33,8 @@ pub enum NidxError {
     TokioTaskError(#[from] tokio::task::JoinError),
     #[error(transparent)]
     GrpcError(#[from] tonic::transport::Error),
+    #[error("Query error: {0}")]
+    QueryError(String),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
