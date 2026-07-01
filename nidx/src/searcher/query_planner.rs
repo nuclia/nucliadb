@@ -165,6 +165,7 @@ impl IndexQueries {
 
 /// A shard reader will use this plan to produce search results as efficiently as
 /// possible.
+#[derive(Clone)]
 pub struct QueryPlan {
     pub prefilter: Option<PreFilterRequest>,
     pub index_queries: IndexQueries,

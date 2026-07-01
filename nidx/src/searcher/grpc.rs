@@ -30,6 +30,7 @@ use tonic::{Request, Response, Result, Status, service::Routes};
 use crate::NidxMetadata;
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::shard_merge::{Limit, OrderBy};
+use crate::searcher::shard_search::{PartialResult, SearchResult};
 use crate::searcher::shard_selector::SearcherNode;
 
 use super::shard_selector::ShardSelector;
@@ -169,7 +170,9 @@ impl NidxSearcher for SearchServer {
             // This is a hopped node, i.e., another searcher has delegated this part of the query to
             // us. We must query our shards and return either a full or partial response or an error.
             // We won't hop to any other node
-            self.local_query(request, shards).await?
+            shard_search::search(shards, Arc::clone(&self.index_cache), request)
+                .await?
+                .into_value()
         } else {
             // A query that may need to be distributed across nodes in order to search in all partitions.
 
@@ -317,46 +320,26 @@ impl SearchServer {
             for (node, shard_ids) in shard_groups {
                 match node {
                     SearcherNode::This => {
-                        // TODO: if we pass down the list of shard ids, we'll be able to reuse the
-                        // query plan for all of them
-                        for shard_id in shard_ids.into_iter() {
-                            tasks.spawn(shard_search::search(
-                                shard_id,
-                                Arc::clone(&self.index_cache),
-                                request.clone(),
-                            ));
-                        }
+                        tasks.spawn(shard_search::search(
+                            shard_ids,
+                            Arc::clone(&self.index_cache),
+                            request.clone(),
+                        ));
                     }
                     SearcherNode::Remote(ref hostname) => {
                         match self.get_client(hostname).await {
-                            Ok(mut client) => {
-                                // Send the query to a different node specifying only a subset of shards
-                                let mut search_request = request.clone();
-                                search_request.shard_ids = shard_ids.into_iter().map(|x| x.to_string()).collect();
-
-                                // We do include a marker header to indicate we already hopped in
-                                // the cluster. This avoids an infinite loop across nodes
-                                let mut request = Request::new(search_request);
-                                request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
-                                tasks.spawn(async move {
-                                    client.search(request).await.map(|resp| resp.into_inner()).map_err(|e| {
-                                        match e.code() {
-                                            tonic::Code::NotFound => NidxError::NotFound,
-                                            _ => NidxError::Unknown(anyhow::Error::from(e)),
-                                        }
-                                    })
-                                });
+                            Ok(client) => {
+                                tasks.spawn(Self::remote_query(client, request.clone(), shard_ids));
                             }
                             Err(e) => {
-                                // A client for this shard is not available. This is probably a bad
-                                // sign, as we haven't connected to it yet, so it's a problem on our
-                                // side. However, if we manage to get a client for another node for
-                                // this shards, we can still complete the request
+                                // A client for this node is not available, although we've seen it
+                                // in the k8s cluster. We skip it and will retry those shards on
+                                // another node to complete the request
                                 warn!(
                                     ?node,
                                     ?shard_ids,
-                                    concat!("Error in search, trying with next node: {:?}"),
-                                    e
+                                    "{}",
+                                    format!("Error getting a client for node '{hostname}': {e}")
                                 );
                             }
                         }
@@ -371,9 +354,7 @@ impl SearchServer {
 
             while let Some(join) = tasks.join_next().await {
                 match join {
-                    Ok(Ok(response)) => {
-                        responses.push(response);
-                    }
+                    Ok(Ok(result)) => responses.push(result.into_value()),
                     Ok(Err(search_error)) => {
                         warn!("An error occurred while searching: {search_error:?}");
                     }
@@ -408,42 +389,39 @@ impl SearchServer {
         Ok(merged)
     }
 
-    async fn local_query(&self, request: SearchRequest, shards: Vec<uuid::Uuid>) -> Result<SearchResponse> {
-        let mut tasks = JoinSet::new();
+    async fn remote_query(
+        mut client: SearcherClient,
+        request: SearchRequest,
+        shards: Vec<uuid::Uuid>,
+    ) -> NidxResult<SearchResult<SearchResponse>> {
+        // Send the query to a different node specifying only a subset of shards
+        let mut search_request = request.clone();
+        search_request.shard_ids = shards.iter().map(|x| x.to_string()).collect();
 
-        for shard_id in shards {
-            tasks.spawn(shard_search::search(
-                shard_id,
-                Arc::clone(&self.index_cache),
-                request.clone(),
-            ));
-        }
+        // We do include a marker header to indicate we already hopped in
+        // the cluster. This avoids an infinite loop across nodes
+        let mut request = Request::new(search_request);
+        request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
 
-        let mut responses = vec![];
-        while let Some(join) = tasks.join_next().await {
-            match join {
-                Ok(Ok(response)) => {
-                    responses.push(response);
-                }
-                Ok(Err(search_error)) => {
-                    warn!("An error occurred while searching {search_error:?}");
-                }
-                Err(join_error) => {
-                    // Either a panic or a cancellation happened while searching
-                    warn!("A shard query failed in tokio: {:?}", join_error.to_string());
-                }
+        let response = client.search(request).await;
+
+        match response {
+            Ok(response) => {
+                let response = response.into_inner();
+                let result = if response.shard_ids.len() == shards.len() {
+                    SearchResult::Complete(response)
+                } else {
+                    SearchResult::Partial(PartialResult { part: response })
+                };
+                Ok(result)
+            }
+            Err(status) => {
+                let error = match status.code() {
+                    tonic::Code::NotFound => NidxError::NotFound,
+                    _ => NidxError::Unknown(anyhow::Error::from(status)),
+                };
+                Err(error)
             }
         }
-
-        let merged = if responses.len() == 1 {
-            responses.pop().unwrap()
-        } else {
-            shard_merge::merge(
-                responses,
-                OrderBy::from(&request),
-                Limit(request.result_per_page as usize),
-            )
-        };
-        Ok(merged)
     }
 }

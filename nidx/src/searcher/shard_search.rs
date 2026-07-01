@@ -23,27 +23,97 @@ use nidx_relation::{RelationSearcher, graph_query_parser::VectorQueryResults};
 use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::VectorSearcher;
-use tracing::{Span, instrument};
+use tokio::task::JoinSet;
+use tracing::{Span, instrument, warn};
 use uuid::Uuid;
 
-use crate::{
-    errors::{NidxError, NidxResult},
-    searcher::query_planner::{GraphIndexQueries, IndexQueries},
-};
+use crate::errors::{NidxError, NidxResult};
+use crate::searcher::query_planner::{GraphIndexQueries, IndexQueries};
+use crate::searcher::shard_merge;
+use crate::searcher::shard_merge::Limit;
+use crate::searcher::shard_merge::OrderBy;
 
-use super::{
-    index_cache::IndexCache,
-    query_planner::{self, QueryPlan},
-};
+use super::index_cache::IndexCache;
+use super::query_planner;
+use super::query_planner::QueryPlan;
 
-#[instrument(skip_all, fields(shard_id = shard_id.to_string()))]
+pub enum SearchResult<T> {
+    Complete(T),
+    Partial(PartialResult<T>),
+}
+
+pub struct PartialResult<T> {
+    pub part: T,
+}
+
+impl<T> SearchResult<T> {
+    pub fn into_value(self) -> T {
+        match self {
+            Self::Complete(v) => v,
+            Self::Partial(PartialResult { part, .. }) => part,
+        }
+    }
+}
+
+/// Search in multiple shards and return either the full response, partial
+/// results or an error
+///
 pub async fn search(
-    shard_id: uuid::Uuid,
+    shards: Vec<uuid::Uuid>,
     index_cache: Arc<IndexCache>,
     search_request: SearchRequest,
-) -> NidxResult<SearchResponse> {
-    let query_plan = query_planner::build_query_plan(search_request.clone())?;
+) -> NidxResult<SearchResult<SearchResponse>> {
+    let order_by = OrderBy::from(&search_request);
+    let limit = Limit(search_request.result_per_page as usize);
+    let query_plan = query_planner::build_query_plan(search_request)?;
 
+    if shards.len() == 1 {
+        let shard_id = shards[0];
+        let response = shard_search(shard_id, Arc::clone(&index_cache), query_plan).await?;
+        return Ok(SearchResult::Complete(response));
+    }
+
+    let mut tasks = JoinSet::new();
+    for shard_id in shards {
+        tasks.spawn(shard_search(shard_id, Arc::clone(&index_cache), query_plan.clone()));
+    }
+
+    let mut responses = vec![];
+    let mut errors = 0;
+    while let Some(join) = tasks.join_next().await {
+        match join {
+            Ok(Ok(response)) => responses.push(response),
+            Ok(Err(search_error)) => {
+                warn!("An error occurred while searching: {search_error:?}");
+                errors += 1;
+            }
+            Err(join_error) => {
+                // Either a panic or a cancellation happened while searching
+                warn!("A shard query failed in tokio: {:?}", join_error.to_string());
+                errors += 1;
+            }
+        }
+    }
+
+    let merged = if responses.len() == 1 {
+        responses.pop().unwrap()
+    } else {
+        shard_merge::merge(responses, order_by, limit)
+    };
+
+    if errors == 0 {
+        Ok(SearchResult::Complete(merged))
+    } else {
+        Ok(SearchResult::Partial(PartialResult { part: merged }))
+    }
+}
+
+#[instrument(skip_all, fields(shard_id = shard_id.to_string()))]
+async fn shard_search(
+    shard_id: uuid::Uuid,
+    index_cache: Arc<IndexCache>,
+    query_plan: QueryPlan,
+) -> NidxResult<SearchResponse> {
     let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
         return Err(NidxError::NotFound);
     };
@@ -86,11 +156,11 @@ pub async fn search(
     };
 
     // Do not require the vectorset parameter if it's not going to be used
-    let vector_seach = if query_plan.index_queries.vectors_request.is_some() {
-        if search_request.vectorset.is_empty() {
+    let vector_search = if let Some(vector_request) = &query_plan.index_queries.vectors_request {
+        if vector_request.vector_set.is_empty() {
             return Err(NidxError::invalid("Vectorset is required"));
         }
-        let Some(vector_index) = indexes.vector_index(&search_request.vectorset) else {
+        let Some(vector_index) = indexes.vector_index(&vector_request.vector_set) else {
             return Err(NidxError::NotFound);
         };
         Some(index_cache.get(&vector_index).await?)
@@ -138,7 +208,7 @@ pub async fn search(
                 paragraph_search.as_ref().map(|v| v.as_ref().into()),
                 relation_search.as_ref().map(|v| v.as_ref().into()),
                 text_search.as_ref().map(|v| v.as_ref().into()),
-                vector_seach.as_ref().map(|v| v.as_ref().into()),
+                vector_search.as_ref().map(|v| v.as_ref().into()),
                 node_semantic_index.as_ref().map(|v| v.as_ref().into()),
                 edge_semantic_index.as_ref().map(|v| v.as_ref().into()),
             )
