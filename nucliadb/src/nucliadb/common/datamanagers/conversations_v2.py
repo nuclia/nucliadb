@@ -39,22 +39,14 @@ Deleting a single conversation field requires an explicit DELETE by (kbid, rid, 
 because there is no FK from kb_conversations to kb_fields.
 """
 
-from typing import cast
-
-from nucliadb.common.datamanagers.utils import _pg_cursor
+from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_error
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import FieldConversation, SplitsMetadata
 
 # Sentinel page number used to store SplitsMetadata in the kb_conversations table.
 # Real conversation pages are 1-based, so 0 is always free.
 _SPLITS_METADATA_PAGE = 0
-
-
-def _pg(txn: Transaction) -> PGTransaction:
-    return cast(PGTransaction, txn)
-
 
 # ---------------------------------------------------------------------------
 # FieldConversation metadata  (stored in kb_fields, field_type = 'c')
@@ -86,6 +78,7 @@ async def get_metadata(
         return pb
 
 
+@logs_foreign_key_error
 async def set_metadata(
     txn: Transaction,
     *,
@@ -145,6 +138,7 @@ async def get_page(
         return pb
 
 
+@logs_foreign_key_error
 async def set_page(
     txn: Transaction,
     *,
@@ -205,6 +199,7 @@ async def get_splits_metadata(
         return pb
 
 
+@logs_foreign_key_error
 async def set_splits_metadata(
     txn: Transaction,
     *,
@@ -237,6 +232,7 @@ async def set_splits_metadata(
 # ---------------------------------------------------------------------------
 
 
+@logs_foreign_key_error
 async def delete_field(
     txn: Transaction,
     *,

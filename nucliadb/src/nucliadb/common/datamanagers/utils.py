@@ -18,8 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import contextlib
+import functools
+import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, TypeVar, cast
+from typing import AsyncGenerator, Callable, Coroutine, TypeVar, cast
 
 import psycopg
 from google.protobuf.message import Message
@@ -30,7 +32,41 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
+logger = logging.getLogger(__name__)
+
 PB_TYPE = TypeVar("PB_TYPE", bound=Message)
+
+
+def logs_foreign_key_error(
+    func: Callable[..., Coroutine],
+) -> Callable[..., Coroutine]:
+    """Decorator for dual-write datamanager functions during the ORM backfill migration.
+
+    During the backfill migration, writes are sent to both the legacy KV store and
+    the new ORM (PostgreSQL) tables.  A write to an ORM table can fail with a
+    ForeignKeyViolation when the parent row (e.g. the kb_resources row for a field,
+    or the kbs row for a resource) has not been backfilled yet.
+
+    This decorator catches that specific error and logs a warning instead of
+    propagating the exception, so that the dual-write path does not break normal
+    operation for resources and fields that are still pending migration.
+
+    Example::
+
+        @logs_foreign_key_error
+        async def set_basic(txn, *, kbid, rid, basic): ...
+    """
+
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except psycopg.errors.ForeignKeyViolation as exc:
+            logger.warning(
+                f"Foreign key violation in {wrapper.__qualname__} (parent row not yet migrated to ORM tables): {exc}"
+            )
+
+    return wrapper
 
 
 async def get_kv_pb(

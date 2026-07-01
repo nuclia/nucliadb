@@ -346,7 +346,11 @@ async def _main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Backfill ORM tables from the v1 KV store")
-    parser.add_argument("--kbid", help="Backfill a single KB by its UUID", required=True)
+    parser.add_argument(
+        "--kbid",
+        help="KB UUID to backfill, or the special value 'ALL_KBS' to backfill every KB.",
+        required=True,
+    )
     args = parser.parse_args()
     setup_logging(
         settings=LogSettings(
@@ -369,7 +373,10 @@ async def _main():
     await context.initialize()
 
     try:
-        await backfill_kb(kbid=args.kbid)
+        if args.kbid == "ALL_KBS":
+            await backfill_all_kbs()
+        else:
+            await backfill_kb(kbid=args.kbid)
     finally:
         await context.finalize()
 

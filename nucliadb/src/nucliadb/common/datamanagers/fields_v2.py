@@ -37,31 +37,22 @@ removes all related field rows via the ON DELETE CASCADE foreign key —
 there is no need for explicit bulk-delete helpers here.
 """
 
-from typing import Sequence, cast
+from typing import Sequence
 
 from google.protobuf.message import Message
 
-from nucliadb.common.datamanagers.utils import _pg_cursor
+from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_error
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb_protos import resources_pb2 as rpb2
 from nucliadb_protos import writer_pb2 as wpb2
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-
-def _pg(txn: Transaction) -> PGTransaction:
-    return cast(PGTransaction, txn)
-
 
 # ---------------------------------------------------------------------------
 # Write operations
 # ---------------------------------------------------------------------------
 
 
+@logs_foreign_key_error
 async def set_status(
     txn: Transaction,
     *,
@@ -90,6 +81,7 @@ async def set_status(
         )
 
 
+@logs_foreign_key_error
 async def set(
     txn: Transaction,
     *,
@@ -120,6 +112,7 @@ async def set(
         )
 
 
+@logs_foreign_key_error
 async def delete(
     txn: Transaction,
     *,
