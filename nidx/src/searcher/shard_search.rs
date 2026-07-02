@@ -83,10 +83,11 @@ pub async fn search(
     while let Some(join) = tasks.join_next().await {
         match join {
             Ok(Ok(response)) => responses.push(response),
-            Ok(Err(search_error)) => {
-                warn!("An error occurred while searching: {search_error:?}");
+            Ok(Err(NidxError::NotFound)) => {
+                warn!("An error occurred while searching: NotFound");
                 errors += 1;
             }
+            Ok(Err(search_error)) => return Err(search_error),
             Err(join_error) => {
                 // Either a panic or a cancellation happened while searching
                 warn!("A shard query failed in tokio: {:?}", join_error.to_string());

@@ -16,6 +16,7 @@
 use std::collections::HashMap;
 use std::{pin::Pin, sync::Arc};
 
+use axum::http::request;
 use futures::Stream;
 use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use nidx_protos::nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
@@ -269,6 +270,55 @@ impl NidxSearcher for SearchServer {
     }
 }
 
+struct DistributedQuery {
+    shard_nodes: HashMap<uuid::Uuid, Vec<SearcherNode>>,
+}
+
+impl DistributedQuery {
+    fn new(shard_selector: &ShardSelector, shards: Vec<uuid::Uuid>) -> NidxResult<Self> {
+        let mut shard_nodes = HashMap::new();
+        for shard_id in &shards {
+            let nodes = shard_selector.nodes_for_shard(shard_id);
+            if nodes.is_empty() {
+                // We haven't found any node with this shard. As we'll never be able to return a
+                // full result, we fail fast
+                return Err(NidxError::NotFound);
+            }
+
+            shard_nodes.insert(*shard_id, nodes);
+        }
+
+        Ok(Self { shard_nodes })
+    }
+
+    fn next_queries(&mut self) -> Result<Option<HashMap<SearcherNode, Vec<uuid::Uuid>>>, NidxError> {
+        if self.shard_nodes.is_empty() {
+            return Ok(None);
+        }
+        let mut shard_groups = HashMap::new();
+        for (shard_id, nodes) in self.shard_nodes.iter_mut() {
+            if nodes.is_empty() {
+                // A shard doesn't have more nodes to query but we haven't finished yet. We
+                // won't be able to complete the request in all partitions, so we abort
+                return Err(NidxError::QueryError(format!(
+                    "Error in search, exhausted all available nodes for shard {shard_id}"
+                )));
+            }
+
+            let node = nodes.remove(0);
+            shard_groups
+                .entry(node)
+                .and_modify(|shards: &mut Vec<uuid::Uuid>| shards.push(*shard_id))
+                .or_insert(vec![*shard_id]);
+        }
+        Ok(Some(shard_groups))
+    }
+
+    fn ok(&mut self, shard_id: &uuid::Uuid) {
+        self.shard_nodes.remove(shard_id);
+    }
+}
+
 impl SearchServer {
     /// Perform a distributed query over a partitioned dataset across a cluster of nodes.
     ///
@@ -282,74 +332,17 @@ impl SearchServer {
     ///
     async fn distributed_query(&self, request: SearchRequest, shards: Vec<uuid::Uuid>) -> NidxResult<SearchResponse> {
         // Locate which nodes contain each shard and get a list by preference
-        let mut shard_nodes = HashMap::new();
-        for shard_id in &shards {
-            let nodes = self.shard_selector.nodes_for_shard(shard_id);
-            if nodes.is_empty() {
-                // We haven't found any node with this shard. As we'll never be able to return a
-                // full result, we fail fast
-                return Err(NidxError::NotFound);
-            }
-
-            shard_nodes.insert(*shard_id, nodes);
-        }
+        let mut queryer = DistributedQuery::new(&self.shard_selector, shards)?;
 
         // Now, we'll do scatter-gather cycles using the most preferred node per shard. Grouping
         // cycles is less time-efficient, as we wait for the slowest request, but we minimize the
         // amount of requests through the cluster.
         let mut responses = vec![];
-        while !shard_nodes.is_empty() {
-            let mut shard_groups = HashMap::new();
-            for (shard_id, nodes) in shard_nodes.iter_mut() {
-                if nodes.is_empty() {
-                    // A shard doesn't have more nodes to query but we haven't finished yet. We
-                    // won't be able to complete the request in all partitions, so we abort
-                    return Err(NidxError::QueryError(format!(
-                        "Error in search, exhausted all available nodes for shard {shard_id}"
-                    )));
-                }
-
-                let node = nodes.remove(0);
-                shard_groups
-                    .entry(node)
-                    .and_modify(|shards: &mut Vec<uuid::Uuid>| shards.push(*shard_id))
-                    .or_insert(vec![*shard_id]);
-            }
-
+        while let Some(shard_groups) = queryer.next_queries()? {
             let mut tasks = JoinSet::new();
             for (node, shard_ids) in shard_groups {
-                match node {
-                    SearcherNode::This => {
-                        tasks.spawn(shard_search::search(
-                            shard_ids,
-                            Arc::clone(&self.index_cache),
-                            request.clone(),
-                        ));
-                    }
-                    SearcherNode::Remote(ref hostname) => {
-                        match self.get_client(hostname).await {
-                            Ok(client) => {
-                                tasks.spawn(Self::remote_query(client, request.clone(), shard_ids));
-                            }
-                            Err(e) => {
-                                // A client for this node is not available, although we've seen it
-                                // in the k8s cluster. We skip it and will retry those shards on
-                                // another node to complete the request
-                                warn!(
-                                    ?node,
-                                    ?shard_ids,
-                                    "{}",
-                                    format!("Error getting a client for node '{hostname}': {e}")
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-
-            if tasks.is_empty() {
-                // All requests failed, keep iterating and wish more luck on the next round of
-                continue;
+                self.spawn_node_search(&mut tasks, node, shard_ids, request.clone())
+                    .await;
             }
 
             while let Some(join) = tasks.join_next().await {
@@ -362,7 +355,7 @@ impl SearchServer {
                             let shard_id = uuid::Uuid::parse_str(shard_id)
                                 .expect("we always populates queried shards with valid UUIDs");
                             // We now remove successful shards from the set of shards we want to query
-                            shard_nodes.remove(&shard_id);
+                            queryer.ok(&shard_id);
                         }
                         responses.push(response);
                     }
@@ -371,7 +364,8 @@ impl SearchServer {
                     }
                     Err(join_error) => {
                         // Either a panic or a cancellation happened while searching
-                        warn!("A shard query failed in tokio: {:?}", join_error.to_string());
+                        error!("A shard query failed in tokio: {:?}", join_error.to_string());
+                        return Err(join_error.into());
                     }
                 }
             }
@@ -387,6 +381,38 @@ impl SearchServer {
             )
         };
         Ok(merged)
+    }
+
+    async fn spawn_node_search(
+        &self,
+        tasks: &mut JoinSet<NidxResult<SearchResult<SearchResponse>>>,
+        node: SearcherNode,
+        shard_ids: Vec<uuid::Uuid>,
+        request: SearchRequest,
+    ) {
+        match node {
+            SearcherNode::This => {
+                tasks.spawn(shard_search::search(shard_ids, Arc::clone(&self.index_cache), request));
+            }
+            SearcherNode::Remote(ref hostname) => {
+                match self.get_client(hostname).await {
+                    Ok(client) => {
+                        tasks.spawn(Self::remote_query(client, request, shard_ids));
+                    }
+                    Err(e) => {
+                        // A client for this node is not available, although we've seen it
+                        // in the k8s cluster. We skip it and will retry those shards on
+                        // another node to complete the request
+                        warn!(
+                            ?node,
+                            ?shard_ids,
+                            "{}",
+                            format!("Error getting a client for node '{hostname}': {e}")
+                        );
+                    }
+                }
+            }
+        }
     }
 
     async fn remote_query(
