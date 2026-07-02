@@ -354,7 +354,18 @@ impl SearchServer {
 
             while let Some(join) = tasks.join_next().await {
                 match join {
-                    Ok(Ok(result)) => responses.push(result.into_value()),
+                    Ok(Ok(result)) => {
+                        let response = result.into_value();
+                        // The response includes a list of successful shards, that may be a subset of the
+                        // requested ones. This is the way we communicate partial failures.
+                        for shard_id in &response.shard_ids {
+                            let shard_id = uuid::Uuid::parse_str(shard_id)
+                                .expect("we always populates queried shards with valid UUIDs");
+                            // We now remove successful shards from the set of shards we want to query
+                            shard_nodes.remove(&shard_id);
+                        }
+                        responses.push(response);
+                    }
                     Ok(Err(search_error)) => {
                         warn!("An error occurred while searching: {search_error:?}");
                     }
@@ -362,17 +373,6 @@ impl SearchServer {
                         // Either a panic or a cancellation happened while searching
                         warn!("A shard query failed in tokio: {:?}", join_error.to_string());
                     }
-                }
-            }
-
-            for response in &responses {
-                // The response includes a list of successful shards, that may be a subset of the
-                // requested ones. This is the way we communicate partial failures.
-                for shard_id in &response.shard_ids {
-                    let shard_id =
-                        uuid::Uuid::parse_str(shard_id).expect("we always populates queried shards with valid UUIDs");
-                    // We now remove successful shards from the set of shards we want to query
-                    shard_nodes.remove(&shard_id);
                 }
             }
         }
