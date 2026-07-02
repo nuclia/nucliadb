@@ -184,25 +184,3 @@ async def migrate(txn: PGTransaction) -> None:
                     REFERENCES kb_fields (kbid, rid, field_type, field_id) ON DELETE CASCADE
             );
         """)
-
-
-"""
-@Javitonino:
-
-- Why not DELETE CASCADE on the foreign keys?  It would simplify the code and avoid orphaned rows.
-- For KB deletion:
-  - Delete the KB row (kbs) → cascades to kb_resources → cascades to kb_fields → cascades to kb_conversations.
-  - Storage bucket is managed via lifecycle and the purge cronjob.
-
-- For Resource deletion:
-  - Delete the resource row (kb_resources) → cascades to kb_fields → cascades to kb_conversations.
-  - Objects in storage are deleted via the purge cronjob.
-  - File_md5 are simply deleted by the ON DELETE CASCADE on kb_fields.
-
-- For Field deletion:
-  - Delete the field row (kb_fields) → cascades to kb_conversations.
-  - Objects in storage are deleted synchronously in the processor transaction.
-
-- Conversation pages are append only for now. Deletions are simply annotations on the splits metadata.
-
-"""

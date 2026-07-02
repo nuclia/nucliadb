@@ -232,7 +232,6 @@ async def set_splits_metadata(
 # ---------------------------------------------------------------------------
 
 
-@logs_foreign_key_error
 async def delete_field(
     txn: Transaction,
     *,

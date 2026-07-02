@@ -231,7 +231,6 @@ async def set_resource_shard_id(
         )
 
 
-@logs_foreign_key_error
 async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
     """Delete a resource row (cascades to fields)."""
     async with _pg_cursor(txn) as cur:

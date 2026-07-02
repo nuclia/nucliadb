@@ -112,7 +112,6 @@ async def set(
         )
 
 
-@logs_foreign_key_error
 async def delete(
     txn: Transaction,
     *,

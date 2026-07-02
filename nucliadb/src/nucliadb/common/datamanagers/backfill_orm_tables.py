@@ -39,6 +39,7 @@ end of the migration run.
 
 import asyncio
 import logging
+import time
 
 from nucliadb.common import datamanagers, file_md5, locking
 from nucliadb.common.context import ApplicationContext
@@ -71,6 +72,8 @@ logger = logging.getLogger("backfill_orm_tables")
 # conservative enough not to saturate the connection pool.
 _MAX_CONCURRENT_RESOURCES = 10
 
+# Maximum number of reconciliation iterations to perform for each KB.
+_MAX_RECONCILIATION_ITERATIONS = 2
 
 # ---------------------------------------------------------------------------
 # Entry point
@@ -103,7 +106,7 @@ async def backfill_kb(*, kbid: str) -> None:
     migration run.
     """
     logger.info(f"Backfilling KB {kbid}")
-    start_time = asyncio.get_event_loop().time()
+    start_time = time.monotonic()
 
     async with with_rw_transaction() as txn:
         try:
@@ -120,7 +123,15 @@ async def backfill_kb(*, kbid: str) -> None:
 
     await _backfill_resources(kbid=kbid, rids=v1_rids)
 
+    iteration = 0
     while True:
+        if iteration >= _MAX_RECONCILIATION_ITERATIONS:
+            logger.warning(
+                f"Reconciliation: reached max iterations ({_MAX_RECONCILIATION_ITERATIONS}) for KB {kbid}, stopping"
+            )
+            break
+        iteration += 1
+
         # Reconciliation: find resources present in v1 but absent from v2.
         # These are resources that were created after our initial v1 snapshot was
         # taken and would have been missed by the main loop above.
@@ -141,7 +152,7 @@ async def backfill_kb(*, kbid: str) -> None:
         else:
             break
 
-    elapsed = asyncio.get_event_loop().time() - start_time
+    elapsed = time.monotonic() - start_time
     logger.info(f"Backfilled KB {kbid} in {elapsed:.2f} seconds")
 
 
@@ -207,8 +218,8 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
     Read all data for a resource from v1 (metadata, fields, conversation pages)
     and write everything to the ORM tables in one shot:
       - one INSERT for the kb_resources row
-      - one executemany for all kb_fields rows
-      - one executemany for all kb_conversations rows (pages + splits sentinel)
+      - one INSERT for each kb_fields row (including the FieldConversation metadata for conversation fields)
+      - one INSERT for each kb_conversations rows (pages + splits sentinel)
     """
     # --- Resource row ---
     basic = await resources_v1.get_basic(txn, kbid=kbid, rid=rid)
