@@ -68,7 +68,10 @@ async def delete(txn: Transaction, *, kbid: str) -> None:
 
 
 async def soft_delete(txn: Transaction, *, kbid: str) -> None:
-    """Soft delete a KB row by clearing its slug and stamping deleted_at with the current time."""
+    """Soft delete a KB row by clearing its slug and stamping deleted_at with the current time.
+
+    No-op if the KB does not exist (UPDATE affects 0 rows without raising an error).
+    """
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "UPDATE kbs SET slug = NULL, deleted_at = NOW() WHERE kbid = %(kbid)s",
