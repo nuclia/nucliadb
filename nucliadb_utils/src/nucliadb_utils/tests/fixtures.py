@@ -115,3 +115,8 @@ def storage_settings(request, storage) -> Iterator[dict[str, Any]]:
 @pytest.fixture(scope="session", params=lazy_storage_fixture("session_{backend}_storage_settings"))
 def session_storage_settings(request) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
     yield request.param
+
+
+@pytest.fixture(scope="session", params=lazy_storage_fixture("session_{backend}_storage_buckets"))
+def session_storage_buckets(request) -> Iterator[tuple[dict[str, Any], dict[str, Any]]]:
+    yield request.param
