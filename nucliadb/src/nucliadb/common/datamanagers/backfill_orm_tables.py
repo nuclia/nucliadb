@@ -271,10 +271,11 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
         async with _pg_cursor(txn) as cur:
             await cur.execute(
                 """
-                INSERT INTO kb_fields (kbid, rid, field_type, field_id, value, status)
-                VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(value)s, %(status)s)
+                INSERT INTO kb_fields (kbid, rid, field_type, field_id, value, md5, status)
+                VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(value)s, %(md5)s, %(status)s)
                 ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
                     value  = EXCLUDED.value,
+                    md5     = EXCLUDED.md5,
                     status = EXCLUDED.status
                 """,
                 {
