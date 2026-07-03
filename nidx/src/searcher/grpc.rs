@@ -26,11 +26,12 @@ use tonic::service::Interceptor;
 use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Channel;
 use tonic::{Request, Response, Result, Status, service::Routes};
+use uuid::Uuid;
 
 use crate::NidxMetadata;
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::shard_merge::{Limit, OrderBy};
-use crate::searcher::shard_search::{PartialResult, SearchResult};
+use crate::searcher::shard_search::PartitionedResponse;
 use crate::searcher::shard_selector::SearcherNode;
 
 use super::shard_selector::ShardSelector;
@@ -288,22 +289,22 @@ impl SearchServer {
         // cycles is less time-efficient, as we wait for the slowest request, but we minimize the
         // amount of requests through the cluster.
         let mut responses = vec![];
-        while let Some(shard_groups) = partitioner.next_groups_by_node()? {
+        while let Some(groups) = partitioner.next_groups_by_node()? {
             let mut tasks = JoinSet::new();
-            for (node, shard_ids) in shard_groups {
+            for (node, shard_ids) in groups {
                 tasks.spawn(self.node_query(node, shard_ids, request.clone()).await?);
             }
 
             while let Some(join) = tasks.join_next().await {
                 match join {
                     Ok(Ok(result)) => {
-                        let response = result.into_value();
+                        let (response, shards) = match result {
+                            PartitionedResponse::Complete(response, shards) => (response, shards),
+                            PartitionedResponse::Partial(response, shards) => (response, shards),
+                        };
                         // The response includes a list of successful shards, that may be a subset of the
                         // requested ones. This is the way we communicate partial failures.
-                        for shard_id in &response.shard_ids {
-                            let shard_id = uuid::Uuid::parse_str(shard_id)
-                                .expect("we always populates queried shards with valid UUIDs");
-                            // We now remove successful shards from the set of shards we want to query
+                        for shard_id in shards {
                             partitioner.succeeded(&shard_id);
                         }
                         responses.push(response);
@@ -337,7 +338,8 @@ impl SearchServer {
         node: SearcherNode,
         shard_ids: Vec<uuid::Uuid>,
         request: SearchRequest,
-    ) -> NidxResult<Pin<Box<dyn Future<Output = NidxResult<SearchResult<SearchResponse>>> + Send + 'static>>> {
+    ) -> NidxResult<Pin<Box<dyn Future<Output = NidxResult<PartitionedResponse<SearchResponse>>> + Send + 'static>>>
+    {
         match node {
             SearcherNode::This => {
                 let index_cache = Arc::clone(&self.index_cache);
@@ -371,7 +373,7 @@ impl SearchServer {
         mut client: SearcherClient,
         request: SearchRequest,
         shards: Vec<uuid::Uuid>,
-    ) -> NidxResult<SearchResult<SearchResponse>> {
+    ) -> NidxResult<PartitionedResponse<SearchResponse>> {
         // Send the query to a different node specifying only a subset of shards
         let mut search_request = request.clone();
         search_request.shard_ids = shards.iter().map(|x| x.to_string()).collect();
@@ -387,9 +389,14 @@ impl SearchServer {
             Ok(response) => {
                 let response = response.into_inner();
                 let result = if response.shard_ids.len() == shards.len() {
-                    SearchResult::Complete(response)
+                    PartitionedResponse::Complete(response, shards)
                 } else {
-                    SearchResult::Partial(PartialResult { part: response })
+                    let successful_shards = response
+                        .shard_ids
+                        .iter()
+                        .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
+                        .collect();
+                    PartitionedResponse::Partial(response, successful_shards)
                 };
                 Ok(result)
             }
