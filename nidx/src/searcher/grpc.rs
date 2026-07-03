@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::{pin::Pin, sync::Arc};
 
 use futures::Stream;
@@ -22,6 +22,7 @@ use nidx_protos::nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
 use nidx_protos::*;
 use tokio::sync::RwLock;
 use tokio::task::JoinSet;
+use tonic::Code;
 use tonic::service::Interceptor;
 use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Channel;
@@ -163,7 +164,7 @@ impl NidxSearcher for SearchServer {
 
         let mut shards = vec![];
         for shard_id in &request.shard_ids {
-            let shard_id = uuid::Uuid::parse_str(shard_id).map_err(NidxError::from)?;
+            let shard_id = Uuid::parse_str(shard_id).map_err(NidxError::from)?;
             shards.push(shard_id);
         }
 
@@ -185,7 +186,7 @@ impl NidxSearcher for SearchServer {
 
     async fn suggest(&self, request: Request<SuggestRequest>) -> Result<Response<SuggestResponse>> {
         let message = request.get_ref();
-        let shard_id = uuid::Uuid::parse_str(&message.shard).map_err(NidxError::from)?;
+        let shard_id = Uuid::parse_str(&message.shard).map_err(NidxError::from)?;
         shard_request! {
             "suggest",
             self,
@@ -198,7 +199,7 @@ impl NidxSearcher for SearchServer {
 
     async fn graph_search(&self, request: Request<GraphSearchRequest>) -> Result<Response<GraphSearchResponse>> {
         let message = request.get_ref();
-        let shard_id = uuid::Uuid::parse_str(&message.shard).map_err(NidxError::from)?;
+        let shard_id = Uuid::parse_str(&message.shard).map_err(NidxError::from)?;
         shard_request! {
             "graph_search",
             self,
@@ -214,7 +215,7 @@ impl NidxSearcher for SearchServer {
         request: Request<ExtractedTextsRequest>,
     ) -> Result<Response<ExtractedTextsResponse>> {
         let message = request.get_ref();
-        let shard_id = uuid::Uuid::parse_str(&message.shard_id).map_err(NidxError::from)?;
+        let shard_id = Uuid::parse_str(&message.shard_id).map_err(NidxError::from)?;
         shard_request! {
             "extracted_texts",
             self,
@@ -231,7 +232,7 @@ impl NidxSearcher for SearchServer {
         let Some(shard) = &message.shard_id else {
             return Err(NidxError::invalid("Uuid is required").into());
         };
-        let shard_id = uuid::Uuid::parse_str(&shard.id).map_err(NidxError::from)?;
+        let shard_id = Uuid::parse_str(&shard.id).map_err(NidxError::from)?;
         shard_request! {
             "paragraphs",
             self,
@@ -249,7 +250,7 @@ impl NidxSearcher for SearchServer {
         let Some(shard) = &message.shard_id else {
             return Err(NidxError::invalid("Uuid is required").into());
         };
-        let shard_id = uuid::Uuid::parse_str(&shard.id).map_err(NidxError::from)?;
+        let shard_id = Uuid::parse_str(&shard.id).map_err(NidxError::from)?;
         shard_request! {
             "documents",
             self,
@@ -273,8 +274,8 @@ impl SearchServer {
     /// requested to query several partitions and one or more can fail, it will then return a
     /// partial result and is our responsibility to retry on other nodes.
     ///
-    async fn distributed_query(&self, request: SearchRequest, shards: Vec<uuid::Uuid>) -> NidxResult<SearchResponse> {
-        let mut partitioner = QueryPartitioner::new(&self.shard_selector, shards)?;
+    async fn distributed_query(&self, request: SearchRequest, shards: Vec<Uuid>) -> NidxResult<SearchResponse> {
+        let mut partitioner = QueryPartitioner::new(&self.shard_selector, &shards)?;
 
         // Use the query partitioner to group requests by the most preferred
         // node per shard. We'll then do scatter-gather cycles until we complete
@@ -283,12 +284,32 @@ impl SearchServer {
         // NOTE that grouping cycles is less time-efficient, as tail latency can
         // increase due to slow/faulty nodes
         let mut responses = vec![];
-        while let Some(groups) = partitioner.next_groups_by_node()? {
+
+        let mut pending: HashSet<Uuid> = HashSet::from_iter(shards.clone());
+
+        while !pending.is_empty() {
+            let mut groups = HashMap::new();
+            for shard_id in pending.iter() {
+                let Some(node) = partitioner.next_node_for_shard(shard_id) else {
+                    // A shard doesn't have more nodes to query but we haven't finished yet. We
+                    // won't be able to complete the request in all partitions, so we abort
+                    return Err(NidxError::QueryError(format!(
+                        "Error in search, exhausted all available nodes for shard {shard_id}"
+                    )));
+                };
+                groups
+                    .entry(node)
+                    .and_modify(|shards: &mut Vec<Uuid>| shards.push(*shard_id))
+                    .or_insert(vec![*shard_id]);
+            }
+
+            // Distribute requests across nodes
             let mut tasks = JoinSet::new();
             for (node, shard_ids) in groups {
                 tasks.spawn(self.node_query(node, shard_ids, request.clone()).await?);
             }
 
+            // Aggregate results
             while let Some(join) = tasks.join_next().await {
                 match join {
                     Ok(Ok(response)) => {
@@ -298,12 +319,15 @@ impl SearchServer {
                         // The response includes a list of successful shards, that may be a subset of the
                         // requested ones. This is the way we communicate partial failures.
                         for shard_id in shards {
-                            partitioner.succeeded(&shard_id);
+                            pending.remove(&shard_id);
                         }
                         responses.push(response);
                     }
                     Ok(Err(NidxError::NotFound)) => {}
+                    Ok(Err(NidxError::GrpcError(status))) if status.code() == Code::NotFound => {}
+                    Ok(Err(NidxError::GrpcError(status))) if status.code() == Code::Unavailable => {}
                     Ok(Err(search_error)) => return Err(search_error),
+                    // Ok(Err(search_error)) => return Err(search_error),
                     Err(join_error) => {
                         // Either a panic or a cancellation happened while searching
                         return Err(NidxError::from(join_error));
@@ -327,7 +351,7 @@ impl SearchServer {
     async fn node_query(
         &self,
         node: SearcherNode,
-        shard_ids: Vec<uuid::Uuid>,
+        shard_ids: Vec<Uuid>,
         request: SearchRequest,
     ) -> NidxResult<Pin<Box<dyn Future<Output = NidxResult<PartialResponse<SearchResponse>>> + Send + 'static>>> {
         match node {
@@ -339,9 +363,11 @@ impl SearchServer {
             }
             SearcherNode::Remote(ref hostname) => {
                 match self.get_client(hostname).await {
-                    Ok(client) => Ok(Box::pin(
-                        async move { Self::remote_query(client, request, shard_ids).await },
-                    )),
+                    Ok(client) => Ok(Box::pin(async move {
+                        Self::remote_query(client, request, shard_ids)
+                            .await
+                            .map_err(NidxError::GrpcError)
+                    })),
                     Err(e) => {
                         // A client for this node is not available, although we've seen it
                         // in the k8s cluster. We skip it and will retry those shards on
@@ -362,8 +388,8 @@ impl SearchServer {
     async fn remote_query(
         mut client: SearcherClient,
         request: SearchRequest,
-        shards: Vec<uuid::Uuid>,
-    ) -> NidxResult<PartialResponse<SearchResponse>> {
+        shards: Vec<Uuid>,
+    ) -> tonic::Result<PartialResponse<SearchResponse>> {
         // Send the query to a different node specifying only a subset of shards
         let mut search_request = request.clone();
         search_request.shard_ids = shards.iter().map(|x| x.to_string()).collect();
@@ -373,45 +399,33 @@ impl SearchServer {
         let mut request = Request::new(search_request);
         request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
 
-        let response = client.search(request).await;
+        let response = client.search(request).await?.into_inner();
 
-        match response {
-            Ok(response) => {
-                let response = response.into_inner();
-                let result = if response.shard_ids.len() == shards.len() {
-                    PartialResponse { data: response, shards }
-                } else {
-                    let successful_shards = response
-                        .shard_ids
-                        .iter()
-                        .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
-                        .collect();
-                    PartialResponse {
-                        data: response,
-                        shards: successful_shards,
-                    }
-                };
-                Ok(result)
+        let result = if response.shard_ids.len() == shards.len() {
+            PartialResponse { data: response, shards }
+        } else {
+            let successful_shards = response
+                .shard_ids
+                .iter()
+                .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
+                .collect();
+            PartialResponse {
+                data: response,
+                shards: successful_shards,
             }
-            Err(status) => {
-                let error = match status.code() {
-                    tonic::Code::NotFound => NidxError::NotFound,
-                    _ => NidxError::Unknown(anyhow::Error::from(status)),
-                };
-                Err(error)
-            }
-        }
+        };
+        Ok(result)
     }
 }
 
 struct QueryPartitioner {
-    shard_nodes: HashMap<uuid::Uuid, Vec<SearcherNode>>,
+    shard_nodes: HashMap<Uuid, Vec<SearcherNode>>,
 }
 
 impl QueryPartitioner {
-    fn new(shard_selector: &ShardSelector, shards: Vec<uuid::Uuid>) -> NidxResult<Self> {
+    fn new(shard_selector: &ShardSelector, shards: &[Uuid]) -> NidxResult<Self> {
         let mut shard_nodes = HashMap::new();
-        for shard_id in &shards {
+        for shard_id in shards {
             let nodes = shard_selector.nodes_for_shard(shard_id);
             if nodes.is_empty() {
                 // We haven't found any node with this shard. As we'll never be able to return a
@@ -423,32 +437,12 @@ impl QueryPartitioner {
         Ok(Self { shard_nodes })
     }
 
-    fn next_groups_by_node(&mut self) -> Result<Option<HashMap<SearcherNode, Vec<uuid::Uuid>>>, NidxError> {
-        if self.shard_nodes.is_empty() {
-            return Ok(None);
-        }
-
-        let mut shard_groups = HashMap::new();
-        for (shard_id, nodes) in self.shard_nodes.iter_mut() {
-            if nodes.is_empty() {
-                // A shard doesn't have more nodes to query but we haven't finished yet. We
-                // won't be able to complete the request in all partitions, so we abort
-                return Err(NidxError::QueryError(format!(
-                    "Error in search, exhausted all available nodes for shard {shard_id}"
-                )));
-            }
-
-            let node = nodes.remove(0);
-            shard_groups
-                .entry(node)
-                .and_modify(|shards: &mut Vec<uuid::Uuid>| shards.push(*shard_id))
-                .or_insert(vec![*shard_id]);
-        }
-        Ok(Some(shard_groups))
-    }
-
-    fn succeeded(&mut self, shard_id: &uuid::Uuid) {
-        self.shard_nodes.remove(shard_id);
+    /// Return the next preferred node to query for a shard.
+    ///
+    /// *Panics* if a called with a shard that wasn't in the original set
+    fn next_node_for_shard(&mut self, shard: &Uuid) -> Option<SearcherNode> {
+        let nodes = self.shard_nodes.get_mut(shard).unwrap();
+        if !nodes.is_empty() { Some(nodes.remove(0)) } else { None }
     }
 }
 

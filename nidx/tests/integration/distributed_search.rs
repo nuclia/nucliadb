@@ -92,7 +92,7 @@ async fn test_searchers_with_1_shard_replica(pool: PgPool) -> anyhow::Result<()>
         assert!(
             error
                 .message()
-                .contains("Error in search, exhausted all available nodes for shard")
+                .contains("Error in search, exhausted all available nodes for shard"),
         );
     }
 
@@ -248,11 +248,7 @@ async fn test_searchers_partial_results(pool: PgPool) -> anyhow::Result<()> {
     assert!(response.is_err());
     let error = response.unwrap_err();
     assert_eq!(error.code(), Code::Internal);
-    assert!(
-        error
-            .message()
-            .contains("Error in search, exhausted all available nodes for shard")
-    );
+    assert!(error.message().contains("transport error"));
 
     // But a local-only request will return partial results for all its shards
     let mut request = Request::new(SearchRequest {
