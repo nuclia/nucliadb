@@ -291,8 +291,7 @@ impl SearchServer {
         while let Some(shard_groups) = partitioner.next_groups_by_node()? {
             let mut tasks = JoinSet::new();
             for (node, shard_ids) in shard_groups {
-                self.spawn_node_search(&mut tasks, node, shard_ids, request.clone())
-                    .await;
+                tasks.spawn(self.node_query(node, shard_ids, request.clone()).await?);
             }
 
             while let Some(join) = tasks.join_next().await {
@@ -333,22 +332,24 @@ impl SearchServer {
         Ok(merged)
     }
 
-    async fn spawn_node_search(
+    async fn node_query(
         &self,
-        tasks: &mut JoinSet<NidxResult<SearchResult<SearchResponse>>>,
         node: SearcherNode,
         shard_ids: Vec<uuid::Uuid>,
         request: SearchRequest,
-    ) {
+    ) -> NidxResult<Pin<Box<dyn Future<Output = NidxResult<SearchResult<SearchResponse>>> + Send + 'static>>> {
         match node {
             SearcherNode::This => {
-                tasks.spawn(shard_search::search(shard_ids, Arc::clone(&self.index_cache), request));
+                let index_cache = Arc::clone(&self.index_cache);
+                Ok(Box::pin(async move {
+                    shard_search::search(shard_ids, index_cache, request).await
+                }))
             }
             SearcherNode::Remote(ref hostname) => {
                 match self.get_client(hostname).await {
-                    Ok(client) => {
-                        tasks.spawn(Self::remote_query(client, request, shard_ids));
-                    }
+                    Ok(client) => Ok(Box::pin(
+                        async move { Self::remote_query(client, request, shard_ids).await },
+                    )),
                     Err(e) => {
                         // A client for this node is not available, although we've seen it
                         // in the k8s cluster. We skip it and will retry those shards on
@@ -359,6 +360,7 @@ impl SearchServer {
                             "{}",
                             format!("Error getting a client for node '{hostname}': {e}")
                         );
+                        Err(e)
                     }
                 }
             }
