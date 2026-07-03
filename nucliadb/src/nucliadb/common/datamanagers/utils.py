@@ -21,7 +21,7 @@ import contextlib
 import functools
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Callable, Coroutine, TypeVar, cast
+from typing import Any, AsyncGenerator, Callable, Coroutine, ParamSpec, TypeVar, cast
 
 import psycopg
 from google.protobuf.message import Message
@@ -35,11 +35,13 @@ from nucliadb_utils.utilities import has_feature
 logger = logging.getLogger(__name__)
 
 PB_TYPE = TypeVar("PB_TYPE", bound=Message)
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
 
 def logs_foreign_key_error(
-    func: Callable[..., Coroutine],
-) -> Callable[..., Coroutine]:
+    func: Callable[_P, Coroutine[Any, Any, _R]],
+) -> Callable[_P, Coroutine[Any, Any, _R | None]]:
     """Decorator for dual-write datamanager functions during the ORM backfill migration.
 
     During the backfill migration, writes are sent to both the legacy KV store and
@@ -58,13 +60,14 @@ def logs_foreign_key_error(
     """
 
     @functools.wraps(func)
-    async def wrapper(*args, **kwargs):
+    async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R | None:
         try:
             return await func(*args, **kwargs)
         except psycopg.errors.ForeignKeyViolation as exc:
             logger.warning(
                 f"Foreign key violation in {wrapper.__qualname__} (parent row not yet migrated to ORM tables): {exc}"
             )
+        return None
 
     return wrapper
 

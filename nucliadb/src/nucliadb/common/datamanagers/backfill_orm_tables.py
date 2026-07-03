@@ -368,48 +368,6 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
                     )
 
 
-async def _backfill_field_in_txn(
-    txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
-) -> None:
-    """
-    Backfill a single field row (and its conversation pages if applicable) in a single transaction.
-    """
-    status = await fields_v1.get_status(
-        txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id
-    )
-    value = await fields_v1.get_raw(txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id)
-
-    md5 = None
-    if field_type == "f":
-        md5 = await file_md5.get(txn, kbid=kbid, rid=rid, field_id=field_id)
-
-    if field_type == "t" and value is not None:
-        field_text = resources_pb2.FieldText()
-        field_text.ParseFromString(value)
-        md5 = field_text.md5 or None
-
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_fields (kbid, rid, field_type, field_id, value, md5, status)
-            VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(value)s, %(md5)s, %(status)s)
-            ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
-                value  = EXCLUDED.value,
-                md5     = EXCLUDED.md5,
-                status = EXCLUDED.status
-            """,
-            {
-                "kbid": kbid,
-                "rid": rid,
-                "field_type": field_type,
-                "field_id": field_id,
-                "value": value,
-                "md5": md5,
-                "status": status.SerializeToString() if status is not None else None,
-            },
-        )
-
-
 async def _main():
     import argparse
 
