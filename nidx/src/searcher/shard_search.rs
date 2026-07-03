@@ -37,17 +37,35 @@ use super::index_cache::IndexCache;
 use super::query_planner;
 use super::query_planner::QueryPlan;
 
-pub enum PartitionedResponse<T> {
-    Complete(T, Vec<Uuid>),
-    Partial(T, Vec<Uuid>),
+pub struct PartitionedResponse<T> {
+    pub data: T,
+    pub shards: Vec<Uuid>,
+    partial: bool,
 }
 
 impl<T> PartitionedResponse<T> {
-    pub fn into_value(self) -> T {
-        match self {
-            Self::Complete(data, _) => data,
-            Self::Partial(data, _) => data,
+    pub fn complete(data: T, shards: Vec<Uuid>) -> Self {
+        Self {
+            data,
+            shards,
+            partial: false,
         }
+    }
+
+    pub fn partial(data: T, shards: Vec<Uuid>) -> Self {
+        Self {
+            data,
+            shards,
+            partial: true,
+        }
+    }
+
+    pub fn into_value(self) -> T {
+        self.data
+    }
+
+    pub fn is_partial(&self) -> bool {
+        self.partial
     }
 }
 
@@ -66,7 +84,7 @@ pub async fn search(
     let response = if shards.len() == 1 {
         let shard_id = shards[0];
         let response = shard_search(shard_id, Arc::clone(&index_cache), query_plan).await?;
-        PartitionedResponse::Complete(response, vec![shard_id])
+        PartitionedResponse::complete(response, vec![shard_id])
     } else {
         let mut tasks = JoinSet::new();
         for shard_id in &shards {
@@ -96,14 +114,14 @@ pub async fn search(
         };
 
         if merged.shard_ids.len() == shards.len() {
-            PartitionedResponse::Complete(merged, shards)
+            PartitionedResponse::complete(merged, shards)
         } else {
             let successful_shards = merged
                 .shard_ids
                 .iter()
                 .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
                 .collect();
-            PartitionedResponse::Partial(merged, successful_shards)
+            PartitionedResponse::partial(merged, successful_shards)
         }
     };
     Ok(response)

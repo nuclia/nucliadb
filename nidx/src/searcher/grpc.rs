@@ -292,11 +292,13 @@ impl SearchServer {
 
             while let Some(join) = tasks.join_next().await {
                 match join {
-                    Ok(Ok(result)) => {
-                        let (response, shards) = match result {
-                            PartitionedResponse::Complete(response, shards) => (response, shards),
-                            PartitionedResponse::Partial(response, shards) => (response, shards),
-                        };
+                    Ok(Ok(response)) => {
+                        if response.is_partial() {
+                            warn!("A node responded with partial results");
+                        }
+                        let PartitionedResponse {
+                            data: response, shards, ..
+                        } = response;
                         // The response includes a list of successful shards, that may be a subset of the
                         // requested ones. This is the way we communicate partial failures.
                         for shard_id in shards {
@@ -382,14 +384,14 @@ impl SearchServer {
             Ok(response) => {
                 let response = response.into_inner();
                 let result = if response.shard_ids.len() == shards.len() {
-                    PartitionedResponse::Complete(response, shards)
+                    PartitionedResponse::complete(response, shards)
                 } else {
                     let successful_shards = response
                         .shard_ids
                         .iter()
                         .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
                         .collect();
-                    PartitionedResponse::Partial(response, successful_shards)
+                    PartitionedResponse::partial(response, successful_shards)
                 };
                 Ok(result)
             }
@@ -451,7 +453,6 @@ impl QueryPartitioner {
         self.shard_nodes.remove(shard_id);
     }
 }
-
 
 async fn check_shards_exist(meta: &NidxMetadata, shards: &[Uuid]) -> NidxResult<()> {
     let existing_shards = crate::metadata::Shard::exist_many(&meta.pool, shards)
