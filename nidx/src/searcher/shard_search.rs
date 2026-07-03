@@ -37,36 +37,9 @@ use super::index_cache::IndexCache;
 use super::query_planner;
 use super::query_planner::QueryPlan;
 
-pub struct PartitionedResponse<T> {
+pub struct PartialResponse<T> {
     pub data: T,
     pub shards: Vec<Uuid>,
-    partial: bool,
-}
-
-impl<T> PartitionedResponse<T> {
-    pub fn complete(data: T, shards: Vec<Uuid>) -> Self {
-        Self {
-            data,
-            shards,
-            partial: false,
-        }
-    }
-
-    pub fn partial(data: T, shards: Vec<Uuid>) -> Self {
-        Self {
-            data,
-            shards,
-            partial: true,
-        }
-    }
-
-    pub fn into_value(self) -> T {
-        self.data
-    }
-
-    pub fn is_partial(&self) -> bool {
-        self.partial
-    }
 }
 
 /// Search in multiple shards and return either the full response, partial
@@ -76,7 +49,7 @@ pub async fn search(
     shards: Vec<uuid::Uuid>,
     index_cache: Arc<IndexCache>,
     search_request: SearchRequest,
-) -> NidxResult<PartitionedResponse<SearchResponse>> {
+) -> NidxResult<PartialResponse<SearchResponse>> {
     let order_by = OrderBy::from(&search_request);
     let limit = Limit(search_request.result_per_page as usize);
     let query_plan = query_planner::build_query_plan(search_request)?;
@@ -84,7 +57,10 @@ pub async fn search(
     let response = if shards.len() == 1 {
         let shard_id = shards[0];
         let response = shard_search(shard_id, Arc::clone(&index_cache), query_plan).await?;
-        PartitionedResponse::complete(response, vec![shard_id])
+        PartialResponse {
+            data: response,
+            shards: vec![shard_id],
+        }
     } else {
         let mut tasks = JoinSet::new();
         for shard_id in &shards {
@@ -114,14 +90,17 @@ pub async fn search(
         };
 
         if merged.shard_ids.len() == shards.len() {
-            PartitionedResponse::complete(merged, shards)
+            PartialResponse { data: merged, shards }
         } else {
             let successful_shards = merged
                 .shard_ids
                 .iter()
                 .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
                 .collect();
-            PartitionedResponse::partial(merged, successful_shards)
+            PartialResponse {
+                data: merged,
+                shards: successful_shards,
+            }
         }
     };
     Ok(response)

@@ -31,7 +31,7 @@ use uuid::Uuid;
 use crate::NidxMetadata;
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::shard_merge::{Limit, OrderBy};
-use crate::searcher::shard_search::PartitionedResponse;
+use crate::searcher::shard_search::PartialResponse;
 use crate::searcher::shard_selector::SearcherNode;
 
 use super::shard_selector::ShardSelector;
@@ -169,7 +169,6 @@ impl NidxSearcher for SearchServer {
 
         let response = if coordinator {
             // We are the requested searcher to perform a distributed query
-
             check_shards_exist(&self.meta, &shards).await?;
             self.distributed_query(request, shards).await?
         } else {
@@ -178,7 +177,7 @@ impl NidxSearcher for SearchServer {
             // We won't hop to any other node
             shard_search::search(shards, Arc::clone(&self.index_cache), request)
                 .await?
-                .into_value()
+                .data
         };
 
         Ok(Response::new(response))
@@ -293,10 +292,7 @@ impl SearchServer {
             while let Some(join) = tasks.join_next().await {
                 match join {
                     Ok(Ok(response)) => {
-                        if response.is_partial() {
-                            warn!("A node responded with partial results");
-                        }
-                        let PartitionedResponse {
+                        let PartialResponse {
                             data: response, shards, ..
                         } = response;
                         // The response includes a list of successful shards, that may be a subset of the
@@ -333,8 +329,7 @@ impl SearchServer {
         node: SearcherNode,
         shard_ids: Vec<uuid::Uuid>,
         request: SearchRequest,
-    ) -> NidxResult<Pin<Box<dyn Future<Output = NidxResult<PartitionedResponse<SearchResponse>>> + Send + 'static>>>
-    {
+    ) -> NidxResult<Pin<Box<dyn Future<Output = NidxResult<PartialResponse<SearchResponse>>> + Send + 'static>>> {
         match node {
             SearcherNode::This => {
                 let index_cache = Arc::clone(&self.index_cache);
@@ -368,7 +363,7 @@ impl SearchServer {
         mut client: SearcherClient,
         request: SearchRequest,
         shards: Vec<uuid::Uuid>,
-    ) -> NidxResult<PartitionedResponse<SearchResponse>> {
+    ) -> NidxResult<PartialResponse<SearchResponse>> {
         // Send the query to a different node specifying only a subset of shards
         let mut search_request = request.clone();
         search_request.shard_ids = shards.iter().map(|x| x.to_string()).collect();
@@ -384,14 +379,17 @@ impl SearchServer {
             Ok(response) => {
                 let response = response.into_inner();
                 let result = if response.shard_ids.len() == shards.len() {
-                    PartitionedResponse::complete(response, shards)
+                    PartialResponse { data: response, shards }
                 } else {
                     let successful_shards = response
                         .shard_ids
                         .iter()
                         .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
                         .collect();
-                    PartitionedResponse::partial(response, successful_shards)
+                    PartialResponse {
+                        data: response,
+                        shards: successful_shards,
+                    }
                 };
                 Ok(result)
             }
