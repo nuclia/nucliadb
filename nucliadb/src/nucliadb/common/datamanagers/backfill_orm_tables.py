@@ -61,7 +61,7 @@ from nucliadb.common.datamanagers import (
 from nucliadb.common.datamanagers.utils import _pg_cursor, with_ro_transaction, with_rw_transaction
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto
-from nucliadb_protos import resources_pb2
+from nucliadb_protos import resources_pb2, writer_pb2
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.settings import LogLevel, LogSettings
 
@@ -259,37 +259,19 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
             },
         )
 
-    # --- Title and Summary fields (special case) ---
-    # These are stored in the kb_resources.basic protobuf, but also need to be in the kb_fields table for the status API to work correctly.
-    for field_id, field_value in (("title", basic.title), ("summary", basic.summary)):
-        if not field_value:
-            continue
-        field_type_str = "a"
-        status = await fields_v1.get_status(
-            txn, kbid=kbid, rid=rid, field_type=field_type_str, field_id=field_id
-        )
-        if status is not None:
-            async with _pg_cursor(txn) as cur:
-                await cur.execute(
-                    """
-                    INSERT INTO kb_fields (kbid, rid, field_type, field_id, status)
-                    VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(status)s)
-                    ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
-                        status = EXCLUDED.status
-                    """,
-                    {
-                        "kbid": kbid,
-                        "rid": rid,
-                        "field_type": field_type_str,
-                        "field_id": field_id,
-                        "status": status.SerializeToString() if status is not None else None,
-                    },
-                )
-
     # --- Collect all field and conversation rows ---
     all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
     if all_fields is None:
         return
+
+    # Add title and summary in the fields table, even though they are stored in the kb_resources.basic column.
+    # We need to do this to have the status API work correctly for title and summary fields.
+    title_field = resources_pb2.FieldID(field_type=writer_pb2.FieldType.GENERIC, field="title")
+    summary_field = resources_pb2.FieldID(field_type=writer_pb2.FieldType.GENERIC, field="summary")
+    if basic.title and title_field not in all_fields.fields:
+        all_fields.fields.append(title_field)
+    if basic.summary and summary_field not in all_fields.fields:
+        all_fields.fields.append(summary_field)
 
     for field in all_fields.fields:
         field_type_str = from_proto.field_type_name(field.field_type).abbreviation()
@@ -384,6 +366,48 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
                             "value": page.SerializeToString(),
                         },
                     )
+
+
+async def _backfill_field_in_txn(
+    txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
+) -> None:
+    """
+    Backfill a single field row (and its conversation pages if applicable) in a single transaction.
+    """
+    status = await fields_v1.get_status(
+        txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id
+    )
+    value = await fields_v1.get_raw(txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id)
+
+    md5 = None
+    if field_type == "f":
+        md5 = await file_md5.get(txn, kbid=kbid, rid=rid, field_id=field_id)
+
+    if field_type == "t" and value is not None:
+        field_text = resources_pb2.FieldText()
+        field_text.ParseFromString(value)
+        md5 = field_text.md5 or None
+
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(
+            """
+            INSERT INTO kb_fields (kbid, rid, field_type, field_id, value, md5, status)
+            VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(value)s, %(md5)s, %(status)s)
+            ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
+                value  = EXCLUDED.value,
+                md5     = EXCLUDED.md5,
+                status = EXCLUDED.status
+            """,
+            {
+                "kbid": kbid,
+                "rid": rid,
+                "field_type": field_type,
+                "field_id": field_id,
+                "value": value,
+                "md5": md5,
+                "status": status.SerializeToString() if status is not None else None,
+            },
+        )
 
 
 async def _main():
