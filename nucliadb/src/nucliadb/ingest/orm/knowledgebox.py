@@ -287,11 +287,7 @@ class KnowledgeBox:
                 raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
             if slug:
-                await txn.delete(datamanagers.kb.KB_SLUGS.format(slug=stored.slug))
-                await txn.set(
-                    datamanagers.kb.KB_SLUGS.format(slug=slug),
-                    kbid.encode(),
-                )
+                await datamanagers.kb.modify_slug(txn, kbid=kbid, old_slug=stored.slug, new_slug=slug)
                 stored.slug = slug
 
             if title is not None:

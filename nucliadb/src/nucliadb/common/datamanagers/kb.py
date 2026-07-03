@@ -76,6 +76,17 @@ async def set_kbid_for_slug(txn: Transaction, *, slug: str, kbid: str):
         await kb_v2.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
 
 
+async def modify_slug(txn: Transaction, *, kbid: str, old_slug: str, new_slug: str) -> None:
+    await txn.delete(KB_SLUGS.format(slug=old_slug))
+    await txn.set(
+        KB_SLUGS.format(slug=new_slug),
+        kbid.encode(),
+    )
+
+    if datamanagers_v2_write("kbs") or datamanagers_v2_write(kbid):
+        await kb_v2.set_kbid_for_slug(txn, slug=new_slug, kbid=kbid)
+
+
 async def delete_kb_slug(txn: Transaction, *, slug: str):
     key = KB_SLUGS.format(slug=slug)
     await txn.delete(key)
