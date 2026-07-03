@@ -76,7 +76,7 @@ from tests.utils.dirty_index import mark_dirty, wait_for_sync
 async def resource_with_conversation(
     nucliadb_ingest_grpc, nucliadb_writer: AsyncClient, standalone_knowledgebox
 ):
-    messages = []
+    messages: list[InputMessage] = []
     for i in range(1, 301):
         messages.append(
             InputMessage(
@@ -94,13 +94,22 @@ async def resource_with_conversation(
         content=CreateResourcePayload(
             slug="myresource",
             conversations={
-                "faq": InputConversationField(messages=messages),
+                "faq": InputConversationField(messages=[messages[0]]),
             },
         ).model_dump_json(by_alias=True),
     )
 
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
+
+    # Put in buckets of 30 messages
+    remaining = messages[1:]
+    for i in range(0, len(remaining), 30):
+        resp = await nucliadb_writer.put(
+            f"/kb/{standalone_knowledgebox}/resource/{rid}/conversation/faq/messages",
+            json=[m.model_dump(mode="json", by_alias=True) for m in remaining[i : i + 30]],
+        )
+        assert resp.status_code == 200
 
     # add another message using the api to add single message
     resp = await nucliadb_writer.put(

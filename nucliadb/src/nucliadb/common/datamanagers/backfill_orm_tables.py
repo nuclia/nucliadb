@@ -268,22 +268,23 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
         status = await fields_v1.get_status(
             txn, kbid=kbid, rid=rid, field_type=field_type_str, field_id=field_id
         )
-        async with _pg_cursor(txn) as cur:
-            await cur.execute(
-                """
-                INSERT INTO kb_fields (kbid, rid, field_type, field_id, status)
-                VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(status)s)
-                ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
-                    status = EXCLUDED.status
-                """,
-                {
-                    "kbid": kbid,
-                    "rid": rid,
-                    "field_type": field_type_str,
-                    "field_id": field_id,
-                    "status": status.SerializeToString() if status is not None else None,
-                },
-            )
+        if status is not None:
+            async with _pg_cursor(txn) as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO kb_fields (kbid, rid, field_type, field_id, status)
+                    VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(status)s)
+                    ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
+                        status = EXCLUDED.status
+                    """,
+                    {
+                        "kbid": kbid,
+                        "rid": rid,
+                        "field_type": field_type_str,
+                        "field_id": field_id,
+                        "status": status.SerializeToString() if status is not None else None,
+                    },
+                )
 
     # --- Collect all field and conversation rows ---
     all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
