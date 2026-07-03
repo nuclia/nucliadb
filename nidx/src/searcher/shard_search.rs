@@ -24,7 +24,7 @@ use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::VectorSearcher;
 use tokio::task::JoinSet;
-use tracing::{Span, instrument, warn};
+use tracing::{Span, instrument};
 use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
@@ -63,52 +63,50 @@ pub async fn search(
     let limit = Limit(search_request.result_per_page as usize);
     let query_plan = query_planner::build_query_plan(search_request)?;
 
-    if shards.len() == 1 {
+    let response = if shards.len() == 1 {
         let shard_id = shards[0];
         let response = shard_search(shard_id, Arc::clone(&index_cache), query_plan).await?;
-        return Ok(PartitionedResponse::Complete(response, vec![shard_id]));
-    }
+        PartitionedResponse::Complete(response, vec![shard_id])
+    } else {
+        let mut tasks = JoinSet::new();
+        for shard_id in &shards {
+            tasks.spawn(shard_search(*shard_id, Arc::clone(&index_cache), query_plan.clone()));
+        }
 
-    let mut tasks = JoinSet::new();
-    for shard_id in &shards {
-        tasks.spawn(shard_search(*shard_id, Arc::clone(&index_cache), query_plan.clone()));
-    }
-
-    let mut responses = vec![];
-    let mut errors = 0;
-    while let Some(join) = tasks.join_next().await {
-        match join {
-            Ok(Ok(response)) => responses.push(response),
-            Ok(Err(NidxError::NotFound)) => {
-                warn!("An error occurred while searching: NotFound");
-                errors += 1;
-            }
-            Ok(Err(search_error)) => return Err(search_error),
-            Err(join_error) => {
-                // Either a panic or a cancellation happened while searching
-                warn!("A shard query failed in tokio: {:?}", join_error.to_string());
-                errors += 1;
+        let mut responses = vec![];
+        while let Some(join) = tasks.join_next().await {
+            match join {
+                Ok(Ok(response)) => responses.push(response),
+                Ok(Err(NidxError::NotFound)) => {}
+                Ok(Err(search_error)) => return Err(search_error),
+                Err(join_error) => {
+                    // Either a panic or a cancellation happened while searching
+                    return Err(NidxError::from(join_error));
+                }
             }
         }
-    }
+        if responses.is_empty() {
+            return Err(NidxError::NotFound);
+        }
 
-    let merged = if responses.len() == 1 {
-        responses.pop().unwrap()
-    } else {
-        shard_merge::merge(responses, order_by, limit)
+        let merged = if responses.len() == 1 {
+            responses.pop().unwrap()
+        } else {
+            shard_merge::merge(responses, order_by, limit)
+        };
+
+        if merged.shard_ids.len() == shards.len() {
+            PartitionedResponse::Complete(merged, shards)
+        } else {
+            let successful_shards = merged
+                .shard_ids
+                .iter()
+                .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
+                .collect();
+            PartitionedResponse::Partial(merged, successful_shards)
+        }
     };
-
-    if errors == 0 {
-        Ok(PartitionedResponse::Complete(merged, shards))
-    } else {
-        let successful_shards = merged
-            .shard_ids
-            .iter()
-            .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
-            .collect();
-        // TODO: errors
-        Ok(PartitionedResponse::Partial(merged, successful_shards))
-    }
+    Ok(response)
 }
 
 #[instrument(skip_all, fields(shard_id = shard_id.to_string()))]

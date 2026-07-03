@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 // Copyright 2021 Bosutech XXI S.L.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +12,14 @@ use std::collections::HashMap;
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use super::index::*;
+
+use std::collections::HashMap;
+
 use futures::StreamExt;
 use sqlx::{Executor, Postgres, types::time::PrimitiveDateTime};
 use uuid::Uuid;
+
+use super::index::*;
 
 pub struct Shard {
     pub id: Uuid,

@@ -158,7 +158,7 @@ macro_rules! shard_request {
 #[tonic::async_trait]
 impl NidxSearcher for SearchServer {
     async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
-        let local_only = request.metadata().contains_key(HEADER_LOCAL_ONLY);
+        let coordinator = !request.metadata().contains_key(HEADER_LOCAL_ONLY);
         let request = request.into_inner();
 
         let mut shards = vec![];
@@ -167,27 +167,20 @@ impl NidxSearcher for SearchServer {
             shards.push(shard_id);
         }
 
-        let response = if local_only {
+        let response = if coordinator {
+            // We are the requested searcher to perform a distributed query
+
+            check_shards_exist(&self.meta, &shards).await?;
+            self.distributed_query(request, shards).await?
+        } else {
             // This is a hopped node, i.e., another searcher has delegated this part of the query to
             // us. We must query our shards and return either a full or partial response or an error.
             // We won't hop to any other node
             shard_search::search(shards, Arc::clone(&self.index_cache), request)
                 .await?
                 .into_value()
-        } else {
-            // A query that may need to be distributed across nodes in order to search in all partitions.
-
-            // Before doing any work, validate shards exist
-            let existing_shards = crate::metadata::Shard::exist_many(&self.meta.pool, &shards)
-                .await
-                .map_err(NidxError::from)?;
-            for shard_id in &shards {
-                if !existing_shards.contains(shard_id) {
-                    return Err(NidxError::NotFound.into());
-                }
-            }
-            self.distributed_query(request, shards).await?
         };
+
         Ok(Response::new(response))
     }
 
@@ -282,12 +275,14 @@ impl SearchServer {
     /// partial result and is our responsibility to retry on other nodes.
     ///
     async fn distributed_query(&self, request: SearchRequest, shards: Vec<uuid::Uuid>) -> NidxResult<SearchResponse> {
-        // Locate which nodes contain each shard and get a list by preference
         let mut partitioner = QueryPartitioner::new(&self.shard_selector, shards)?;
 
-        // Now, we'll do scatter-gather cycles using the most preferred node per shard. Grouping
-        // cycles is less time-efficient, as we wait for the slowest request, but we minimize the
-        // amount of requests through the cluster.
+        // Use the query partitioner to group requests by the most preferred
+        // node per shard. We'll then do scatter-gather cycles until we complete
+        // the distributed query or fail.
+        //
+        // NOTE that grouping cycles is less time-efficient, as tail latency can
+        // increase due to slow/faulty nodes
         let mut responses = vec![];
         while let Some(groups) = partitioner.next_groups_by_node()? {
             let mut tasks = JoinSet::new();
@@ -309,13 +304,11 @@ impl SearchServer {
                         }
                         responses.push(response);
                     }
-                    Ok(Err(search_error)) => {
-                        warn!("An error occurred while searching: {search_error:?}");
-                    }
+                    Ok(Err(NidxError::NotFound)) => {}
+                    Ok(Err(search_error)) => return Err(search_error),
                     Err(join_error) => {
                         // Either a panic or a cancellation happened while searching
-                        error!("A shard query failed in tokio: {:?}", join_error.to_string());
-                        return Err(join_error.into());
+                        return Err(NidxError::from(join_error));
                     }
                 }
             }
@@ -457,4 +450,17 @@ impl QueryPartitioner {
     fn succeeded(&mut self, shard_id: &uuid::Uuid) {
         self.shard_nodes.remove(shard_id);
     }
+}
+
+
+async fn check_shards_exist(meta: &NidxMetadata, shards: &[Uuid]) -> NidxResult<()> {
+    let existing_shards = crate::metadata::Shard::exist_many(&meta.pool, shards)
+        .await
+        .map_err(NidxError::from)?;
+
+    if existing_shards.len() < shards.len() {
+        return Err(NidxError::NotFound);
+    }
+
+    Ok(())
 }
