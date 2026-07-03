@@ -16,7 +16,6 @@
 use std::collections::HashMap;
 use std::{pin::Pin, sync::Arc};
 
-use axum::http::request;
 use futures::Stream;
 use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use nidx_protos::nidx::nidx_searcher_server::{NidxSearcher, NidxSearcherServer};
@@ -270,55 +269,6 @@ impl NidxSearcher for SearchServer {
     }
 }
 
-struct DistributedQuery {
-    shard_nodes: HashMap<uuid::Uuid, Vec<SearcherNode>>,
-}
-
-impl DistributedQuery {
-    fn new(shard_selector: &ShardSelector, shards: Vec<uuid::Uuid>) -> NidxResult<Self> {
-        let mut shard_nodes = HashMap::new();
-        for shard_id in &shards {
-            let nodes = shard_selector.nodes_for_shard(shard_id);
-            if nodes.is_empty() {
-                // We haven't found any node with this shard. As we'll never be able to return a
-                // full result, we fail fast
-                return Err(NidxError::NotFound);
-            }
-
-            shard_nodes.insert(*shard_id, nodes);
-        }
-
-        Ok(Self { shard_nodes })
-    }
-
-    fn next_queries(&mut self) -> Result<Option<HashMap<SearcherNode, Vec<uuid::Uuid>>>, NidxError> {
-        if self.shard_nodes.is_empty() {
-            return Ok(None);
-        }
-        let mut shard_groups = HashMap::new();
-        for (shard_id, nodes) in self.shard_nodes.iter_mut() {
-            if nodes.is_empty() {
-                // A shard doesn't have more nodes to query but we haven't finished yet. We
-                // won't be able to complete the request in all partitions, so we abort
-                return Err(NidxError::QueryError(format!(
-                    "Error in search, exhausted all available nodes for shard {shard_id}"
-                )));
-            }
-
-            let node = nodes.remove(0);
-            shard_groups
-                .entry(node)
-                .and_modify(|shards: &mut Vec<uuid::Uuid>| shards.push(*shard_id))
-                .or_insert(vec![*shard_id]);
-        }
-        Ok(Some(shard_groups))
-    }
-
-    fn ok(&mut self, shard_id: &uuid::Uuid) {
-        self.shard_nodes.remove(shard_id);
-    }
-}
-
 impl SearchServer {
     /// Perform a distributed query over a partitioned dataset across a cluster of nodes.
     ///
@@ -332,13 +282,13 @@ impl SearchServer {
     ///
     async fn distributed_query(&self, request: SearchRequest, shards: Vec<uuid::Uuid>) -> NidxResult<SearchResponse> {
         // Locate which nodes contain each shard and get a list by preference
-        let mut queryer = DistributedQuery::new(&self.shard_selector, shards)?;
+        let mut partitioner = QueryPartitioner::new(&self.shard_selector, shards)?;
 
         // Now, we'll do scatter-gather cycles using the most preferred node per shard. Grouping
         // cycles is less time-efficient, as we wait for the slowest request, but we minimize the
         // amount of requests through the cluster.
         let mut responses = vec![];
-        while let Some(shard_groups) = queryer.next_queries()? {
+        while let Some(shard_groups) = partitioner.next_groups_by_node()? {
             let mut tasks = JoinSet::new();
             for (node, shard_ids) in shard_groups {
                 self.spawn_node_search(&mut tasks, node, shard_ids, request.clone())
@@ -355,7 +305,7 @@ impl SearchServer {
                             let shard_id = uuid::Uuid::parse_str(shard_id)
                                 .expect("we always populates queried shards with valid UUIDs");
                             // We now remove successful shards from the set of shards we want to query
-                            queryer.ok(&shard_id);
+                            partitioner.succeeded(&shard_id);
                         }
                         responses.push(response);
                     }
@@ -449,5 +399,53 @@ impl SearchServer {
                 Err(error)
             }
         }
+    }
+}
+
+struct QueryPartitioner {
+    shard_nodes: HashMap<uuid::Uuid, Vec<SearcherNode>>,
+}
+
+impl QueryPartitioner {
+    fn new(shard_selector: &ShardSelector, shards: Vec<uuid::Uuid>) -> NidxResult<Self> {
+        let mut shard_nodes = HashMap::new();
+        for shard_id in &shards {
+            let nodes = shard_selector.nodes_for_shard(shard_id);
+            if nodes.is_empty() {
+                // We haven't found any node with this shard. As we'll never be able to return a
+                // full result, we fail fast
+                return Err(NidxError::NotFound);
+            }
+            shard_nodes.insert(*shard_id, nodes);
+        }
+        Ok(Self { shard_nodes })
+    }
+
+    fn next_groups_by_node(&mut self) -> Result<Option<HashMap<SearcherNode, Vec<uuid::Uuid>>>, NidxError> {
+        if self.shard_nodes.is_empty() {
+            return Ok(None);
+        }
+
+        let mut shard_groups = HashMap::new();
+        for (shard_id, nodes) in self.shard_nodes.iter_mut() {
+            if nodes.is_empty() {
+                // A shard doesn't have more nodes to query but we haven't finished yet. We
+                // won't be able to complete the request in all partitions, so we abort
+                return Err(NidxError::QueryError(format!(
+                    "Error in search, exhausted all available nodes for shard {shard_id}"
+                )));
+            }
+
+            let node = nodes.remove(0);
+            shard_groups
+                .entry(node)
+                .and_modify(|shards: &mut Vec<uuid::Uuid>| shards.push(*shard_id))
+                .or_insert(vec![*shard_id]);
+        }
+        Ok(Some(shard_groups))
+    }
+
+    fn succeeded(&mut self, shard_id: &uuid::Uuid) {
+        self.shard_nodes.remove(shard_id);
     }
 }
