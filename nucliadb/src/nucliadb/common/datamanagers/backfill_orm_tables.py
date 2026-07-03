@@ -259,6 +259,32 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
             },
         )
 
+    # --- Title and Summary fields (special case) ---
+    # These are stored in the kb_resources.basic protobuf, but also need to be in the kb_fields table for the status API to work correctly.
+    for field_id, field_value in (("title", basic.title), ("summary", basic.summary)):
+        if not field_value:
+            continue
+        field_type_str = "a"
+        status = await fields_v1.get_status(
+            txn, kbid=kbid, rid=rid, field_type=field_type_str, field_id=field_id
+        )
+        async with _pg_cursor(txn) as cur:
+            await cur.execute(
+                """
+                INSERT INTO kb_fields (kbid, rid, field_type, field_id, status)
+                VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(status)s)
+                ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
+                    status = EXCLUDED.status
+                """,
+                {
+                    "kbid": kbid,
+                    "rid": rid,
+                    "field_type": field_type_str,
+                    "field_id": field_id,
+                    "status": status.SerializeToString() if status is not None else None,
+                },
+            )
+
     # --- Collect all field and conversation rows ---
     all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
     if all_fields is None:
@@ -278,6 +304,11 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
         md5 = None
         if field_type_str == "f":
             md5 = await file_md5.get(txn, kbid=kbid, rid=rid, field_id=field_id)
+
+        if field_type_str == "t" and value is not None:
+            field_text = resources_pb2.FieldText()
+            field_text.ParseFromString(value)
+            md5 = field_text.md5 or None
 
         async with _pg_cursor(txn) as cur:
             await cur.execute(
