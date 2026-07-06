@@ -503,3 +503,55 @@ async def test_kv_filter_schema_validation(
         assert resp.status_code == 412, (
             f"Expected validation error for `{key} {op} {value}`, got {resp.json()}"
         )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_kv_field_in_catalog(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    """
+    Checks that key_value field data is returned in catalog results when
+    show=["values"] is requested.
+    """
+    kbid = standalone_knowledgebox
+
+    # Setup: create schema
+    resp = await nucliadb_writer.post(f"/kb/{kbid}/kv-schemas", json=PRODUCT_SCHEMA)
+    assert resp.status_code == 201, resp.text
+
+    # Create a resource with both a KV field and a text field
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "Catalog KV resource",
+            "key_values": {"product": VALID_PRODUCT_DATA},
+            "texts": {"body": {"body": "some text content", "format": "PLAIN"}},
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Query catalog with show=["values"] so key_value field data is included
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/catalog",
+        json={"show": ["values"], "field_type_filter": ["key_value"]},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+
+    resources = body["resources"]
+    assert rid in resources, "Created resource not found in catalog results"
+    resource = resources[rid]
+
+    assert "data" in resource, "Expected 'data' key in resource"
+    assert "key_values" in resource["data"], "Expected 'key_values' in resource data"
+    assert "product" in resource["data"]["key_values"], "Expected 'product' schema in key_values"
+
+    value = resource["data"]["key_values"]["product"]["value"]
+    assert value["data"]["color"] == "red"
+    assert value["data"]["price"] == 12.5
+
+    # Text fields must be absent — the filter excluded them
+    assert "texts" not in resource.get("data", {}), "texts should be excluded by field_type_filter"

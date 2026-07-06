@@ -96,6 +96,9 @@ async def catalog_get(
     show: list[ResourceProperties] = fastapi_query(
         SearchParamDefaults.show, default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
     ),
+    field_type_filter: list[FieldTypeName] = fastapi_query(
+        SearchParamDefaults.field_type_filter, alias="field_type"
+    ),
 ) -> CatalogResponse | HTTPClientError:
     try:
         expr = (
@@ -120,6 +123,7 @@ async def catalog_get(
         range_modification_end=range_modification_end,
         hidden=hidden,
         show=show,
+        field_type_filter=field_type_filter,
     )
     if sort_field:
         item.sort = SortOptions(field=sort_field, order=sort_order)
@@ -168,7 +172,7 @@ async def catalog(
                 opts=ResourceHydrationOptions(
                     show=item.show,
                     extracted=[],
-                    field_type_filter=list(FieldTypeName),
+                    field_type_filter=item.field_type_filter,
                 ),
             )
             return catalog_results
