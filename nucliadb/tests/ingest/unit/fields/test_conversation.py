@@ -21,30 +21,28 @@ from unittest import mock
 
 import pytest
 
-from nucliadb.common import datamanagers
-from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest.fields.conversation import Conversation
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.resource import Resource
-from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation
+from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import Message as PBMessage
 from nucliadb_protos.resources_pb2 import MessageContent as PBMessageContent
 
 
-@pytest.fixture(scope="function")
-async def txn(maindb_driver: Driver):
-    async with maindb_driver.rw_transaction() as txn:
-        yield txn
+class MockTransaction:
+    def __init__(self, *args, **kwargs):
+        self.data = {}
+
+    async def set(self, key, value):
+        self.data[key] = value
+
+    async def get(self, key):
+        return self.data.get(key, None)
 
 
 @pytest.fixture(scope="function")
-async def kbid(maindb_driver: Driver):
-    kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.kb.kb_v2.set_kbid_for_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
-    return kbid
+def txn():
+    txn = MockTransaction()
+    yield txn
 
 
 @pytest.fixture(scope="function")
@@ -55,18 +53,11 @@ def storage():
 
 
 @pytest.fixture(scope="function")
-async def resource(maindb_driver: Driver, txn: Transaction, storage, kbid: str):
-    rid = Resource.new_unique_rid()
-    async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.resources.resources_v2.set_slug(txn, kbid=kbid, rid=rid, slug=f"slug-{rid}")
-        await txn.commit()
-
+def resource(txn, storage):
     resource = mock.AsyncMock()
     resource.modified = False
     resource.txn = txn
     resource.storage = storage
-    resource.kbid = kbid
-    resource.uuid = rid
     yield resource
 
 
@@ -74,18 +65,21 @@ async def test_get_metadata(resource):
     conv = Conversation("faq", resource)
     assert conv.value == {}
     assert conv.metadata is None
+    assert conv._created is False
 
     metadata = await conv.get_metadata()
-    assert metadata is None
+    assert conv._created is True
+    assert metadata.size == 200
+    assert metadata.pages == 0
+    assert metadata.total == 0
 
-    metadata = FieldConversation()
-    metadata.size == 200
     metadata.pages = 1
     metadata.total = 10
 
     await conv.db_set_metadata(metadata)
     assert conv.metadata == metadata
     assert conv.resource.modified is True
+    assert conv._created is False
 
     # Check it is cached
     assert await conv.get_metadata() == metadata
@@ -93,6 +87,7 @@ async def test_get_metadata(resource):
     # Force reload
     conv.metadata = None
     assert await conv.get_metadata() == metadata
+    assert conv._created is False
 
 
 def get_cf(uri):
@@ -133,7 +128,6 @@ async def test_get_value(resource):
     await conv.set_value(payload)
 
     metadata = await conv.get_metadata()
-    assert metadata is not None
     assert metadata.size == 200
     assert metadata.pages == 1
     assert metadata.total == 2
@@ -147,7 +141,6 @@ async def test_get_value(resource):
 
     conv.metadata = None
     metadata = await conv.get_metadata()
-    assert metadata is not None
     assert metadata.size == 200
     assert metadata.pages == 2
     assert metadata.total == 302

@@ -101,9 +101,6 @@ async def build_splits_metadata(
         field_id, resources_pb2.FieldType.CONVERSATION, load=False
     )
     conv_metadata = await field_obj.get_metadata()
-    if conv_metadata is None:
-        return splits_metadata
-
     for i in range(1, conv_metadata.pages + 1):
         page = await field_obj.get_value(page=i)
         if page is None:

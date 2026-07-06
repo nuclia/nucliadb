@@ -17,16 +17,25 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from collections.abc import AsyncGenerator, Callable, Coroutine
+from collections.abc import AsyncGenerator, Callable, Coroutine, Sequence
 from datetime import datetime
 from functools import partial
 from typing import Any
 from uuid import uuid4
 
+from grpc import StatusCode
+from grpc.aio import AioRpcError
 from nidx_protos import nidx_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers, file_md5
+from nucliadb.common.cluster.exceptions import ShardNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
+
+# XXX: this keys shouldn't be exposed outside datamanagers
+from nucliadb.common.datamanagers.resources import (
+    KB_RESOURCE_SLUG,
+    KB_RESOURCE_SLUG_BASE,
+)
 from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.pg import PGTransaction
@@ -58,6 +67,9 @@ from nucliadb_utils.utilities import (
     get_storage,
     has_feature,
 )
+
+# XXX Eventually all these keys should be moved to datamanagers.kb
+KB_RESOURCE = "/kbs/{kbid}/r/{uuid}"
 
 KB_KEYS = "/kbs/{kbid}/"
 
@@ -287,7 +299,11 @@ class KnowledgeBox:
                 raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
             if slug:
-                await datamanagers.kb.modify_slug(txn, kbid=kbid, old_slug=stored.slug, new_slug=slug)
+                await txn.delete(datamanagers.kb.KB_SLUGS.format(slug=stored.slug))
+                await txn.set(
+                    datamanagers.kb.KB_SLUGS.format(slug=slug),
+                    kbid.encode(),
+                )
                 stored.slug = slug
 
             if title is not None:
@@ -350,40 +366,13 @@ class KnowledgeBox:
             await nidx_api.ConfigureShards(nidx_pb2.ShardsConfig(configs=configs))
 
     @classmethod
-    async def mark_for_purge(cls, txn: Transaction, kbid: str):
-        """
-        Mark KB to purge. Purge command will eventually delete all KB keys and objects in storage.
-        """
-        key = KB_TO_DELETE.format(kbid=kbid)
-        value = datetime.now().isoformat().encode()
-        await txn.set(key, value)
-
-    @classmethod
-    async def unmark_for_purge(cls, txn: Transaction, kbid: str):
-        """
-        Unmark KB to purge. To be called after purge is completed, to remove the KB from the list of KBs to purge.
-        """
-        key = KB_TO_DELETE.format(kbid=kbid)
-        await txn.delete(key)
-
-    @classmethod
     async def delete(cls, driver: Driver, kbid: str):
-        """
-        Delete a knowledge base (KB) and all its associated data.
-
-        In the current transaction, the KB is marked for and we only delete:
-        - The KB config
-        - The KB slug
-        - Mark shards to be deleted from nidx
-        - Mark the KB for purge, which will eventually delete all KB keys in Postgresql and objects in storage.
-        """
-
         async with driver.rw_transaction() as txn:
             exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
             if not exists:
-                # Already deleted, or never existed.
                 return
 
+            # Delete main anchor
             kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
             if kb_config is not None:
                 slug = kb_config.slug
@@ -391,11 +380,12 @@ class KnowledgeBox:
 
             await datamanagers.kb.delete_config(txn, kbid=kbid)
 
-            await cls.mark_for_purge(txn, kbid=kbid)
+            # Mark KB to purge. This will eventually delete all KB keys, storage
+            # and index data (for the old index nodes)
+            when = datetime.now().isoformat()
+            await txn.set(KB_TO_DELETE.format(kbid=kbid), when.encode())
 
             shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-
-            await datamanagers.kb.kb_v2.soft_delete(txn, kbid=kbid)
 
             await txn.commit()
 
@@ -424,6 +414,10 @@ class KnowledgeBox:
         """
         Deletes all kb parts
 
+        It takes care of signaling the nodes related to this kb that they
+        need to delete the kb shards and also deletes the related storage
+        buckets.
+
         Removes all catalog entries related to the kb.
 
         As non-empty buckets cannot be deleted, they are scheduled to be
@@ -437,25 +431,43 @@ class KnowledgeBox:
         if exists is False:
             logger.error(f"{kbid} KB does not exists on Storage")
 
+        nidx_api = get_nidx_api_client()
+
         async with driver.rw_transaction() as txn:
-            # Mark storage to be deleted. This will
             storage_to_delete = KB_TO_DELETE_STORAGE.format(kbid=kbid)
             await txn.set(storage_to_delete, b"")
 
             await catalog_delete_kb(txn, kbid)
-            await file_md5.delete(txn, kbid=kbid)
-            await txn.commit()
 
-        # Delete by prefix in another transaction, as it can be slow and we don't want to block the previous one
-        async with driver.rw_transaction() as txn:
-            await cls.delete_all_kb_keys(txn, kbid)
+            await file_md5.delete(txn, kbid=kbid)
+
+            # Delete KB Shards
+            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+            if shards_obj is None:
+                logger.warning(f"Shards not found for KB while purging it", extra={"kbid": kbid})
+            else:
+                for shard in shards_obj.shards:
+                    if shard.nidx_shard_id:
+                        try:
+                            await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
+                            logger.debug(
+                                f"Succeded deleting shard",
+                                extra={"kbid": kbid, "shard_id": shard.nidx_shard_id},
+                            )
+                        except AioRpcError as exc:
+                            if exc.code() == StatusCode.NOT_FOUND:
+                                continue
+                            raise ShardNotFound(f"{exc.details()} @ shard {shard.nidx_shard_id}")
+
             await txn.commit()
+        await cls.delete_all_kb_keys(driver, kbid)
 
     @classmethod
-    async def delete_all_kb_keys(cls, txn: Transaction, kbid: str):
+    async def delete_all_kb_keys(cls, driver: Driver, kbid: str, chunk_size: int = 1_000):
         prefix = KB_KEYS.format(kbid=kbid)
-        await txn.delete_by_prefix(prefix)
-        await datamanagers.kb.kb_v2.delete(txn, kbid=kbid)
+        async with driver.rw_transaction() as txn:
+            await txn.delete_by_prefix(prefix)
+            await txn.commit()
 
     async def get_resource_shard(self, shard_id: str) -> writer_pb2.ShardObject | None:
         async with datamanagers.with_ro_transaction() as txn:
@@ -472,14 +484,20 @@ class KnowledgeBox:
         return await Resource.get(self.txn, self.kbid, uuid)
 
     async def maindb_delete_resource(self, uuid: str):
-        await datamanagers.resources.delete(self.txn, kbid=self.kbid, rid=uuid)
+        basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kbid, rid=uuid)
+        await self.txn.delete_by_prefix(KB_RESOURCE.format(kbid=self.kbid, uuid=uuid))
+        if basic and basic.slug:
+            try:
+                await self.txn.delete(KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=basic.slug))
+            except Exception:
+                logger.exception("Error deleting slug")
 
     async def storage_delete_resource(self, uuid: str):
         if is_onprem_nucliadb():
             await self.storage.delete_resource(self.kbid, uuid)
         else:
             # Deleting from storage can be slow, so we schedule its deletion and the purge cronjob
-            # will take care of it. This is OK as resource uuids are unique and not reused.
+            # will take care of it
             await self.schedule_delete_resource(self.kbid, uuid)
 
     async def schedule_delete_resource(self, kbid: str, uuid: str):
@@ -497,11 +515,24 @@ class KnowledgeBox:
             self.txn, kbid=self.kbid, slug=slug
         )
 
+    async def get_unique_slug(self, uuid: str, slug: str) -> str:
+        key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
+        key_ok = False
+        while key_ok is False:
+            found = await self.txn.get(key, for_update=False)
+            if found and found.decode() != uuid:
+                slug += ".c"
+                key = KB_RESOURCE_SLUG.format(kbid=self.kbid, slug=slug)
+            else:
+                key_ok = True
+        return slug
+
     async def add_resource(self, uuid: str, slug: str, basic: Basic | None = None) -> Resource:
         if basic is None:
             basic = Basic()
         if slug == "":
             slug = uuid
+        slug = await self.get_unique_slug(uuid, slug)
         basic.slug = slug
         fix_paragraph_annotation_keys(uuid, basic)
         await datamanagers.resources.set_basic(self.txn, kbid=self.kbid, rid=uuid, basic=basic)
@@ -515,15 +546,18 @@ class KnowledgeBox:
         )
 
     async def iterate_resources(self) -> AsyncGenerator[Resource, None]:
-        # This uses a separate transaction for iterating resource ids
-        async for uuid in datamanagers.resources.iterate_resource_ids(kbid=self.kbid):
-            yield Resource(
-                self.txn,
-                self.storage,
-                self.kbid,
-                uuid,
-                disable_vectors=False,
-            )
+        base = KB_RESOURCE_SLUG_BASE.format(kbid=self.kbid)
+        async for key in self.txn.keys(match=base):
+            slug = key.split("/")[-1]
+            uuid = await self.get_resource_uuid_by_slug(slug)
+            if uuid is not None:
+                yield Resource(
+                    self.txn,
+                    self.storage,
+                    self.kbid,
+                    uuid,
+                    disable_vectors=False,
+                )
 
     async def create_vectorset(self, config: knowledgebox_pb2.VectorSetConfig):
         if await datamanagers.vectorsets.exists(
@@ -588,6 +622,10 @@ class KnowledgeBox:
         stored: StoredExternalIndexProviderMetadata,
     ) -> None:
         return
+
+
+def chunker(seq: Sequence, size: int):
+    return (seq[pos : pos + size] for pos in range(0, len(seq), size))
 
 
 def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:

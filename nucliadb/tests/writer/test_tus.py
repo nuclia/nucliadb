@@ -22,7 +22,6 @@ import uuid
 
 import pytest
 
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb.writer.settings import settings
 from nucliadb.writer.tus import get_dm
 from nucliadb.writer.tus.gcs import GCloudBlobStore, GCloudFileStorageManager
@@ -120,16 +119,16 @@ async def test_local_driver(local_storage_tus: LocalBlobStore):
 async def storage_test(storage: BlobStore, file_storage_manager: FileStorageManager):
     example = b"mytestinfo"
     field = "myfield"
-    rid = Resource.new_unique_rid()
-    kbid = str(uuid.uuid4())
+    rid = "myrid"
+    kbid = "mykb_tus_test"
 
     metadata: dict[str, str] = {"filename": "non-ascii is problematic - Ôñ"}
     bucket_name = storage.get_bucket_name(kbid)
     assert bucket_name in [
-        f"test_{kbid}",
-        f"test-{kbid}",
-        f"ndb_{kbid}",
-        kbid,
+        "test_mykb_tus_test",
+        "test-mykb-tus-test",
+        "ndb_mykb_tus_test",
+        "mykb_tus_test",
     ]
 
     assert await storage.check_exists(bucket_name) is False

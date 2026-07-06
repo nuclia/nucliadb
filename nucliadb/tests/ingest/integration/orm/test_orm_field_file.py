@@ -21,7 +21,6 @@ from datetime import datetime
 from os.path import dirname, getsize
 from uuid import uuid4
 
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import CloudFile, FieldType
@@ -30,7 +29,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_field_file(
-    local_files, storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    local_files, storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -63,5 +62,3 @@ async def test_create_resource_orm_field_file(
     with open(filename, "rb") as testfile:
         data2 = testfile.read()
     assert data.read() == data2
-
-    await txn.abort()

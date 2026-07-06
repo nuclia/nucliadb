@@ -23,9 +23,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from nucliadb.common.datamanagers import kb_v2
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb.search.search.query_parser.parsers import parse_find
@@ -43,24 +41,14 @@ def disable_hidden_resources_check():
         yield
 
 
-@pytest.fixture(scope="function", autouse=True)
-async def kbid(maindb_driver: Driver):
-    kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
-        await kb_v2.set_kbid_for_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
-    return kbid
-
-
 async def test_find_query_parsing__top_k(
     maindb_driver: Driver,
     dummy_predict: PredictEngine,
-    kbid: str,
 ):
     find = FindRequest(
         top_k=20,
     )
-    parsed = await parse_find(kbid, find)
+    parsed = await parse_find("kbid", find)
     assert parsed.retrieval.top_k == find.top_k
 
 
@@ -88,14 +76,13 @@ async def test_find_query_parsing__rank_fusion(
     expected: parser_models.RankFusion,
     maindb_driver: Driver,
     dummy_predict: PredictEngine,
-    kbid: str,
 ):
     find = FindRequest(
         top_k=20,
         rank_fusion=rank_fusion,
         reranker=search_models.RerankerName.NOOP,
     )
-    parsed = await parse_find(kbid, find)
+    parsed = await parse_find("kbid", find)
     assert parsed.retrieval.rank_fusion is not None
     assert parsed.retrieval.rank_fusion == expected
 
@@ -103,7 +90,7 @@ async def test_find_query_parsing__rank_fusion(
 # ATENTION: if you're changing this test, make sure public models, private
 # models and parsing are change accordingly!
 async def test_find_query_parsing__rank_fusion_limits(
-    maindb_driver: Driver, dummy_predict: PredictEngine, kbid: str
+    maindb_driver: Driver, dummy_predict: PredictEngine
 ):
     FindRequest.model_validate(
         {
@@ -115,7 +102,7 @@ async def test_find_query_parsing__rank_fusion_limits(
     )
 
     await parse_find(
-        kbid, FindRequest(rank_fusion=search_models.ReciprocalRankFusion.model_construct(window=500))
+        "kbid", FindRequest(rank_fusion=search_models.ReciprocalRankFusion.model_construct(window=500))
     )
 
     with pytest.raises(ValidationError):
@@ -129,7 +116,7 @@ async def test_find_query_parsing__rank_fusion_limits(
         )
 
     parsed = await parse_find(
-        kbid, FindRequest(rank_fusion=search_models.ReciprocalRankFusion.model_construct(window=501))
+        "kbid", FindRequest(rank_fusion=search_models.ReciprocalRankFusion.model_construct(window=501))
     )
     assert parsed.retrieval.rank_fusion is not None and parsed.retrieval.rank_fusion.window == 500
 
@@ -145,7 +132,6 @@ async def test_find_query_parsing__rank_fusion_limits(
 async def test_find_query_parsing__reranker(
     maindb_driver: Driver,
     dummy_predict: PredictEngine,
-    kbid: str,
     reranker: search_models.RerankerName | search_models.Reranker,
     expected: parser_models.Reranker,
 ):
@@ -153,16 +139,14 @@ async def test_find_query_parsing__reranker(
         top_k=20,
         reranker=reranker,
     )
-    parsed = await parse_find(kbid, find)
+    parsed = await parse_find("kbid", find)
     assert parsed.retrieval.reranker is not None
     assert parsed.retrieval.reranker == expected
 
 
 # ATENTION: if you're changing this test, make sure public models, private
 # models and parsing are change accordingly!
-async def test_find_query_parsing__reranker_limits(
-    maindb_driver: Driver, dummy_predict: PredictEngine, kbid: str
-):
+async def test_find_query_parsing__reranker_limits(maindb_driver: Driver, dummy_predict: PredictEngine):
     FindRequest.model_validate(
         {
             "reranker": {
@@ -172,13 +156,13 @@ async def test_find_query_parsing__reranker_limits(
         }
     )
 
-    await parse_find(kbid, FindRequest(reranker=search_models.PredictReranker(window=200)))
+    await parse_find("kbid", FindRequest(reranker=search_models.PredictReranker(window=200)))
 
     with pytest.raises(ValidationError):
         FindRequest.model_validate({"reranker": {"name": "predict", "window": 201}})
 
     parsed = await parse_find(
-        kbid, FindRequest(reranker=search_models.PredictReranker.model_construct(window=201))
+        "kbid", FindRequest(reranker=search_models.PredictReranker.model_construct(window=201))
     )
     assert (
         isinstance(parsed.retrieval.reranker, parser_models.PredictReranker)
@@ -186,9 +170,7 @@ async def test_find_query_parsing__reranker_limits(
     )
 
 
-async def test_find_query_parsing__query_image(
-    maindb_driver: Driver, dummy_predict: PredictEngine, kbid: str
-):
+async def test_find_query_parsing__query_image(maindb_driver: Driver, dummy_predict: PredictEngine):
     """We want to check that the rephrased query is used for keyword search if an image is provided."""
     predict = get_predict()
     assert isinstance(predict, DummyPredictEngine)
@@ -201,15 +183,15 @@ async def test_find_query_parsing__query_image(
         ),
     )
 
-    fetcher = fetcher_for_find(kbid, find)
-    parsed = await parse_find(kbid, find, fetcher=fetcher)
+    fetcher = fetcher_for_find("kbid", find)
+    parsed = await parse_find("kbid", find, fetcher=fetcher)
     assert parsed.retrieval.query.keyword is not None
     assert parsed.retrieval.query.keyword.query == "<REPHRASED-QUERY>"
 
     # If rephrase is on but there is no query image, we should use the original query
     find.rephrase = True
     find.query_image = None
-    fetcher = fetcher_for_find(kbid, find)
-    parsed = await parse_find(kbid, find, fetcher=fetcher)
+    fetcher = fetcher_for_find("kbid", find)
+    parsed = await parse_find("kbid", find, fetcher=fetcher)
     assert parsed.retrieval.query.keyword is not None
     assert parsed.retrieval.query.keyword.query == find.query

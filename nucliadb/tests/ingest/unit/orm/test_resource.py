@@ -23,10 +23,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nucliadb.common import datamanagers
-from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.brain_v2 import ResourceBrain
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor.processor import (
     get_text_field_mimetype,
     maybe_update_basic_icon,
@@ -169,10 +166,20 @@ def test_maybe_update_basic_icon(basic, icon, updated):
         assert basic.icon != icon
 
 
+class Transaction:
+    def __init__(self):
+        self.kv = {}
+
+    async def get(self, key, **kwargs):
+        return self.kv.get(key)
+
+    async def set(self, key, value):
+        self.kv[key] = value
+
+
 @pytest.fixture(scope="function")
-async def txn(maindb_driver: Driver):
-    async with maindb_driver.rw_transaction() as txn:
-        yield txn
+def txn():
+    return Transaction()
 
 
 @pytest.fixture(scope="function")
@@ -182,21 +189,8 @@ def storage():
 
 
 @pytest.fixture(scope="function")
-async def kb(maindb_driver: Driver):
-    kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.kb.kb_v2.set_kbid_for_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
-    return kbid
-
-
-@pytest.fixture(scope="function")
-async def rid(maindb_driver: Driver, kb: str):
-    r_id = Resource.new_unique_rid()
-    async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.resources.resources_v2.set_slug(txn, kbid=kb, rid=r_id, slug=f"slug-{r_id}")
-        await txn.commit()
-    return r_id
+def kb():
+    return "mock-kbid"
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -205,8 +199,8 @@ def file_md5_mock():
         yield mock
 
 
-async def test_get_fields_ids_caches_keys(txn, storage, kb: str, rid: str):
-    resource = Resource(txn, storage, kb, rid)
+async def test_get_fields_ids_caches_keys(txn, storage, kb):
+    resource = Resource(txn, storage, kb, "rid")
     cached_field_keys: list[tuple[FieldType.ValueType, str]] = [
         (FieldType.FILE, "foo"),
         (FieldType.TEXT, "bar"),
@@ -230,33 +224,21 @@ async def test_get_fields_ids_caches_keys(txn, storage, kb: str, rid: str):
     resource._inner_get_fields_ids.assert_not_awaited()  # type: ignore[ty:unresolved-attribute]
 
 
-async def test_get_set_all_field_ids(txn, storage, kb, rid):
-    resource = Resource(txn, storage, kb, rid)
+async def test_get_set_all_field_ids(txn, storage, kb):
+    resource = Resource(txn, storage, kb, "rid")
 
-    all_field_ids = await resource.get_all_field_ids(for_update=False)
-    assert all_field_ids is None or all_field_ids.fields == []
+    assert await resource.get_all_field_ids(for_update=False) is None
 
     all_fields = AllFieldIDs()
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text"))
 
-    await datamanagers.fields.fields_v2.set(
-        txn=txn,
-        kbid=kb,
-        rid=rid,
-        field_type="t",
-        field_id="text",
-        value=FieldText(body="text", format=FieldText.Format.PLAIN),
-    )
-
     await resource.set_all_field_ids(all_fields)
 
-    final = await resource.get_all_field_ids(for_update=False)
-    assert final is not None
-    assert final == all_fields
+    assert await resource.get_all_field_ids(for_update=False) == all_fields
 
 
-async def test_update_all_fields_key(txn, storage, kb, rid):
-    resource = Resource(txn, storage, kb, rid)
+async def test_update_all_fields_key(txn, storage, kb):
+    resource = Resource(txn, storage, kb, "rid")
 
     await resource.update_all_field_ids(updated=[], deleted=[])
 
@@ -266,22 +248,6 @@ async def test_update_all_fields_key(txn, storage, kb, rid):
     all_fields = AllFieldIDs()
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text1"))
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text2"))
-    await datamanagers.fields.fields_v2.set(
-        txn=txn,
-        kbid=kb,
-        rid=rid,
-        field_type="t",
-        field_id="text1",
-        value=FieldText(body="text1", format=FieldText.Format.PLAIN),
-    )
-    await datamanagers.fields.fields_v2.set(
-        txn=txn,
-        kbid=kb,
-        rid=rid,
-        field_type="t",
-        field_id="text2",
-        value=FieldText(body="text2", format=FieldText.Format.PLAIN),
-    )
 
     await resource.update_all_field_ids(updated=list(all_fields.fields))
 
@@ -289,30 +255,20 @@ async def test_update_all_fields_key(txn, storage, kb, rid):
     assert await resource.get_all_field_ids(for_update=False) == all_fields
 
     file_field = FieldID(field_type=FieldType.FILE, field="file")
-    await datamanagers.fields.fields_v2.set(
-        txn=txn, kbid=kb, rid=rid, field_type="f", field_id="file", value=FileExtractedData()
-    )
     await resource.update_all_field_ids(updated=[file_field])
 
     result = await resource.get_all_field_ids(for_update=False)
     assert result is not None
-    assert len(result.fields) == 3
-    # Sort them by field_type and field to ensure consistent ordering for the assertion
-    obtained = list(result.fields)
-    obtained.sort(key=lambda x: (x.field_type, x.field))
-    expected = [*list(all_fields.fields), file_field]
-    expected.sort(key=lambda x: (x.field_type, x.field))
-    assert obtained == expected
+    assert list(result.fields) == [*list(all_fields.fields), file_field]
 
     # Check deletes
-    await datamanagers.fields.fields_v2.delete(txn, kbid=kb, rid=rid, field_type="f", field_id="file")
     await resource.update_all_field_ids(deleted=[file_field])
 
     assert await resource.get_all_field_ids(for_update=False) == all_fields
 
 
-async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb, rid):
-    resource = Resource(txn, storage, kb, rid)
+async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb):
+    resource = Resource(txn, storage, kb, "rid")
     resource.update_all_field_ids = AsyncMock()  # type: ignore
     resource.set_field = AsyncMock()  # type: ignore
 
@@ -338,7 +294,7 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb, rid):
     ]
 
 
-async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb, rid):
+async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb):
     STORED_VECTOR_DIMENSION = 100
     MATRYOSHKA_DIMENSION = 10
 
@@ -356,7 +312,7 @@ async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb, rid):
         )
     )
 
-    brain = ResourceBrain(rid)
+    brain = ResourceBrain("rid")
     brain.generate_vectors(
         "t/text",
         vectors,
@@ -367,16 +323,16 @@ async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb, rid):
 
     sentences = (
         brain.brain.paragraphs["t/text"]
-        .paragraphs[f"{rid}/t/text/0-10"]
+        .paragraphs["rid/t/text/0-10"]
         .vectorsets_sentences["my-vectorset"]
         .sentences
     )
     assert len(sentences) == 1
-    assert sentences[f"{rid}/t/text/0/0-10"].metadata.position.start == 0
-    assert sentences[f"{rid}/t/text/0/0-10"].metadata.position.end == 10
-    assert len(sentences[f"{rid}/t/text/0/0-10"].vector) == STORED_VECTOR_DIMENSION
+    assert sentences["rid/t/text/0/0-10"].metadata.position.start == 0
+    assert sentences["rid/t/text/0/0-10"].metadata.position.end == 10
+    assert len(sentences["rid/t/text/0/0-10"].vector) == STORED_VECTOR_DIMENSION
 
-    brain = ResourceBrain(rid)
+    brain = ResourceBrain("rid")
     brain.generate_vectors(
         "t/text",
         vectors,
@@ -387,11 +343,11 @@ async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb, rid):
 
     sentences = (
         brain.brain.paragraphs["t/text"]
-        .paragraphs[f"{rid}/t/text/0-10"]
+        .paragraphs["rid/t/text/0-10"]
         .vectorsets_sentences["my-vectorset"]
         .sentences
     )
     assert len(sentences) == 1
-    assert sentences[f"{rid}/t/text/0/0-10"].metadata.position.start == 0
-    assert sentences[f"{rid}/t/text/0/0-10"].metadata.position.end == 10
-    assert len(sentences[f"{rid}/t/text/0/0-10"].vector) == MATRYOSHKA_DIMENSION
+    assert sentences["rid/t/text/0/0-10"].metadata.position.start == 0
+    assert sentences["rid/t/text/0/0-10"].metadata.position.end == 10
+    assert len(sentences["rid/t/text/0/0-10"].vector) == MATRYOSHKA_DIMENSION
