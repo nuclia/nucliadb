@@ -121,7 +121,6 @@ impl SearcherCluster {
         let list_nodes = Arc::new(ManualListNodes(self.nodes.clone(), node_id));
 
         let searcher_api = SearchServer::new(
-            self.settings.metadata.clone(),
             searcher.index_cache(),
             ShardSelector::new(Arc::clone(&list_nodes) as Arc<dyn ListNodes>, self.shard_replication),
         );

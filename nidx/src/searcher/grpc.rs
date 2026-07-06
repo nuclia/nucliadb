@@ -29,7 +29,6 @@ use tonic::transport::Channel;
 use tonic::{Request, Response, Result, Status, service::Routes};
 use uuid::Uuid;
 
-use crate::NidxMetadata;
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::shard_merge::{Limit, OrderBy};
 use crate::searcher::shard_search::PartialResponse;
@@ -61,16 +60,14 @@ impl Interceptor for TelemetryInterceptor {
 type SearcherClient = NidxSearcherClient<InterceptedService<Channel, TelemetryInterceptor>>;
 
 pub struct SearchServer {
-    meta: NidxMetadata,
     index_cache: Arc<IndexCache>,
     shard_selector: ShardSelector,
     clients: Arc<RwLock<HashMap<String, SearcherClient>>>,
 }
 
 impl SearchServer {
-    pub fn new(meta: NidxMetadata, index_cache: Arc<IndexCache>, shard_selector: ShardSelector) -> Self {
+    pub fn new(index_cache: Arc<IndexCache>, shard_selector: ShardSelector) -> Self {
         SearchServer {
-            meta,
             index_cache,
             shard_selector,
             clients: Arc::new(RwLock::new(HashMap::new())),
@@ -170,7 +167,6 @@ impl NidxSearcher for SearchServer {
 
         let response = if coordinator {
             // We are the requested searcher to perform a distributed query
-            check_shards_exist(&self.meta, &shards).await?;
             self.distributed_query(request, shards).await?
         } else {
             // This is a hopped node, i.e., another searcher has delegated this part of the query to
@@ -293,9 +289,11 @@ impl SearchServer {
                 let Some(node) = partitioner.next_node_for_shard(shard_id) else {
                     // A shard doesn't have more nodes to query but we haven't finished yet. We
                     // won't be able to complete the request in all partitions, so we abort
-                    return Err(NidxError::QueryError(format!(
-                        "Error in search, exhausted all available nodes for shard {shard_id}"
-                    )));
+                    error!(?shard_id, "Error in search, exhausted all available nodes for shard");
+                    // Propagate a NotFound error. Note that we can only arrive here due to NotFound
+                    // errors as they are the only ones we retry. If at some point we handle more,
+                    // this will be an incorrect assumption
+                    return Err(NidxError::NotFound);
                 };
                 groups
                     .entry(node)
@@ -450,16 +448,4 @@ impl QueryPartitioner {
         let nodes = self.shard_nodes.get_mut(shard).unwrap();
         if !nodes.is_empty() { Some(nodes.remove(0)) } else { None }
     }
-}
-
-async fn check_shards_exist(meta: &NidxMetadata, shards: &[Uuid]) -> NidxResult<()> {
-    let existing_shards = crate::metadata::Shard::exist_many(&meta.pool, shards)
-        .await
-        .map_err(NidxError::from)?;
-
-    if existing_shards.len() < shards.len() {
-        return Err(NidxError::NotFound);
-    }
-
-    Ok(())
 }
