@@ -292,7 +292,7 @@ class Resource:
 
     async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
         """Return whether this resource has this field or not."""
-        all_fields_ids = await self.get_fields_ids(force=True)
+        all_fields_ids = await self.get_fields_ids(force=False)
         for field_type, field_id in all_fields_ids:
             if field_type == type and field_id == field:
                 return True
@@ -611,8 +611,8 @@ class Resource:
 
             if not await self.field_exists(field_vectors.field.field_type, field_vectors.field.field):
                 # skipping because field does not exist
-                raise RuntimeError("Vector field does not exist, skipping vectors")
-                logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors')
+                logger.warning(f'Field "{field_vectors.field.field}" does not exist, skipping vectors', extra={"kbid": self.kbid,
+                                                                                                               "rid": self.uuid})
                 continue
 
             field_obj = await self.get_field(
