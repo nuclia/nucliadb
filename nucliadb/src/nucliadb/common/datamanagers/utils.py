@@ -18,58 +18,14 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import contextlib
-import functools
-import logging
-from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Callable, Coroutine, ParamSpec, TypeVar, cast
+from typing import TypeVar
 
-import psycopg
 from google.protobuf.message import Message
 
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.pg import PGTransaction, ReadOnlyPGTransaction
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
-
-logger = logging.getLogger(__name__)
 
 PB_TYPE = TypeVar("PB_TYPE", bound=Message)
-_P = ParamSpec("_P")
-_R = TypeVar("_R")
-
-
-def logs_foreign_key_error(
-    func: Callable[_P, Coroutine[Any, Any, _R]],
-) -> Callable[_P, Coroutine[Any, Any, _R | None]]:
-    """Decorator for dual-write datamanager functions during the ORM backfill migration.
-
-    During the backfill migration, writes are sent to both the legacy KV store and
-    the new ORM (PostgreSQL) tables.  A write to an ORM table can fail with a
-    ForeignKeyViolation when the parent row (e.g. the kb_resources row for a field,
-    or the kbs row for a resource) has not been backfilled yet.
-
-    This decorator catches that specific error and logs a warning instead of
-    propagating the exception, so that the dual-write path does not break normal
-    operation for resources and fields that are still pending migration.
-
-    Example::
-
-        @logs_foreign_key_error
-        async def set_basic(txn, *, kbid, rid, basic): ...
-    """
-
-    @functools.wraps(func)
-    async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R | None:
-        try:
-            return await func(*args, **kwargs)
-        except psycopg.errors.ForeignKeyViolation as exc:
-            logger.warning(
-                f"Foreign key violation in {wrapper.__qualname__} (parent row not yet migrated to ORM tables): {exc}"
-            )
-        return None
-
-    return wrapper
 
 
 async def get_kv_pb(
@@ -99,33 +55,3 @@ async def with_ro_transaction():
     driver = get_driver()
     async with driver.ro_transaction() as ro_txn:
         yield ro_txn
-
-
-def datamanagers_v2_write(kbid: str) -> bool:
-    """
-    Check if the knowledge box is currently being migrated to the v2 datamanagers.
-    """
-    return has_feature(const.Features.DATAMANAGERS_V2_WRITE, context={"kbid": kbid})
-
-
-def datamanagers_v2_read(kbid: str) -> bool:
-    """
-    Check if the knowledge box has already been migrated and has datamanagers v2 reads enabled.
-    """
-    return has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid})
-
-
-def _pg(txn: Transaction) -> PGTransaction:
-    return cast(PGTransaction, txn)
-
-
-@asynccontextmanager
-async def _pg_cursor(txn: Transaction) -> AsyncGenerator[psycopg.AsyncCursor]:
-    if isinstance(txn, PGTransaction):
-        async with _pg(txn).connection.cursor() as cur:
-            yield cur
-    elif isinstance(txn, ReadOnlyPGTransaction):
-        async with txn.driver._get_connection() as conn, conn.cursor() as cur:
-            yield cur
-    else:
-        raise TypeError(f"Unsupported transaction type: {type(txn)}")

@@ -20,9 +20,7 @@
 import logging
 from collections.abc import AsyncIterator
 
-from nucliadb.common.datamanagers import kb_v2
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.datamanagers.utils import datamanagers_v2_read, datamanagers_v2_write
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import knowledgebox_pb2
 
@@ -36,11 +34,6 @@ logger = logging.getLogger(__name__)
 
 
 async def get_kbs(txn: Transaction, *, prefix: str = "") -> AsyncIterator[tuple[str, str]]:
-    if datamanagers_v2_read("kbs"):
-        async for kbid, slug in kb_v2.get_kbs(txn, slug_prefix=prefix):
-            yield (kbid, slug)
-        return
-
     async for key in txn.keys(KB_SLUGS.format(slug=prefix)):
         slug = key.replace(KB_SLUGS_BASE, "")
         uuid = await get_kb_uuid(txn, slug=slug)
@@ -51,16 +44,10 @@ async def get_kbs(txn: Transaction, *, prefix: str = "") -> AsyncIterator[tuple[
 
 
 async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
-    if datamanagers_v2_read("kbs"):
-        return await kb_v2.exists_kb(txn, kbid=kbid)
-
     return await get_config(txn, kbid=kbid, for_update=False) is not None
 
 
 async def get_kb_uuid(txn: Transaction, *, slug: str) -> str | None:
-    if datamanagers_v2_read("kbs"):
-        return await kb_v2.get_kb_uuid(txn, slug=slug)
-
     uuid = await txn.get(KB_SLUGS.format(slug=slug), for_update=False)
     if uuid is not None:
         return uuid.decode()
@@ -72,20 +59,6 @@ async def set_kbid_for_slug(txn: Transaction, *, slug: str, kbid: str):
     key = KB_SLUGS.format(slug=slug)
     await txn.set(key, kbid.encode())
 
-    if datamanagers_v2_write("kbs"):
-        await kb_v2.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
-
-
-async def modify_slug(txn: Transaction, *, kbid: str, old_slug: str, new_slug: str) -> None:
-    await txn.delete(KB_SLUGS.format(slug=old_slug))
-    await txn.set(
-        KB_SLUGS.format(slug=new_slug),
-        kbid.encode(),
-    )
-
-    if datamanagers_v2_write("kbs") or datamanagers_v2_write(kbid):
-        await kb_v2.set_kbid_for_slug(txn, slug=new_slug, kbid=kbid)
-
 
 async def delete_kb_slug(txn: Transaction, *, slug: str):
     key = KB_SLUGS.format(slug=slug)
@@ -95,9 +68,6 @@ async def delete_kb_slug(txn: Transaction, *, slug: str):
 async def get_config(
     txn: Transaction, *, kbid: str, for_update: bool = False
 ) -> knowledgebox_pb2.KnowledgeBoxConfig | None:
-    if datamanagers_v2_read(kbid) or datamanagers_v2_read("kbs"):
-        return await kb_v2.get_config(txn, kbid=kbid)
-
     key = KB_UUID.format(kbid=kbid)
     payload = await txn.get(key, for_update=for_update)
     if payload is None:
@@ -110,9 +80,6 @@ async def get_config(
 async def set_config(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.KnowledgeBoxConfig):
     key = KB_UUID.format(kbid=kbid)
     await txn.set(key, config.SerializeToString())
-
-    if datamanagers_v2_write(kbid) or datamanagers_v2_write("kbs"):
-        await kb_v2.set_config(txn, kbid=kbid, config=config)
 
 
 async def delete_config(txn: Transaction, *, kbid: str) -> None:

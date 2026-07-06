@@ -33,7 +33,6 @@ from starlette.requests import Request as StarletteRequest
 
 from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.back_pressure import maybe_back_pressure
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.models.internal.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
@@ -868,7 +867,7 @@ async def validate_field_upload(
             raise HTTPConflict("File already exists in the Knowledge Box")
 
         # We are creating a new resource. Assign a new resource id
-        rid = Resource.new_unique_rid()
+        rid = uuid.uuid4().hex
     else:
         # Adding a field to an existing resource, the resource must exist.
         if not await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid):

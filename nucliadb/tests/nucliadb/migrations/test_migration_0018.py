@@ -19,8 +19,6 @@
 #
 from unittest.mock import AsyncMock, Mock, patch
 
-import pytest
-
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.kb import KB_SLUGS
 from nucliadb.common.maindb.driver import Driver
@@ -32,7 +30,6 @@ from tests.nucliadb.migrations import get_migration
 migration: Migration = get_migration(18)
 
 
-@pytest.mark.skip(reason="This migration is not needed anymore")
 async def test_migration_0018_global(maindb_driver: Driver):
     execution_context = Mock()
     execution_context.kv_driver = maindb_driver
@@ -47,7 +44,7 @@ async def test_migration_0018_global(maindb_driver: Driver):
         # setup some orphan /kbslugs keys and some real ones
         async with maindb_driver.rw_transaction() as txn:
             fake_kb_slug = "fake-kb-slug"
-            fake_kb_id = KnowledgeBox.new_unique_kbid()
+            fake_kb_id = "fake-kb-id"
             key = KB_SLUGS.format(slug=fake_kb_slug)
             await txn.set(key, fake_kb_id.encode())
             assert not await datamanagers.kb.exists_kb(txn, kbid=fake_kb_id)

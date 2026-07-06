@@ -31,11 +31,9 @@ import pytest
 from nidx_protos.nodereader_pb2 import DocumentScored, GraphSearchResponse, ParagraphResult
 
 import nucliadb_models.search as search_models
-from nucliadb.common import datamanagers
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion, WeightedCombSum, get_rank_fusion
@@ -57,15 +55,6 @@ def disable_hidden_resources_check():
         yield
 
 
-@pytest.fixture(scope="function")
-async def kbid(maindb_driver: Driver) -> str:
-    kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.kb.kb_v2.set_kbid_for_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
-    return kbid
-
-
 @pytest.mark.parametrize(
     "rank_fusion,expected_type",
     [
@@ -74,10 +63,10 @@ async def kbid(maindb_driver: Driver) -> str:
     ],
 )
 async def test_get_rank_fusion(
-    maindb_driver: Driver, dummy_predict: PredictEngine, kbid: str, rank_fusion, expected_type: type
+    maindb_driver: Driver, dummy_predict: PredictEngine, rank_fusion, expected_type: type
 ):
     item = FindRequest(rank_fusion=rank_fusion)
-    parsed = await parse_find(kbid, item)
+    parsed = await parse_find("kbid", item)
     assert parsed.retrieval.rank_fusion is not None
     algorithm = get_rank_fusion(parsed.retrieval.rank_fusion)
     assert isinstance(algorithm, expected_type)

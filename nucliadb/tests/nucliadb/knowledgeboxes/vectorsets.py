@@ -26,7 +26,6 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 
@@ -78,7 +77,7 @@ async def inject_broker_message_with_vectorset_data(
 
     bm = create_broker_message_with_vectorset(
         kbid,
-        rid=Resource.new_unique_rid(),
+        rid=uuid.uuid4().hex,
         field_id=uuid.uuid4().hex,
         vectorset_id=vectorset_id,
         default_vectorset_dimension=default_vector_dimension,

@@ -18,8 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import uuid
-
 import pytest
 from httpx import AsyncClient
 
@@ -54,10 +52,10 @@ EXTRACTED = ("extracted",)
 @pytest.mark.deploy_modes("component")
 async def test_get_resource_inexistent(nucliadb_reader: AsyncClient, knowledgebox: str) -> None:
     kbid = knowledgebox
-    inexistent = uuid.uuid4().hex
+    rid = "000000000000001"
 
     resp = await nucliadb_reader.get(
-        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{inexistent}",
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}",
     )
     assert resp.status_code == 404
 
@@ -331,17 +329,15 @@ async def test_get_resource_extracted_metadata(nucliadb_reader: AsyncClient, tes
 async def test_head_resource(nucliadb_reader: AsyncClient, test_resource: Resource):
     kbid = test_resource.kbid
     slug = test_resource.basic.slug  # type: ignore
-    ruuid = test_resource.uuid
+    uuid = test_resource.uuid
 
     # By UUID
     resp = await nucliadb_reader.head(
-        f"/kb/{kbid}/resource/{ruuid}",
+        f"/kb/{kbid}/resource/{uuid}",
     )
     assert resp.status_code == 200
-
-    non_existent_ruuid = uuid.uuid4().hex
     resp = await nucliadb_reader.head(
-        f"/kb/{kbid}/resource/{non_existent_ruuid}",
+        f"/kb/{kbid}/resource/non-existent-uuid",
     )
     assert resp.status_code == 404
 

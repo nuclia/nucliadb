@@ -431,30 +431,30 @@ async def _get_resource_field(
 
             if isinstance(field, Conversation):
                 conversation_metadata = await field.get_metadata()
-                if conversation_metadata is not None:
-                    if page == "first":
-                        page_to_fetch = 1
-                    elif page == "last":
-                        page_to_fetch = conversation_metadata.pages
-                    else:
-                        page_to_fetch = int(page)
+                if page == "first":
+                    page_to_fetch = 1
+                elif page == "last":
+                    page_to_fetch = conversation_metadata.pages
+                else:
+                    page_to_fetch = int(page)
 
-                    page_value = await field.get_value(page=page_to_fetch)
-                    if page_value is not None:
-                        splits_metadata = await field.get_splits_metadata()
-                        deleted_messages = set(splits_metadata.deleted_splits)
-                        resource_field.value = from_proto.conversation_page(
-                            page_value,
-                            total=conversation_metadata.total,
-                            pages=conversation_metadata.pages,
-                            page=page_to_fetch,
-                        )
-                        # Skip deleted messages
-                        resource_field.value.messages = [
-                            msg
-                            for msg in (resource_field.value.messages or [])
-                            if msg.ident not in deleted_messages
-                        ]
+                page_value = await field.get_value(page=page_to_fetch)
+                if page_value is not None:
+                    splits_metadata = await field.get_splits_metadata()
+                    deleted_messages = set(splits_metadata.deleted_splits)
+                    resource_field.value = from_proto.conversation_page(
+                        page_value,
+                        total=conversation_metadata.total,
+                        pages=conversation_metadata.pages,
+                        page=page_to_fetch,
+                    )
+                    # Skip deleted messages
+                    resource_field.value.messages = [
+                        msg
+                        for msg in (resource_field.value.messages or [])
+                        if msg.ident not in deleted_messages
+                    ]
+
         if (
             ResourceFieldProperties.EXTRACTED in show
             and extracted

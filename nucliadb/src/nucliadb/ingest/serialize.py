@@ -278,10 +278,7 @@ async def serialize_resource(
                     await serialize_field_errors(field, resource.data.conversations[field.id])
                 if include_value and isinstance(field, Conversation):
                     value = await field.get_metadata()
-                    if value is not None:
-                        resource.data.conversations[field.id].value = from_proto.field_conversation(
-                            value
-                        )
+                    resource.data.conversations[field.id].value = from_proto.field_conversation(value)
                 if include_extracted_data:
                     resource.data.conversations[field.id].extracted = ConversationFieldExtractedData()
                     await set_resource_field_extracted_data(

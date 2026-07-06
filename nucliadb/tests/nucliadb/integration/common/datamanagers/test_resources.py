@@ -17,17 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import AsyncIterator
-
 import pytest
 
 from nucliadb.common import datamanagers
+from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.models_utils import from_proto
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.resources_pb2 import Basic, FieldLink
+from nucliadb_protos.resources_pb2 import Basic
 
 
 async def check_slug(driver: Driver, kbid, rid, slug):
@@ -40,28 +36,15 @@ async def check_slug(driver: Driver, kbid, rid, slug):
 
 
 @pytest.fixture(scope="function")
-async def kbid(maindb_driver: Driver) -> AsyncIterator[str]:
-    kbid = KnowledgeBox.new_unique_kbid()
-    slug = kbid
-    async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.kb.kb_v2.set_kbid_for_slug(txn, kbid=kbid, slug=slug)
-        await txn.commit()
-    try:
-        yield kbid
-    finally:
-        async with maindb_driver.rw_transaction() as txn:
-            await datamanagers.kb.kb_v2.delete(txn, kbid=kbid)
-            await txn.commit()
-
-
-@pytest.fixture(scope="function")
-async def resource_with_slug(maindb_driver: Driver, kbid: str):
-    rid = Resource.new_unique_rid()
+async def resource_with_slug(maindb_driver: Driver):
+    kbid = "kbid"
+    rid = "rid"
     slug = "slug"
 
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=Basic(slug=slug))
-        await datamanagers.resources.set_slug(txn, kbid=kbid, rid=rid, slug=slug)
+        await txn.set(KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug), rid.encode())
+        basic = Basic(slug=slug)
+        await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
         await txn.commit()
 
     await check_slug(maindb_driver, kbid, rid, slug)
@@ -80,15 +63,15 @@ async def test_modify_slug(resource_with_slug, maindb_driver: Driver):
     await check_slug(maindb_driver, kbid, rid, new_slug)
 
 
-async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, str, str]):
-    kbid, rid, _ = resource_with_slug
-
+async def test_all_fields(maindb_driver: Driver):
+    kbid = "mykb"
+    rid = "myresource"
     field = resources_pb2.FieldID(field="myfield", field_type=resources_pb2.FieldType.LINK)
-    field_type_abbr = from_proto.field_type_name(field.field_type).abbreviation()
 
     async with maindb_driver.ro_transaction() as txn:
         all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
-        assert all_fields is None or len(all_fields.fields) == 0
+        assert all_fields is None
+
         assert (await datamanagers.resources.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is False
 
     # set a field for a resource
@@ -96,14 +79,6 @@ async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, 
     async with maindb_driver.rw_transaction() as txn:
         pb = resources_pb2.AllFieldIDs()
         pb.fields.append(field)
-        await datamanagers.fields.fields_v2.set(
-            txn,
-            kbid=kbid,
-            rid=rid,
-            field_type=field_type_abbr,
-            field_id=field.field,
-            value=FieldLink(uri="http://example.com"),
-        )
         await datamanagers.resources.set_all_field_ids(txn, kbid=kbid, rid=rid, allfields=pb)
         await txn.commit()
 
@@ -119,9 +94,6 @@ async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, 
     async with maindb_driver.rw_transaction() as txn:
         await datamanagers.resources.set_all_field_ids(
             txn, kbid=kbid, rid=rid, allfields=resources_pb2.AllFieldIDs()
-        )
-        await datamanagers.fields.fields_v2.delete(
-            txn, kbid=kbid, rid=rid, field_type=field_type_abbr, field_id=field.field
         )
         await txn.commit()
 

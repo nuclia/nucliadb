@@ -201,9 +201,9 @@ async def test_resource_crud_sync(nucliadb_writer: AsyncClient, knowledgebox: st
     assert resp.status_code == 200
 
     # Test delete resource
-    non_existing_rid = Resource.new_unique_rid()
+
     resp = await nucliadb_writer.delete(
-        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{non_existing_rid}",
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/resource1",
     )
 
     assert resp.status_code == 404
