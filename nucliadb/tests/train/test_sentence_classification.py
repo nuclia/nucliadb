@@ -18,11 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import asyncio
-import uuid
 
 import aiohttp
 import pytest
 
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.train import API_PREFIX
 from nucliadb.train.api.v1.router import KB_PREFIX
 from nucliadb_protos import resources_pb2 as rpb
@@ -77,7 +77,7 @@ async def inject_resource_with_sentence_classification(knowledgebox, writer):
 
 
 def broker_resource(knowledgebox: str) -> BrokerMessage:
-    rid = str(uuid.uuid4())
+    rid = Resource.new_unique_rid()
     bmb = BrokerMessageBuilder(kbid=knowledgebox, rid=rid)
     bmb.with_title("Title Resource")
     bmb.with_summary("Summary of document")

@@ -13,12 +13,12 @@
 # limitations under the License.
 
 import time
-import uuid
 from datetime import datetime
 
 import pytest
 
 from integration.utils import export_dataset
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_models.resource import KnowledgeBoxObj
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 from nucliadb_protos.resources_pb2 import (
@@ -79,7 +79,7 @@ def qa_kb(sdk: NucliaDB, kb: KnowledgeBoxObj, ingest_stub_sync: WriterStub) -> K
 
 
 def smb_wonder_bm(kbid: str) -> BrokerMessage:
-    rid = str(uuid.uuid4())
+    rid = Resource.new_unique_rid()
     now = datetime.now()
 
     bm = BrokerMessage()

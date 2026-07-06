@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -31,11 +30,11 @@ from grpc import aio
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
-from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.standalone.settings import Settings
 from nucliadb.train.settings import settings as train_settings
 from nucliadb.train.utils import (
@@ -147,7 +146,7 @@ async def knowledgebox_with_labels(nucliadb_writer: AsyncClient, knowledgebox: s
 
 
 def broker_simple_resource(knowledgebox: str, number: int) -> BrokerMessage:
-    rid = str(uuid.uuid4())
+    rid = Resource.new_unique_rid()
     message1: BrokerMessage = BrokerMessage(
         kbid=knowledgebox,
         uuid=rid,
@@ -288,12 +287,9 @@ async def test_pagination_resources(processor: Processor, knowledgebox: str):
 
     while time() - t0 < 30:  # wait max 30 seconds for it
         async with driver.ro_transaction() as txn:
-            count = 0
-            async for key in txn.keys(match=KB_RESOURCE_SLUG_BASE.format(kbid=knowledgebox)):
-                count += 1
-
-        if count == amount:
-            break
+            count = await datamanagers.resources.calculate_number_of_resources(txn, kbid=knowledgebox)
+            if count == amount:
+                break
         print(f"got {count}, retrying")
         await asyncio.sleep(2)
 

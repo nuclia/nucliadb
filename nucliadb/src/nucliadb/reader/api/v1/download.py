@@ -97,6 +97,7 @@ async def _download_extract_file(
     rslug: str | None = None,
     range_request: str | None = None,
 ) -> Response:
+
     rid = await _get_resource_uuid_from_params(kbid, rid, rslug)
 
     storage = await get_storage(service_name=SERVICE_NAME)

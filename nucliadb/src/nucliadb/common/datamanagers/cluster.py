@@ -19,10 +19,11 @@
 #
 import logging
 
+from nucliadb.common.datamanagers import kb_v2
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import writer_pb2
 
-from .utils import get_kv_pb
+from .utils import datamanagers_v2_read, datamanagers_v2_write, get_kv_pb
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +34,15 @@ KB_SHARDS = "/kbs/{kbid}/shards"
 async def get_kb_shards(
     txn: Transaction, *, kbid: str, for_update: bool = False
 ) -> writer_pb2.Shards | None:
+    if datamanagers_v2_read(kbid):
+        return await kb_v2.get_kb_shards(txn, kbid=kbid, for_update=for_update)
+
     key = KB_SHARDS.format(kbid=kbid)
     return await get_kv_pb(txn, key, writer_pb2.Shards, for_update=for_update)
 
 
-async def is_kb_shard(txn: Transaction, *, kbid: str, shard_id: str, for_update: bool = False) -> bool:
-    shards = await get_kb_shards(txn, kbid=kbid, for_update=for_update)
+async def is_kb_shard(txn: Transaction, *, kbid: str, shard_id: str) -> bool:
+    shards = await get_kb_shards(txn, kbid=kbid)
     if shards is None:
         return False
     for shard in shards.shards:
@@ -50,3 +54,6 @@ async def is_kb_shard(txn: Transaction, *, kbid: str, shard_id: str, for_update:
 async def update_kb_shards(txn: Transaction, *, kbid: str, shards: writer_pb2.Shards) -> None:
     key = KB_SHARDS.format(kbid=kbid)
     await txn.set(key, shards.SerializeToString())
+
+    if datamanagers_v2_write(kbid):
+        await kb_v2.update_kb_shards(txn, kbid=kbid, shards=shards)

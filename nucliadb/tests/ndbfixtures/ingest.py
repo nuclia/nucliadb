@@ -416,7 +416,7 @@ async def test_resource(storage: Storage, maindb_driver: Driver, knowledgebox: s
 
 def broker_resource(knowledgebox: str, rid: str | None = None, slug: str | None = None) -> BrokerMessage:
     if rid is None:
-        rid = str(uuid.uuid4())
+        rid = Resource.new_unique_rid()
     if slug is None:
         slug = f"{rid}slug1"
 
@@ -528,11 +528,13 @@ def broker_resource(knowledgebox: str, rid: str | None = None, slug: str | None 
     return message1
 
 
-async def create_resource(storage: Storage, driver: Driver, knowledgebox: str) -> Resource:
+async def create_resource(
+    storage: Storage, driver: Driver, knowledgebox: str, slug: str = "slug"
+) -> Resource:
     async with driver.rw_transaction() as txn:
-        rid = str(uuid.uuid4())
+        rid = Resource.new_unique_rid()
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
-        test_resource = await kb_obj.add_resource(uuid=rid, slug="slug")
+        test_resource = await kb_obj.add_resource(uuid=rid, slug=slug)
         await test_resource.set_slug()
 
         # 1.  ROOT ELEMENTS

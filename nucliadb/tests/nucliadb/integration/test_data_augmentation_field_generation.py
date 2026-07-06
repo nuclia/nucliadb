@@ -20,7 +20,6 @@
 import datetime
 import hashlib
 import json
-import uuid
 from collections.abc import AsyncIterator, Iterable
 from unittest.mock import patch
 
@@ -33,6 +32,7 @@ from pytest_mock import MockerFixture
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import (
     DummyProcessingEngine,
     ProcessingEngine,
@@ -100,7 +100,7 @@ async def test_send_to_process_generated_fields(
     mocker: MockerFixture,
 ):
     kbid = knowledgebox
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
 
     # Resource creation (from writer)
     bm = BrokerMessage()
@@ -366,7 +366,7 @@ async def test_send_to_process_generated_conversation_field(
     This emulates the generation of a conversation field in the context of the memory feature.
     """
     kbid = knowledgebox
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     slug = "my-resource"
 
     # Resource creation (from writer)

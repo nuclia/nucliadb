@@ -39,10 +39,14 @@ class Features:
     AUDIT_RETRIEVE_AND_AUGMENT = "nucliadb_audit_retrieve_and_augment"
     # Flipt features
     KEY_VALUE_FIELDS = "nucliadb_key_value_fields"
+    DATAMANAGERS_V2_READ = "nucliadb_datamanagers_v2_read"
+    DATAMANAGERS_V2_WRITE = "nucliadb_datamanagers_v2_write"
 
 
 _FliptFeatures = set(
     [
         Features.KEY_VALUE_FIELDS,
+        Features.DATAMANAGERS_V2_READ,
+        Features.DATAMANAGERS_V2_WRITE,
     ]
 )

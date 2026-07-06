@@ -96,6 +96,9 @@ async def backfill_splits_page(txn: Transaction, storage, kbid: str, rid: str, f
     )
     splits_metadata = await field_obj.get_splits_metadata()
     conv_metadata = await field_obj.get_metadata()
+    if conv_metadata is None:
+        return
+
     for page_number in range(1, conv_metadata.pages + 1):
         page = await field_obj.get_value(page=page_number)
         if page is None:
