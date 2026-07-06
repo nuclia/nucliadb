@@ -367,7 +367,6 @@ async def list_search_configurations(request: Request, kbid: str) -> dict[str, S
     summary="List KV schemas",
     tags=["Knowledge Box Services"],
     response_model=KBKVSchemas,
-    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
@@ -385,7 +384,6 @@ async def list_kv_schemas(request: Request, kbid: str) -> KBKVSchemas:
     summary="Get a KV schema",
     tags=["Knowledge Box Services"],
     response_model=KVSchema,
-    include_in_schema=False,
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
