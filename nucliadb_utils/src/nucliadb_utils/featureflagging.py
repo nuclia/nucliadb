@@ -73,7 +73,7 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
     const.Features.DATAMANAGERS_V2_READ: {
         "rollout": 0,
         "variants": {
-            "environment": ["local"],
+            "environment": ["none"],
         },
     },
 }
