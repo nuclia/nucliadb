@@ -323,11 +323,17 @@ impl SearchServer {
                         }
                         responses.push(response);
                     }
-                    Ok(Err(NidxError::NotFound)) => {}
-                    Ok(Err(NidxError::GrpcError(status))) if status.code() == Code::NotFound => {}
-                    Ok(Err(NidxError::GrpcError(status))) if status.code() == Code::Unavailable => {}
+                    Ok(Err(NidxError::NotFound)) => {
+                        // shard not found in searcher, probably due to a
+                        // topology change the shard is not yet where it should
+                    }
+                    Ok(Err(NidxError::GrpcError(status))) if status.code() == Code::NotFound => {
+                        // same as above
+                    }
+                    Ok(Err(NidxError::GrpcError(status))) if status.code() == Code::Unavailable => {
+                        // searcher peer temporarily unavailable, will retry with another node
+                    }
                     Ok(Err(search_error)) => return Err(search_error),
-                    // Ok(Err(search_error)) => return Err(search_error),
                     Err(join_error) => {
                         // Either a panic or a cancellation happened while searching
                         return Err(NidxError::from(join_error));
