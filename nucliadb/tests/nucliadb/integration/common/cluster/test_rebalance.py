@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -49,10 +50,9 @@ async def app_context(natsd, storage, nucliadb):
 
 @pytest.mark.deploy_modes("standalone")
 async def test_rebalance_splits_kb_shards(
-    app_context,
-    standalone_knowledgebox,
+    app_context: ApplicationContext,
+    standalone_knowledgebox: str,
     nucliadb_writer: AsyncClient,
-    nucliadb_reader_manager: AsyncClient,
 ):
     total_resources = 10
     total_paragraphs = total_resources
@@ -102,8 +102,8 @@ async def test_rebalance_splits_kb_shards(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_rebalance_merges_kb_shards(
-    app_context,
-    standalone_knowledgebox,
+    app_context: ApplicationContext,
+    standalone_knowledgebox: str,
     nucliadb_writer: AsyncClient,
     nucliadb_reader_manager: AsyncClient,
 ):
@@ -191,6 +191,9 @@ async def create_shard_for_kb(kbid: str):
         sm = get_shard_manager()
         await sm.create_shard_by_kbid(txn, kbid, prewarm_enabled=False)
         await txn.commit()
+
+    sync_refresh_interval = 1
+    await asyncio.sleep(sync_refresh_interval)
 
 
 async def get_kb_shards(kbid: str) -> writer_pb2.Shards:
