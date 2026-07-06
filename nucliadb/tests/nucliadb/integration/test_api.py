@@ -40,7 +40,11 @@ from nucliadb.models.internal.processing import ClassificationLabel
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models import common, metadata
 from nucliadb_models.resource import Resource
-from nucliadb_models.search import KnowledgeboxCounters, KnowledgeboxSearchResults
+from nucliadb_models.search import (
+    KnowledgeboxCounters,
+    KnowledgeboxFindResults,
+    KnowledgeboxSearchResults,
+)
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
@@ -55,6 +59,7 @@ from nucliadb_protos.resources_pb2 import (
     LinkExtractedData,
     Paragraph,
     QuestionAnswer,
+    Sentence,
     Vector,
 )
 from nucliadb_protos.train_pb2 import GetSentencesRequest, TrainParagraph
@@ -2133,3 +2138,104 @@ async def test_successive_file_uploads_and_deletions_work(
     assert resp.status_code == 201, resp.text
     new_rid = resp.json()["uuid"]
     assert new_rid != rid, "Resource id was reused after deletion"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_resource_creation_with_data_augmentation_searchability(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox,
+) -> None:
+    """
+    This test checks that when a resource is created with a text field, but the KB also has a generator data augmentation agent,
+    the created checks are searchable semantically.
+    """
+    kbid = standalone_knowledgebox
+    text = "Hello, this is a test file for vector search."
+    vector = [0.1 for _ in range(1024)]  # Example vector of size 1024
+    resp = await nucliadb_writer.post(
+        f"/kb/{kbid}/resources",
+        json={
+            "title": "My title",
+            "texts": {
+                "text": {
+                    "body": text,
+                },
+            },
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    # Create a broker message for the resource with the created text field (with vectors and extracted text) and
+    # also the generated summary text field
+    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, source=BrokerMessage.MessageSource.PROCESSOR)
+    text_field = bmb.field_builder("text", field_type=FieldType.TEXT)
+    text_field.with_extracted_text(
+        text=text,
+    )
+    text_field.with_extracted_paragraph_metadata(
+        paragraph=Paragraph(
+            start=0,
+            end=len(text),
+            sentences=[
+                Sentence(
+                    start=0,
+                    end=len(text),
+                )
+            ],
+        )
+    )
+    text_field.with_extracted_vectors(
+        vectors=[
+            Vector(
+                start=0,
+                end=len(text),
+                vector=vector,
+            )
+        ],
+        vectorset="multilingual",
+    )
+    title_field = bmb.field_builder("title", field_type=FieldType.GENERIC)
+    title_field.with_extracted_text(
+        text="My title",
+    )
+    title_field.with_extracted_paragraph_metadata(
+        paragraph=Paragraph(
+            start=0,
+            end=len("My title"),
+            sentences=[
+                Sentence(
+                    start=0,
+                    end=len("My title"),
+                )
+            ],
+        )
+    )
+    bm1 = bmb.build()
+    author = bm1.generated_by.add()
+    author.processor.SetInParent()
+    da_generated_text = bm1.texts["da-short_summary-t-text"]
+    da_generated_text.body = "This is a generated summary of the text."
+    da_generated_text.generated_by.data_augmentation.SetInParent()
+
+    await inject_message(nucliadb_ingest_grpc, bm1)
+    await mark_dirty()
+    await wait_for_sync()
+
+    for feature in ["semantic", "keyword"]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "query": text,
+                "vector": vector,
+                "top_k": 1,
+                "features": [feature],
+                "reranker": "noop",
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        results = KnowledgeboxFindResults.model_validate(resp.json())
+        assert len(results.best_matches) == 1
+        assert results.best_matches[0].startswith(f"{rid}/t/text")
