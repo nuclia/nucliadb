@@ -288,7 +288,7 @@ class Resource:
 
     async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
         """Return whether this resource has this field or not."""
-        all_fields_ids = await self.get_fields_ids(force=True)
+        all_fields_ids = await self.get_fields_ids(force=False)
         for field_type, field_id in all_fields_ids:
             if field_type == type and field_id == field:
                 return True
