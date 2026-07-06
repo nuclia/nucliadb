@@ -23,7 +23,6 @@ from uuid import uuid4
 from nidx_protos.noderesources_pb2 import Resource
 
 from nucliadb.common import datamanagers
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -49,7 +48,7 @@ from tests.ndbfixtures.ingest import create_resource
 
 
 async def test_create_resource_orm_with_basic(
-    storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     basic = PBBasic(
         icon="text/plain",
@@ -94,11 +93,9 @@ async def test_create_resource_orm_with_basic(
     assert o2 is not None
     assert o2.source_id == "My Source"
 
-    await txn.abort()
-
 
 async def test_paragraphs_with_page(
-    maindb_driver, storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    maindb_driver, storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     # Create a resource
     basic = PBBasic(
@@ -159,11 +156,9 @@ async def test_paragraphs_with_page(
             assert metadata.metadata.representation.is_a_table is True
             assert metadata.metadata.representation.file == "myfile"
 
-    await txn.abort()
-
 
 async def test_vector_duplicate_fields(
-    maindb_driver, storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    maindb_driver, storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     basic = PBBasic(title="My title", summary="My summary")
     basic.metadata.status = PBMetadata.Status.PROCESSED
@@ -247,8 +242,6 @@ async def test_vector_duplicate_fields(
                     )
 
     assert count == 1
-
-    await txn.abort()
 
 
 async def test_generate_broker_message(

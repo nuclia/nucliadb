@@ -22,8 +22,6 @@
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-
 
 @pytest.mark.parametrize(
     "method,endpoint,params,payload,headers",
@@ -89,9 +87,8 @@ async def test_predict_proxy_not_proxied_returns_422(
 async def test_predict_proxy_returns_404_on_non_existing_kb(
     nucliadb_reader: AsyncClient,
 ):
-    idonotexist_kb = KnowledgeBox.new_unique_kbid()
     resp = await nucliadb_reader.post(
-        f"/kb/{idonotexist_kb}/predict/chat",
+        f"/kb/idonotexist-kb/predict/chat",
         json={"question": "foo", "query_context": ["foobar"], "user_id": "foo"},
     )
     assert resp.status_code == 404

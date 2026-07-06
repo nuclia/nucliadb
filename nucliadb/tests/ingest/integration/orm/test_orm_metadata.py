@@ -20,7 +20,6 @@
 from datetime import datetime
 from uuid import uuid4
 
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
@@ -38,7 +37,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_metadata(
-    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -79,11 +78,9 @@ async def test_create_resource_orm_metadata(
     assert ex2.metadata.links[0] == ex1.metadata.metadata.links[0]
     assert ex2.metadata.mime_type == ex1.metadata.metadata.mime_type
 
-    await txn.abort()
-
 
 async def test_create_resource_orm_metadata_split(
-    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -139,5 +136,3 @@ async def test_create_resource_orm_metadata_split(
     assert ex3 is not None
     assert ex1.metadata.split_metadata["ff1"].links[0] == ex3.split_metadata["ff1"].links[0]
     assert len(ex3.split_metadata) == 2
-
-    await txn.abort()

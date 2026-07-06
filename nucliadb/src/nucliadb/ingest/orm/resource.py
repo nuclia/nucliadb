@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import uuid
 from collections import defaultdict
 from collections.abc import Sequence
 from typing import Any, cast
@@ -94,6 +93,7 @@ class Resource:
         self.extra: PBExtra | None = None
         self.security: utils_pb2.Security | None = None
         self.modified: bool = False
+        self._modified_extracted_text: list[FieldID] = []
 
         self.txn: Transaction = txn
         self.storage = storage
@@ -104,10 +104,6 @@ class Resource:
         self._previous_status: Metadata.Status.ValueType | None = None
         self.user_relations: PBRelations | None = None
         self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
-
-    @staticmethod
-    def new_unique_rid() -> str:
-        return uuid.uuid4().hex
 
     @classmethod
     async def get(cls, txn: Transaction, kbid: str, rid: str) -> Resource | None:
@@ -384,8 +380,6 @@ class Resource:
             )
             self.modified = True
 
-        await self.apply_fields_status(message)
-
     async def set_file_field_md5(self, field_id: str, file: CloudFile):
         """
         Record file MD5 hashes for deduplication checks.
@@ -403,19 +397,18 @@ class Resource:
         """
         await file_md5.delete(self.txn, kbid=self.kbid, rid=self.uuid, field_id=field_id)
 
-    async def apply_fields_status(self, message: BrokerMessage):
-        # Update the status for fields for which the extracted text has been updated.
-        updated_fields = [et.field for et in message.extracted_text]
-
+    async def apply_fields_status(self, message: BrokerMessage, updated_fields: list[FieldID]):
         # Dictionary of all errors per field (we may have several due to DA tasks)
         errors_by_field: dict[tuple[FieldType.ValueType, str], list[writer_pb2.Error]] = defaultdict(
             list
         )
+
         # Make sure if a file is updated without errors, it ends up in errors_by_field
         for field_id in updated_fields:
             errors_by_field[(field_id.field_type, field_id.field)] = []
         for fs in message.field_statuses:
             errors_by_field[(fs.id.field_type, fs.id.field)] = []
+
         for error in message.errors:
             errors_by_field[(error.field_type, error.field)].append(error)
 
@@ -523,6 +516,9 @@ class Resource:
         await asyncio.gather(*tasks)
         tasks.clear()
 
+        # Update field statuses depending on processing results. This depends on the extracted text being applied first
+        await self.apply_fields_status(message, self._modified_extracted_text)
+
     async def _apply_question_answers_ops(self, message: BrokerMessage):
         tasks = []
         updated = [qa.field for qa in message.question_answers]
@@ -539,6 +535,9 @@ class Resource:
             extracted_text.field.field, extracted_text.field.field_type, load=False
         )
         await field_obj.set_extracted_text(extracted_text)
+        self._modified_extracted_text.append(
+            extracted_text.field,
+        )
         self.modified = True
 
     async def _apply_question_answers(self, question_answers: FieldQuestionAnswerWrapper):

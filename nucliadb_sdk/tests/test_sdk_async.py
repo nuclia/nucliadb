@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-import uuid
-
 import pytest
 
 import nucliadb_sdk
@@ -49,9 +47,8 @@ async def test_kb_services(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
 
 async def test_resource_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
     # Create, Get, List, Update
-    idonotexist = uuid.uuid4().hex
-    assert not await sdk_async.exists_resource(kbid=kb.uuid, rid=idonotexist)
-    assert not await sdk_async.exists_resource_by_slug(kbid=kb.uuid, slug=idonotexist)
+    assert not await sdk_async.exists_resource(kbid=kb.uuid, rid="nonexistent")
+    assert not await sdk_async.exists_resource_by_slug(kbid=kb.uuid, slug="nonexistent")
     await sdk_async.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
     resource = await sdk_async.get_resource_by_slug(kbid=kb.uuid, slug="resource")
     await sdk_async.get_resource_by_id(kbid=kb.uuid, rid=resource.id)
@@ -89,8 +86,7 @@ async def test_search_endpoints(sdk_async: nucliadb_sdk.NucliaDBAsync, kb):
         kbid=kb.uuid, ident="bar", good=True, feedback="baz", task=FeedbackTasks.CHAT
     )
     with pytest.raises(nucliadb_sdk.exceptions.PreconditionFailed) as err:
-        foobar = uuid.uuid4().hex
-        await sdk_async.summarize(kbid=kb.uuid, resources=[foobar])
+        await sdk_async.summarize(kbid=kb.uuid, resources=["foobar"])
     assert "Could not summarize" in str(err.value)
 
 

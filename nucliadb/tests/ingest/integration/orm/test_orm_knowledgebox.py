@@ -26,7 +26,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxCreationError
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox, chunker
 from nucliadb_protos import knowledgebox_pb2, utils_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_utils.storages.storage import Storage
@@ -233,7 +233,7 @@ async def test_knowledgebox_delete_all_kb_keys(
     storage,
     cache,
     dummy_nidx_utility,
-    maindb_driver: Driver,
+    maindb_driver,
     knowledgebox: str,
 ):
     async with maindb_driver.rw_transaction() as txn:
@@ -262,9 +262,7 @@ async def test_knowledgebox_delete_all_kb_keys(
         await txn.abort()
 
     # Now delete all kb keys
-    async with maindb_driver.rw_transaction() as txn:
-        await KnowledgeBox.delete_all_kb_keys(txn, kbid)
-        await txn.commit()
+    await KnowledgeBox.delete_all_kb_keys(maindb_driver, kbid, chunk_size=10)
 
     # Check that all of them were deleted
     async with maindb_driver.ro_transaction() as txn:
@@ -272,3 +270,20 @@ async def test_knowledgebox_delete_all_kb_keys(
         for rid, slug in rids_and_slugs:
             assert await kb_obj.get_resource_uuid_by_slug(slug) is None
         await txn.abort()
+
+
+def test_chunker():
+    total_items = 100
+    chunk_size = 10
+    iterations = 0
+    for chunk in chunker(list(range(total_items)), chunk_size):
+        assert len(chunk) == chunk_size
+        assert chunk == list(range(iterations * chunk_size, (iterations * chunk_size) + chunk_size))
+        iterations += 1
+
+    assert iterations == total_items / chunk_size
+
+    iterations = 0
+    for chunk in chunker([], 2):
+        iterations += 1
+    assert iterations == 0

@@ -32,11 +32,10 @@ async def test_create_cleansup_on_error(
 ):
     # Create a KB
     kbid = str(uuid4())
-    slug = f"slug-{kbid}"
     result = await nucliadb_ingest_grpc.NewKnowledgeBoxV2(  # type: ignore
         writer_pb2.NewKnowledgeBoxV2Request(
             kbid=kbid,
-            slug=slug,
+            slug="test",
             title="My Title",
             vectorsets=[
                 writer_pb2.NewKnowledgeBoxV2Request.VectorSet(

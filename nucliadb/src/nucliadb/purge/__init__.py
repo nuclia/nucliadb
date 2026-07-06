@@ -31,6 +31,7 @@ from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import (
+    KB_TO_DELETE,
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
     KB_VECTORSET_TO_DELETE,
@@ -84,12 +85,13 @@ async def purge_kb(driver: Driver):
         # Now delete the delete mark
         try:
             async with driver.rw_transaction() as txn:
-                await KnowledgeBox.unmark_for_purge(txn, kbid)
+                key_to_purge = KB_TO_DELETE.format(kbid=kbid)
+                await txn.delete(key_to_purge)
                 await txn.commit()
-            logger.info(f"  √ Deleted {kbid}")
+            logger.info(f"  √ Deleted {key_to_purge}")
         except Exception as exc:
             errors.capture_exception(exc)
-            logger.error(f"  X Error while deleting key {kbid}")
+            logger.error(f"  X Error while deleting key {key_to_purge}")
             await txn.abort()
     logger.info("END PURGING KB")
 

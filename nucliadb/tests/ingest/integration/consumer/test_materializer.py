@@ -43,12 +43,11 @@ async def test_materialize_kb_data(
     audit_storage = stream_audit
 
     count = 10
-    for i in range(count):
+    for _ in range(count):
         await create_resource(
             storage=storage,
             driver=maindb_driver,
             knowledgebox=knowledgebox,
-            slug=f"materializer-test-{i}",
         )
 
     mz = materializer.MaterializerHandler(

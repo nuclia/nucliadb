@@ -25,7 +25,6 @@ import pytest
 from httpx import AsyncClient, Response
 from typing_extensions import assert_never
 
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import LinkExtractedData
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -507,9 +506,8 @@ async def test_suggest_features(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_search_kb_not_found(nucliadb_reader: AsyncClient) -> None:
-    nonexistent_kbid = KnowledgeBox.new_unique_kbid()
     resp = await nucliadb_reader.get(
-        f"/kb/{nonexistent_kbid}/suggest?query=own+text",
+        f"/kb/00000000000000/suggest?query=own+text",
     )
     assert resp.status_code == 404
 

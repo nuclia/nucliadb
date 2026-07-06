@@ -26,7 +26,6 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.ingest.orm.resource import Resource as ORMResource
 from nucliadb.ingest.processing import DummyProcessingEngine
 from nucliadb.models.internal.processing import PushMessageFormat, PushPayload
 from nucliadb.reader.api.models import ResourceField
@@ -76,7 +75,7 @@ from tests.utils.dirty_index import mark_dirty, wait_for_sync
 async def resource_with_conversation(
     nucliadb_ingest_grpc, nucliadb_writer: AsyncClient, standalone_knowledgebox
 ):
-    messages: list[InputMessage] = []
+    messages = []
     for i in range(1, 301):
         messages.append(
             InputMessage(
@@ -94,22 +93,13 @@ async def resource_with_conversation(
         content=CreateResourcePayload(
             slug="myresource",
             conversations={
-                "faq": InputConversationField(messages=[messages[0]]),
+                "faq": InputConversationField(messages=messages),
             },
         ).model_dump_json(by_alias=True),
     )
 
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
-
-    # Put in buckets of 30 messages
-    remaining = messages[1:]
-    for i in range(0, len(remaining), 30):
-        resp = await nucliadb_writer.put(
-            f"/kb/{standalone_knowledgebox}/resource/{rid}/conversation/faq/messages",
-            json=[m.model_dump(mode="json", by_alias=True) for m in remaining[i : i + 30]],
-        )
-        assert resp.status_code == 200
 
     # add another message using the api to add single message
     resp = await nucliadb_writer.put(
@@ -1166,9 +1156,8 @@ async def test_delete_conversation_message_lambs_resource(
     # Verify error cases
 
     # Non-existent resource
-    nonexistent_rid = ORMResource.new_unique_rid()
     resp = await nucliadb_writer.delete(
-        f"/kb/{kbid}/resource/{nonexistent_rid}/conversation/lambs/messages/6",
+        f"/kb/{kbid}/resource/nonexistent-rid/conversation/lambs/messages/6",
     )
     assert resp.status_code == 404
 

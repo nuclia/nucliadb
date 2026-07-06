@@ -24,7 +24,6 @@ from uuid import uuid4
 
 import pytest
 
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.text import Text
@@ -48,7 +47,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_vector(
-    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -70,11 +69,9 @@ async def test_create_resource_orm_vector(
     assert ex2 is not None
     assert ex2.vectors.vectors[0].vector == ex1.vectors.vectors.vectors[0].vector
 
-    await txn.abort()
-
 
 async def test_create_resource_orm_vector_file(
-    local_files, storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    local_files, storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -110,11 +107,9 @@ async def test_create_resource_orm_vector_file(
 
     assert ex3.vectors.vectors[0].vector == ex2.vectors.vectors[0].vector
 
-    await txn.abort()
-
 
 async def test_create_resource_orm_vector_split(
-    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -150,8 +145,6 @@ async def test_create_resource_orm_vector_split(
     ex2: VectorObject | None = await field_obj2.get_vectors(vectorset_id, storage_key_kind)
     assert ex2 is not None
     assert len(ex2.split_vectors) == 3
-
-    await txn.abort()
 
 
 @pytest.mark.parametrize(
@@ -189,7 +182,7 @@ async def test_create_resource_with_cloud_file_vectors(
     storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
     destination_path: str,
     storage: Storage,
-    txn: Transaction,
+    txn,
     dummy_nidx_utility,
     knowledgebox: str,
 ):
@@ -226,14 +219,12 @@ async def test_create_resource_with_cloud_file_vectors(
         assert cf.uri == cf_uri
         assert sf.key == destination_path
 
-    await txn.abort()
-
 
 @pytest.mark.parametrize("found_in_storage", [True, False])
 async def test_create_resource_with_cloud_file_vectors_already_moved(
     found_in_storage: bool,
     storage: Storage,
-    txn: Transaction,
+    txn,
     dummy_nidx_utility,
     knowledgebox: str,
 ):
@@ -298,5 +289,3 @@ async def test_create_resource_with_cloud_file_vectors_already_moved(
             sf.exists.return_value = False
             with pytest.raises(CouldNotCopyNotFound):
                 await field_obj.set_vectors(evw, vectorset_id, storage_key_kind)
-
-    await txn.abort()

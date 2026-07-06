@@ -20,7 +20,6 @@
 from os.path import dirname, getsize
 from uuid import uuid4
 
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
@@ -35,7 +34,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_large_metadata(
-    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -57,11 +56,9 @@ async def test_create_resource_orm_large_metadata(
     assert ex2 is not None
     assert ex2.metadata.tokens["tok"] == ex1.real.metadata.tokens["tok"]
 
-    await txn.abort()
-
 
 async def test_create_resource_orm_large_metadata_file(
-    local_files, storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    local_files, storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -102,5 +99,3 @@ async def test_create_resource_orm_large_metadata_file(
         data2 = testfile.read()
     ex3.ParseFromString(data2)
     assert ex3.metadata.tokens["tok"] == ex2.metadata.tokens["tok"]
-
-    await txn.abort()

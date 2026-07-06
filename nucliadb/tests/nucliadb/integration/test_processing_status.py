@@ -60,14 +60,6 @@ async def test_endpoint_set_resource_status_to_pending(
     )
     await inject_message(nucliadb_ingest_grpc, br)
 
-    async def _get_status():
-        resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{br.uuid}")
-        assert resp.status_code == 200
-        resp_json = resp.json()
-        return resp_json["metadata"]["status"]
-
-    assert await _get_status() == "PENDING"
-
     # Receive message from processor
     br.source = BrokerMessage.MessageSource.PROCESSOR
     etw = rpb.ExtractedTextWrapper()
@@ -75,10 +67,12 @@ async def test_endpoint_set_resource_status_to_pending(
     etw.field.field = "text"
     etw.field.field_type = rpb.FieldType.TEXT
     br.extracted_text.append(etw)
-
     await inject_message(nucliadb_ingest_grpc, br)
 
-    assert await _get_status() == "PROCESSED"
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{br.uuid}")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"
 
     kwargs = payload or {}
     resp = await nucliadb_writer.post(
@@ -87,7 +81,10 @@ async def test_endpoint_set_resource_status_to_pending(
     )
     assert resp.status_code == expected_status
 
-    assert await _get_status() == "PENDING"
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{br.uuid}")
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PENDING"
 
 
 @pytest.mark.deploy_modes("standalone")
