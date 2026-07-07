@@ -143,9 +143,6 @@ class KBShardManager:
                     nucliadb_index_config_to_nidx(model.vectorset_index_config)
                 )
 
-        # TODO: remove this once nidx has been deployed. This is just for bw/c while removing the FF
-        req.features.append("nidx-as-extracted-text-storage")
-
         shard_uuid = uuid.uuid4().hex
 
         shard = writer_pb2.ShardObject(shard=shard_uuid, read_only=False)

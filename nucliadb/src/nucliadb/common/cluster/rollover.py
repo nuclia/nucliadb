@@ -165,11 +165,7 @@ async def create_rollover_shards(
                         nucliadb_index_config_to_nidx(model.vectorset_index_config)
                     )
 
-            # TODO: remove this once nidx has been deployed. This is just for bw/c while removing the FF
-            req.features.append("nidx-as-extracted-text-storage")
-
             nidx_shard = await get_nidx_api_client().NewShard(req)
-
             shard.nidx_shard_id = nidx_shard.id
             created_shards.append(shard)
 
