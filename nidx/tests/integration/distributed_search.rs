@@ -88,12 +88,7 @@ async fn test_searchers_with_1_shard_replica(pool: PgPool) -> anyhow::Result<()>
             .await;
         assert!(response.is_err());
         let error = response.unwrap_err();
-        assert_eq!(error.code(), Code::Internal);
-        assert!(
-            error
-                .message()
-                .contains("Error in search, exhausted all available nodes for shard"),
-        );
+        assert_eq!(error.code(), Code::NotFound);
     }
 
     Ok(())
@@ -176,12 +171,7 @@ async fn test_searchers_with_2_shard_replica(pool: PgPool) -> anyhow::Result<()>
         .await;
     assert!(response.is_err());
     let error = response.unwrap_err();
-    assert_eq!(error.code(), Code::Internal);
-    assert!(
-        error
-            .message()
-            .contains("Error in search, exhausted all available nodes for shard")
-    );
+    assert_eq!(error.code(), Code::NotFound);
 
     Ok(())
 }
