@@ -297,6 +297,7 @@ class Processor:
         partition: str,
         transaction_check: bool = True,
     ) -> None:
+        breakpoint()
         kbid = message.kbid
         kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
         uuid: str | None = None
