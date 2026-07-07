@@ -83,6 +83,65 @@ async def test_set_basic_missing_parent_logs_warning_and_does_not_raise(
 
 
 @pytest.mark.asyncio
+async def test_transaction_remains_usable_after_foreign_key_violation(
+    maindb_driver: Driver,
+    kbid: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """
+    After logs_foreign_key_error swallows a ForeignKeyViolation (via a
+    savepoint rollback), the surrounding transaction must still be open and
+    fully usable.  We verify this by:
+
+      1. Triggering an FK violation (set_basic for a kbid that has no parent
+         kbs row).
+      2. Then writing a valid row for the real kbid on the *same* transaction.
+      3. Committing and reading back to confirm the valid write was persisted
+         and the bad one was silently dropped.
+    """
+    missing_kbid = KnowledgeBox.new_unique_kbid()  # no kbs row - will trigger FK violation
+    rid_bad = Resource.new_unique_rid()
+    rid_good = Resource.new_unique_rid()
+
+    with caplog.at_level(logging.WARNING, logger="nucliadb.common.datamanagers.utils"):
+        async with maindb_driver.rw_transaction() as txn:
+            # Step 1: FK violation - must be swallowed, savepoint rolled back.
+            await resources_v2.set_basic(
+                txn,
+                kbid=missing_kbid,
+                rid=rid_bad,
+                basic=resources_pb2.Basic(slug="bad-slug"),
+            )
+
+            # Step 2: Valid write on the same (still-open) transaction.
+            await resources_v2.set_slug(
+                txn,
+                kbid=kbid,
+                rid=rid_good,
+                slug="good-slug",
+            )
+
+            # Step 3: Commit must succeed - the transaction was never aborted.
+            await txn.commit()
+
+    # The FK-violation write was silently dropped.
+    async with maindb_driver.ro_transaction() as txn:
+        assert await resources_v2.exists(txn, kbid=missing_kbid, rid=rid_bad) is False
+
+    # The valid write was persisted.
+    async with maindb_driver.ro_transaction() as txn:
+        assert await resources_v2.exists(txn, kbid=kbid, rid=rid_good) is True
+        assert (
+            await resources_v2.get_resource_uuid_from_slug(txn, kbid=kbid, slug="good-slug") == rid_good
+        )
+
+    warning_records = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("Foreign key violation" in r.message for r in warning_records), (
+        f"Expected a FK warning log, got: {[r.message for r in warning_records]}"
+    )
+
+
+@pytest.mark.asyncio
 async def test_set_slug_raises_conflict_error(
     maindb_driver: Driver,
     kbid: str,

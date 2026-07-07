@@ -21,7 +21,7 @@ import contextlib
 import functools
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, AsyncGenerator, Callable, Coroutine, ParamSpec, TypeVar, cast
+from typing import Any, AsyncGenerator, Callable, Concatenate, Coroutine, ParamSpec, TypeVar, cast
 
 import psycopg
 from google.protobuf.message import Message
@@ -40,8 +40,8 @@ _R = TypeVar("_R")
 
 
 def logs_foreign_key_error(
-    func: Callable[_P, Coroutine[Any, Any, _R]],
-) -> Callable[_P, Coroutine[Any, Any, _R | None]]:
+    func: Callable[Concatenate[Transaction, _P], Coroutine[Any, Any, _R]],
+) -> Callable[Concatenate[Transaction, _P], Coroutine[Any, Any, _R | None]]:
     """Decorator for dual-write datamanager functions during the ORM backfill migration.
 
     During the backfill migration, writes are sent to both the legacy KV store and
@@ -60,10 +60,14 @@ def logs_foreign_key_error(
     """
 
     @functools.wraps(func)
-    async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R | None:
+    async def wrapper(txn: Transaction, *args: _P.args, **kwargs: _P.kwargs) -> _R | None:
+        txn = cast(PGTransaction, txn)
         try:
-            return await func(*args, **kwargs)
+            async with txn.connection.transaction():
+                return await func(txn, *args, **kwargs)
         except psycopg.errors.ForeignKeyViolation as exc:
+            # psycopg has already rolled back to the savepoint; the outer
+            # transaction remains usable.
             logger.warning(
                 f"Foreign key violation in {wrapper.__qualname__} (parent row not yet migrated to ORM tables): {exc}"
             )

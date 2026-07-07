@@ -240,7 +240,7 @@ async def test_get_set_all_field_ids(txn, storage, kb, rid):
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text"))
 
     await datamanagers.fields.fields_v2.set(
-        txn=txn,
+        txn,
         kbid=kb,
         rid=rid,
         field_type="t",
@@ -267,7 +267,7 @@ async def test_update_all_fields_key(txn, storage, kb, rid):
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text1"))
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text2"))
     await datamanagers.fields.fields_v2.set(
-        txn=txn,
+        txn,
         kbid=kb,
         rid=rid,
         field_type="t",
@@ -275,7 +275,7 @@ async def test_update_all_fields_key(txn, storage, kb, rid):
         value=FieldText(body="text1", format=FieldText.Format.PLAIN),
     )
     await datamanagers.fields.fields_v2.set(
-        txn=txn,
+        txn,
         kbid=kb,
         rid=rid,
         field_type="t",
@@ -290,7 +290,7 @@ async def test_update_all_fields_key(txn, storage, kb, rid):
 
     file_field = FieldID(field_type=FieldType.FILE, field="file")
     await datamanagers.fields.fields_v2.set(
-        txn=txn, kbid=kb, rid=rid, field_type="f", field_id="file", value=FileExtractedData()
+        txn, kbid=kb, rid=rid, field_type="f", field_id="file", value=FileExtractedData()
     )
     await resource.update_all_field_ids(updated=[file_field])
 
