@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+import uuid
 from typing import cast
 
 import httpx
@@ -65,7 +66,8 @@ def test_kb_services(sdk: nucliadb_sdk.NucliaDB, kb):
 
 def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     # Create, Get, List, Update
-    assert not sdk.exists_resource(kbid=kb.uuid, rid="nonexistent")
+    nonexistent = uuid.uuid4().hex
+    assert not sdk.exists_resource(kbid=kb.uuid, rid=nonexistent)
     assert not sdk.exists_resource_by_slug(kbid=kb.uuid, slug="nonexistent")
     sdk.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
     resource = sdk.get_resource_by_slug(kbid=kb.uuid, slug="resource")
@@ -145,7 +147,8 @@ def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.ask_on_resource_by_slug(kbid=kb.uuid, slug="resource", query="foo")
     sdk.feedback(kbid=kb.uuid, ident="bar", good=True, feedback="baz", task="CHAT")
     with pytest.raises(nucliadb_sdk.exceptions.PreconditionFailed) as err:
-        sdk.summarize(kbid=kb.uuid, resources=["foobar"])
+        foobar = uuid.uuid4().hex
+        sdk.summarize(kbid=kb.uuid, resources=[foobar])
     assert "Could not summarize" in str(err.value)
 
 

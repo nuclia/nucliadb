@@ -44,8 +44,6 @@ class Conversation(Field[PBConversation]):
     value: dict[int, PBConversation]
     metadata: FieldConversation | None
 
-    _created: bool = False
-
     def __init__(self, id: str, resource: Any):
         super().__init__(id, resource)
         self.value = {}
@@ -69,14 +67,23 @@ class Conversation(Field[PBConversation]):
             # As we need to overwrite the value of the conversation, first delete any previous data.
             await self.delete_value()
 
+        created = False
         metadata = await self.get_metadata()
+        if metadata is None:
+            metadata = FieldConversation()
+            metadata.size = PAGE_SIZE
+            metadata.pages = 0
+            metadata.total = 0
+            await self.db_set_metadata(metadata)
+            created = True
+
         metadata.extract_strategy = payload.extract_strategy
         metadata.split_strategy = payload.split_strategy
         metadata.generated_by.CopyFrom(payload.generated_by)
 
         # Get the last page if it exists
         last_page: PBConversation | None = None
-        if self._created is False and metadata.pages > 0:
+        if not created and metadata.pages > 0:
             try:
                 last_page = await self.db_get_value(page=metadata.pages)
             except PageNotFound:
@@ -174,7 +181,7 @@ class Conversation(Field[PBConversation]):
             n_page += 1
         return full_conv
 
-    async def get_metadata(self) -> FieldConversation:
+    async def get_metadata(self) -> FieldConversation | None:
         if self.metadata is None:
             self.metadata = await datamanagers.conversations.get_metadata(
                 self.resource.txn,
@@ -183,12 +190,6 @@ class Conversation(Field[PBConversation]):
                 field_type=self.type,
                 field_id=self.id,
             )
-            if self.metadata is None:
-                self.metadata = FieldConversation()
-                self.metadata.size = PAGE_SIZE
-                self.metadata.pages = 0
-                self.metadata.total = 0
-                self._created = True
         return self.metadata
 
     async def db_get_value(self, page: int = 1):
@@ -233,7 +234,6 @@ class Conversation(Field[PBConversation]):
         )
         self.metadata = payload
         self.resource.modified = True
-        self._created = False
 
     async def get_splits_metadata(self) -> SplitsMetadata:
         if self._splits_metadata is None:

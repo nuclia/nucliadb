@@ -26,6 +26,7 @@ from httpx import AsyncClient
 
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 
 
@@ -321,8 +322,9 @@ async def test_resource_slug_modification_handles_unknown_resources(
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox,
 ):
+    non_existing_resource = Resource.new_unique_rid()
     resp = await nucliadb_writer.patch(
-        f"/{KB_PREFIX}/{standalone_knowledgebox}/resource/foobar",
+        f"/{KB_PREFIX}/{standalone_knowledgebox}/resource/{non_existing_resource}",
         json={
             "slug": "foo",
         },

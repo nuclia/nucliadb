@@ -22,6 +22,7 @@ import uuid
 
 from nucliadb.common import ids
 from nucliadb.ingest.orm.brain_v2 import ResourceBrain
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import utils_pb2
 
 
@@ -29,7 +30,7 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
     STORED_VECTOR_DIMENSION = 100
     MATRYOSHKA_DIMENSION = 10
 
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     field_id = f"u/{uuid.uuid4().hex}"
     fid = ids.FieldId.from_string(f"{rid}/{field_id}")
     vectors = utils_pb2.VectorObject(
@@ -81,7 +82,7 @@ def test_apply_field_vectors_for_matryoshka_embeddings():
 
 
 def test_apply_field_vectors_append_splits():
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     field_id = f"u/{uuid.uuid4().hex}"
     split = "subfield"
     vectorset = "my-vectorset"

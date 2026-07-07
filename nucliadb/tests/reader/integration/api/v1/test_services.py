@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from unittest import mock
@@ -145,7 +146,8 @@ async def test_activity(kb_notifications, nucliadb_reader: AsyncClient, knowledg
 async def test_activity_kb_not_found(
     nucliadb_reader: AsyncClient,
 ):
-    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/foobar/notifications")
+    foobar = uuid.uuid4().hex
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{foobar}/notifications")
     assert resp.status_code == 404
 
 

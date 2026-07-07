@@ -37,6 +37,14 @@ class Features:
     IGNORE_EXTRACTED_IN_SEARCH = "nucliadb_ignore_extracted_in_search"
     SEMANTIC_GRAPH = "nucliadb_semantic_graph"
     AUDIT_RETRIEVE_AND_AUGMENT = "nucliadb_audit_retrieve_and_augment"
+    # Flipt features
+    DATAMANAGERS_V2_READ = "nucliadb_datamanagers_v2_read"
+    DATAMANAGERS_V2_WRITE = "nucliadb_datamanagers_v2_write"
 
 
-_FliptFeatures: set[str] = set([])
+_FliptFeatures = set(
+    [
+        Features.DATAMANAGERS_V2_READ,
+        Features.DATAMANAGERS_V2_WRITE,
+    ]
+)

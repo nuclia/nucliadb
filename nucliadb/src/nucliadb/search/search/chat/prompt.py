@@ -171,6 +171,8 @@ async def get_next_conversation_messages(
 ) -> list[resources_pb2.Message]:
     output = []
     cmetadata = await field_obj.get_metadata()
+    if cmetadata is None:
+        return []
     for current_page in range(page, cmetadata.pages + 1):
         conv = await field_obj.db_get_value(current_page)
         for message in conv.messages[start_idx:]:
@@ -190,6 +192,8 @@ async def find_conversation_message(
     field_obj: Conversation, mident: str
 ) -> tuple[resources_pb2.Message | None, int, int]:
     cmetadata = await field_obj.get_metadata()
+    if cmetadata is None:
+        return None, -1, -1
     for page in range(1, cmetadata.pages + 1):
         conv = await field_obj.db_get_value(page)
         for idx, message in enumerate(conv.messages):
@@ -834,6 +838,8 @@ async def conversation_prompt_context(
                     field_id, FIELD_TYPE_STR_TO_PB["c"], load=True
                 )
                 cmetadata = await field_obj.get_metadata()
+                if cmetadata is None:
+                    continue
 
                 attachments: list[resources_pb2.FieldRef] = []
                 if strategy.full:

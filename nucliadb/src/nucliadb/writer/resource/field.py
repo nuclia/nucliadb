@@ -192,7 +192,7 @@ async def _to_push_conversationfield(
     Returns None if the conversation has no messages.
     """
     metadata = await field.get_metadata()
-    if metadata.pages == 0:
+    if metadata is None or metadata.pages == 0:
         return None
 
     full_conversation = PushConversation(
@@ -711,7 +711,11 @@ async def _conversation_append_checks(
         )
 
         # Make sure that the max number of messages is not exceeded
-        current_message_count = (await conv.get_metadata()).total
+        cmetadata = await conv.get_metadata()
+        if cmetadata is None:
+            current_message_count = 0
+        else:
+            current_message_count = cmetadata.total
         if (
             MAX_CONVERSATION_MESSAGES is not None
             and (len(input.messages) + current_message_count) > MAX_CONVERSATION_MESSAGES
