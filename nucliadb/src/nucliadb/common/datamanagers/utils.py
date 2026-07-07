@@ -20,7 +20,6 @@
 import contextlib
 import functools
 import logging
-import uuid
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Callable, Concatenate, Coroutine, ParamSpec, TypeVar, cast
 
@@ -64,23 +63,16 @@ def logs_foreign_key_error(
     @functools.wraps(func)
     async def wrapper(txn: Transaction, *args: _P.args, **kwargs: _P.kwargs) -> _R | None:
         txn = cast(PGTransaction, txn)
-        sp = f"sp_{uuid.uuid4().hex}"
-        async with txn.connection.cursor() as cur:
-            await cur.execute(psycopg.sql.SQL("SAVEPOINT {}").format(psycopg.sql.Identifier(sp)))
         try:
-            result = await func(txn, *args, **kwargs)
+            async with txn.connection.transaction():
+                return await func(txn, *args, **kwargs)
         except psycopg.errors.ForeignKeyViolation as exc:
-            # Roll back to the savepoint so the outer transaction is not aborted.
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    psycopg.sql.SQL("ROLLBACK TO SAVEPOINT {}").format(psycopg.sql.Identifier(sp))
-                )
+            # psycopg has already rolled back to the savepoint; the outer
+            # transaction remains usable.
             logger.warning(
                 f"Foreign key violation in {wrapper.__qualname__} (parent row not yet migrated to ORM tables): {exc}"
             )
-            return None
-        else:
-            return result
+        return None
 
     return wrapper
 

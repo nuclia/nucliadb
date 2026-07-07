@@ -612,8 +612,6 @@ class Processor:
         all mutations derived from extracted data), origin, extra, security and
         user relations.
         """
-        tasks = []
-
         # Load and update basic. For new resources basic was already set by
         # kb.add_resource(); we still need to apply extracted-data mutations.
         current_basic = await resource.get_basic()
@@ -634,17 +632,15 @@ class Processor:
         await compute_resource_status(resource.txn, resource.kbid, resource.uuid, current_basic)
 
         if current_basic != previous_basic:
-            tasks.append(resource.set_basic(current_basic))
+            await resource.set_basic(current_basic)
         if message.HasField("origin"):
-            tasks.append(resource.set_origin(message.origin))
+            await resource.set_origin(message.origin)
         if message.HasField("extra"):
-            tasks.append(resource.set_extra(message.extra))
+            await resource.set_extra(message.extra)
         if message.HasField("security"):
-            tasks.append(resource.set_security(message.security))
+            await resource.set_security(message.security)
         if message.HasField("user_relations"):
-            tasks.append(resource.set_user_relations(message.user_relations))
-
-        await asyncio.gather(*tasks)
+            await resource.set_user_relations(message.user_relations)
 
     @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(
