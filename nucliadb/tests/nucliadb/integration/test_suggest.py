@@ -595,7 +595,6 @@ async def entities(nucliadb_writer: AsyncClient, standalone_knowledgebox: str):
         }
         for entity, type in entities
     ]
-    breakpoint()
     resp = await nucliadb_writer.post(
         f"/kb/{standalone_knowledgebox}/resources",
         json={
