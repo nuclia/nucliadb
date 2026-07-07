@@ -35,6 +35,7 @@ from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.driver import Driver
 from nucliadb_protos import writer_pb2
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
 @pytest.fixture()
@@ -49,10 +50,9 @@ async def app_context(natsd, storage, nucliadb):
 
 @pytest.mark.deploy_modes("standalone")
 async def test_rebalance_splits_kb_shards(
-    app_context,
-    standalone_knowledgebox,
+    app_context: ApplicationContext,
+    standalone_knowledgebox: str,
     nucliadb_writer: AsyncClient,
-    nucliadb_reader_manager: AsyncClient,
 ):
     total_resources = 10
     total_paragraphs = total_resources
@@ -102,8 +102,8 @@ async def test_rebalance_splits_kb_shards(
 
 @pytest.mark.deploy_modes("standalone")
 async def test_rebalance_merges_kb_shards(
-    app_context,
-    standalone_knowledgebox,
+    app_context: ApplicationContext,
+    standalone_knowledgebox: str,
     nucliadb_writer: AsyncClient,
     nucliadb_reader_manager: AsyncClient,
 ):
@@ -191,6 +191,9 @@ async def create_shard_for_kb(kbid: str):
         sm = get_shard_manager()
         await sm.create_shard_by_kbid(txn, kbid, prewarm_enabled=False)
         await txn.commit()
+
+    await mark_dirty()
+    await wait_for_sync()
 
 
 async def get_kb_shards(kbid: str) -> writer_pb2.Shards:

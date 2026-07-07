@@ -102,7 +102,7 @@ async fn test_search_sorting(pool: PgPool) -> Result<(), Box<dyn std::error::Err
         let response = fixture
             .searcher_client
             .search(SearchRequest {
-                shard: shard_id.clone(),
+                shard_ids: vec![shard_id.clone()],
                 order,
                 document: true,
                 vectorset: "english".to_string(),

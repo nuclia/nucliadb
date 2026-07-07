@@ -99,7 +99,7 @@ async def test_search_resource_all(
 
             request = SearchRequest()
             request.vectorset = "my-semantic-model"
-            request.shard = shard_id
+            request.shard_ids[:] = [shard_id]
             request.body = "Ramon"
             request.result_per_page = 20
             request.document = True

@@ -13,96 +13,43 @@
 // limitations under the License.
 //
 
-use crate::common::services::NidxFixture;
-use nidx::grpc_server::GrpcServer;
-use nidx::searcher::{ListNodes, SyncedSearcher, grpc::SearchServer, shard_selector::ShardSelector};
 use nidx_protos::SearchRequest;
 use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
-use nidx_protos::{NewShardRequest, VectorIndexConfig};
 
 use sqlx::PgPool;
 use std::collections::HashMap;
-use std::sync::Mutex;
-use std::{sync::Arc, time::Duration};
-use tempfile::tempdir;
-use tokio_util::sync::CancellationToken;
+use std::time::Duration;
 use tonic::Request;
 use uuid::Uuid;
 
-struct ManualListNodes(Arc<Mutex<Vec<String>>>, usize);
-impl ListNodes for ManualListNodes {
-    fn list_nodes(&self) -> Vec<String> {
-        self.0.lock().unwrap().clone()
-    }
-
-    fn this_node(&self) -> String {
-        self.list_nodes()
-            .get(self.1)
-            .cloned()
-            .unwrap_or("out_of_cluster".to_string())
-    }
-}
+use crate::common::cluster::{NetworkAvailability, SearcherCluster, Topology};
+use crate::common::services::NidxFixture;
+use crate::common::utils::create_shards;
 
 #[sqlx::test]
 async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Result<()> {
-    let mut shards = Vec::new();
     let mut fixture = NidxFixture::new(pool).await?;
-    for _ in 0..10 {
-        let response = fixture
-            .api_client
-            .new_shard(Request::new(NewShardRequest {
-                kbid: "aabbccddeeff11223344556677889900".to_string(),
-                vectorsets_configs: HashMap::from([(
-                    "english".to_string(),
-                    VectorIndexConfig {
-                        vector_dimension: Some(3),
-                        ..Default::default()
-                    },
-                )]),
-                ..Default::default()
-            }))
-            .await?;
-        shards.push(uuid::Uuid::parse_str(&response.into_inner().id).unwrap());
-    }
+    let shards = create_shards(&mut fixture.api_client, 10).await?;
 
     // Create a cluster with 3 nodes
-    let nodes = Arc::new(Mutex::new(Vec::new()));
-    let mut searchers = Vec::new();
-    for i in 0..3 {
-        let searcher_server = GrpcServer::new("localhost:0").await?;
-        let searcher_port = searcher_server.port()?;
-        nodes.lock().unwrap().push(format!("localhost:{searcher_port}"));
-        let list_nodes = ManualListNodes(nodes.clone(), i);
-        let work_dir = tempdir()?;
-        let searcher = SyncedSearcher::new(fixture.settings.metadata.clone(), work_dir.path());
-        let arc_list_nodes = Arc::new(list_nodes);
-        let searcher_api = SearchServer::new(searcher.index_cache(), ShardSelector::new(arc_list_nodes.clone(), 1));
-        searchers.push(format!("localhost:{searcher_port}"));
-        let settings_copy = fixture.settings.clone();
-        let shutdown = CancellationToken::new();
-        tokio::task::spawn(searcher_server.serve(searcher_api.into_router(), shutdown.clone()));
-        tokio::task::spawn(async move {
-            searcher
-                .run(
-                    settings_copy.storage.as_ref().unwrap().object_store.clone(),
-                    settings_copy.searcher.clone().unwrap_or_default(),
-                    shutdown.clone(),
-                    ShardSelector::new(arc_list_nodes, 1),
-                    None,
-                    None,
-                )
-                .await
-        });
-    }
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    let mut cluster = SearcherCluster::new(
+        fixture.settings.clone(),
+        Topology {
+            nodes: 3,
+            shard_replication: 1,
+            network: vec![NetworkAvailability::Connected; 3],
+        },
+    )
+    .await?;
 
     // All shards are accessible from all nodes
     for shard in &shards {
-        for searcher in &searchers {
-            NidxSearcherClient::connect(format!("http://{searcher}"))
+        for searcher in &cluster.searchers {
+            let searcher = searcher.as_ref().expect("we don't have any fake node configured");
+            NidxSearcherClient::connect(format!("http://{}", searcher.address()))
                 .await?
                 .search(Request::new(SearchRequest {
-                    shard: shard.to_string(),
+                    shard_ids: vec![shard.to_string()],
                     result_per_page: 20,
                     body: "Hola".into(),
                     paragraph: true,
@@ -113,14 +60,16 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
     }
 
     // Remove one node from the cluster and wait for sync, searches should still work
-    nodes.lock().unwrap().remove(2);
-    tokio::time::sleep(Duration::from_secs_f32(1.2)).await;
+    let _ = cluster.shrink();
+    assert_eq!(cluster.size(), 2);
+    tokio::time::sleep(cluster.refresh_interval()).await;
     for shard in &shards {
-        for searcher in &searchers[0..2] {
-            NidxSearcherClient::connect(format!("http://{searcher}"))
+        for searcher in &cluster.searchers {
+            let searcher = searcher.as_ref().expect("we don't have any fake node configured");
+            NidxSearcherClient::connect(format!("http://{}", searcher.address()))
                 .await?
                 .search(Request::new(SearchRequest {
-                    shard: shard.to_string(),
+                    shard_ids: vec![shard.to_string()],
                     result_per_page: 20,
                     body: "Hola".into(),
                     paragraph: true,
@@ -135,67 +84,31 @@ async fn test_search_cluster_all_shards_accessible(pool: PgPool) -> anyhow::Resu
 
 #[sqlx::test]
 async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<()> {
-    let mut shards = Vec::new();
     let mut fixture = NidxFixture::new(pool).await?;
-    for _ in 0..30 {
-        let response = fixture
-            .api_client
-            .new_shard(Request::new(NewShardRequest {
-                kbid: "aabbccddeeff11223344556677889900".to_string(),
-                vectorsets_configs: HashMap::from([(
-                    "english".to_string(),
-                    VectorIndexConfig {
-                        vector_dimension: Some(3),
-                        ..Default::default()
-                    },
-                )]),
-                ..Default::default()
-            }))
-            .await?;
-        shards.push(uuid::Uuid::parse_str(&response.into_inner().id).unwrap());
-    }
+    let shards = create_shards(&mut fixture.api_client, 30).await?;
 
     // Create a cluster with 3 nodes, set an invalid entrypoint so they cannot communicate among them
-    let nodes = Arc::new(Mutex::new(Vec::new()));
-    let mut searchers = Vec::new();
-    for i in 0..3 {
-        let searcher_server = GrpcServer::new("localhost:0").await?;
-        let searcher_port = searcher_server.port()?;
-        nodes.lock().unwrap().push(format!("fake_{searcher_port}"));
-        let list_nodes = ManualListNodes(nodes.clone(), i);
-        let work_dir = tempdir()?;
-        let searcher = SyncedSearcher::new(fixture.settings.metadata.clone(), work_dir.path());
-        let arc_list_nodes = Arc::new(list_nodes);
-        let searcher_api = SearchServer::new(searcher.index_cache(), ShardSelector::new(arc_list_nodes.clone(), 1));
-        searchers.push(format!("localhost:{searcher_port}"));
-        let settings_copy = fixture.settings.clone();
-        let shutdown = CancellationToken::new();
-        tokio::task::spawn(searcher_server.serve(searcher_api.into_router(), shutdown.clone()));
-        tokio::task::spawn(async move {
-            searcher
-                .run(
-                    settings_copy.storage.as_ref().unwrap().object_store.clone(),
-                    settings_copy.searcher.clone().unwrap_or_default(),
-                    shutdown.clone(),
-                    ShardSelector::new(arc_list_nodes, 1),
-                    None,
-                    None,
-                )
-                .await
-        });
-    }
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    let mut cluster = SearcherCluster::new(
+        fixture.settings.clone(),
+        Topology {
+            nodes: 3,
+            shard_replication: 1,
+            network: vec![NetworkAvailability::Isolated; 3],
+        },
+    )
+    .await?;
 
     // Each shard is only accessible from a single node
     let mut node_for_shard_original = HashMap::new();
     let mut shards_per_node = vec![0, 0, 0];
     for shard in &shards {
         let mut success = 0;
-        for (i, searcher) in searchers.iter().enumerate() {
-            let result = NidxSearcherClient::connect(format!("http://{searcher}"))
+        for (i, searcher) in cluster.searchers.iter().enumerate() {
+            let searcher = searcher.as_ref().expect("we don't have any fake node configured");
+            let result = NidxSearcherClient::connect(format!("http://{}", searcher.address()))
                 .await?
                 .search(Request::new(SearchRequest {
-                    shard: shard.to_string(),
+                    shard_ids: vec![shard.to_string()],
                     result_per_page: 20,
                     body: "Hola".into(),
                     paragraph: true,
@@ -215,17 +128,19 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
     }
 
     // Remove one node from the cluster, we expect shards to rebalance among the remaining nodes
-    nodes.lock().unwrap().remove(2);
-    tokio::time::sleep(Duration::from_secs_f32(1.2)).await;
+    let node_2 = cluster.shrink();
+    assert_eq!(cluster.size(), 2);
+    tokio::time::sleep(cluster.refresh_interval()).await;
 
     let mut node_for_shard_scale_down = HashMap::new();
     for shard in &shards {
         let mut success = 0;
-        for (i, searcher) in searchers[0..2].iter().enumerate() {
-            let result = NidxSearcherClient::connect(format!("http://{searcher}"))
+        for (i, searcher) in cluster.searchers[0..2].iter().enumerate() {
+            let searcher = searcher.as_ref().expect("we don't have any fake node configured");
+            let result = NidxSearcherClient::connect(format!("http://{}", searcher.address()))
                 .await?
                 .search(Request::new(SearchRequest {
-                    shard: shard.to_string(),
+                    shard_ids: vec![shard.to_string()],
                     result_per_page: 20,
                     body: "Hola".into(),
                     paragraph: true,
@@ -253,17 +168,19 @@ async fn test_search_cluster_shard_distribution(pool: PgPool) -> anyhow::Result<
     // Add a new node again, shards should split up again
     // This node will have a different ID, so shard split
     // should be different than originally
-    nodes.lock().unwrap().push("fake_new_node".to_string());
-    tokio::time::sleep(Duration::from_secs_f32(1.2)).await;
+    cluster.grow_fake("fake_new_node".to_string());
+    assert_eq!(cluster.size(), 3);
+    tokio::time::sleep(cluster.refresh_interval()).await;
 
     let mut node_for_shard_scale_up = HashMap::new();
     for shard in &shards {
         let mut success = 0;
-        for (i, searcher) in searchers.iter().enumerate() {
-            let result = NidxSearcherClient::connect(format!("http://{searcher}"))
+        for (i, searcher) in cluster.searchers[0..2].iter().chain([&node_2]).enumerate() {
+            let searcher = searcher.as_ref().expect("fake node is 2");
+            let result = NidxSearcherClient::connect(format!("http://{}", searcher.address()))
                 .await?
                 .search(Request::new(SearchRequest {
-                    shard: shard.to_string(),
+                    shard_ids: vec![shard.to_string()],
                     result_per_page: 20,
                     body: "Hola".into(),
                     paragraph: true,
@@ -314,41 +231,22 @@ async fn test_search_cluster_shards_not_accessible(pool: PgPool) -> anyhow::Resu
     let fixture = NidxFixture::new(pool).await?;
 
     // Create a cluster with 3 nodes and 2 replicas for each shard
-    let nodes = Arc::new(Mutex::new(Vec::new()));
-    let mut searchers = Vec::new();
-    for i in 0..3 {
-        let searcher_server = GrpcServer::new("localhost:0").await?;
-        let searcher_port = searcher_server.port()?;
-        nodes.lock().unwrap().push(format!("localhost:{searcher_port}"));
-        let list_nodes = ManualListNodes(nodes.clone(), i);
-        let work_dir = tempdir()?;
-        let searcher = SyncedSearcher::new(fixture.settings.metadata.clone(), work_dir.path());
-        let arc_list_nodes = Arc::new(list_nodes);
-        let searcher_api = SearchServer::new(searcher.index_cache(), ShardSelector::new(arc_list_nodes.clone(), 2));
-        searchers.push(format!("localhost:{searcher_port}"));
-        let settings_copy = fixture.settings.clone();
-        let shutdown = CancellationToken::new();
-        tokio::task::spawn(searcher_server.serve(searcher_api.into_router(), shutdown.clone()));
-        tokio::task::spawn(async move {
-            searcher
-                .run(
-                    settings_copy.storage.as_ref().unwrap().object_store.clone(),
-                    settings_copy.searcher.clone().unwrap_or_default(),
-                    shutdown.clone(),
-                    ShardSelector::new(arc_list_nodes, 2),
-                    None,
-                    None,
-                )
-                .await
-        });
-    }
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    let cluster = SearcherCluster::new(
+        fixture.settings.clone(),
+        Topology {
+            nodes: 3,
+            shard_replication: 2,
+            network: vec![NetworkAvailability::Connected; 3],
+        },
+    )
+    .await?;
 
     // Same behaviour from all nodes
     let fake_uuid = Uuid::new_v4();
-    for searcher in &searchers {
+    for searcher in &cluster.searchers {
+        let searcher = searcher.as_ref().expect("we don't have any fake node configured");
         let mut request = Request::new(SearchRequest {
-            shard: fake_uuid.to_string(),
+            shard_ids: vec![fake_uuid.to_string()],
             result_per_page: 20,
             body: "Hola".into(),
             paragraph: true,
@@ -356,7 +254,7 @@ async fn test_search_cluster_shards_not_accessible(pool: PgPool) -> anyhow::Resu
         });
         request.set_timeout(Duration::from_secs(1));
 
-        let response = NidxSearcherClient::connect(format!("http://{searcher}"))
+        let response = NidxSearcherClient::connect(format!("http://{}", searcher.address()))
             .await?
             .search(request)
             .await;

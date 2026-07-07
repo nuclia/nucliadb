@@ -246,7 +246,7 @@ class AskResult:
                     if not first_reasoning_chunk_yielded:
                         self.metrics.record_first_reasoning_chunk_yielded()
                         first_reasoning_chunk_yielded = True
-                else:
+                else:  # pragma: no cover
                     assert_never(answer_chunk)
 
         if self._object is not None:

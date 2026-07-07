@@ -94,7 +94,7 @@ def check_kv_type(schema_name: str, schema_field: KVSchemaField, key: str, value
                 ok = False
         else:
             ok = is_datetime(value)
-    else:
+    else:  # pragma: no cover
         assert_never(expected)
     if not ok:
         if expected is KVFieldType.TEXT and isinstance(value, str):

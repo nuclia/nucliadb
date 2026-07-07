@@ -22,7 +22,7 @@ use nidx::indexer::{delete_resource, index_resource};
 use nidx::searcher::SyncedSearcher;
 use nidx::searcher::grpc::SearchServer;
 use nidx::searcher::shard_selector::ShardSelector;
-use nidx::settings::{EnvSettings, MetadataSettings, StorageSettings};
+use nidx::settings::{EnvSettings, MetadataSettings, SearcherSettings, StorageSettings};
 use nidx::{NidxMetadata, Settings};
 use nidx_protos::Resource;
 use nidx_protos::nidx::nidx_api_client::NidxApiClient;
@@ -63,7 +63,11 @@ impl NidxFixture {
                 telemetry: Default::default(),
                 work_path: None,
                 control_socket: None,
-                searcher: Default::default(),
+                searcher: Some(SearcherSettings {
+                    // tests can take advantage of faster refresh intervals
+                    metadata_refresh_interval: 0.1,
+                    ..Default::default()
+                }),
                 audit: None,
             },
         };

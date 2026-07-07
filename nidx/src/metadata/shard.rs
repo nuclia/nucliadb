@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 // Copyright 2021 Bosutech XXI S.L.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +12,14 @@ use std::collections::HashMap;
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-use super::index::*;
+
+use std::collections::HashMap;
+
 use futures::StreamExt;
 use sqlx::{Executor, Postgres, types::time::PrimitiveDateTime};
 use uuid::Uuid;
+
+use super::index::*;
 
 pub struct Shard {
     pub id: Uuid,
@@ -40,6 +42,12 @@ impl Shard {
     pub async fn get(meta: impl Executor<'_, Database = Postgres>, id: Uuid) -> sqlx::Result<Shard> {
         sqlx::query_as!(Shard, "SELECT * FROM shards WHERE id = $1 AND deleted_at IS NULL", id)
             .fetch_one(meta)
+            .await
+    }
+
+    pub async fn exist_many(meta: impl Executor<'_, Database = Postgres>, ids: &[Uuid]) -> sqlx::Result<Vec<Uuid>> {
+        sqlx::query_scalar!("SELECT id FROM shards WHERE id = ANY($1) AND deleted_at IS NULL", ids)
+            .fetch_all(meta)
             .await
     }
 

@@ -126,7 +126,7 @@ async fn test_date_range_search(pool: PgPool) -> Result<(), Box<dyn std::error::
     populate(&mut fixture, shard_id.clone(), metadata).await;
 
     let request = SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         order: None,
         vectorset: "english".to_string(),
         vector: vec![4.0, 6.0, 7.0],
