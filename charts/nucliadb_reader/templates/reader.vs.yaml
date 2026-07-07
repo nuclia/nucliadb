@@ -51,7 +51,7 @@ spec:
         - method:
             regex: "GET|OPTIONS"
           uri:
-            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/(text|file|link|conversation).*'
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/(text|file|link|conversation|key_value).*'
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/resources'
           method:
