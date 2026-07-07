@@ -744,7 +744,7 @@ class CatalogRequest(BaseModel):
     show: list[ResourceProperties] = SearchParamDefaults.show.to_pydantic_field(
         default=[ResourceProperties.BASIC, ResourceProperties.ERRORS]
     )
-
+    field_type_filter: list[FieldTypeName] = SearchParamDefaults.field_type_filter.to_pydantic_field()
     debug: SkipJsonSchema[bool] = SearchParamDefaults.debug.to_pydantic_field()
 
     # Deprecated filter parameters
