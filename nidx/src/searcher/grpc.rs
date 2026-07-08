@@ -306,8 +306,8 @@ impl SearchServer {
             for (node, shard_ids) in groups {
                 tasks.spawn(
                     self.node_query(node, shard_ids, request.clone())
-                        .instrument(Span::current())
-                        .await?,
+                        .await?
+                        .instrument(Span::current()),
                 );
             }
 
