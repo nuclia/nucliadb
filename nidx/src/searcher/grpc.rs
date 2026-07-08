@@ -27,6 +27,7 @@ use tonic::service::Interceptor;
 use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Channel;
 use tonic::{Request, Response, Result, Status, service::Routes};
+use tracing::field::Empty;
 use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
@@ -284,6 +285,9 @@ impl SearchServer {
         let mut pending: HashSet<Uuid> = HashSet::from_iter(shards.clone());
 
         while !pending.is_empty() {
+            let span = tracing::info_span!("scatter-gather", partitions = pending.len(), nodes = Empty);
+            let _enter = span.enter();
+
             let mut groups = HashMap::new();
             for shard_id in pending.iter() {
                 let Some(node) = partitioner.next_node_for_shard(shard_id) else {
@@ -300,6 +304,7 @@ impl SearchServer {
                     .and_modify(|shards: &mut Vec<Uuid>| shards.push(*shard_id))
                     .or_insert(vec![*shard_id]);
             }
+            span.record("nodes", groups.len());
 
             // Distribute requests across nodes
             let mut tasks = JoinSet::new();
