@@ -143,7 +143,7 @@ class EntitiesManager:
         async def query_indexed_entities_group_names(shard_id: str) -> set[str]:
             """Search all relation types"""
             request = SearchRequest(
-                shard=shard_id,
+                shard_ids=[shard_id],
                 result_per_page=0,
                 body="",
                 document=True,

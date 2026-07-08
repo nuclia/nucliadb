@@ -40,11 +40,13 @@ class Features:
     # Flipt features
     DATAMANAGERS_V2_READ = "nucliadb_datamanagers_v2_read"
     DATAMANAGERS_V2_WRITE = "nucliadb_datamanagers_v2_write"
+    BETTER_MULTI_SHARD_SEARCH = "nucliadb_better_multi_shard_search"
 
 
 _FliptFeatures = set(
     [
         Features.DATAMANAGERS_V2_READ,
         Features.DATAMANAGERS_V2_WRITE,
+        Features.BETTER_MULTI_SHARD_SEARCH,
     ]
 )

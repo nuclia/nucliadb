@@ -71,6 +71,9 @@ DEFAULT_FLAG_DATA: dict[str, Any] = {
         "variants": {
             "environment": ["local"],
         },
+    const.Features.BETTER_MULTI_SHARD_SEARCH: {
+        "rollout": 0,
+        "variants": {"environment": ["local"]},
     },
 }
 

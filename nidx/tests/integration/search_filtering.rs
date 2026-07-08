@@ -112,7 +112,7 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
     let query_vector = vec![17.0 / magnitude; VECTOR_DIMENSION];
 
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         field_filter: Some(file_field_filter_expression(&["foobar"])),
         vector: query_vector.clone(),
         vectorset: "english".to_string(),
@@ -134,7 +134,7 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
 
     // Search filtering with a real field, to check that the vector is returned
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         vector: query_vector.clone(),
         vectorset: "english".to_string(),
         field_filter: Some(file_field_filter_expression(&["field1", "unexisting"])),
@@ -161,7 +161,7 @@ async fn test_search_fields_filtering(pool: PgPool) -> Result<(), Box<dyn std::e
 
     // Search filtering with multiple fields, to check that the OR is applied
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         vector: query_vector.clone(),
         vectorset: "english".to_string(),
         field_filter: Some(file_field_filter_expression(&["field1", "field2"])),
@@ -285,7 +285,7 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
 
     // Without filters, finds everything
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         result_per_page: 10,
         min_score_bm25: 0.0,
         paragraph: true,
@@ -301,7 +301,7 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
 
     // Finds resource 1 by uuid
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         result_per_page: 10,
         min_score_bm25: 0.0,
         paragraph: true,
@@ -322,7 +322,7 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
 
     // Finds resource 1 by uuid and field
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         result_per_page: 10,
         min_score_bm25: 0.0,
         paragraph: true,
@@ -342,7 +342,7 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
 
     // Finds resource 1 or 2 by uuid
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         result_per_page: 10,
         min_score_bm25: 0.0,
         paragraph: true,
@@ -362,7 +362,7 @@ async fn test_search_key_filtering(pool: PgPool) -> Result<(), Box<dyn std::erro
 
     // Finds nothing with fake id
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         result_per_page: 10,
         min_score_bm25: 0.0,
         paragraph: true,
@@ -408,7 +408,7 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
 
     // Without filters, finds everything
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         result_per_page: 10,
         min_score_bm25: 0.0,
         paragraph: true,
@@ -424,7 +424,7 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
 
     // With keyword filter, finds the resource
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         result_per_page: 10,
         min_score_bm25: 0.0,
         paragraph: true,
@@ -441,7 +441,7 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
 
     // With keyword filter, finds the resource
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         result_per_page: 10,
         min_score_bm25: 0.0,
         paragraph: true,
@@ -458,7 +458,7 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
 
     // With not keyword filter, finds the resource
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         result_per_page: 10,
         min_score_bm25: 0.0,
         paragraph: true,
@@ -475,7 +475,7 @@ async fn test_search_keyword_filtering(pool: PgPool) -> Result<(), Box<dyn std::
 
     // With not keyword filter, finds the resource
     let search_request = nodereader::SearchRequest {
-        shard: shard_id.clone(),
+        shard_ids: vec![shard_id.clone()],
         result_per_page: 10,
         min_score_bm25: 0.0,
         paragraph: true,

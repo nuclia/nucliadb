@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi import HTTPException
@@ -50,13 +50,6 @@ def shard_manager():
         clean_utility(Utility.SHARD_MANAGER)
     else:
         set_utility(Utility.SHARD_MANAGER, original)
-
-
-@pytest.fixture()
-def mocked_search_methods():
-    methods = {utils.Method.SEARCH: AsyncMock()}
-    with patch.dict(utils.METHODS, methods, clear=True):
-        yield methods
 
 
 def test_validate_nidx_query_results():

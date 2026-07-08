@@ -17,6 +17,7 @@ pub mod grpc;
 mod index_cache;
 mod query_language;
 mod query_planner;
+mod shard_merge;
 mod shard_search;
 pub mod shard_selector;
 mod shard_suggest;

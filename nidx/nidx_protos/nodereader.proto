@@ -374,7 +374,7 @@ message JsonFilterExpression {
 message SearchRequest {
     reserved 7, 20, 21;
 
-    string shard = 1;
+    repeated string shard_ids = 1;
 
     // query this text in all the paragraphs
     string body = 3;
@@ -454,6 +454,12 @@ message SuggestResponse {
 
 message SearchResponse {
     reserved 4;
+
+    // List of successfully queried shard ids. This is used in the multi-shard
+    // querying, where the caller must know which shards have been successfully
+    // searched to know about failures.
+    repeated string shard_ids = 6;
+
     DocumentSearchResponse document = 1;
     ParagraphSearchResponse paragraph = 2;
     VectorSearchResponse vector = 3;

@@ -21,7 +21,7 @@ import asyncio
 import json
 from collections.abc import Sequence
 from enum import Enum, auto
-from typing import TypeVar, overload
+from typing import Any, Callable, Coroutine, TypeVar, overload
 
 from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
@@ -35,18 +35,17 @@ from nidx_protos.nodereader_pb2 import (
     SuggestRequest,
     SuggestResponse,
 )
+from typing_extensions import assert_never
 
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.search import logger
-from nucliadb.search.search.shards import (
-    graph_search_shard,
-    query_shard,
-    suggest_shard,
-)
+from nucliadb.search.search.shards import graph_search_shard, query_shard, query_shards, suggest_shard
 from nucliadb.search.settings import settings
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_telemetry import errors
+from nucliadb_utils import const
+from nucliadb_utils.utilities import has_feature
 
 
 class Method(Enum):
@@ -54,12 +53,6 @@ class Method(Enum):
     SUGGEST = auto()
     GRAPH = auto()
 
-
-METHODS = {
-    Method.SEARCH: query_shard,
-    Method.SUGGEST: suggest_shard,
-    Method.GRAPH: graph_search_shard,
-}
 
 REQUEST_TYPE = SuggestRequest | SearchRequest | GraphSearchRequest
 
@@ -117,14 +110,42 @@ async def nidx_query(
     ops = []
     queried_shards = []
 
-    for shard_obj in shard_groups:
-        shard_id = shard_obj.nidx_shard_id
-        if shard_id is not None:
-            # At least one node is alive for this shard group
-            # let's add it ot the query list if has a valid value
-            func = METHODS[method]
-            ops.append(func(shard_id, pb_query))  # type: ignore
-            queried_shards.append(shard_id)
+    func: (
+        Callable[[list[str], SearchRequest], Coroutine[Any, Any, SearchResponse]]
+        | Callable[[str, SuggestRequest], Coroutine[Any, Any, SuggestResponse]]
+        | Callable[[str, GraphSearchRequest], Coroutine[Any, Any, GraphSearchResponse]]
+    )
+
+    if method == Method.SEARCH:
+        assert isinstance(pb_query, SearchRequest), "type checked constraint"
+
+        if has_feature(const.Features.BETTER_MULTI_SHARD_SEARCH, context={"kbid": kbid}):
+            for shard_obj in shard_groups:
+                if shard_obj.nidx_shard_id is not None:
+                    queried_shards.append(shard_obj.nidx_shard_id)
+            ops.append(query_shards(queried_shards, pb_query))
+
+        else:
+            for shard_obj in shard_groups:
+                if shard_obj.nidx_shard_id is not None:
+                    ops.append(query_shard(shard_obj.nidx_shard_id, pb_query))
+                    queried_shards.append(shard_obj.nidx_shard_id)
+
+    else:
+        if method == Method.SUGGEST:
+            func = suggest_shard
+        elif method == Method.GRAPH:
+            func = graph_search_shard
+        else:  # pragma: no cover
+            assert_never(method)
+
+        for shard_obj in shard_groups:
+            shard_id = shard_obj.nidx_shard_id
+            if shard_id is not None:
+                # At least one node is alive for this shard group
+                # let's add it ot the query list if has a valid value
+                ops.append(func(shard_id, pb_query))  # type: ignore
+                queried_shards.append(shard_id)
 
     if not ops:
         logger.warning(f"No shards found for kb", extra={"kbid": kbid})
@@ -135,7 +156,7 @@ async def nidx_query(
 
     try:
         results: list[T | BaseException] = await asyncio.wait_for(  # type: ignore
-            asyncio.gather(*ops, return_exceptions=True),
+            asyncio.gather(*ops, return_exceptions=True),  # type: ignore[arg-type]
             timeout=timeout,
         )
     except asyncio.TimeoutError as exc:  # pragma: no cover

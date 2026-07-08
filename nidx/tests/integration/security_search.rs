@@ -135,7 +135,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
         .searcher_client
         .search(SearchRequest {
             body: "text".to_string(),
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             document: true,
             vectorset: "english".to_string(),
             security: None,
@@ -164,7 +164,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let response = fixture
         .searcher_client
         .search(SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             document: true,
             vectorset: "english".to_string(),
             security: Some(Security {
@@ -197,7 +197,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let response = fixture
         .searcher_client
         .search(SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             document: true,
             vectorset: "english".to_string(),
             security: Some(Security { access_groups: vec![] }),
@@ -226,7 +226,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let response = fixture
         .searcher_client
         .search(SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             document: true,
             vectorset: "english".to_string(),
             security: Some(Security {
@@ -260,7 +260,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let response = fixture
         .searcher_client
         .search(SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             document: true,
             vectorset: "english".to_string(),
             security: Some(Security {
@@ -320,7 +320,7 @@ async fn test_security_search_public_resource(pool: PgPool) -> Result<(), Box<dy
         .search(SearchRequest {
             body: "text".to_string(),
             vectorset: "english".to_string(),
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             document: true,
             security: Some(Security { access_groups: vec![] }),
             ..Default::default()
@@ -334,7 +334,7 @@ async fn test_security_search_public_resource(pool: PgPool) -> Result<(), Box<dy
     let response = fixture
         .searcher_client
         .search(SearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             vectorset: "english".to_string(),
             document: true,
             security: Some(Security {

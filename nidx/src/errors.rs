@@ -32,7 +32,11 @@ pub enum NidxError {
     #[error(transparent)]
     TokioTaskError(#[from] tokio::task::JoinError),
     #[error(transparent)]
-    GrpcError(#[from] tonic::transport::Error),
+    TransportError(#[from] tonic::transport::Error),
+    #[error(transparent)]
+    GrpcError(tonic::Status),
+    #[error("Query error: {0}")]
+    QueryError(String),
     #[error(transparent)]
     Unknown(#[from] anyhow::Error),
 }
@@ -58,6 +62,7 @@ impl From<NidxError> for tonic::Status {
             NidxError::NotFound => tonic::Status::not_found("Not found"),
             NidxError::InvalidRequest(_) => tonic::Status::invalid_argument(value.to_string()),
             NidxError::InvalidUuid(_) => tonic::Status::invalid_argument(value.to_string()),
+            NidxError::GrpcError(status) => status,
             _ => tonic::Status::internal(value.to_string()),
         }
     }

@@ -104,7 +104,7 @@ async def db_augment_resource(
         elif isinstance(prop, ResourceClassificationLabels):
             labels = await classification_labels(resource)
 
-        else:
+        else:  # pragma: no cover
             assert_never(prop)
 
     augmented = AugmentedResource(
