@@ -304,7 +304,11 @@ impl SearchServer {
             // Distribute requests across nodes
             let mut tasks = JoinSet::new();
             for (node, shard_ids) in groups {
-                tasks.spawn(self.node_query(node, shard_ids, request.clone()).await?);
+                tasks.spawn(
+                    self.node_query(node, shard_ids, request.clone())
+                        .instrument(Span::current())
+                        .await?,
+                );
             }
 
             // Aggregate results

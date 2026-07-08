@@ -24,7 +24,7 @@ use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::VectorSearcher;
 use tokio::task::JoinSet;
-use tracing::{Span, instrument};
+use tracing::{Instrument, Span, instrument};
 use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
@@ -64,7 +64,9 @@ pub async fn search(
     } else {
         let mut tasks = JoinSet::new();
         for shard_id in &shards {
-            tasks.spawn(shard_search(*shard_id, Arc::clone(&index_cache), query_plan.clone()));
+            tasks.spawn(
+                shard_search(*shard_id, Arc::clone(&index_cache), query_plan.clone()).instrument(Span::current()),
+            );
         }
 
         let mut responses = vec![];
