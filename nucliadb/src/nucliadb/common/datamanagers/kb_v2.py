@@ -28,11 +28,16 @@ Each row represents one knowledge box and stores:
   - config  - serialised knowledgebox_pb2.KnowledgeBoxConfig protobuf
 """
 
+import logging
 from collections.abc import AsyncIterator
+
+import psycopg.errors
 
 from nucliadb.common.datamanagers.utils import _pg_cursor
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Write operations
@@ -120,15 +125,22 @@ async def update_kb_shards(
 async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
     """Return True if a KB with the given kbid exists, has a slug, and has not been soft-deleted."""
     async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            SELECT 1 FROM kbs
-            WHERE kbid = %(kbid)s
-              AND slug IS NOT NULL
-              AND deleted_at IS NULL
-            """,
-            {"kbid": kbid},
-        )
+        try:
+            await cur.execute(
+                """
+                SELECT 1 FROM kbs
+                WHERE kbid = %(kbid)s
+                  AND slug IS NOT NULL
+                  AND deleted_at IS NULL
+                """,
+                {"kbid": kbid},
+            )
+        except psycopg.errors.InvalidTextRepresentation:
+            logger.warning(
+                "Invalid UUID format in exists_kb() check, returning False",
+                extra={"kbid": kbid},
+            )
+            return False
         return await cur.fetchone() is not None
 
 
