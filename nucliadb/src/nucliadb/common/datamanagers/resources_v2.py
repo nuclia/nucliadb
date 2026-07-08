@@ -31,6 +31,7 @@ Each row represents one resource in a knowledge box and stores:
   - extra          - serialised resources_pb2.Extra
 """
 
+import logging
 import uuid
 from collections.abc import AsyncIterator
 
@@ -40,6 +41,8 @@ from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_erro
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb_protos import resources_pb2
+
+logger = logging.getLogger(__name__)
 
 
 def _to_rid(value: uuid.UUID) -> str:
@@ -248,10 +251,17 @@ async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
 async def exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
     """Return True if the resource exists."""
     async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            "SELECT 1 FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
-            {"kbid": kbid, "rid": rid},
-        )
+        try:
+            await cur.execute(
+                "SELECT 1 FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
+                {"kbid": kbid, "rid": rid},
+            )
+        except psycopg.errors.InvalidTextRepresentation:
+            logger.warning(
+                "Invalid UUID format in exists() check, returning False",
+                extra={"kbid": kbid, "rid": rid},
+            )
+            return False
         return await cur.fetchone() is not None
 
 
