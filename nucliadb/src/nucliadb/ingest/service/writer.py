@@ -33,7 +33,7 @@ from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.orm.processor import Processor, sequence_manager
+from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
 from nucliadb_protos import backups_pb2, writer_pb2, writer_pb2_grpc
@@ -56,8 +56,6 @@ from nucliadb_protos.writer_pb2 import (
     ListEntitiesGroupsRequest,
     ListEntitiesGroupsResponse,
     OpStatusWriter,
-    WriterStatusRequest,
-    WriterStatusResponse,
 )
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import is_onprem_nucliadb
@@ -207,9 +205,11 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             await KnowledgeBoxORM.delete(self.driver, kbid=kbid)
             logger.info("KB deleted successfully", extra={"kbid": kbid})
         except KnowledgeBoxNotFound:
-            logger.warning(f"KB not found: kbid={request.uuid}, slug={request.slug}")
+            logger.warning("KB not found", extra={"kbid": request.uuid, "slug": request.slug})
         except Exception:
-            logger.exception("Could not delete KB", exc_info=True)
+            logger.exception(
+                "Could not delete KB", exc_info=True, extra={"kbid": request.uuid, "slug": request.slug}
+            )
             return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
         return DeleteKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.OK)
 
@@ -223,11 +223,15 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     message, -1, partition=self.partitions[0], transaction_check=False
                 )
             except Exception:
-                logger.exception("Error processing", stack_info=True)
+                logger.exception(
+                    "Error processing message",
+                    stack_info=True,
+                    extra={"kbid": message.kbid, "rid": message.uuid},
+                )
                 response.status = OpStatusWriter.Status.ERROR
                 break
             response.status = OpStatusWriter.Status.OK
-            logger.info(f"Processed {message.uuid}")
+            logger.info("Processed message", extra={"kbid": message.kbid, "rid": message.uuid})
         return response
 
     async def GetEntities(self, request: GetEntitiesRequest, context=None) -> GetEntitiesResponse:
@@ -298,20 +302,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 else:
                     response.status = GetEntitiesGroupResponse.Status.OK
                     response.group.CopyFrom(entities_group)
-
-            return response
-
-    async def Status(self, request: WriterStatusRequest, context=None) -> WriterStatusResponse:
-        logger.info("Status Call")
-        response = WriterStatusResponse()
-        async with self.driver.ro_transaction() as txn:
-            async for _, slug in datamanagers.kb.get_kbs(txn):
-                response.knowledgeboxes.append(slug)
-
-            for partition in settings.partitions:
-                seq_id = await sequence_manager.get_last_seqid(self.driver, partition)
-                if seq_id is not None:
-                    response.msgid[partition] = seq_id
 
             return response
 

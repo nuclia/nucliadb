@@ -293,7 +293,7 @@ class PGDriver(Driver):
         self.max_lifetime_seconds = max_lifetime_seconds
         self._lock = asyncio.Lock()
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         async with self._lock:
             if self.initialized is False:
                 optional_args: dict[str, Any] = {}

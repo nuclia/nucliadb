@@ -76,7 +76,7 @@ def kb():
 async def test_purge(kb, keys, driver):
     keys.append("/pathto/kbid")
 
-    await purge.purge_kb(driver)
+    await purge.purge_kbs(driver)
 
     kb.purge.assert_called_once_with(driver, "kbid")
 
@@ -91,7 +91,7 @@ async def test_purge_handle_errors(kb, keys, driver):
     kb.purge.side_effect = [ShardNotFound(), NodeError(), Exception(), None]
     driver.begin.return_value.delete.side_effect = Exception()
 
-    await purge.purge_kb(driver)
+    await purge.purge_kbs(driver)
 
 
 async def test_purge_kb_storage(
@@ -101,7 +101,7 @@ async def test_purge_kb_storage(
 ):
     keys.append("/pathto/kbid")
 
-    await purge.purge_kb_storage(driver, storage)
+    await purge.purge_kbs_storage(driver, storage)
 
 
 async def test_purge_kb_storage_handle_errors(keys, driver, storage):
@@ -110,18 +110,18 @@ async def test_purge_kb_storage_handle_errors(keys, driver, storage):
 
     driver.begin.return_value.delete.side_effect = Exception()
 
-    await purge.purge_kb_storage(driver, storage)
+    await purge.purge_kbs_storage(driver, storage)
 
 
 async def test_main(driver, storage, dummy_nidx_utility):
     with (
-        patch("nucliadb.purge.purge_kb", AsyncMock()) as purge_kb,
-        patch("nucliadb.purge.purge_kb_storage", AsyncMock()) as purge_kb_storage,
+        patch("nucliadb.purge.purge_kbs", AsyncMock()) as purge_kbs,
+        patch("nucliadb.purge.purge_kbs_storage", AsyncMock()) as purge_kbs_storage,
         patch("nucliadb.purge.get_storage", return_value=storage),
         patch("nucliadb.purge.setup_driver", return_value=driver),
         patch("nucliadb.purge.setup_cluster", return_value=driver),
     ):
         await purge.main()
 
-        purge_kb.assert_called_once_with(driver)
-        purge_kb_storage.assert_called_once_with(driver, storage)
+        purge_kbs.assert_called_once_with(driver)
+        purge_kbs_storage.assert_called_once_with(driver, storage)

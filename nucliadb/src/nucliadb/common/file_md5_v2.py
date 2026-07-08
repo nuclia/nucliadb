@@ -29,7 +29,7 @@ relying on the existing index on (kbid, md5) in kb_fields for efficient lookups.
 
 from typing import cast, overload
 
-from nucliadb.common.datamanagers.utils import _pg_cursor
+from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_error
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
@@ -50,6 +50,7 @@ async def exists(*, kbid: str, md5: str) -> bool:
         return cur.rowcount > 0
 
 
+@logs_foreign_key_error
 async def set(
     txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str, field_type: str = "f"
 ) -> None:

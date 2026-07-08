@@ -175,14 +175,6 @@ message BrokerMessageBlobReference {
 }
 
 
-message WriterStatusResponse {
-    repeated string knowledgeboxes = 1;
-    // map of last message processed
-    map<string, int64> msgid = 2;
-}
-
-message WriterStatusRequest {
-}
 
 message ListEntitiesGroupsRequest {
     knowledgebox.KnowledgeBoxID kb = 1;
@@ -393,8 +385,6 @@ service Writer {
     rpc GetEntities(GetEntitiesRequest) returns (GetEntitiesResponse) {}
     rpc GetEntitiesGroup(GetEntitiesGroupRequest) returns (GetEntitiesGroupResponse) {}
     rpc ListEntitiesGroups(ListEntitiesGroupsRequest) returns (ListEntitiesGroupsResponse) {}
-
-    rpc Status(WriterStatusRequest) returns (WriterStatusResponse) {}
 
     rpc ReIndex(IndexResource) returns (IndexStatus) {}
 

@@ -86,7 +86,7 @@ class NatsPubsub(PubSubDriver[Msg]):
             self._jsm = self.nc.jsm()
         return self._jsm
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         # No asyncio loop to run
 
         async with self.lock:

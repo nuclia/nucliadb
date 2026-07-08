@@ -42,8 +42,8 @@ from nucliadb.purge import (
     _count_resources_storage_to_purge,
     _purge_resources_storage_batch,
     purge_deleted_resource_storage,
-    purge_kb,
-    purge_kb_storage,
+    purge_kbs,
+    purge_kbs_storage,
 )
 from nucliadb.purge.orphan_shards import detect_orphan_shards, purge_orphan_shards
 from nucliadb_protos import utils_pb2, writer_pb2
@@ -100,7 +100,7 @@ async def test_purge_deletes_everything_from_maindb(
     # A marker key has been added to delete the KB asynchronously
     assert any([key.startswith(KB_TO_DELETE_BASE) for key in keys_after_delete])
 
-    await purge_kb(maindb_driver)
+    await purge_kbs(maindb_driver)
     keys_after_purge_kb = await list_all_keys(maindb_driver)
     # A marker key has been added to delete storage when bucket is empty (that
     # can take a while so it will happen asynchronously too)
@@ -109,7 +109,7 @@ async def test_purge_deletes_everything_from_maindb(
     # Catalog entries should be deleted too at this point
     assert await kb_catalog_entries_count(maindb_driver, kbid) == 0
 
-    await purge_kb_storage(maindb_driver, storage)
+    await purge_kbs_storage(maindb_driver, storage)
 
     # After deletion and purge, no keys should be in maindb
     keys_after_purge_storage = await list_all_keys(maindb_driver)
@@ -154,7 +154,7 @@ async def test_purge_orphan_shards(
         nucliadb.common.nidx.get_nidx().api_client.DeleteShard = AsyncMock()
         resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
         assert resp.status_code == 200, resp.text
-        await purge_kb(maindb_driver)
+        await purge_kbs(maindb_driver)
 
     # We have removed the shards in maindb but left them orphan in the index
     # nodes

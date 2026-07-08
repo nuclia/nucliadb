@@ -33,7 +33,6 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import (
     KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
-    KB_VECTORSET_TO_DELETE,
     KB_VECTORSET_TO_DELETE_BASE,
     RESOURCE_TO_DELETE_STORAGE_BASE,
     KnowledgeBox,
@@ -52,8 +51,8 @@ async def _iter_keys(driver: Driver, match: str) -> AsyncGenerator[str, None]:
             yield key
 
 
-async def purge_kb(driver: Driver):
-    logger.info("START PURGING KB")
+async def purge_kbs(driver: Driver):
+    logger.info("START PURGING KBS")
     async for key in _iter_keys(driver, KB_TO_DELETE_BASE):
         logger.info(f"Purging kb {key}")
         try:
@@ -94,33 +93,34 @@ async def purge_kb(driver: Driver):
     logger.info("END PURGING KB")
 
 
-async def purge_kb_storage(driver: Driver, storage: Storage):
+async def purge_kbs_storage(driver: Driver, storage: Storage):
     # Last iteration deleted all kbs, and set their storages marked to be deleted also in tikv
     # Here we'll delete those storage buckets
-    logger.info("START PURGING KB STORAGE")
+    logger.info("Start purging storage for KBs")
     async for key in _iter_keys(driver, KB_TO_DELETE_STORAGE_BASE):
-        logger.info(f"Purging storage {key}")
         try:
             kbid = key.split("/")[2]
         except Exception:
-            logger.info(
-                f"  X Skipping purge {key}, wrong key format, expected {KB_TO_DELETE_STORAGE_BASE}"
-            )
+            logger.warning("Skipping purge for key, wrong key format", extra={"key": key})
             continue
 
+        logger.info("Purging storage for KB", extra={"kbid": kbid})
         deleted, conflict = await storage.delete_kb(kbid)
 
         delete_marker = False
         if conflict:
-            logger.info(f"  . Nothing was deleted for {key}, (Bucket not yet empty), will try next time")
+            logger.info(
+                "Nothing was deleted for KB. (Bucket not yet empty), will try next time",
+                extra={"kbid": kbid},
+            )
             # Just in case something failed while setting a lifecycle policy to
             # remove all elements from the bucket, reschedule it
             await storage.schedule_delete_kb(kbid)
         elif not deleted:
-            logger.info(f"  ! Expected bucket for {key} was not found, will delete marker")
+            logger.info("Expected bucket for KB was not found, will delete marker", extra={"kbid": kbid})
             delete_marker = True
         elif deleted:
-            logger.info("  √ Bucket successfully deleted")
+            logger.info("Bucket successfully deleted", extra={"kbid": kbid})
             delete_marker = True
 
         if delete_marker:
@@ -128,10 +128,10 @@ async def purge_kb_storage(driver: Driver, storage: Storage):
                 async with driver.rw_transaction() as txn:
                     await txn.delete(key)
                     await txn.commit()
-                logger.info(f"  √ Deleted storage deletion marker {key}")
+                logger.info("Deleted KB storage deletion marker", extra={"kbid": kbid})
             except Exception as exc:
                 errors.capture_exception(exc)
-                logger.info(f"  X Error while deleting key {key}")
+                logger.info("Error while deleting KB storage deletion marker", extra={"key": key})
 
     logger.info("FINISH PURGING KB STORAGE")
 
@@ -207,16 +207,16 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
     vectors for the specific vectorset to purge.
 
     """
-    logger.info("START PURGING KB VECTORSETS")
+    logger.info("Start purging vectorsets")
 
     vectorsets_to_delete = [key async for key in _iter_keys(driver, KB_VECTORSET_TO_DELETE_BASE)]
     for key in vectorsets_to_delete:
-        logger.info(f"Purging vectorsets {key}")
         try:
             _base, kbid, vectorset = key.lstrip("/").split("/")
         except ValueError:
-            logger.info(f"  X Skipping purge {key}, wrong key format, expected {KB_VECTORSET_TO_DELETE}")
+            logger.warning("Skipping purge vectorset for key, wrong key format", extra={"key": key})
             continue
+        logger.info("Purging vectorsets", extra={"kbid": kbid, "vectorset": vectorset})
 
         try:
             async with driver.ro_transaction() as txn:
@@ -267,13 +267,13 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
         except Exception as exc:
             errors.capture_exception(exc)
             logger.error(
-                f"  X ERROR while executing KB vectorset purge, skipping",
+                "ERROR while executing KB vectorset purge, skipping",
                 exc_info=exc,
                 extra={"kbid": kbid},
             )
             continue
 
-    logger.info("FINISH PURGING KB VECTORSETS")
+    logger.info("Finish purging KB vectorsets")
 
 
 async def main():
@@ -292,8 +292,8 @@ async def main():
         purge_resources_storage_task = asyncio.create_task(
             purge_deleted_resource_storage(driver, storage)
         )
-        await purge_kb(driver)
-        await purge_kb_storage(driver, storage)
+        await purge_kbs(driver)
+        await purge_kbs_storage(driver, storage)
         await purge_kb_vectorsets(driver, storage)
         await purge_resources_storage_task
         await purge_task_metadata_task
