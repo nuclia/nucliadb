@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import uuid
+
 import pytest
 from httpx import AsyncClient
 
@@ -50,7 +52,8 @@ async def test_api(nucliadb_writer: AsyncClient, knowledgebox: str, export_impor
     assert resp.status_code < 500
 
     # Check that for non-existing kbs, endpoints return a 404
-    for endpoint in ("/kb/idonotexist/import", "/kb/idonotexist/export"):
+    idonotexist = uuid.uuid4().hex
+    for endpoint in (f"/kb/{idonotexist}/import", f"/kb/{idonotexist}/export"):
         resp = await nucliadb_writer.post(endpoint)
         assert resp.status_code == 404
         assert resp.json()["detail"] == "Knowledge Box not found"

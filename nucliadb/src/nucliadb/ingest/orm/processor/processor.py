@@ -611,8 +611,6 @@ class Processor:
         all mutations derived from extracted data), origin, extra, security and
         user relations.
         """
-        tasks = []
-
         # Load and update basic. For new resources basic was already set by
         # kb.add_resource(); we still need to apply extracted-data mutations.
         current_basic = await resource.get_basic()
@@ -633,17 +631,15 @@ class Processor:
         await compute_resource_status(resource.txn, resource.kbid, resource.uuid, current_basic)
 
         if current_basic != previous_basic:
-            tasks.append(resource.set_basic(current_basic))
+            await resource.set_basic(current_basic)
         if message.HasField("origin"):
-            tasks.append(resource.set_origin(message.origin))
+            await resource.set_origin(message.origin)
         if message.HasField("extra"):
-            tasks.append(resource.set_extra(message.extra))
+            await resource.set_extra(message.extra)
         if message.HasField("security"):
-            tasks.append(resource.set_security(message.security))
+            await resource.set_security(message.security)
         if message.HasField("user_relations"):
-            tasks.append(resource.set_user_relations(message.user_relations))
-
-        await asyncio.gather(*tasks)
+            await resource.set_user_relations(message.user_relations)
 
     @processor_observer.wrap({"type": "apply_fields"})
     async def apply_fields(
@@ -656,6 +652,7 @@ class Processor:
         """
         with processor_observer({"type": "apply_field_values"}):
             await resource.apply_field_values(message)
+
         with processor_observer({"type": "apply_field_extracted_data"}):
             await resource.apply_field_extracted_data(message)
 
@@ -949,8 +946,14 @@ async def compute_resource_status(
         basic.metadata.status = resources_pb2.Metadata.Status.PROCESSED
         return
 
+    processed_fields = [f for f in field_ids.fields if is_processed_field(f)]
+    if not processed_fields:
+        # No processed fields, it is pending
+        basic.metadata.status = resources_pb2.Metadata.Status.PROCESSED
+        return
+
     field_statuses = await datamanagers.fields.get_statuses(
-        txn, kbid=kbid, rid=uuid, fields=field_ids.fields
+        txn, kbid=kbid, rid=uuid, fields=processed_fields
     )
 
     # If any field is processing -> PENDING
@@ -970,6 +973,16 @@ async def compute_resource_status(
     # Otherwise (everything processed or we only have DA errors) -> PROCESSED
     else:
         basic.metadata.status = resources_pb2.Metadata.Status.PROCESSED
+
+
+def is_processed_field(field: resources_pb2.FieldID) -> bool:
+    """
+    Title and summary fields are not considered processed fields
+    """
+    return field not in (
+        resources_pb2.FieldID(field="title", field_type=resources_pb2.FieldType.GENERIC),
+        resources_pb2.FieldID(field="summary", field_type=resources_pb2.FieldType.GENERIC),
+    )
 
 
 def delete_basic_computedmetadata_classifications(basic: PBBasic, deleted_fields: list[FieldID]) -> bool:

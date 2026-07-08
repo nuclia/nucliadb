@@ -19,6 +19,7 @@
 #
 import uuid
 
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
@@ -35,7 +36,7 @@ def broker_resource(
     """
     Returns a broker resource with barebones metadata.
     """
-    rid = rid or str(uuid.uuid4()).replace("-", "")
+    rid = rid or Resource.new_unique_rid()
     slug = slug or f"{rid}slug1"
 
     bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, slug=slug, source=source)

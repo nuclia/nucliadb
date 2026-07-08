@@ -19,6 +19,7 @@
 #
 from uuid import uuid4
 
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import FieldText as PBFieldText
@@ -27,7 +28,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_field_text(
-    storage, txn, cache, dummy_nidx_utility, knowledgebox: str
+    storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -39,10 +40,12 @@ async def test_create_resource_orm_field_text(
 
     textfield: Text = await r.get_field("text1", FieldType.TEXT, load=True)
     assert textfield.value.body == t2.body
+
+    await txn.abort()
 
 
 async def test_create_resource_orm_field_text_file(
-    storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -55,3 +58,5 @@ async def test_create_resource_orm_field_text_file(
 
     textfield: Text = await r.get_field("text1", FieldType.TEXT, load=True)
     assert textfield.value.body == t2.body
+
+    await txn.abort()

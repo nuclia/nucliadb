@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from uuid import UUID
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.utils import get_driver
@@ -126,14 +127,11 @@ async def get_resource_uuid(kbobj: KnowledgeBox, uuid_or_slug: str) -> str | Non
     Return the uuid of the resource with the given uuid_or_slug.
     """
     # Try with uuid first
-    resource = await kbobj.get(uuid_or_slug)
-    if resource is not None:
-        return uuid_or_slug
-
-    # Try with slug
-    uuid = await kbobj.get_resource_uuid_by_slug(uuid_or_slug)
-    if uuid is not None:
-        return uuid
-
-    # Resource not found
+    try:
+        ruuid = UUID(uuid_or_slug).hex
+        if await datamanagers.resources.resource_exists(kbobj.txn, kbid=kbobj.kbid, rid=ruuid):
+            return ruuid
+    except ValueError:
+        # Not a valid uuid, try with slug
+        return await kbobj.get_resource_uuid_by_slug(uuid_or_slug)
     return None

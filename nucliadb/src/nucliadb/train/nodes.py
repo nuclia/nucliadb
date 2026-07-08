@@ -23,7 +23,6 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster import manager
 
 # XXX: this keys shouldn't be exposed outside datamanagers
-from nucliadb.common.datamanagers.resources import KB_RESOURCE_SLUG_BASE
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -125,11 +124,7 @@ class TrainShardManager(manager.KBShardManager):
     async def kb_resources(self, request: GetResourcesRequest) -> AsyncIterator[TrainResource]:
         async with self.driver.ro_transaction() as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
-            base = KB_RESOURCE_SLUG_BASE.format(kbid=request.kb.uuid)
-            async for key in txn.keys(match=base):
-                # Fetch and Add wanted item
-                rid = await txn.get(key, for_update=False)
-                if rid is not None:
-                    resource = await kb.get(rid.decode())
-                    if resource is not None:
-                        yield await generate_train_resource(resource, request.metadata)
+            async for rid in datamanagers.resources.iterate_resource_ids(kbid=request.kb.uuid):
+                resource = await kb.get(rid)
+                if resource is not None:
+                    yield await generate_train_resource(resource, request.metadata)

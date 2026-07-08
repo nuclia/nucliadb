@@ -20,7 +20,6 @@
 
 import functools
 import random
-import uuid
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -33,6 +32,7 @@ from nucliadb.common.cluster import manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb_models.internal.predict import (
     QueryInfo,
@@ -284,7 +284,7 @@ async def test_querying_kb_with_vectorsets(
             ),
         },
     )
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     field_id = "my-field"
     bm = create_broker_message_with_vectorsets(kbid, rid, field_id, [("model", 768)])
     await inject_message(nucliadb_ingest_grpc, bm)
@@ -348,7 +348,7 @@ async def test_querying_kb_with_vectorsets(
             ),
         },
     )
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     field_id = "my-field"
     bm = create_broker_message_with_vectorsets(
         kbid, rid, field_id, [("model-A", 768), ("model-B", 1024)]

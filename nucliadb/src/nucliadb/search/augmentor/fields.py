@@ -310,6 +310,8 @@ async def db_augment_conversation_field(
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_metadata()
+            if db_value is None:
+                continue
             augmented.value = from_proto.field_conversation(db_value)
 
         elif isinstance(prop, FieldClassificationLabels):
@@ -482,6 +484,8 @@ async def find_conversation_message(
 ) -> tuple[int, int, resources_pb2.Message] | None:
     """Find a message in the conversation identified by `ident`."""
     conversation_metadata = await field.get_metadata()
+    if conversation_metadata is None:
+        return None
     splits_metadata = await field.get_splits_metadata()
     deleted_splits = set(splits_metadata.deleted_splits)
     if ident in deleted_splits:
@@ -515,6 +519,8 @@ async def iter_conversation_messages(
     """
     start_page, start_index = start_from
     conversation_metadata = await field.get_metadata()
+    if conversation_metadata is None:
+        return
     splits_metadata = await field.get_splits_metadata()
     deleted_splits = set(splits_metadata.deleted_splits)
     for page in range(start_page, conversation_metadata.pages + 1):
@@ -655,6 +661,8 @@ async def conversation_selector(
         # the window won't be centered
         messages: Deque[tuple[int, int, resources_pb2.Message]] = deque(maxlen=selector.size)
         metadata = await field.get_metadata()
+        if metadata is None:
+            return
         pending = -1
         for page in range(1, metadata.pages + 1):
             conversation_page = await field.db_get_value(page)

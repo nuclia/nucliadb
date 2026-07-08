@@ -20,6 +20,7 @@
 from os.path import dirname, getsize
 from uuid import uuid4
 
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import (
@@ -33,7 +34,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_extracted(
-    storage: Storage, txn, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn: Transaction, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -52,11 +53,13 @@ async def test_create_resource_orm_extracted(
     assert ex2 is not None
     assert ex2.text == ex1.body.text
 
+    await txn.abort()
+
 
 async def test_create_resource_orm_extracted_file(
     local_files,
     storage: Storage,
-    txn,
+    txn: Transaction,
     dummy_nidx_utility,
     knowledgebox: str,
 ):
@@ -91,9 +94,11 @@ async def test_create_resource_orm_extracted_file(
     ex3.ParseFromString(data2)
     assert ex3.text == ex2.text
 
+    await txn.abort()
+
 
 async def test_create_resource_orm_extracted_delta(
-    storage: Storage, txn, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -123,3 +128,5 @@ async def test_create_resource_orm_extracted_delta(
     assert ex2 is not None
     assert ex2.text == ex1.body.text
     assert len(ex2.split_text) == 2
+
+    await txn.abort()

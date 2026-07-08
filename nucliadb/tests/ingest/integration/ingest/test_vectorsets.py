@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import random
-import uuid
 from datetime import datetime
 
 from nidx_protos import noderesources_pb2
@@ -28,6 +27,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import (
     knowledgebox_pb2,
     resources_pb2,
@@ -50,7 +50,7 @@ async def test_ingest_broker_message_with_vectorsets(
 
     """
     kbid = knowledgebox
-    rid = uuid.uuid4().hex
+    rid = Resource.new_unique_rid()
     field_id = "my-text-field"
     default_vectorset_id = "my-semantic-model"
     vectorset_id = "fancy-multilang"

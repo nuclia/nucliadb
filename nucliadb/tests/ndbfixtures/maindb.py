@@ -84,6 +84,14 @@ async def cleanup_maindb(driver: Driver):
         except Exception:
             pass
 
+        try:
+            if isinstance(txn, PGTransaction):
+                async with txn.connection.cursor() as cur:
+                    await cur.execute("TRUNCATE kbs CASCADE")
+        except Exception:
+            logger.exception("Could not truncate kbs table")
+            pass
+
 
 async def create_test_database(base_url):
     async with (
