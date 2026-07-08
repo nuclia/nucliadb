@@ -222,10 +222,13 @@ class Processor:
             self.driver.rw_transaction() as txn,
         ):
             try:
+                logger.info("Deleting resource", extra={"kbid": kbid, "rid": uuid})
                 kb = KnowledgeBox(txn, self.storage, kbid)
                 shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
                 if shard_id is None:
-                    logger.warning(f"Resource {uuid} does not exist")
+                    logger.warning(
+                        "Resource shard not found: Skipping delete", extra={"kbid": kbid, "rid": uuid}
+                    )
                 else:
                     shard = await kb.get_resource_shard(shard_id)
                     if shard is None:
@@ -308,7 +311,7 @@ class Processor:
             )
             if not uuid:
                 logger.info(
-                    "Resource does not exist: skipping txn", extra={"kbid": kbid, "slug": message.slug}
+                    "Resource slug not found: skipping txn", extra={"kbid": kbid, "slug": message.slug}
                 )
         if not kb_exists or not uuid:
             if transaction_check:
@@ -321,6 +324,10 @@ class Processor:
             locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)),
             self.driver.rw_transaction() as txn,
         ):
+            logger.info(
+                "Processing message",
+                extra={"kbid": kbid, "rid": uuid, "seqid": seqid, "partition": partition},
+            )
             try:
                 kb = KnowledgeBox(txn, self.storage, kbid)
                 resource: Resource | None = None

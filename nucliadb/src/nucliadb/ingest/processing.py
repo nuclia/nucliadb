@@ -421,16 +421,38 @@ class ProcessingEngine:
             elif resp.status == 429:
                 raise LimitsExceededError(resp.status, "Rate limited")
             elif resp.status in (502, 503):
-                logger.warning(f"Processing engine is not available, retrying. Status: {resp.status}")
+                error_text = await resp.text()
+                logger.warning(
+                    "Processing api is not available, retrying",
+                    extra={
+                        "status": resp.status,
+                        "text": error_text,
+                        "kbid": item.kbid,
+                        "rid": item.uuid,
+                    },
+                )
                 raise ProcessingAPIUnavailableError()
             else:
                 error_text = await resp.text()
-                logger.warning(f"Error sending to process: {resp.status} {error_text}")
+                logger.warning(
+                    "Unexpected error sending to process",
+                    extra={
+                        "status": resp.status,
+                        "text": error_text,
+                        "kbid": item.kbid,
+                        "rid": item.uuid,
+                    },
+                )
                 raise SendToProcessError()
 
         logger.info(
-            f"Pushed message to proxy. kb: {item.kbid}, resource: {item.uuid}, \
-                ingest seqid: {seqid}, partition: {partition}"
+            "Pushed message to processing api",
+            extra={
+                "kbid": item.kbid,
+                "rid": item.uuid,
+                "seqid": seqid,
+                "partition": partition,
+            },
         )
 
         return ProcessingInfo(

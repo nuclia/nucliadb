@@ -42,7 +42,7 @@ class BackPressureCache:
     times if back pressure has been applied.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._cache: TTLCache[str, BackPressureData] = TTLCache(maxsize=1024, ttl=5 * 60)
         self._lock = threading.Lock()
 
