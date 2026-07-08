@@ -21,6 +21,8 @@ use nidx_protos::{
     ParagraphSearchResponse, SearchRequest, SearchResponse, VectorSearchResponse, document_result, order_by,
     paragraph_result,
 };
+use tracing::field::Empty;
+use tracing::{Span, instrument};
 
 #[derive(Clone, Copy)]
 pub struct OrderBy {
@@ -44,6 +46,7 @@ pub struct Limit(pub usize);
 /// Note however that date ordering is only possible on fulltext/keyword search
 /// (this is validated before searching, so we don't care much here)
 ///
+#[instrument(skip_all, fields(shards_count = Empty, document_count = Empty, paragraph_count = Empty, vector_count = Empty, graph_count = Empty, limit = limit.0))]
 pub fn merge(shard_responses: Vec<SearchResponse>, order_by: OrderBy, limit: Limit) -> SearchResponse {
     let mut shard_ids = vec![];
     let mut document_responses = Vec::with_capacity(shard_responses.len());
@@ -67,6 +70,9 @@ pub fn merge(shard_responses: Vec<SearchResponse>, order_by: OrderBy, limit: Lim
             graph_responses.push(graph);
         }
     }
+
+    let span = Span::current();
+    span.record("shards_count", shard_ids.len());
 
     let document =
         (!document_responses.is_empty()).then(|| merge_document_responses(document_responses, order_by, limit));
@@ -94,11 +100,13 @@ fn merge_document_responses(
 
     let mut facets = vec![];
     let mut results = vec![];
+    let mut count = 0;
     for response in responses {
         merged.total += response.total;
         merged.query = response.query;
         merged.next_page = merged.next_page || response.next_page;
 
+        count += response.results.len();
         results.push(response.results.into_iter());
         facets.push(response.facets);
     }
@@ -108,6 +116,10 @@ fn merge_document_responses(
         .take(limit.0)
         .collect();
     merged.facets = merge_facets(facets);
+
+    let span = Span::current();
+    span.record("document_count", count);
+
     merged
 }
 
@@ -160,11 +172,13 @@ fn merge_paragraph_responses(
     let mut results = vec![];
     let mut facets = vec![];
     let mut ematches = HashSet::new();
+    let mut count = 0;
     for response in responses {
         merged.total += response.total;
         merged.query = response.query;
         merged.next_page = merged.next_page || response.next_page;
 
+        count += response.results.len();
         results.push(response.results.into_iter());
         ematches.extend(response.ematches);
         facets.push(response.facets);
@@ -176,6 +190,9 @@ fn merge_paragraph_responses(
         .collect();
     merged.facets = merge_facets(facets);
     merged.ematches = ematches.into_iter().collect();
+
+    let span = Span::current();
+    span.record("paragraph_count", count);
 
     merged
 }
@@ -222,6 +239,13 @@ fn sort_paragraphs_fn(order_by: OrderBy) -> Box<dyn Fn(&ParagraphResult, &Paragr
 
 fn merge_vector_responses(responses: Vec<VectorSearchResponse>, limit: Limit) -> VectorSearchResponse {
     debug_assert!(!responses.is_empty(), "must pass at least 1 shard response");
+
+    let span = Span::current();
+    span.record(
+        "vector_count",
+        responses.iter().map(|r| r.documents.len()).sum::<usize>(),
+    );
+
     let merged = responses
         .into_iter()
         .map(|response| response.documents)
@@ -254,6 +278,9 @@ fn merge_graph_responses(responses: Vec<GraphSearchResponse>, _limit: Limit) -> 
     }
 
     // TODO: now that we have scores, we can cut. This is not implemented in Python though
+
+    let span = Span::current();
+    span.record("graph_count", merged.graph.len());
 
     merged
 }
