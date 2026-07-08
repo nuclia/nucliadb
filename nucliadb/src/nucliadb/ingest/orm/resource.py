@@ -406,6 +406,11 @@ class Resource:
     async def apply_fields_status(self, message: BrokerMessage):
         # Update the status for fields for which the extracted text has been updated.
         updated_fields = [et.field for et in message.extracted_text]
+        # And also key_value fields being modified directly
+        updated_fields += [
+            FieldID(field_type=FieldType.KEY_VALUE, field=field_name)
+            for field_name in message.key_value_fields
+        ]
 
         # Dictionary of all errors per field (we may have several due to DA tasks)
         errors_by_field: dict[tuple[FieldType.ValueType, str], list[writer_pb2.Error]] = defaultdict(

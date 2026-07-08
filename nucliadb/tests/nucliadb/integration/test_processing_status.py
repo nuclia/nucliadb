@@ -27,6 +27,71 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
 
 
+@pytest.mark.deploy_modes("standalone")
+async def test_key_value_field_processing_status(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    """
+    Key value fields do not require processing. This test verifies two related scenarios:
+
+    1. When the processor adds a key value field alongside extracted text, both the
+       text field and the key value field should end up PROCESSED (DA running inside processor).
+    2. When a subsequent message adds another key value field to an already-PROCESSED
+       resource, the resource should remain PROCESSED (DA over existing resources case).
+    """
+    # Create a resource with a text field via WRITER
+    br = broker_resource(standalone_knowledgebox)
+    br.texts["text"].CopyFrom(
+        rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
+    )
+    await inject_message(nucliadb_ingest_grpc, br)
+
+    # Processor processes the text field and also adds a key value field
+    br.source = BrokerMessage.MessageSource.PROCESSOR
+    etw = rpb.ExtractedTextWrapper()
+    etw.body.text = "Hello!"
+    etw.field.field = "text"
+    etw.field.field_type = rpb.FieldType.TEXT
+    br.extracted_text.append(etw)
+    g = Generator()
+    g.processor.SetInParent()
+    br.generated_by.append(g)
+    br.key_value_fields["my_kv"].CopyFrom(
+        rpb.FieldKeyValue(schema_id="my_schema", data='{"key": "value"}')
+    )
+    await inject_message(nucliadb_ingest_grpc, br)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{br.uuid}?show=basic&show=errors"
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"
+    assert resp_json["data"]["texts"]["text"]["status"] == "PROCESSED"
+    assert resp_json["data"]["key_values"]["my_kv"]["status"] == "PROCESSED"
+
+    # A subsequent message adds another key value field; the resource should stay PROCESSED
+    br2 = broker_resource(standalone_knowledgebox, rid=br.uuid)
+    br2.source = BrokerMessage.MessageSource.PROCESSOR
+    br2.key_value_fields["my_kv_2"].CopyFrom(
+        rpb.FieldKeyValue(schema_id="my_schema", data='{"key": "value2"}')
+    )
+    await inject_message(nucliadb_ingest_grpc, br2)
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{br.uuid}?show=basic&show=errors"
+    )
+    assert resp.status_code == 200
+    resp_json = resp.json()
+    assert resp_json["metadata"]["status"] == "PROCESSED"
+    assert resp_json["data"]["texts"]["text"]["status"] == "PROCESSED"
+    assert resp_json["data"]["key_values"]["my_kv"]["status"] == "PROCESSED"
+    assert resp_json["data"]["key_values"]["my_kv_2"]["status"] == "PROCESSED"
+
+
 @pytest.mark.parametrize(
     "endpoint,expected_status,payload",
     [
