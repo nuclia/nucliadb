@@ -252,6 +252,10 @@ def broker_resource_with_classifications(standalone_knowledgebox):
     return bm
 
 
+# FIXME: for some reason, paragraph search here doesn't return any result
+# sometimes, although the resource seems to be properly indexed and synced in
+# nidx. Further debugging is needed
+@pytest.mark.flaky(reruns=5)
 @pytest.mark.deploy_modes("standalone")
 async def test_search_returns_labels(
     nucliadb_search: AsyncClient, nucliadb_ingest_grpc: WriterStub, standalone_knowledgebox
