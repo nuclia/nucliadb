@@ -26,12 +26,15 @@ from fastapi import Request
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.timestamp_pb2 import Timestamp
 from nidx_protos.nodereader_pb2 import SearchRequest
+from nuclia_models.predict.chat import ChatModel
 from opentelemetry.trace import INVALID_SPAN, format_trace_id, get_current_span
+from pydantic import BaseModel, ValidationError
 from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
+from nucliadb_models import search as ndb_search_models
 from nucliadb_protos.audit_pb2 import (
     AuditField,
     AuditRequest,
@@ -113,10 +116,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
         context.audit_request.trace_id = get_trace_id() or ""
         context.path = request.url.path
 
-        if request.url.path.split("/")[-1] in ("ask", "search", "find", "chat"):
+        endpoint = request.url.path.split("/")[-1]
+        if endpoint in ("ask", "search", "find", "chat"):
             if request.method == "POST":
-                body = (await request.body()).decode(errors="replace")
-                context.audit_request.user_request = body
+                user_request = await valid_user_request(request, endpoint)
+                if user_request is not None:
+                    context.audit_request.user_request = user_request
             elif request.method == "GET":
                 query_params = json.dumps(dict(request.query_params))
                 context.audit_request.user_request = query_params
@@ -147,6 +152,40 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
 
 KB_USAGE_STREAM_SUBJECT = "kb-usage.nuclia_db"
+
+
+class AuditedChatRequest(ChatModel, ndb_search_models.AuditMetadataBase):
+    """
+    This class is used to validate the data that we send to the audit stream, as we do not want to send arbitrary data provided by the user.
+    AuditMetadataBase is added too to limit the amount of user-custom data that we send to audit.
+
+    """
+
+    ...
+
+
+endpoint_validators: dict[str, type[BaseModel]] = {
+    "chat": AuditedChatRequest,
+    "ask": ndb_search_models.AskRequest,
+    "find": ndb_search_models.FindRequest,
+    "search": ndb_search_models.SearchRequest,
+}
+
+
+async def valid_user_request(request: Request, endpoint: str) -> str | None:
+    try:
+        kls = endpoint_validators[endpoint]
+        json_body = await request.json()
+        return kls.model_validate(json_body).model_dump_json(exclude_unset=True)
+    except ValidationError as exc:
+        logger.warning(f"Invalid request body for audit: {request.url.path} - {exc}")
+        return None
+    except json.JSONDecodeError as exc:
+        logger.warning(f"Invalid JSON for audit: {request.url.path} - {exc}")
+        return None
+    except KeyError as exc:
+        logger.warning(f"Invalid endpoint for audit: {request.url.path} - {exc}")
+        return None
 
 
 class StreamAuditStorage(AuditStorage):
