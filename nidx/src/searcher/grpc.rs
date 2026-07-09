@@ -168,12 +168,15 @@ impl NidxSearcher for SearchServer {
 
         let response = if coordinator {
             // We are the requested searcher to perform a distributed query
-            self.distributed_query(request, shards).await?
+            let order_by = OrderBy::from(&request);
+            let limit = Limit(request.result_per_page as usize);
+            let partitions = self.distributed_query::<SearchOp>(request, shards).await?;
+            SearchOp::merge(partitions, order_by, limit)
         } else {
             // This is a hopped node, i.e., another searcher has delegated this part of the query to
             // us. We must query our shards and return either a full or partial response or an error.
             // We won't hop to any other node
-            shard_search::search(shards, Arc::clone(&self.index_cache), request)
+            SearchOp::local_query(Arc::clone(&self.index_cache), request, shards)
                 .await?
                 .data
         };
@@ -271,14 +274,18 @@ impl SearchServer {
     /// requested to query several partitions and one or more can fail, it will then return a
     /// partial result and is our responsibility to retry on other nodes.
     ///
-    async fn distributed_query(&self, request: SearchRequest, shards: Vec<Uuid>) -> NidxResult<SearchResponse> {
+    async fn distributed_query<Op>(&self, request: Op::Request, shards: Vec<Uuid>) -> NidxResult<Vec<Op::Response>>
+    where
+        Op: SearcherOp,
+    {
         let mut partitioner = QueryPartitioner::new(&self.shard_selector, &shards)?;
 
         let mut responses = vec![];
         let mut pending: HashSet<Uuid> = HashSet::from_iter(shards.clone());
         while !pending.is_empty() {
-            for PartialResponse { data: response, shards } in
-                self.scatter_gather(&mut partitioner, request.clone(), &pending).await?
+            for PartialResponse { data: response, shards } in self
+                .scatter_gather::<Op>(&mut partitioner, request.clone(), &pending)
+                .await?
             {
                 // The response includes a list of successful shards, that may be a subset of the
                 // requested ones. This is the way we communicate partial failures.
@@ -289,16 +296,7 @@ impl SearchServer {
             }
         }
 
-        let merged = if responses.len() == 1 {
-            responses.pop().unwrap()
-        } else {
-            shard_merge::merge(
-                responses,
-                OrderBy::from(&request),
-                Limit(request.result_per_page as usize),
-            )
-        };
-        Ok(merged)
+        Ok(responses)
     }
 
     /// Perform a scatter-gather cycle using the preferred node for each shard.
@@ -308,12 +306,15 @@ impl SearchServer {
     /// NOTE that cycles are less time-efficient than immediately requesting
     /// failed nodes, as tail latency can increase due to slow/faulty nodes
     #[instrument(skip_all, fields(partitions = shards.len(), nodes = Empty))]
-    async fn scatter_gather(
+    async fn scatter_gather<Op>(
         &self,
         partitioner: &mut QueryPartitioner,
-        request: SearchRequest,
+        request: Op::Request,
         shards: &HashSet<Uuid>,
-    ) -> NidxResult<Vec<PartialResponse<SearchResponse>>> {
+    ) -> NidxResult<Vec<PartialResponse<Op::Response>>>
+    where
+        Op: SearcherOp,
+    {
         let mut groups = HashMap::new();
         for shard_id in shards.iter() {
             let Some(node) = partitioner.next_node_for_shard(shard_id) else {
@@ -336,7 +337,7 @@ impl SearchServer {
         let mut tasks = JoinSet::new();
         for (node, shard_ids) in groups {
             tasks.spawn(
-                self.node_query(node, shard_ids, request.clone())
+                self.node_query::<Op>(node, shard_ids, request.clone())
                     .await?
                     .instrument(Span::current()),
             );
@@ -372,33 +373,32 @@ impl SearchServer {
         Ok(responses)
     }
 
-    async fn node_query(
+    async fn node_query<Op>(
         &self,
         node: SearcherNode,
-        shard_ids: Vec<Uuid>,
-        request: SearchRequest,
-    ) -> NidxResult<Pin<Box<dyn Future<Output = NidxResult<PartialResponse<SearchResponse>>> + Send + 'static>>> {
+        shards: Vec<Uuid>,
+        request: Op::Request,
+    ) -> NidxResult<Pin<Box<dyn Future<Output = NidxResult<PartialResponse<Op::Response>>> + Send + 'static>>>
+    where
+        Op: SearcherOp,
+    {
         match node {
             SearcherNode::This => {
                 let index_cache = Arc::clone(&self.index_cache);
-                Ok(Box::pin(async move {
-                    shard_search::search(shard_ids, index_cache, request).await
-                }))
+                Ok(Box::pin(
+                    async move { Op::local_query(index_cache, request, shards).await },
+                ))
             }
             SearcherNode::Remote(ref hostname) => {
                 match self.get_client(hostname).await {
-                    Ok(client) => Ok(Box::pin(async move {
-                        Self::remote_query(client, request, shard_ids)
-                            .await
-                            .map_err(NidxError::GrpcError)
-                    })),
+                    Ok(client) => Ok(Box::pin(async move { Op::remote_query(client, request, shards).await })),
                     Err(e) => {
                         // A client for this node is not available, although we've seen it
                         // in the k8s cluster. We skip it and will retry those shards on
                         // another node to complete the request
                         warn!(
                             ?node,
-                            ?shard_ids,
+                            ?shards,
                             "{}",
                             format!("Error getting a client for node '{hostname}': {e}")
                         );
@@ -408,12 +408,47 @@ impl SearchServer {
             }
         }
     }
+}
+
+trait SearcherOp: Clone + Send {
+    type Request: Clone + Send + 'static;
+    type Response: Send + 'static;
+
+    fn local_query(
+        index_cache: Arc<IndexCache>,
+        request: Self::Request,
+        shards: Vec<Uuid>,
+    ) -> impl std::future::Future<Output = NidxResult<PartialResponse<Self::Response>>> + Send;
+
+    fn remote_query(
+        client: SearcherClient,
+        request: Self::Request,
+        shards: Vec<Uuid>,
+    ) -> impl std::future::Future<Output = NidxResult<PartialResponse<Self::Response>>> + Send;
+
+    fn merge(partitions: Vec<Self::Response>, order_by: OrderBy, limit: Limit) -> Self::Response;
+}
+
+#[derive(Clone)]
+struct SearchOp;
+
+impl SearcherOp for SearchOp {
+    type Request = SearchRequest;
+    type Response = SearchResponse;
+
+    async fn local_query(
+        index_cache: Arc<IndexCache>,
+        request: Self::Request,
+        shards: Vec<Uuid>,
+    ) -> NidxResult<PartialResponse<Self::Response>> {
+        shard_search::search(shards, index_cache, request).await
+    }
 
     async fn remote_query(
         mut client: SearcherClient,
-        request: SearchRequest,
+        request: Self::Request,
         shards: Vec<Uuid>,
-    ) -> tonic::Result<PartialResponse<SearchResponse>> {
+    ) -> NidxResult<PartialResponse<Self::Response>> {
         // Send the query to a different node specifying only a subset of shards
         let mut search_request = request.clone();
         search_request.shard_ids = shards.iter().map(|x| x.to_string()).collect();
@@ -423,7 +458,7 @@ impl SearchServer {
         let mut request = Request::new(search_request);
         request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
 
-        let response = client.search(request).await?.into_inner();
+        let response = client.search(request).await.map_err(NidxError::GrpcError)?.into_inner();
 
         let result = if response.shard_ids.len() == shards.len() {
             PartialResponse { data: response, shards }
@@ -439,6 +474,14 @@ impl SearchServer {
             }
         };
         Ok(result)
+    }
+
+    fn merge(mut partitions: Vec<Self::Response>, order_by: OrderBy, limit: Limit) -> Self::Response {
+        if partitions.len() == 1 {
+            partitions.pop().unwrap()
+        } else {
+            shard_merge::merge(partitions, order_by, limit)
+        }
     }
 }
 
