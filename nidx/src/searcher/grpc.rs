@@ -340,9 +340,13 @@ impl SearchServer {
                     Ok(Err(NidxError::GrpcError(status))) if status.code() == Code::Unavailable => {
                         // searcher peer temporarily unavailable, will retry with another node
                     }
-                    Ok(Err(search_error)) => return Err(search_error),
+                    Ok(Err(search_error)) => {
+                        tasks.shutdown().await; // abort the rest before exiting the tracing span
+                        return Err(search_error);
+                    }
                     Err(join_error) => {
                         // Either a panic or a cancellation happened while searching
+                        tasks.shutdown().await; // abort the rest before exiting the tracing span
                         return Err(NidxError::from(join_error));
                     }
                 }
