@@ -905,7 +905,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -2181,14 +2181,14 @@ wheels = [
 
 [[package]]
 name = "nuclia-models"
-version = "0.56.0"
+version = "0.62.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic", extra = ["email"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/04/41/45e00c5ee2c2bc05b65f30feff7738bf86720c5ff619d05113976b440ba2/nuclia_models-0.56.0.tar.gz", hash = "sha256:d9cb2ea0199dd1db28703adbf04e2f72519362dea31324e79525308a07d24fce", size = 24965, upload-time = "2026-03-27T12:47:23.921Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/de/91/7ede9ea267a15941dbd038d94517c0cbdf4b4f65bc5c52a6ae7c960cf182/nuclia_models-0.62.0.tar.gz", hash = "sha256:664ab2ba3850532a5ff61dc30584fbd7c3f4b30420a070bce225756ba684b88a", size = 28437, upload-time = "2026-07-09T08:37:31.83Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/a7/fc5b20b8d407ab9a20b3702b4b94a368edfc5b03bdcd7249a28d5330b4ff/nuclia_models-0.56.0-py3-none-any.whl", hash = "sha256:1f4358afde7a579f05ac75777e3c8973f4b43b8cb615e38900a4eaeebf60cb33", size = 29464, upload-time = "2026-03-27T12:47:24.593Z" },
+    { url = "https://files.pythonhosted.org/packages/30/d5/cb77ac6a9ece79591981ec4dfa4e8449343ab151f3ef372b5fe8df5adfd7/nuclia_models-0.62.0-py3-none-any.whl", hash = "sha256:776a8e12b90bc82a23114c715363764845c890f12953fe395a2f78e472e74ba8", size = 33703, upload-time = "2026-07-09T08:37:30.878Z" },
 ]
 
 [[package]]
@@ -2292,7 +2292,7 @@ requires-dist = [
     { name = "mmh3", specifier = ">=3.0.0" },
     { name = "multidict", specifier = ">=6.0.4" },
     { name = "nidx-protos", extras = ["grpc"], editable = "nidx/nidx_protos" },
-    { name = "nuclia-models", specifier = ">=0.50.0" },
+    { name = "nuclia-models", specifier = ">=0.62.0" },
     { name = "nucliadb-admin-assets", specifier = ">=1.0.0.post1224" },
     { name = "nucliadb-models", editable = "nucliadb_models" },
     { name = "nucliadb-protos", extras = ["grpc"], editable = "nucliadb_protos" },
@@ -2407,7 +2407,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "httpx" },
-    { name = "nuclia-models", specifier = ">=0.50.0" },
+    { name = "nuclia-models", specifier = ">=0.62.0" },
     { name = "nucliadb-models", editable = "nucliadb_models" },
     { name = "orjson" },
     { name = "pydantic", specifier = ">=2.6" },

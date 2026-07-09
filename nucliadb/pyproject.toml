@@ -29,7 +29,7 @@ dependencies = [
     "nidx-protos[grpc]",
 
     "nucliadb-admin-assets>=1.0.0.post1224",
-    "nuclia-models>=0.50.0",
+    "nuclia-models>=0.62.0",
 
     # external dependencies
     "uvicorn[standard]",
