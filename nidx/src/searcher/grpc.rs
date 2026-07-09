@@ -154,7 +154,8 @@ macro_rules! shard_request {
     }};
 }
 
-macro_rules! distributed_query {
+/// Operation to multiple shards distributed across the searcher cluster
+macro_rules! shards_request {
     ($self:ident, $op:ty, $request:ident) => {{
         let coordinator = !$request.metadata().contains_key(HEADER_LOCAL_ONLY);
         let request = $request.into_inner();
@@ -163,10 +164,7 @@ macro_rules! distributed_query {
 
         let response = if coordinator {
             // We are the requested searcher to perform a distributed query
-            let order_by = OrderBy::from(&request);
-            let limit = Limit(request.result_per_page as usize);
-            let partitions = $self.distributed_query::<$op>(request, shards).await?;
-            <$op>::merge(partitions, order_by, limit)
+            $self.distributed_query::<$op>(request, shards).await?
         } else {
             // This is a hopped node, i.e., another searcher has delegated this part of the query to
             // us. We must query our shards and return either a full or partial response or an error.
@@ -182,7 +180,7 @@ macro_rules! distributed_query {
 #[tonic::async_trait]
 impl NidxSearcher for SearchServer {
     async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
-        distributed_query!(self, SearchOp, request)
+        shards_request!(self, SearchOp, request)
     }
 
     async fn suggest(&self, request: Request<SuggestRequest>) -> Result<Response<SuggestResponse>> {
@@ -275,7 +273,7 @@ impl SearchServer {
     /// requested to query several partitions and one or more can fail, it will then return a
     /// partial result and is our responsibility to retry on other nodes.
     ///
-    async fn distributed_query<Op>(&self, request: Op::Request, shards: Vec<Uuid>) -> NidxResult<Vec<Op::Response>>
+    async fn distributed_query<Op>(&self, request: Op::Request, shards: Vec<Uuid>) -> NidxResult<Op::Response>
     where
         Op: SearcherOp,
     {
@@ -297,7 +295,12 @@ impl SearchServer {
             }
         }
 
-        Ok(responses)
+        let merged = if responses.len() == 1 {
+            responses.pop().unwrap()
+        } else {
+            Op::merge(&request, responses)
+        };
+        Ok(merged)
     }
 
     /// Perform a scatter-gather cycle using the preferred node for each shard.
@@ -427,7 +430,7 @@ trait SearcherOp: Clone + Send {
         shards: Vec<Uuid>,
     ) -> impl std::future::Future<Output = NidxResult<PartialResponse<Self::Response>>> + Send;
 
-    fn merge(partitions: Vec<Self::Response>, order_by: OrderBy, limit: Limit) -> Self::Response;
+    fn merge(request: &Self::Request, partitions: Vec<Self::Response>) -> Self::Response;
 }
 
 #[derive(Clone)]
@@ -477,10 +480,12 @@ impl SearcherOp for SearchOp {
         Ok(result)
     }
 
-    fn merge(mut partitions: Vec<Self::Response>, order_by: OrderBy, limit: Limit) -> Self::Response {
+    fn merge(request: &Self::Request, mut partitions: Vec<Self::Response>) -> Self::Response {
         if partitions.len() == 1 {
             partitions.pop().unwrap()
         } else {
+            let order_by = OrderBy::from(request);
+            let limit = Limit(request.result_per_page as usize);
             shard_merge::merge(partitions, order_by, limit)
         }
     }
