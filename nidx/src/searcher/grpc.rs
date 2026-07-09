@@ -154,34 +154,35 @@ macro_rules! shard_request {
     }};
 }
 
-#[tonic::async_trait]
-impl NidxSearcher for SearchServer {
-    async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
-        let coordinator = !request.metadata().contains_key(HEADER_LOCAL_ONLY);
-        let request = request.into_inner();
+macro_rules! distributed_query {
+    ($self:ident, $op:ty, $request:ident) => {{
+        let coordinator = !$request.metadata().contains_key(HEADER_LOCAL_ONLY);
+        let request = $request.into_inner();
 
-        let mut shards = vec![];
-        for shard_id in &request.shard_ids {
-            let shard_id = Uuid::parse_str(shard_id).map_err(NidxError::from)?;
-            shards.push(shard_id);
-        }
+        let shards = validate_shards(&request.shard_ids)?;
 
         let response = if coordinator {
             // We are the requested searcher to perform a distributed query
             let order_by = OrderBy::from(&request);
             let limit = Limit(request.result_per_page as usize);
-            let partitions = self.distributed_query::<SearchOp>(request, shards).await?;
-            SearchOp::merge(partitions, order_by, limit)
+            let partitions = $self.distributed_query::<$op>(request, shards).await?;
+            <$op>::merge(partitions, order_by, limit)
         } else {
             // This is a hopped node, i.e., another searcher has delegated this part of the query to
             // us. We must query our shards and return either a full or partial response or an error.
             // We won't hop to any other node
-            SearchOp::local_query(Arc::clone(&self.index_cache), request, shards)
+            <$op>::local_query(Arc::clone(&$self.index_cache), request, shards)
                 .await?
                 .data
         };
-
         Ok(Response::new(response))
+    }};
+}
+
+#[tonic::async_trait]
+impl NidxSearcher for SearchServer {
+    async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
+        distributed_query!(self, SearchOp, request)
     }
 
     async fn suggest(&self, request: Request<SuggestRequest>) -> Result<Response<SuggestResponse>> {
@@ -511,4 +512,13 @@ impl QueryPartitioner {
         let nodes = self.shard_nodes.get_mut(shard).unwrap();
         if !nodes.is_empty() { Some(nodes.remove(0)) } else { None }
     }
+}
+
+fn validate_shards(shards: &[String]) -> NidxResult<Vec<Uuid>> {
+    let mut valid = Vec::with_capacity(shards.len());
+    for shard_id in shards {
+        let shard_id = Uuid::parse_str(shard_id).map_err(NidxError::from)?;
+        valid.push(shard_id);
+    }
+    Ok(valid)
 }
