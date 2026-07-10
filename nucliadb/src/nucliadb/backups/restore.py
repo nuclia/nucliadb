@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 import asyncio
 import functools
 import json
@@ -32,6 +31,7 @@ from pydantic import TypeAdapter
 from nucliadb.backups.const import MaindbKeys, StorageKeys
 from nucliadb.backups.models import RestoreBackupRequest
 from nucliadb.backups.settings import settings
+from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import (
     import_binary,
@@ -74,6 +74,22 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
     """
     Downloads the backup files from the cloud storage and imports them into the KB.
     """
+    kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    if not kb_exists:
+        logger.warning(
+            "Trying to restore on a KB that doesn't exist",
+            extra={"kbid": kbid, "backup_id": backup_id},
+        )
+        return
+    if not await context.blob_storage.exists_object(
+        bucket=settings.backups_bucket, key=StorageKeys.BACKUP_FOLDER.format(backup_id=backup_id)
+    ):
+        logger.warning(
+            "Trying to restore from a bucket that doesn't exist",
+            extra={"kbid": kbid, "backup_id": backup_id},
+        )
+        return
+
     await restore_resources(context, kbid, backup_id)
     await restore_labels(context, kbid, backup_id)
     await restore_synonyms(context, kbid, backup_id)
