@@ -23,6 +23,7 @@ from datetime import datetime
 
 import pytest
 from httpx import AsyncClient
+from pytest import LogCaptureFixture
 
 from nucliadb.backups.const import StorageKeys
 from nucliadb.backups.create import backup_kb_task, get_metadata, set_metadata
@@ -379,3 +380,29 @@ def test_all_broker_message_fields_are_backed_up():
             or field_name in BM_FIELDS["common"]
             or field_name in BM_FIELDS["deprecated"]
         ), f"Field {field_name} is not being taken into account in the backup!"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_restore_with_nonexistent_kb(
+    nucliadb_reader: AsyncClient,
+    settings: BackupSettings,
+    context: ApplicationContext,
+    caplog: LogCaptureFixture,
+):
+    fake_kbid = str(uuid.uuid4())
+    fake_backup_id = str(uuid.uuid4())
+    await restore_kb_task(context, RestoreBackupRequest(kb_id=fake_kbid, backup_id=fake_backup_id))
+    assert caplog.records[0].message == "Trying to restore on a KB that doesn't exist"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_restore_with_nonexistent_backup_bucket(
+    nucliadb_reader: AsyncClient,
+    dst_kb: str,
+    settings: BackupSettings,
+    context: ApplicationContext,
+    caplog: LogCaptureFixture,
+):
+    fake_backup_id = str(uuid.uuid4())
+    await restore_kb_task(context, RestoreBackupRequest(kb_id=dst_kb, backup_id=fake_backup_id))
+    assert caplog.records[0].message == "Trying to restore from a bucket that doesn't exist"

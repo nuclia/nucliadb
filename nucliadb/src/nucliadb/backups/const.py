@@ -32,6 +32,7 @@ class StorageKeys:
     Defines the key templates used to store backup files in the backups bucket of the storage.
     """
 
+    BACKUP_FOLDER = "backups/{backup_id}"
     BACKUP_PREFIX = "backups/{backup_id}/"
     RESOURCES_PREFIX = "backups/{backup_id}/resources/"
     RESOURCE = "backups/{backup_id}/resources/{resource_id}.tar"
