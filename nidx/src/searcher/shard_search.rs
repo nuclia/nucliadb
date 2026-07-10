@@ -73,8 +73,13 @@ pub async fn search(
         while let Some(join) = tasks.join_next().await {
             match join {
                 Ok(Ok(response)) => responses.push(response),
-                Ok(Err(NidxError::NotFound)) => {}
-                Ok(Err(search_error)) => return Err(search_error),
+                Ok(Err(NidxError::NotFound)) => {
+                    // shard not found in searcher, probably due to a
+                    // topology change the shard is not yet where it should
+                }
+                Ok(Err(search_error)) => {
+                    return Err(search_error);
+                }
                 Err(join_error) => {
                     // Either a panic or a cancellation happened while searching
                     return Err(NidxError::from(join_error));
