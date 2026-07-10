@@ -112,7 +112,7 @@ async def _ndb_index_find(
         )
         text_block_hydration_options = TextBlockHydrationOptions(
             highlight=item.highlight,
-            ematches=pb_response.paragraph.ematches,  # type: ignore
+            ematches=list(pb_response.paragraph.ematches),
         )
         search_results = await build_find_response(
             pb_response,

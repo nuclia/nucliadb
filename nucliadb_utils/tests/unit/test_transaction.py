@@ -89,7 +89,7 @@ async def test_commit_timeout(txn: TransactionUtility, pubsub):
     bm = BrokerMessage()
 
     waiting_event = mock.Mock(wait=mock.Mock(side_effect=asyncio.TimeoutError))
-    txn.wait_for_commited = mock.AsyncMock(return_value=waiting_event)  # type: ignore
+    txn.wait_for_commited = mock.AsyncMock(return_value=waiting_event)
 
     with pytest.raises(TransactionCommitTimeoutError):
         await txn.commit(bm, 1, wait=True, target_subject="foo")

@@ -65,13 +65,13 @@ def test_field_extension_strategy_fields_field_validator():
 
 def test_find_request_fulltext_feature_not_allowed():
     with pytest.raises(ValidationError):
-        search.FindRequest(features=[search.SearchOptions.FULLTEXT])  # type: ignore
+        search.FindRequest(features=[search.SearchOptions.FULLTEXT])
 
 
 def test_find_supports_search_options():
-    search.FindRequest(features=[search.SearchOptions.KEYWORD])  # type: ignore
-    search.FindRequest(features=[search.SearchOptions.SEMANTIC])  # type: ignore
-    search.FindRequest(features=[search.SearchOptions.RELATIONS])  # type: ignore
+    search.FindRequest(features=[search.SearchOptions.KEYWORD])
+    search.FindRequest(features=[search.SearchOptions.SEMANTIC])
+    search.FindRequest(features=[search.SearchOptions.RELATIONS])
 
 
 def test_search_semantic_with_offset_not_supported():
@@ -149,13 +149,13 @@ def test_rank_fusion(rank_fusion, expected):
 
 def test_rank_fusion_errors():
     with pytest.raises(ValueError):
-        search.FindRequest(rank_fusion="unknown")  # type: ignore
+        search.FindRequest(rank_fusion="unknown")
     with pytest.raises(ValueError):
-        search.AskRequest(query="q", rank_fusion="unknown")  # type: ignore
+        search.AskRequest(query="q", rank_fusion="unknown")
 
 
 def test_legacy_rank_fusion_fix():
-    req = search.FindRequest(rank_fusion="legacy")  # type: ignore
+    req = search.FindRequest(rank_fusion="legacy")
     assert req.rank_fusion == "rrf"
 
     req = search.FindRequest.model_validate({"rank_fusion": "legacy"})

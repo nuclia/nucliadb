@@ -20,6 +20,7 @@
 
 import asyncio
 import json
+from typing import Any
 
 import pytest
 from httpx import AsyncClient
@@ -227,12 +228,12 @@ async def _test_ask_request_with_security(
     security_groups: list[str] | None,
     expected_resources: list[str],
 ):
-    payload = {
+    payload: dict[str, Any] = {
         "query": query,
     }
     headers = {"x_synchronous": "true"}
     if security_groups:
-        payload["security"] = {"groups": security_groups}  # type: ignore
+        payload["security"] = {"groups": security_groups}
 
     if ask_endpoint == "ask_post":
         resp = await nucliadb_reader.post(f"/kb/{kbid}/ask", json=payload, headers=headers)

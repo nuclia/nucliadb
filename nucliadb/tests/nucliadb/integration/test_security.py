@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+from typing import Any
 
 import pytest
 from httpx import AsyncClient
@@ -246,15 +247,15 @@ async def _test_search_request_with_security(
     security_groups: list[str] | None,
     expected_resources: list[str],
 ):
-    payload = {
+    payload: dict[str, Any] = {
         "query": query,
     }
-    params = {
+    params: dict[str, Any] = {
         "query": query,
     }
     if security_groups is not None:
-        payload["security"] = {"groups": security_groups}  # type: ignore
-        params["security_groups"] = security_groups  # type: ignore
+        payload["security"] = {"groups": security_groups}
+        params["security_groups"] = security_groups
 
     if method == "POST" and endpoint == "find":
         resp = await nucliadb_reader.post(
