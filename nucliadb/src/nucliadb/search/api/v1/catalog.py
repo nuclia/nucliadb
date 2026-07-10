@@ -191,7 +191,7 @@ async def catalog(
                 extra={
                     "kbid": kbid,
                     "duration": duration,
-                    "query": item.model_dump_json(),
+                    "query": item.model_dump_json(exclude_unset=True),
                 },
             )
 

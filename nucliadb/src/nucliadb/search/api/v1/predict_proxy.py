@@ -72,6 +72,7 @@ async def predict_proxy_endpoint(
         payload = await request.json()
     except json.JSONDecodeError:
         payload = None
+
     try:
         response = await predict_proxy(
             kbid,

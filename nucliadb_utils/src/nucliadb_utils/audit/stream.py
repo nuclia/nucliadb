@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import contextvars
+import enum
 import json
 import time
 from collections.abc import Callable
@@ -26,12 +27,15 @@ from fastapi import Request
 from google.protobuf.json_format import MessageToDict
 from google.protobuf.timestamp_pb2 import Timestamp
 from nidx_protos.nodereader_pb2 import SearchRequest
+from nuclia_models.predict.chat import ChatModel
 from opentelemetry.trace import INVALID_SPAN, format_trace_id, get_current_span
+from pydantic import BaseModel, ValidationError
 from starlette.background import BackgroundTask
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
+from nucliadb_models import search as ndb_search_models
 from nucliadb_protos.audit_pb2 import (
     AuditField,
     AuditRequest,
@@ -113,13 +117,20 @@ class AuditMiddleware(BaseHTTPMiddleware):
         context.audit_request.trace_id = get_trace_id() or ""
         context.path = request.url.path
 
-        if request.url.path.split("/")[-1] in ("ask", "search", "find", "chat"):
+        try:
+            endpoint = AuditedEndpoint._from_request(request)
+        except ValueError:
+            # Not an endpoint we want to audit, just pass through
+            pass
+        else:
             if request.method == "POST":
-                body = (await request.body()).decode(errors="replace")
-                context.audit_request.user_request = body
+                request_payload = await valid_payload(request, endpoint)
+                if request_payload is not None:
+                    context.audit_request.user_request = request_payload
             elif request.method == "GET":
-                query_params = json.dumps(dict(request.query_params))
-                context.audit_request.user_request = query_params
+                request_query_params = await valid_query_params(request, endpoint)
+                if request_query_params is not None:
+                    context.audit_request.user_request = request_query_params
 
         response = await call_next(request)
 
@@ -147,6 +158,66 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
 
 KB_USAGE_STREAM_SUBJECT = "kb-usage.nuclia_db"
+
+
+class AuditedChatRequest(ChatModel, ndb_search_models.AuditMetadataBase):
+    """
+    This class is used to validate the data that we send to the audit stream, as we do not want to send arbitrary data provided by the user.
+    AuditMetadataBase is added too to limit the amount of user-custom data that we send to audit.
+
+    """
+
+    ...
+
+
+class AuditedEndpoint(str, enum.Enum):
+    CHAT = "chat"
+    ASK = "ask"
+    FIND = "find"
+    SEARCH = "search"
+
+    @classmethod
+    def _from_request(cls, request: Request) -> "AuditedEndpoint":
+        endpoint = request.url.path.split("/")[-1]
+        match endpoint:
+            case "chat":
+                return cls.CHAT
+            case "ask":
+                return cls.ASK
+            case "find":
+                return cls.FIND
+            case "search":
+                return cls.SEARCH
+        raise ValueError(f"Unknown endpoint for request: {request.url.path}")
+
+
+endpoint_validators: dict[AuditedEndpoint, type[BaseModel]] = {
+    AuditedEndpoint.CHAT: AuditedChatRequest,
+    AuditedEndpoint.ASK: ndb_search_models.AskRequest,
+    AuditedEndpoint.FIND: ndb_search_models.FindRequest,
+    AuditedEndpoint.SEARCH: ndb_search_models.SearchRequest,
+}
+
+
+async def valid_payload(request: Request, endpoint: AuditedEndpoint) -> str | None:
+    try:
+        kls = endpoint_validators[endpoint]
+        json_body = await request.json()
+        return kls.model_validate(json_body).model_dump_json(exclude_unset=True)
+    except ValidationError as exc:
+        logger.warning(f"Invalid request body for audit: {request.url.path} - {exc}")
+        return None
+    except json.JSONDecodeError as exc:
+        logger.warning(f"Invalid JSON for audit: {request.url.path} - {exc}")
+        return None
+
+
+async def valid_query_params(request: Request, endpoint: AuditedEndpoint) -> str | None:
+    query_params = dict(request.query_params)
+    kls = endpoint_validators[endpoint]
+    allowed = kls.model_fields.keys()
+    filtered = {k: v for k, v in query_params.items() if k in allowed}
+    return json.dumps(filtered)
 
 
 class StreamAuditStorage(AuditStorage):
