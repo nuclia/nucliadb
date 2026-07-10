@@ -274,82 +274,18 @@ impl SearchServer {
     async fn distributed_query(&self, request: SearchRequest, shards: Vec<Uuid>) -> NidxResult<SearchResponse> {
         let mut partitioner = QueryPartitioner::new(&self.shard_selector, &shards)?;
 
-        // Use the query partitioner to group requests by the most preferred
-        // node per shard. We'll then do scatter-gather cycles until we complete
-        // the distributed query or fail.
-        //
-        // NOTE that grouping cycles is less time-efficient, as tail latency can
-        // increase due to slow/faulty nodes
         let mut responses = vec![];
-
         let mut pending: HashSet<Uuid> = HashSet::from_iter(shards.clone());
-
         while !pending.is_empty() {
-            let span = tracing::info_span!("scatter-gather", partitions = pending.len(), nodes = Empty);
-            let _enter = span.enter();
-
-            let mut groups = HashMap::new();
-            for shard_id in pending.iter() {
-                let Some(node) = partitioner.next_node_for_shard(shard_id) else {
-                    // A shard doesn't have more nodes to query but we haven't finished yet. We
-                    // won't be able to complete the request in all partitions, so we abort
-                    error!(?shard_id, "Error in search, exhausted all available nodes for shard");
-                    // Propagate a NotFound error. Note that we can only arrive here due to NotFound
-                    // errors as they are the only ones we retry. If at some point we handle more,
-                    // this will be an incorrect assumption
-                    return Err(NidxError::NotFound);
-                };
-                groups
-                    .entry(node)
-                    .and_modify(|shards: &mut Vec<Uuid>| shards.push(*shard_id))
-                    .or_insert(vec![*shard_id]);
-            }
-            span.record("nodes", groups.len());
-
-            // Distribute requests across nodes
-            let mut tasks = JoinSet::new();
-            for (node, shard_ids) in groups {
-                tasks.spawn(
-                    self.node_query(node, shard_ids, request.clone())
-                        .await?
-                        .instrument(Span::current()),
-                );
-            }
-
-            // Aggregate results
-            while let Some(join) = tasks.join_next().await {
-                match join {
-                    Ok(Ok(response)) => {
-                        let PartialResponse {
-                            data: response, shards, ..
-                        } = response;
-                        // The response includes a list of successful shards, that may be a subset of the
-                        // requested ones. This is the way we communicate partial failures.
-                        for shard_id in shards {
-                            pending.remove(&shard_id);
-                        }
-                        responses.push(response);
-                    }
-                    Ok(Err(NidxError::NotFound)) => {
-                        // shard not found in searcher, probably due to a
-                        // topology change the shard is not yet where it should
-                    }
-                    Ok(Err(NidxError::GrpcError(status))) if status.code() == Code::NotFound => {
-                        // same as above
-                    }
-                    Ok(Err(NidxError::GrpcError(status))) if status.code() == Code::Unavailable => {
-                        // searcher peer temporarily unavailable, will retry with another node
-                    }
-                    Ok(Err(search_error)) => {
-                        tasks.shutdown().await; // abort the rest before exiting the tracing span
-                        return Err(search_error);
-                    }
-                    Err(join_error) => {
-                        // Either a panic or a cancellation happened while searching
-                        tasks.shutdown().await; // abort the rest before exiting the tracing span
-                        return Err(NidxError::from(join_error));
-                    }
+            for PartialResponse { data: response, shards } in
+                self.scatter_gather(&mut partitioner, request.clone(), &pending).await?
+            {
+                // The response includes a list of successful shards, that may be a subset of the
+                // requested ones. This is the way we communicate partial failures.
+                for shard_id in shards {
+                    pending.remove(&shard_id);
                 }
+                responses.push(response);
             }
         }
 
@@ -363,6 +299,77 @@ impl SearchServer {
             )
         };
         Ok(merged)
+    }
+
+    /// Perform a scatter-gather cycle using the preferred node for each shard.
+    /// This operation will group shards by node and scatter the requests across
+    /// nodes. Then, we'll wait for all of them and gather the results
+    ///
+    /// NOTE that cycles are less time-efficient than immediately requesting
+    /// failed nodes, as tail latency can increase due to slow/faulty nodes
+    #[instrument(skip_all, fields(partitions = shards.len(), nodes = Empty))]
+    async fn scatter_gather(
+        &self,
+        partitioner: &mut QueryPartitioner,
+        request: SearchRequest,
+        shards: &HashSet<Uuid>,
+    ) -> NidxResult<Vec<PartialResponse<SearchResponse>>> {
+        let mut groups = HashMap::new();
+        for shard_id in shards.iter() {
+            let Some(node) = partitioner.next_node_for_shard(shard_id) else {
+                // A shard doesn't have more nodes to query but we haven't finished yet. We
+                // won't be able to complete the request in all partitions, so we abort
+                error!(?shard_id, "Error in search, exhausted all available nodes for shard");
+                // Propagate a NotFound error. Note that we can only arrive here due to NotFound
+                // errors as they are the only ones we retry. If at some point we handle more,
+                // this will be an incorrect assumption
+                return Err(NidxError::NotFound);
+            };
+            groups
+                .entry(node)
+                .and_modify(|shards: &mut Vec<Uuid>| shards.push(*shard_id))
+                .or_insert(vec![*shard_id]);
+        }
+        Span::current().record("nodes", groups.len());
+
+        // Distribute requests across nodes
+        let mut tasks = JoinSet::new();
+        for (node, shard_ids) in groups {
+            tasks.spawn(
+                self.node_query(node, shard_ids, request.clone())
+                    .await?
+                    .instrument(Span::current()),
+            );
+        }
+
+        // Aggregate results
+        let mut responses = vec![];
+        while let Some(join) = tasks.join_next().await {
+            match join {
+                Ok(Ok(response)) => {
+                    responses.push(response);
+                }
+                Ok(Err(NidxError::NotFound)) => {
+                    // shard not found in searcher, probably due to a
+                    // topology change the shard is not yet where it should
+                }
+                Ok(Err(NidxError::GrpcError(status))) if status.code() == Code::NotFound => {
+                    // same as above
+                }
+                Ok(Err(NidxError::GrpcError(status))) if status.code() == Code::Unavailable => {
+                    // searcher peer temporarily unavailable, will retry with another node
+                }
+                Ok(Err(search_error)) => {
+                    return Err(search_error);
+                }
+                Err(join_error) => {
+                    // Either a panic or a cancellation happened while searching
+                    return Err(NidxError::from(join_error));
+                }
+            }
+        }
+
+        Ok(responses)
     }
 
     async fn node_query(
