@@ -31,6 +31,7 @@ from pydantic import TypeAdapter
 from nucliadb.backups.const import MaindbKeys, StorageKeys
 from nucliadb.backups.models import RestoreBackupRequest
 from nucliadb.backups.settings import settings
+from nucliadb.backups.utils import exists_backup
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import (
@@ -81,9 +82,7 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
             extra={"kbid": kbid, "backup_id": backup_id},
         )
         return
-    if not await context.blob_storage.exists_object(
-        bucket=settings.backups_bucket, key=StorageKeys.BACKUP_FOLDER.format(backup_id=backup_id)
-    ):
+    if not exists_backup(context.blob_storage, backup_id):
         logger.warning(
             "Trying to restore from a bucket that doesn't exist",
             extra={"kbid": kbid, "backup_id": backup_id},
