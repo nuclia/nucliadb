@@ -315,13 +315,15 @@ async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb, rid):
     resource = Resource(txn, storage, kb, rid)
     resource.update_all_field_ids = AsyncMock()
     resource.set_field = AsyncMock()
+    resource.delete_field = AsyncMock()
+    resource.set_file_field_md5 = AsyncMock()
 
     bm = MagicMock()
     bm.texts = {"text": MagicMock()}
     bm.links = {"link": MagicMock()}
     bm.files = {"file": MagicMock()}
     bm.conversations = {"conversation": MagicMock()}
-    bm.delete_fields.append(FieldID(field_type=FieldType.CONVERSATION, field="to_delete"))
+    bm.delete_fields = [FieldID(field_type=FieldType.CONVERSATION, field="to_delete")]
 
     await resource.apply_field_values(bm)
 
