@@ -178,14 +178,16 @@ class AuditedEndpoint(str, enum.Enum):
 
     @classmethod
     def _from_request(cls, request: Request) -> "AuditedEndpoint":
-        if request.url.path.endswith("/chat"):
-            return cls.CHAT
-        elif request.url.path.endswith("/ask"):
-            return cls.ASK
-        elif request.url.path.endswith("/find"):
-            return cls.FIND
-        elif request.url.path.endswith("/search"):
-            return cls.SEARCH
+        endpoint = request.url.path.split("/")[-1]
+        match endpoint:
+            case "chat":
+                return cls.CHAT
+            case "ask":
+                return cls.ASK
+            case "find":
+                return cls.FIND
+            case "search":
+                return cls.SEARCH
         raise ValueError(f"Unknown endpoint for request: {request.url.path}")
 
 
