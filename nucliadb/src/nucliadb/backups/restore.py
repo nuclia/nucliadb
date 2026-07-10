@@ -82,7 +82,7 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
             extra={"kbid": kbid, "backup_id": backup_id},
         )
         return
-    if not exists_backup(context.blob_storage, backup_id):
+    if not await exists_backup(context.blob_storage, backup_id):
         logger.warning(
             "Trying to restore from a bucket that doesn't exist",
             extra={"kbid": kbid, "backup_id": backup_id},
