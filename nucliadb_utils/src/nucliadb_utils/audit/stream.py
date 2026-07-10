@@ -13,6 +13,7 @@
 # limitations under the License.
 import asyncio
 import contextvars
+import enum
 import json
 import time
 from collections.abc import Callable
@@ -116,8 +117,12 @@ class AuditMiddleware(BaseHTTPMiddleware):
         context.audit_request.trace_id = get_trace_id() or ""
         context.path = request.url.path
 
-        endpoint = request.url.path.split("/")[-1]
-        if endpoint in ("ask", "search", "find", "chat"):
+        try:
+            endpoint = AuditedEndpoint._from_request(request)
+        except ValueError:
+            # Not an endpoint we want to audit, just pass through
+            pass
+        else:
             if request.method == "POST":
                 request_payload = await valid_payload(request, endpoint)
                 if request_payload is not None:
@@ -165,15 +170,34 @@ class AuditedChatRequest(ChatModel, ndb_search_models.AuditMetadataBase):
     ...
 
 
-endpoint_validators: dict[str, type[BaseModel]] = {
-    "chat": AuditedChatRequest,
-    "ask": ndb_search_models.AskRequest,
-    "find": ndb_search_models.FindRequest,
-    "search": ndb_search_models.SearchRequest,
+class AuditedEndpoint(str, enum.Enum):
+    CHAT = "chat"
+    ASK = "ask"
+    FIND = "find"
+    SEARCH = "search"
+
+    @classmethod
+    def _from_request(cls, request: Request) -> "AuditedEndpoint":
+        if request.url.path.endswith("/chat"):
+            return cls.CHAT
+        elif request.url.path.endswith("/ask"):
+            return cls.ASK
+        elif request.url.path.endswith("/find"):
+            return cls.FIND
+        elif request.url.path.endswith("/search"):
+            return cls.SEARCH
+        raise ValueError(f"Unknown endpoint for request: {request.url.path}")
+
+
+endpoint_validators: dict[AuditedEndpoint, type[BaseModel]] = {
+    AuditedEndpoint.CHAT: AuditedChatRequest,
+    AuditedEndpoint.ASK: ndb_search_models.AskRequest,
+    AuditedEndpoint.FIND: ndb_search_models.FindRequest,
+    AuditedEndpoint.SEARCH: ndb_search_models.SearchRequest,
 }
 
 
-async def valid_payload(request: Request, endpoint: str) -> str | None:
+async def valid_payload(request: Request, endpoint: AuditedEndpoint) -> str | None:
     try:
         kls = endpoint_validators[endpoint]
         json_body = await request.json()
@@ -184,18 +208,11 @@ async def valid_payload(request: Request, endpoint: str) -> str | None:
     except json.JSONDecodeError as exc:
         logger.warning(f"Invalid JSON for audit: {request.url.path} - {exc}")
         return None
-    except KeyError as exc:
-        logger.warning(f"Invalid endpoint for audit: {request.url.path} - {exc}")
-        return None
 
 
-async def valid_query_params(request: Request, endpoint: str) -> str | None:
+async def valid_query_params(request: Request, endpoint: AuditedEndpoint) -> str | None:
     query_params = dict(request.query_params)
-    try:
-        kls = endpoint_validators[endpoint]
-    except KeyError:
-        logger.warning(f"Invalid endpoint for audit: {request.url.path}")
-        return None
+    kls = endpoint_validators[endpoint]
     allowed = kls.model_fields.keys()
     filtered = {k: v for k, v in query_params.items() if k in allowed}
     return json.dumps(filtered)
