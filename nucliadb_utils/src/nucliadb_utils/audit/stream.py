@@ -119,12 +119,13 @@ class AuditMiddleware(BaseHTTPMiddleware):
         endpoint = request.url.path.split("/")[-1]
         if endpoint in ("ask", "search", "find", "chat"):
             if request.method == "POST":
-                user_request = await valid_user_request(request, endpoint)
-                if user_request is not None:
-                    context.audit_request.user_request = user_request
+                request_payload = await valid_payload(request, endpoint)
+                if request_payload is not None:
+                    context.audit_request.user_request = request_payload
             elif request.method == "GET":
-                query_params = json.dumps(dict(request.query_params))
-                context.audit_request.user_request = query_params
+                request_query_params = await valid_query_params(request, endpoint)
+                if request_query_params is not None:
+                    context.audit_request.user_request = request_query_params
 
         response = await call_next(request)
 
@@ -172,7 +173,7 @@ endpoint_validators: dict[str, type[BaseModel]] = {
 }
 
 
-async def valid_user_request(request: Request, endpoint: str) -> str | None:
+async def valid_payload(request: Request, endpoint: str) -> str | None:
     try:
         kls = endpoint_validators[endpoint]
         json_body = await request.json()
@@ -186,6 +187,18 @@ async def valid_user_request(request: Request, endpoint: str) -> str | None:
     except KeyError as exc:
         logger.warning(f"Invalid endpoint for audit: {request.url.path} - {exc}")
         return None
+
+
+async def valid_query_params(request: Request, endpoint: str) -> str | None:
+    query_params = dict(request.query_params)
+    try:
+        kls = endpoint_validators[endpoint]
+    except KeyError:
+        logger.warning(f"Invalid endpoint for audit: {request.url.path}")
+        return None
+    allowed = kls.model_fields.keys()
+    filtered = {k: v for k, v in query_params.items() if k in allowed}
+    return json.dumps(filtered)
 
 
 class StreamAuditStorage(AuditStorage):

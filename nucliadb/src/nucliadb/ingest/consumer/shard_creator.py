@@ -91,6 +91,12 @@ class ShardCreatorHandler:
     async def process_kb(self, kbid: str) -> None:
         logger.info({"message": "Processing notification for kbid", "kbid": kbid})
         async with self.driver.ro_transaction() as txn:
+            if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+                logger.info(
+                    "Processing a notification for KB that does not exist",
+                    extra={"kbid": kbid},
+                )
+                return
             current_shard = await self.shard_manager.get_current_active_shard(txn, kbid)
 
         if current_shard is None:

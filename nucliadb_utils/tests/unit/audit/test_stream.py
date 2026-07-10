@@ -26,7 +26,8 @@ from nucliadb_utils.audit.stream import (
     RequestContext,
     StreamAuditStorage,
     request_context_var,
-    valid_user_request,
+    valid_payload,
+    valid_query_params,
 )
 
 
@@ -167,12 +168,12 @@ async def test_chat(audit_storage: StreamAuditStorage, nats):
 
 
 # ---------------------------------------------------------------------------
-# Tests for valid_user_request
+# Tests for valid_payload
 # ---------------------------------------------------------------------------
 
 
 class TestValidUserRequest:
-    """Tests for the valid_user_request helper and the endpoint_validators mapping."""
+    """Tests for the valid_payload helper and the endpoint_validators mapping."""
 
     @pytest.fixture()
     def make_request(self):
@@ -194,7 +195,7 @@ class TestValidUserRequest:
     async def test_valid_chat_body_returns_json(self, make_request):
         payload = {"question": "hello", "user_id": "u1", "arbitrary_extra": "should_be_gone"}
         request = make_request("POST", "/kb/x/chat", body=payload)
-        result = await valid_user_request(request, "chat")
+        result = await valid_payload(request, "chat")
         assert result is not None
         parsed = json.loads(result)
         assert parsed["question"] == "hello"
@@ -208,7 +209,7 @@ class TestValidUserRequest:
         # 'question' and 'user_id' are both required
         payload = {"question": "hello"}  # missing user_id
         request = make_request("POST", "/kb/x/chat", body=payload)
-        result = await valid_user_request(request, "chat")
+        result = await valid_payload(request, "chat")
         assert result is None
 
     # --- ask endpoint ---
@@ -217,7 +218,7 @@ class TestValidUserRequest:
     async def test_valid_ask_body_returns_json(self, make_request):
         payload = {"query": "what is nucliadb?"}
         request = make_request("POST", "/kb/x/ask", body=payload)
-        result = await valid_user_request(request, "ask")
+        result = await valid_payload(request, "ask")
         assert result is not None
         parsed = json.loads(result)
         assert parsed["query"] == "what is nucliadb?"
@@ -227,7 +228,7 @@ class TestValidUserRequest:
         # 'query' is required for AskRequest
         payload = {}
         request = make_request("POST", "/kb/x/ask", body=payload)
-        result = await valid_user_request(request, "ask")
+        result = await valid_payload(request, "ask")
         assert result is None
 
     # --- find / search endpoints (no required fields) ---
@@ -235,13 +236,13 @@ class TestValidUserRequest:
     @pytest.mark.asyncio
     async def test_valid_find_empty_body_returns_json(self, make_request):
         request = make_request("POST", "/kb/x/find", body={})
-        result = await valid_user_request(request, "find")
+        result = await valid_payload(request, "find")
         assert result is not None
 
     @pytest.mark.asyncio
     async def test_valid_search_empty_body_returns_json(self, make_request):
         request = make_request("POST", "/kb/x/search", body={})
-        result = await valid_user_request(request, "search")
+        result = await valid_payload(request, "search")
         assert result is not None
 
     # --- malformed JSON ---
@@ -250,7 +251,7 @@ class TestValidUserRequest:
     async def test_invalid_json_returns_none(self, make_request):
         request = make_request("POST", "/kb/x/ask", body=None)
         request.json = AsyncMock(side_effect=json.JSONDecodeError("bad json", "", 0))
-        result = await valid_user_request(request, "ask")
+        result = await valid_payload(request, "ask")
         assert result is None
 
     # --- audit_metadata field pass-through ---
@@ -263,7 +264,64 @@ class TestValidUserRequest:
             "audit_metadata": {"env": "prod", "team": "search"},
         }
         request = make_request("POST", "/kb/x/chat", body=payload)
-        result = await valid_user_request(request, "chat")
+        result = await valid_payload(request, "chat")
         assert result is not None
         parsed = json.loads(result)
         assert parsed["audit_metadata"] == {"env": "prod", "team": "search"}
+
+
+class TestValidQueryParams:
+    """Tests for the valid_query_params helper."""
+
+    @pytest.fixture()
+    def make_request(self):
+        def _make(path: str, query: dict | None = None):
+            request = MagicMock()
+            request.url.path = path
+            request.query_params = query or {}
+            return request
+
+        return _make
+
+    @pytest.mark.asyncio
+    async def test_known_fields_are_kept(self, make_request):
+        """Only fields that exist on the validator model should be retained."""
+        # 'query' is a known field on SearchRequest
+        request = make_request("/kb/x/search", query={"query": "hello", "unknown_field": "x"})
+        result = await valid_query_params(request, "search")
+        assert result is not None
+        parsed = json.loads(result)
+        assert parsed["query"] == "hello"
+        assert "unknown_field" not in parsed
+
+    @pytest.mark.asyncio
+    async def test_all_unknown_fields_returns_empty_dict(self, make_request):
+        """If no query params match any model field, an empty JSON object is returned."""
+        request = make_request("/kb/x/find", query={"totally_unknown": "val"})
+        result = await valid_query_params(request, "find")
+        assert result is not None
+        assert json.loads(result) == {}
+
+    @pytest.mark.asyncio
+    async def test_empty_query_params_returns_empty_dict(self, make_request):
+        request = make_request("/kb/x/ask", query={})
+        result = await valid_query_params(request, "ask")
+        assert result is not None
+        assert json.loads(result) == {}
+
+    @pytest.mark.asyncio
+    async def test_multiple_known_fields_are_all_kept(self, make_request):
+        # 'query' and 'vectorset' are both known fields on SearchRequest
+        request = make_request("/kb/x/search", query={"query": "hello", "vectorset": "my-vs"})
+        result = await valid_query_params(request, "search")
+        assert result is not None
+        parsed = json.loads(result)
+        assert parsed["query"] == "hello"
+        assert parsed["vectorset"] == "my-vs"
+
+    @pytest.mark.asyncio
+    async def test_unknown_endpoint_returns_none(self, make_request):
+        """An endpoint not in endpoint_validators should return None."""
+        request = make_request("/kb/x/unknown", query={"query": "hello"})
+        result = await valid_query_params(request, "unknown_endpoint")
+        assert result is None
