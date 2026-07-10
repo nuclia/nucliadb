@@ -42,7 +42,11 @@ def pubsub():
 def kbdm():
     mock = MagicMock()
     mock.get_model_metadata = AsyncMock(return_value="model")
-    with patch("nucliadb.common.cluster.manager.datamanagers.kb", return_value=mock):
+    mock.exists_kb = AsyncMock(return_value=True)
+    with (
+        patch("nucliadb.common.cluster.manager.datamanagers.kb", new=mock),
+        patch("nucliadb.ingest.consumer.shard_creator.datamanagers.kb", new=mock),
+    ):
         yield mock
 
 
@@ -98,6 +102,7 @@ async def test_handle_message_create_new_shard(
 
 
 async def test_handle_message_do_not_create(
+    kbdm,
     shard_creator_handler: shard_creator.ShardCreatorHandler,
     dummy_nidx_utility: NidxUtility,
     shard_manager,
@@ -105,6 +110,25 @@ async def test_handle_message_do_not_create(
     dummy_nidx_utility.api_client.GetShard.return_value = nodereader_pb2.Shard(
         paragraphs=settings.max_shard_paragraphs - 1
     )
+
+    notif = Notification(
+        kbid="kbid",
+        action=Notification.Action.INDEXED,
+    )
+    await shard_creator_handler.handle_message(notif.SerializeToString())
+
+    await shard_creator_handler.finalize()
+
+    shard_manager.create_shard_by_kbid.assert_not_called()
+
+
+async def test_handle_message_do_not_create_on_kb_not_found(
+    kbdm,
+    shard_creator_handler: shard_creator.ShardCreatorHandler,
+    dummy_nidx_utility: NidxUtility,
+    shard_manager,
+):
+    kbdm.exists_kb.return_value = False
 
     notif = Notification(
         kbid="kbid",
