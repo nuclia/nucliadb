@@ -136,7 +136,7 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             continue
 
         field_pb = await field.get_value()
-        if field_pb is None:
+        if field_pb is None and field_type_name != FieldTypeName.CONVERSATION:
             logger.warning(
                 f"Field no longer exists or it does not have a value",
                 extra={
