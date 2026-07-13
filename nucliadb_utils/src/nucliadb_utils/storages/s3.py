@@ -30,7 +30,7 @@ from aiobotocore.session import AioSession, get_session  # type: ignore[import-u
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import errors, metrics
 from nucliadb_utils import logger
-from nucliadb_utils.storages.exceptions import UnparsableResponse
+from nucliadb_utils.storages.exceptions import CouldNotCopyNotFound, UnparsableResponse
 from nucliadb_utils.storages.storage import Storage, StorageField
 from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
 
@@ -312,11 +312,24 @@ class S3StorageField(StorageField):
         origin_bucket_name: str,
         destination_bucket_name: str,
     ):
-        await self.storage._s3aioclient.copy_object(
-            CopySource={"Bucket": origin_bucket_name, "Key": origin_uri},
-            Bucket=destination_bucket_name,
-            Key=destination_uri,
-        )
+        try:
+            await self.storage._s3aioclient.copy_object(
+                CopySource={"Bucket": origin_bucket_name, "Key": origin_uri},
+                Bucket=destination_bucket_name,
+                Key=destination_uri,
+            )
+        except botocore.exceptions.ClientError as e:
+            error_code = parse_status_code(e)
+            if error_code == 404:
+                raise CouldNotCopyNotFound(
+                    origin_uri=origin_uri,
+                    origin_bucket_name=origin_bucket_name,
+                    destination_uri=destination_uri,
+                    destination_bucket_name=destination_bucket_name,
+                    text=str(e),
+                )
+            else:
+                raise
 
     @s3_ops_observer.wrap({"type": "move"})
     async def move(
