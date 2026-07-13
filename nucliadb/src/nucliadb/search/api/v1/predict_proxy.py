@@ -28,6 +28,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.predict_proxy import PredictProxiedEndpoints, predict_proxy
+from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils.authentication import requires
@@ -62,7 +63,7 @@ DESCRIPTION = (
 @version(1)
 async def predict_proxy_endpoint(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     endpoint: PredictProxiedEndpoints,
     x_nucliadb_user: str = Header(""),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),

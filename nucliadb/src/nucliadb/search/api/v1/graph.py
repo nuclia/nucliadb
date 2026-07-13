@@ -32,6 +32,7 @@ from nucliadb.search.search.query_parser.parsers import (
     parse_graph_relation_search,
     parse_graph_search,
 )
+from nucliadb_models.common import KbId
 from nucliadb_models.graph.requests import (
     GraphNodesSearchRequest,
     GraphRelationsSearchRequest,
@@ -62,7 +63,7 @@ from nucliadb_utils.authentication import requires
 async def graph_search_knowledgebox(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     item: GraphSearchRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
@@ -93,7 +94,7 @@ async def graph_path_search(kbid: str, item: GraphSearchRequest) -> GraphSearchR
 async def graph_nodes_search_knowledgebox(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     item: GraphNodesSearchRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),
@@ -124,7 +125,7 @@ async def graph_nodes_search(kbid: str, item: GraphNodesSearchRequest) -> GraphN
 async def graph_relations_search_knowledgebox(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     item: GraphRelationsSearchRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),

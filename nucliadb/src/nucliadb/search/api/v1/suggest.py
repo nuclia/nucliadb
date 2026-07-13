@@ -33,6 +33,7 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query_parser.parsers import parse_suggest
 from nucliadb_models import SuggestRequest
+from nucliadb_models.common import KbId
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import KnowledgeboxSuggestResults
@@ -55,7 +56,7 @@ from nucliadb_utils.authentication import requires
 async def suggest_knowledgebox(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     query: str = fastapi_query(SuggestParamDefaults.suggest_query),
     filter_expression: str | None = fastapi_query(
         SuggestParamDefaults.filter_expression, include_in_schema=False
@@ -115,7 +116,7 @@ async def suggest_knowledgebox(
 async def suggest_post_knowledgebox(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     item: SuggestRequest,
 ) -> KnowledgeboxSuggestResults | HTTPClientError:
     try:

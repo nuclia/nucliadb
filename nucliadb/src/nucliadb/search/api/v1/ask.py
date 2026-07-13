@@ -31,6 +31,7 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.chat.ask import AskResult, ask, handled_ask_exceptions
 from nucliadb.search.search.chat.exceptions import AnswerJsonSchemaTooLong
 from nucliadb.search.search.utils import maybe_log_request_payload
+from nucliadb_models.common import KbId
 from nucliadb_models.configuration import AskConfig
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -55,7 +56,7 @@ from nucliadb_utils.authentication import NucliaUser, requires
 @version(1)
 async def ask_knowledgebox_endpoint(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     item: AskRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_show_consumption: bool = Header(default=False),

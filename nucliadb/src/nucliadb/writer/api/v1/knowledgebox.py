@@ -35,6 +35,7 @@ from nucliadb.writer import logger
 from nucliadb.writer.api.utils import only_for_onprem
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.common import KbId
 from nucliadb_models.resource import (
     KnowledgeBoxConfig,
     KnowledgeBoxObj,
@@ -151,7 +152,7 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> KnowledgeBoxObjID:
+async def update_kb(request: Request, kbid: KbId, item: KnowledgeBoxConfig) -> KnowledgeBoxObjID:
     if (
         item.slug
         or item.title
@@ -191,7 +192,7 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def delete_kb(request: Request, kbid: str, background: BackgroundTasks) -> KnowledgeBoxObj:
+async def delete_kb(request: Request, kbid: KbId, background: BackgroundTasks) -> KnowledgeBoxObj:
     driver = get_driver()
     try:
         await KnowledgeBox.delete(driver, kbid=kbid)

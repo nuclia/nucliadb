@@ -28,6 +28,7 @@ from nucliadb.ingest.orm.exceptions import VectorSetConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from nucliadb_models.common import KbId
 from nucliadb_models.resource import (
     NucliaDBRoles,
 )
@@ -48,7 +49,7 @@ from nucliadb_utils.utilities import get_storage
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
 @version(1)
-async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> CreatedVectorSet:
+async def add_vectorset(request: Request, kbid: KbId, vectorset_id: str) -> CreatedVectorSet:
     try:
         await _add_vectorset(kbid, vectorset_id)
 
@@ -139,7 +140,7 @@ def get_vectorset_config(
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
 @version(1)
-async def delete_vectorset(request: Request, kbid: str, vectorset_id: str) -> Response:
+async def delete_vectorset(request: Request, kbid: KbId, vectorset_id: str) -> Response:
     try:
         await _delete_vectorset(kbid, vectorset_id)
 

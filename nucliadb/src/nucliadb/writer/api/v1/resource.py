@@ -61,6 +61,7 @@ from nucliadb.writer.resource.field import (
 )
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.common import KbId, RId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import (
     CreateResourcePayload,
@@ -94,7 +95,7 @@ from nucliadb_utils.utilities import (
 async def create_resource(
     request: Request,
     item: CreateResourcePayload,
-    kbid: str,
+    kbid: KbId,
     x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
 ):
@@ -187,7 +188,7 @@ async def create_resource(
 @version(1)
 async def modify_resource_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     item: UpdateResourcePayload,
     x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
@@ -215,8 +216,8 @@ async def modify_resource_rslug_prefix(
 @version(1)
 async def modify_resource_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     item: UpdateResourcePayload,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
     x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
@@ -389,7 +390,7 @@ async def update_resource_slug(
 @version(1)
 async def reprocess_resource_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
     reset_title: bool = Query(
@@ -414,8 +415,8 @@ async def reprocess_resource_rslug_prefix(
 @version(1)
 async def reprocess_resource_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
     reset_title: bool = Query(
         default=False,
@@ -497,7 +498,7 @@ async def _reprocess_resource(
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def delete_resource_rslug_prefix(
-    request: Request, kbid: str, rslug: str, background: BackgroundTasks
+    request: Request, kbid: KbId, rslug: str, background: BackgroundTasks
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _delete_resource(request, kbid, rid, background)
@@ -511,7 +512,9 @@ async def delete_resource_rslug_prefix(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_resource_rid_prefix(request: Request, kbid: str, rid: str, background: BackgroundTasks):
+async def delete_resource_rid_prefix(
+    request: Request, kbid: KbId, rid: RId, background: BackgroundTasks
+):
     return await _delete_resource(request, kbid, rid, background)
 
 
@@ -545,7 +548,7 @@ async def _delete_resource(request: Request, kbid: str, rid: str, background: Ba
 @version(1)
 async def reindex_resource_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     reindex_vectors: bool = Query(False),
 ):
@@ -563,8 +566,8 @@ async def reindex_resource_rslug_prefix(
 @version(1)
 async def reindex_resource_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     reindex_vectors: bool = Query(False),
 ):
     return await _reindex_resource(request, kbid, rid, reindex_vectors=reindex_vectors)

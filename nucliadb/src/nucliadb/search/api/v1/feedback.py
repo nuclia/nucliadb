@@ -25,6 +25,7 @@ from nucliadb.common.models_utils import to_proto
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import FeedbackRequest, NucliaDBClientType
 from nucliadb_telemetry import errors
@@ -44,7 +45,7 @@ from nucliadb_utils.utilities import get_audit
 async def send_feedback_endpoint(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     item: FeedbackRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),

@@ -59,6 +59,7 @@ from nucliadb.writer.resource.field import (
     parse_text_field,
 )
 from nucliadb.writer.utilities import get_processing
+from nucliadb_models.common import KbId, RId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import KeyValueField, ResourceFieldAdded, ResourceUpdated
@@ -322,7 +323,7 @@ FIELD_PARSERS_MAP: dict[type, Callable] = {
 @version(1)
 async def add_resource_field_key_value_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_id: FieldIdString,
     item: KeyValueField,
@@ -341,8 +342,8 @@ async def add_resource_field_key_value_rslug_prefix(
 @version(1)
 async def add_resource_field_key_value_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_id: FieldIdString,
     item: KeyValueField,
 ):
@@ -360,7 +361,7 @@ async def add_resource_field_key_value_rid_prefix(
 @version(1)
 async def add_resource_field_text_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_id: FieldIdString,
     field_payload: models.TextField,
@@ -379,8 +380,8 @@ async def add_resource_field_text_rslug_prefix(
 @version(1)
 async def add_resource_field_text_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_id: FieldIdString,
     field_payload: models.TextField,
 ) -> ResourceFieldAdded:
@@ -398,7 +399,7 @@ async def add_resource_field_text_rid_prefix(
 @version(1)
 async def add_resource_field_link_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_id: FieldIdString,
     field_payload: models.LinkField,
@@ -417,8 +418,8 @@ async def add_resource_field_link_rslug_prefix(
 @version(1)
 async def add_resource_field_link_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_id: FieldIdString,
     field_payload: models.LinkField,
 ) -> ResourceFieldAdded:
@@ -436,7 +437,7 @@ async def add_resource_field_link_rid_prefix(
 @version(1)
 async def add_resource_field_conversation_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_id: FieldIdString,
     field_payload: models.InputConversationField,
@@ -457,8 +458,8 @@ async def add_resource_field_conversation_rslug_prefix(
 @version(1)
 async def add_resource_field_conversation_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_id: FieldIdString,
     field_payload: models.InputConversationField,
 ) -> ResourceFieldAdded:
@@ -476,7 +477,7 @@ async def add_resource_field_conversation_rid_prefix(
 @version(1)
 async def add_resource_field_file_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_id: FieldIdString,
     field_payload: models.FileField,
@@ -498,8 +499,8 @@ async def add_resource_field_file_rslug_prefix(
 @version(1)
 async def add_resource_field_file_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_id: FieldIdString,
     field_payload: models.FileField,
     x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
@@ -520,7 +521,7 @@ async def add_resource_field_file_rid_prefix(
 @version(1)
 async def append_messages_to_conversation_field_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_id: FieldIdString,
     messages: list[models.InputMessage],
@@ -545,8 +546,8 @@ async def append_messages_to_conversation_field_rslug_prefix(
 @version(1)
 async def append_messages_to_conversation_field_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_id: FieldIdString,
     messages: list[models.InputMessage],
 ) -> ResourceFieldAdded:
@@ -568,7 +569,7 @@ async def append_messages_to_conversation_field_rid_prefix(
 @version(1)
 async def delete_resource_field_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_type: models.FieldTypeName,
     field_id: FieldIdString,
@@ -587,8 +588,8 @@ async def delete_resource_field_rslug_prefix(
 @version(1)
 async def delete_resource_field_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_type: models.FieldTypeName,
     field_id: FieldIdString,
 ):
@@ -606,8 +607,8 @@ async def delete_resource_field_rid_prefix(
 @version(1)
 async def reprocess_file_field(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_id: FieldIdString,
     x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
     x_file_password: Annotated[str | None, X_FILE_PASSWORD] = None,
@@ -711,7 +712,7 @@ MessageIdent = Annotated[str, Path(max_length=128, description="The ident of the
 @version(1)
 async def delete_conversation_messages_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_id: FieldIdString,
     message_ident: MessageIdent,
@@ -731,8 +732,8 @@ async def delete_conversation_messages_rslug_prefix(
 @version(1)
 async def delete_conversation_messages_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_id: FieldIdString,
     message_ident: MessageIdent,
 ) -> Response:

@@ -33,6 +33,7 @@ from nucliadb.export_import.datamanager import ExportImportDataManager
 from nucliadb.export_import.exceptions import MetadataNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
+from nucliadb_models.common import KbId
 from nucliadb_models.export_import import Status, StatusResponse
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
@@ -47,7 +48,7 @@ from nucliadb_utils.authentication import requires_one
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
-async def download_export_kb_endpoint(request: Request, kbid: str, export_id: str):
+async def download_export_kb_endpoint(request: Request, kbid: KbId, export_id: str):
     context = get_app_context(request.app)
     if not await exists_kb(kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
@@ -107,7 +108,7 @@ async def download_export_and_delete(
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
 async def get_export_status_endpoint(
-    request: Request, kbid: str, export_id: str
+    request: Request, kbid: KbId, export_id: str
 ) -> StatusResponse | HTTPClientError:
     context = get_app_context(request.app)
     if not await exists_kb(kbid):
@@ -126,7 +127,7 @@ async def get_export_status_endpoint(
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
 async def get_import_status_endpoint(
-    request: Request, kbid: str, import_id: str
+    request: Request, kbid: KbId, import_id: str
 ) -> StatusResponse | HTTPClientError:
     context = get_app_context(request.app)
     if not await exists_kb(kbid):

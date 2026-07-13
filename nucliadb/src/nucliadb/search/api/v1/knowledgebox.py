@@ -38,6 +38,7 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search.shards import get_shard
 from nucliadb.search.settings import settings
+from nucliadb_models.common import KbId
 from nucliadb_models.internal.shards import KnowledgeboxShards
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -62,7 +63,7 @@ MAX_PARAGRAPHS_FOR_SMALL_KB = 250_000
 )
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
-async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards:
+async def knowledgebox_shards(request: Request, kbid: KbId) -> KnowledgeboxShards:
     shard_manager = get_shard_manager()
     try:
         shards: Shards = await shard_manager.get_shards_by_kbid_inner(kbid)
@@ -86,7 +87,7 @@ async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards
 @version(1)
 async def knowledgebox_counters(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     debug: bool = fastapi_query(SearchParamDefaults.debug),
 ) -> KnowledgeboxCounters:
     try:

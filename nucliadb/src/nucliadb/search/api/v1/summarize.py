@@ -26,6 +26,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.summarize import NoResourcesToSummarize, summarize
+from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import SummarizedResponse, SummarizeRequest
 from nucliadb_utils.authentication import requires
@@ -44,7 +45,7 @@ from nucliadb_utils.exceptions import LimitsExceededError
 @version(1)
 async def summarize_endpoint(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     item: SummarizeRequest,
     x_show_consumption: bool = Header(default=False),
 ) -> SummarizedResponse | HTTPClientError:

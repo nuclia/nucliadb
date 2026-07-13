@@ -46,6 +46,7 @@ from nucliadb.writer import logger
 from nucliadb.writer.api.utils import only_for_onprem
 from nucliadb.writer.api.v1.knowledgebox import create_kb
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
+from nucliadb_models.common import KbId
 from nucliadb_models.export_import import (
     CreateExportResponse,
     CreateImportResponse,
@@ -70,7 +71,7 @@ from nucliadb_utils.authentication import requires_one
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
-async def start_kb_export_endpoint(request: Request, kbid: str):
+async def start_kb_export_endpoint(request: Request, kbid: KbId):
     context = get_app_context(request.app)
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
@@ -146,7 +147,7 @@ async def kb_create_and_import_endpoint(request: Request):
 )
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.WRITER])
 @version(1)
-async def start_kb_import_endpoint(request: Request, kbid: str):
+async def start_kb_import_endpoint(request: Request, kbid: KbId):
     context = get_app_context(request.app)
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")

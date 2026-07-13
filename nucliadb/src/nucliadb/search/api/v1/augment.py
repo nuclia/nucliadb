@@ -80,7 +80,7 @@ from nucliadb_models.augment import (
     AugmentResources,
     AugmentResponse,
 )
-from nucliadb_models.common import FieldTypeName
+from nucliadb_models.common import FieldTypeName, KbId
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import NucliaDBClientType, ResourceProperties
 from nucliadb_utils.authentication import requires
@@ -98,7 +98,7 @@ from nucliadb_utils.utilities import get_audit
 @version(1)
 async def _augment_endpoint(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     item: AugmentRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),

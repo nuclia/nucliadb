@@ -43,7 +43,7 @@ from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
 from nucliadb.search.search.utils import (
     min_score_from_query_params,
 )
-from nucliadb_models.common import FieldTypeName
+from nucliadb_models.common import FieldTypeName, KbId
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (
@@ -99,7 +99,7 @@ SEARCH_EXAMPLES = {
 async def search_knowledgebox(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     query: str = fastapi_query(SearchParamDefaults.query),
     filter_expression: str | None = fastapi_query(SearchParamDefaults.filter_expression),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
@@ -205,7 +205,7 @@ async def search_knowledgebox(
 async def search_post_knowledgebox(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     item: SearchRequest = Body(openapi_examples=SEARCH_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),

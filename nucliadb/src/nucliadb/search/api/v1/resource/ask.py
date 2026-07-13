@@ -26,6 +26,7 @@ from starlette.responses import StreamingResponse
 from nucliadb.common import datamanagers
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_SLUG_PREFIX, api
+from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import AskRequest, NucliaDBClientType, SyncAskResponse
 from nucliadb_models.security import RequestSecurity
@@ -46,7 +47,7 @@ from ..ask import create_ask_response
 @version(1)
 async def resource_ask_endpoint_by_uuid(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rid: UUID,
     item: AskRequest,
     x_show_consumption: bool = Header(default=False),
@@ -92,7 +93,7 @@ async def resource_ask_endpoint_by_uuid(
 @version(1)
 async def resource_ask_endpoint_by_slug(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     slug: str,
     item: AskRequest,
     x_show_consumption: bool = Header(default=False),

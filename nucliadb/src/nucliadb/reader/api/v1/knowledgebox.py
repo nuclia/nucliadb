@@ -25,6 +25,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto
 from nucliadb.reader.api.v1.router import KB_PREFIX, KBS_PREFIX, api
+from nucliadb_models.common import KbId
 from nucliadb_models.resource import (
     KnowledgeBoxList,
     KnowledgeBoxObj,
@@ -71,7 +72,7 @@ async def get_kbs(
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.READER])
 @version(1)
 async def get_kb(
-    request: Request, kbid: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
+    request: Request, kbid: KbId, x_nucliadb_account: str = Header(default="", include_in_schema=False)
 ) -> KnowledgeBoxObj:
     driver = get_driver()
     async with driver.ro_transaction() as txn:

@@ -37,6 +37,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb.reader.reader.notifications import kb_notifications_stream
+from nucliadb_models.common import KbId
 from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.entities import (
     EntitiesGroup,
@@ -68,7 +69,7 @@ from nucliadb_utils.utilities import get_ingest, get_storage
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def get_entities(
-    request: Request, kbid: str, show_entities: bool = False
+    request: Request, kbid: KbId, show_entities: bool = False
 ) -> KnowledgeBoxEntities | HTTPClientError:
     if show_entities:
         return HTTPClientError(
@@ -107,7 +108,7 @@ async def list_entities_groups(kbid: str):
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
+async def get_entity(request: Request, kbid: KbId, group: str) -> EntitiesGroup:
     ingest = get_ingest()
     l_request: GetEntitiesGroupRequest = GetEntitiesGroupRequest()
     l_request.kb.uuid = kbid
@@ -134,7 +135,7 @@ async def get_entity(request: Request, kbid: str, group: str) -> EntitiesGroup:
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_labelsets_endoint(request: Request, kbid: str) -> KnowledgeBoxLabels:
+async def get_labelsets_endoint(request: Request, kbid: KbId) -> KnowledgeBoxLabels:
     try:
         return await get_labelsets(kbid)
     except KnowledgeBoxNotFound:
@@ -171,7 +172,7 @@ async def get_labelsets(kbid: str) -> KnowledgeBoxLabels:
 @version(1)
 async def get_labelset_endpoint(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     labelset: str = Path(
         title="The ID of the labelset to get. This is a unique identifier that should be used at search time.",
         examples=["categories", "movie-genres", "document-types"],
@@ -218,7 +219,7 @@ async def get_labelset(kbid: str, labelset_id: str) -> LabelSet:
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_custom_synonyms(request: Request, kbid: str):
+async def get_custom_synonyms(request: Request, kbid: KbId):
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     synonyms = await datamanagers.atomic.synonyms.get(kbid=kbid) or Synonyms()
@@ -237,7 +238,7 @@ async def get_custom_synonyms(request: Request, kbid: str):
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def notifications_endpoint(request: Request, kbid: str) -> StreamingResponse | HTTPClientError:
+async def notifications_endpoint(request: Request, kbid: KbId) -> StreamingResponse | HTTPClientError:
     if in_standalone_mode():
         return HTTPClientError(
             status_code=404,
@@ -278,7 +279,7 @@ async def exists_kb(kbid: str) -> bool:
 @version(1)
 async def processing_status(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     cursor: str | None = None,
     scheduled: bool | None = None,
     limit: int = 20,
@@ -332,7 +333,9 @@ async def processing_status(
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_search_configuration(request: Request, kbid: str, config_name: str) -> SearchConfiguration:
+async def get_search_configuration(
+    request: Request, kbid: KbId, config_name: str
+) -> SearchConfiguration:
     async with datamanagers.with_ro_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -353,7 +356,7 @@ async def get_search_configuration(request: Request, kbid: str, config_name: str
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def list_search_configurations(request: Request, kbid: str) -> dict[str, SearchConfiguration]:
+async def list_search_configurations(request: Request, kbid: KbId) -> dict[str, SearchConfiguration]:
     async with datamanagers.with_ro_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -370,7 +373,7 @@ async def list_search_configurations(request: Request, kbid: str) -> dict[str, S
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def list_kv_schemas(request: Request, kbid: str) -> KBKVSchemas:
+async def list_kv_schemas(request: Request, kbid: KbId) -> KBKVSchemas:
     async with datamanagers.with_ro_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -387,7 +390,7 @@ async def list_kv_schemas(request: Request, kbid: str) -> KBKVSchemas:
 )
 @requires(NucliaDBRoles.READER)
 @version(1)
-async def get_kv_schema(request: Request, kbid: str, schema_id: str) -> KVSchema:
+async def get_kv_schema(request: Request, kbid: KbId, schema_id: str) -> KVSchema:
     async with datamanagers.with_ro_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")

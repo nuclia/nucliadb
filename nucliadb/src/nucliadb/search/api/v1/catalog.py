@@ -38,7 +38,7 @@ from nucliadb.search.search.query_parser.parsers import parse_catalog
 from nucliadb.search.search.utils import (
     maybe_log_request_payload,
 )
-from nucliadb_models.common import FieldTypeName
+from nucliadb_models.common import FieldTypeName, KbId
 from nucliadb_models.filters import CatalogFilterExpression
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import NucliaDBRoles
@@ -73,7 +73,7 @@ from nucliadb_utils.exceptions import LimitsExceededError
 async def catalog_get(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     query: str = fastapi_query(SearchParamDefaults.query),
     filter_expression: str | None = fastapi_query(SearchParamDefaults.catalog_filter_expression),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),
@@ -143,7 +143,7 @@ async def catalog_get(
 @version(1)
 async def catalog_post(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     item: CatalogRequest,
 ) -> CatalogResponse | HTTPClientError:
     return await catalog(kbid, item)
@@ -209,6 +209,6 @@ async def catalog(
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def catalog_facets_endpoint(
-    request: Request, kbid: str, item: CatalogFacetsRequest
+    request: Request, kbid: KbId, item: CatalogFacetsRequest
 ) -> CatalogFacetsResponse:
     return CatalogFacetsResponse(facets=await catalog_facets(kbid, item))

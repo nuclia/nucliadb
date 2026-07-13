@@ -25,6 +25,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.models_utils import to_proto
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from nucliadb_models.common import KbId
 from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.kv_schemas import MAX_KV_SCHEMAS, KVSchema, UpdateKVSchema
 from nucliadb_models.labels import LabelSet
@@ -47,7 +48,7 @@ from nucliadb_utils.authentication import requires
 @version(1)
 async def set_labelset_endpoint(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     labelset: str = Path(
         title="The ID of the labelset to create or update. This is a unique identifier that should be used at search time.",
         examples=["categories", "movie-genres", "document-types"],
@@ -109,7 +110,7 @@ async def set_labelset(kbid: str, labelset_id: str, item: LabelSet):
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_labelset_endpoint(request: Request, kbid: str, labelset: str):
+async def delete_labelset_endpoint(request: Request, kbid: KbId, labelset: str):
     try:
         await delete_labelset(kbid, labelset)
     except KnowledgeBoxNotFound:
@@ -132,7 +133,7 @@ async def delete_labelset(kbid: str, labelset_id: str):
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSynonyms):
+async def set_custom_synonyms(request: Request, kbid: KbId, item: KnowledgeBoxSynonyms):
     if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     synonyms = to_proto.kb_synonyms(item)
@@ -149,7 +150,7 @@ async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSyn
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_custom_synonyms(request: Request, kbid: str):
+async def delete_custom_synonyms(request: Request, kbid: KbId):
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -169,7 +170,7 @@ async def delete_custom_synonyms(request: Request, kbid: str):
 @requires(NucliaDBRoles.OWNER)
 @version(1)
 async def create_search_configuration(
-    request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
+    request: Request, kbid: KbId, config_name: str, search_configuration: SearchConfiguration
 ):
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
@@ -195,7 +196,7 @@ async def create_search_configuration(
 @requires(NucliaDBRoles.OWNER)
 @version(1)
 async def update_search_configuration(
-    request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
+    request: Request, kbid: KbId, config_name: str, search_configuration: SearchConfiguration
 ):
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
@@ -220,7 +221,7 @@ async def update_search_configuration(
 )
 @requires(NucliaDBRoles.OWNER)
 @version(1)
-async def delete_search_configuration(request: Request, kbid: str, config_name: str):
+async def delete_search_configuration(request: Request, kbid: KbId, config_name: str):
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -243,7 +244,7 @@ async def delete_search_configuration(request: Request, kbid: str, config_name: 
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def create_kv_schema(request: Request, kbid: str, item: KVSchema) -> KVSchema:
+async def create_kv_schema(request: Request, kbid: KbId, item: KVSchema) -> KVSchema:
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -274,7 +275,7 @@ async def create_kv_schema(request: Request, kbid: str, item: KVSchema) -> KVSch
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def update_kv_schema(
-    request: Request, kbid: str, schema_id: str, item: UpdateKVSchema
+    request: Request, kbid: KbId, schema_id: str, item: UpdateKVSchema
 ) -> KVSchema:
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
@@ -303,7 +304,7 @@ async def update_kv_schema(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_kv_schema(request: Request, kbid: str, schema_id: str) -> Response:
+async def delete_kv_schema(request: Request, kbid: KbId, schema_id: str) -> Response:
     async with datamanagers.with_transaction() as txn:
         if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")

@@ -32,6 +32,7 @@ from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
+from nucliadb_models.common import KbId, RId
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
@@ -59,9 +60,9 @@ from nucliadb_utils.authentication import requires_one
 async def resource_search(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     query: str,
-    rid: str,
+    rid: RId,
     filter_expression: str | None = fastapi_query(SearchParamDefaults.filter_expression),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
     filters: list[str] = fastapi_query(SearchParamDefaults.filters),

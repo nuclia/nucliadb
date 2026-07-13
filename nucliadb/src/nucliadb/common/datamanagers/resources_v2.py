@@ -305,7 +305,6 @@ async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.B
         return pb
 
 
-@handle_invalid_uuid(default=None)
 async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Origin | None:
     """Return the deserialised Origin for a resource, or None."""
     async with _pg_cursor(txn) as cur:
@@ -321,7 +320,6 @@ async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.
         return pb
 
 
-@handle_invalid_uuid(default=None)
 async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Security | None:
     """Return the deserialised Security for a resource, or None."""
     async with _pg_cursor(txn) as cur:
@@ -337,7 +335,6 @@ async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb
         return pb
 
 
-@handle_invalid_uuid(default=None)
 async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Extra | None:
     """Return the deserialised Extra for a resource, or None."""
     async with _pg_cursor(txn) as cur:
@@ -365,7 +362,6 @@ async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
                 yield _to_rid(rid)
 
 
-@handle_invalid_uuid(default=0)
 async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
     """Return the total number of resources in a knowledge box."""
     async with _pg_cursor(txn) as cur:
@@ -377,7 +373,6 @@ async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
         return row[0] if row else 0
 
 
-@handle_invalid_uuid(default=None)
 async def get_resource_shard_id(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
 ) -> str | None:

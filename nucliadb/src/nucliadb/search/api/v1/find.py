@@ -35,7 +35,7 @@ from nucliadb.search.search import cache
 from nucliadb.search.search.find import find
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.utils import maybe_log_request_payload, min_score_from_query_params
-from nucliadb_models.common import FieldTypeName
+from nucliadb_models.common import FieldTypeName, KbId
 from nucliadb_models.configuration import FindConfig
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
@@ -80,7 +80,7 @@ FIND_EXAMPLES = {
 async def find_knowledgebox(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     query: str = fastapi_query(SearchParamDefaults.query),
     filter_expression: str | None = fastapi_query(SearchParamDefaults.filter_expression),
     fields: list[str] = fastapi_query(SearchParamDefaults.fields),
@@ -188,7 +188,7 @@ async def find_knowledgebox(
 async def find_post_knowledgebox(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     item: FindRequest = Body(openapi_examples=FIND_EXAMPLES),
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),

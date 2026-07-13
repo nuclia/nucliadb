@@ -25,6 +25,7 @@ from nuclia_models.config.proto import ExtractConfig, SplitConfiguration
 from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
+from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.settings import is_onprem_nucliadb
@@ -42,7 +43,7 @@ from nucliadb_utils.settings import is_onprem_nucliadb
 @version(1)
 async def download_model(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     model_id: str,
     filename: str,
 ):
@@ -59,7 +60,7 @@ async def download_model(
 )
 @requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
-async def get_configuration(request: Request, kbid: str):
+async def get_configuration(request: Request, kbid: KbId):
     return await learning_config_proxy(
         request,
         "GET",
@@ -79,7 +80,7 @@ async def get_configuration(request: Request, kbid: str):
 @version(1)
 async def get_models(
     request: Request,
-    kbid: str,
+    kbid: KbId,
 ):
     return await learning_config_proxy(request, "GET", f"/models/{kbid}")
 
@@ -96,7 +97,7 @@ async def get_models(
 @version(1)
 async def get_model(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     model_id: str,
 ):
     return await learning_config_proxy(
@@ -117,7 +118,7 @@ async def get_model(
 @requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
 @version(1)
 async def get_schema_for_configuration_updates(
-    request: Request, kbid: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
+    request: Request, kbid: KbId, x_nucliadb_account: str = Header(default="", include_in_schema=False)
 ):
     return await learning_config_proxy(
         request,
@@ -139,7 +140,7 @@ async def get_schema_for_configuration_updates(
 @version(1)
 async def get_models_group_by_providers(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     x_nucliadb_account: str = Header(default="", include_in_schema=False),
     x_nucliadb_account_type: str = Header(default="", include_in_schema=False),
     x_allow_access_non_enterprise_models: bool = Header(False, include_in_schema=False),
@@ -187,7 +188,7 @@ async def get_schema_for_configuration_creation(
 @version(1)
 async def get_extract_strategies(
     request: Request,
-    kbid: str,
+    kbid: KbId,
 ):
     return await learning_config_proxy(request, "GET", f"/extract_strategies/{kbid}")
 
@@ -204,7 +205,7 @@ async def get_extract_strategies(
 @version(1)
 async def get_extract_strategy_from_id(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     strategy_id: str,
 ):
     return await learning_config_proxy(
@@ -224,7 +225,7 @@ async def get_extract_strategy_from_id(
 @version(1)
 async def get_split_strategies(
     request: Request,
-    kbid: str,
+    kbid: KbId,
 ):
     return await learning_config_proxy(request, "GET", f"/split_strategies/{kbid}")
 
@@ -241,7 +242,7 @@ async def get_split_strategies(
 @version(1)
 async def get_split_strategy_from_id(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     strategy_id: str,
 ):
     return await learning_config_proxy(

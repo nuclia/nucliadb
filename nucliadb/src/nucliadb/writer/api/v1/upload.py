@@ -72,6 +72,7 @@ from nucliadb.writer.tus.storage import FileStorageManager
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models import content_types
+from nucliadb_models.common import KbId, RId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
@@ -152,7 +153,7 @@ def _tus_options() -> Response:
 @version(1)
 async def tus_post_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field: FieldIdString,
     item: CreateResourcePayload | None = None,
@@ -181,8 +182,8 @@ async def tus_post_rslug_prefix(
 @version(1)
 async def tus_post_rid_prefix(
     request: Request,
-    kbid: str,
-    path_rid: str,
+    kbid: KbId,
+    path_rid: RId,
     field: FieldIdString,
     item: CreateResourcePayload | None = None,
     x_extract_strategy: Annotated[str | None, X_EXTRACT_STRATEGY] = None,
@@ -209,7 +210,7 @@ async def tus_post_rid_prefix(
 @version(1)
 async def tus_post(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     item: CreateResourcePayload | None = None,
     x_extract_strategy: Annotated[str | None, X_EXTRACT_STRATEGY] = None,
     x_split_strategy: Annotated[str | None, X_SPLIT_STRATEGY] = None,
@@ -361,7 +362,7 @@ async def _tus_post(
 @version(1)
 async def tus_head_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field: FieldIdString,
     upload_id: str,
@@ -381,8 +382,8 @@ async def tus_head_rslug_prefix(
 @version(1)
 async def tus_head_rid_prefix(
     request: Request,
-    kbid: str,
-    path_rid: str,
+    kbid: KbId,
+    path_rid: RId,
     field: FieldIdString,
     upload_id: str,
 ) -> Response:
@@ -401,7 +402,7 @@ async def tus_head_rid_prefix(
 @version(1)
 async def head(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     upload_id: str,
 ) -> Response:
     return await _tus_head(upload_id)
@@ -439,7 +440,7 @@ async def _tus_head(
 @version(1)
 async def tus_patch_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field: FieldIdString,
     upload_id: str,
@@ -459,8 +460,8 @@ async def tus_patch_rslug_prefix(
 @version(1)
 async def tus_patch_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field: FieldIdString,
     upload_id: str,
 ) -> Response:
@@ -478,7 +479,7 @@ async def tus_patch_rid_prefix(
 @version(1)
 async def patch(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     upload_id: str,
 ) -> Response:
     return await tus_patch(request, kbid, upload_id)
@@ -645,7 +646,7 @@ def validate_intermediate_tus_chunk(read_bytes: int, storage_manager: FileStorag
 @version(1)
 async def upload_rslug_prefix(
     request: StarletteRequest,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field: FieldIdString,
     x_filename: Annotated[str | None, X_FILENAME] = None,
@@ -681,8 +682,8 @@ async def upload_rslug_prefix(
 @version(1)
 async def upload_rid_prefix(
     request: StarletteRequest,
-    kbid: str,
-    path_rid: str,
+    kbid: KbId,
+    path_rid: RId,
     field: FieldIdString,
     x_filename: Annotated[str | None, X_FILENAME] = None,
     x_password: Annotated[str | None, X_PASSWORD] = None,
@@ -716,7 +717,7 @@ async def upload_rid_prefix(
 @version(1)
 async def upload(
     request: StarletteRequest,
-    kbid: str,
+    kbid: KbId,
     x_filename: Annotated[str | None, X_FILENAME] = None,
     x_password: Annotated[str | None, X_PASSWORD] = None,
     x_language: Annotated[str | None, X_LANGUAGE] = None,

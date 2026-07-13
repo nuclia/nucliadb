@@ -23,6 +23,7 @@ from nuclia_models.config.proto import ExtractConfig, SplitConfiguration
 
 from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
+from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 
@@ -39,7 +40,7 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def set_configuration(
     request: Request,
-    kbid: str,
+    kbid: KbId,
 ):
     return await learning_config_proxy(request, "POST", f"/config/{kbid}")
 
@@ -55,7 +56,7 @@ async def set_configuration(
 @requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
 @version(1)
 async def patch_configuration(
-    request: Request, kbid: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
+    request: Request, kbid: KbId, x_nucliadb_account: str = Header(default="", include_in_schema=False)
 ):
     return await learning_config_proxy(
         request, "PATCH", f"/config/{kbid}", headers={"account-id": x_nucliadb_account}
@@ -74,7 +75,7 @@ async def patch_configuration(
 @version(1)
 async def add_strategy(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     item: ExtractConfig,
 ):
     return await learning_config_proxy(request, "POST", f"/extract_strategies/{kbid}")
@@ -92,7 +93,7 @@ async def add_strategy(
 @version(1)
 async def delete_strategy(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     strategy_id: str,
 ):
     return await learning_config_proxy(
@@ -112,7 +113,7 @@ async def delete_strategy(
 @version(1)
 async def add_split_strategy(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     item: SplitConfiguration,
 ):
     return await learning_config_proxy(request, "POST", f"/split_strategies/{kbid}")
@@ -130,7 +131,7 @@ async def add_split_strategy(
 @version(1)
 async def delete_split_strategy(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     strategy_id: str,
 ):
     return await learning_config_proxy(

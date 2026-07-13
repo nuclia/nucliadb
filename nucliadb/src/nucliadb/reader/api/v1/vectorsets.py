@@ -22,6 +22,7 @@ from starlette.requests import Request
 
 from nucliadb.common import datamanagers
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
+from nucliadb_models.common import KbId
 from nucliadb_models.resource import (
     NucliaDBRoles,
 )
@@ -40,7 +41,7 @@ from nucliadb_utils.authentication import requires_one
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
-async def list_vectorsets(request: Request, kbid: str) -> VectorSetList:
+async def list_vectorsets(request: Request, kbid: KbId) -> VectorSetList:
     vectorsets = []
     async with datamanagers.with_ro_transaction() as txn:
         async for vid, _ in datamanagers.vectorsets.iter(txn, kbid=kbid):

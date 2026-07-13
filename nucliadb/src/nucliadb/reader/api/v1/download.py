@@ -30,7 +30,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.common.models_utils import to_proto
 from nucliadb.reader import RANGE_HEADER, SERVICE_NAME, logger
-from nucliadb_models.common import FieldTypeName
+from nucliadb_models.common import FieldTypeName, KbId, RId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.storages.storage import ObjectMetadata, Range, StorageField
@@ -49,7 +49,7 @@ from .router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 @version(1)
 async def download_extract_file_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_type: FieldTypeName,
     field_id: str,
@@ -76,8 +76,8 @@ async def download_extract_file_rslug_prefix(
 @version(1)
 async def download_extract_file_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_type: FieldTypeName,
     field_id: str,
     download_field: str,
@@ -120,7 +120,7 @@ async def _download_extract_file(
 @version(1)
 async def download_field_file_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_id: str,
     inline: bool = False,
@@ -139,8 +139,8 @@ async def download_field_file_rslug_prefix(
 @version(1)
 async def download_field_file_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_id: str,
     inline: bool = False,
     range: Annotated[str | None, RANGE_HEADER] = None,
@@ -175,7 +175,7 @@ async def _download_field_file(
 @version(1)
 async def download_field_conversation_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_id: str,
     message_id: str,
@@ -202,8 +202,8 @@ async def download_field_conversation_rslug_prefix(
 @version(1)
 async def download_field_conversation_attachment_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_id: str,
     message_id: str,
     file_num: int,

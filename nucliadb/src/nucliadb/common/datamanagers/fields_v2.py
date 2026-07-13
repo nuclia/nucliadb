@@ -41,7 +41,7 @@ from typing import Sequence
 
 from google.protobuf.message import Message
 
-from nucliadb.common.datamanagers.utils import _pg_cursor, handle_invalid_uuid, logs_foreign_key_error
+from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_error
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb_protos import resources_pb2 as rpb2
@@ -142,7 +142,6 @@ async def delete(
 # ---------------------------------------------------------------------------
 
 
-@handle_invalid_uuid(default=None)
 async def get_raw(
     txn: Transaction,
     *,
@@ -172,7 +171,6 @@ async def get_raw(
         return bytes(row[0])
 
 
-@handle_invalid_uuid(default=None)
 async def get_status(
     txn: Transaction,
     *,
@@ -204,10 +202,6 @@ async def get_status(
         return pb
 
 
-default_statuses: list[wpb2.FieldStatus] = []
-
-
-@handle_invalid_uuid(default=default_statuses)
 async def get_statuses(
     txn: Transaction,
     *,
@@ -254,7 +248,6 @@ def _to_abbr(field_type: rpb2.FieldType.ValueType) -> str:
     return from_proto.field_type_name(field_type).abbreviation()
 
 
-@handle_invalid_uuid(default=rpb2.AllFieldIDs())
 async def get_all_field_ids(
     txn: Transaction,
     *,
@@ -280,7 +273,6 @@ async def get_all_field_ids(
         return pb
 
 
-@handle_invalid_uuid(default=False)
 async def has_field(
     txn: Transaction,
     *,

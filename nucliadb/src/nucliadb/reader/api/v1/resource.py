@@ -40,7 +40,7 @@ from nucliadb.reader.api.models import (
     ResourceField,
 )
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
-from nucliadb_models.common import FieldTypeName
+from nucliadb_models.common import FieldTypeName, KbId, RId
 from nucliadb_models.resource import (
     Error,
     ExtractedDataTypeName,
@@ -69,8 +69,8 @@ from nucliadb_utils.utilities import get_audit, get_storage
 @version(1)
 async def head_resource_by_uuid(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
 ):
     return await head_resource(kbid=kbid, rid=rid)
 
@@ -86,7 +86,7 @@ async def head_resource_by_uuid(
 @version(1)
 async def head_resource_by_slug(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
 ):
     return await head_resource(kbid=kbid, rslug=rslug)
@@ -120,7 +120,7 @@ async def head_resource(
 async def list_resources(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     page: int = Query(0, description="Requested page number (0-based)"),
     size: int = Query(DEFAULT_RESOURCE_LIST_PAGE_SIZE, description="Page size"),
 ) -> ResourceList:
@@ -201,8 +201,8 @@ async def list_resources(
 @version(1)
 async def get_resource_by_uuid(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     show: list[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: list[FieldTypeName] = Query(list(FieldTypeName), alias="field_type"),
     extracted: list[ExtractedDataTypeName] = Query(
@@ -239,7 +239,7 @@ async def get_resource_by_uuid(
 @version(1)
 async def get_resource_by_slug(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     show: list[ResourceProperties] = Query([ResourceProperties.BASIC]),
     field_type_filter: list[FieldTypeName] = Query(list(FieldTypeName), alias="field_type"),
@@ -310,7 +310,7 @@ async def _get_resource(
 @version(1)
 async def get_resource_field_rslug_prefix(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     rslug: str,
     field_type: FieldTypeName,
     field_id: str,
@@ -350,8 +350,8 @@ async def get_resource_field_rslug_prefix(
 @version(1)
 async def get_resource_field_rid_prefix(
     request: Request,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     field_type: FieldTypeName,
     field_id: str,
     show: list[ResourceFieldProperties] = Query([ResourceFieldProperties.VALUE]),

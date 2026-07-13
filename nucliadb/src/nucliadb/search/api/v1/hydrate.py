@@ -35,6 +35,7 @@ from nucliadb.search.search.hydrator.images import (
 )
 from nucliadb.search.search.hydrator.paragraphs import ParagraphIndex, hydrate_paragraph
 from nucliadb.search.search.hydrator.resources import hydrate_resource
+from nucliadb_models.common import KbId
 from nucliadb_models.hydration import (
     Hydrated,
     HydratedConversationField,
@@ -67,7 +68,7 @@ from nucliadb_utils.authentication import requires
 async def hydrate_endpoint(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     item: HydrateRequest,
 ) -> Hydrated:
     with request_caches():

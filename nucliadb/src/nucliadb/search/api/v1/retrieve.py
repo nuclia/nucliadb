@@ -34,6 +34,7 @@ from nucliadb.search.search.query_parser.parsers.retrieve import parse_retrieve
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import get_rephrased_query
 from nucliadb.search.search.rerankers import RerankableItem, Reranker, RerankingOptions, get_reranker
 from nucliadb.search.search.retrieval import text_block_search
+from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.retrieval import (
     Metadata,
@@ -59,7 +60,7 @@ from nucliadb_utils.utilities import get_audit
 @version(1)
 async def _retrieve_endpoint(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     item: RetrievalRequest,
     x_ndb_client: NucliaDBClientType = Header(NucliaDBClientType.API),
     x_nucliadb_user: str = Header(""),

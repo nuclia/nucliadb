@@ -35,6 +35,7 @@ from nucliadb_models.agents.ingestion import (
     ResourceAgentsResponse,
 )
 from nucliadb_models.agents.ingestion import AugmentedField as PublicAugmentedField
+from nucliadb_models.common import KbId, RId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 
@@ -53,8 +54,8 @@ from nucliadb_utils.authentication import requires_one
 async def run_agents_by_uuid(
     request: Request,
     response: Response,
-    kbid: str,
-    rid: str,
+    kbid: KbId,
+    rid: RId,
     item: ResourceAgentsRequest,
     x_nucliadb_user: str = Header(""),
 ) -> ResourceAgentsResponse | HTTPClientError:
@@ -75,7 +76,7 @@ async def run_agents_by_uuid(
 async def run_agents_by_slug(
     request: Request,
     response: Response,
-    kbid: str,
+    kbid: KbId,
     slug: str,
     item: ResourceAgentsRequest,
     x_nucliadb_user: str = Header(""),
