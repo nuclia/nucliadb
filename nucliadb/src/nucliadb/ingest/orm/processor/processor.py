@@ -458,7 +458,6 @@ class Processor:
                     exc_info=True,
                     extra={"kbid": kbid, "rid": uuid, "seqid": seqid, "partition": partition},
                 )
-                errors.capture_exception(exc)
                 await self.deadletter(message, partition, seqid)
                 await self.notify_abort(
                     partition=partition,
