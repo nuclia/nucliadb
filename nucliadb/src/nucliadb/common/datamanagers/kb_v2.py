@@ -31,9 +31,7 @@ Each row represents one knowledge box and stores:
 import logging
 from collections.abc import AsyncIterator
 
-import psycopg.errors
-
-from nucliadb.common.datamanagers.utils import _pg_cursor
+from nucliadb.common.datamanagers.utils import _pg_cursor, handle_invalid_uuid
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
@@ -122,28 +120,23 @@ async def update_kb_shards(
 # ---------------------------------------------------------------------------
 
 
+@handle_invalid_uuid(default=False)
 async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
     """Return True if a KB with the given kbid exists, has a slug, and has not been soft-deleted."""
     async with _pg_cursor(txn) as cur:
-        try:
-            await cur.execute(
-                """
-                SELECT 1 FROM kbs
-                WHERE kbid = %(kbid)s
-                  AND slug IS NOT NULL
-                  AND deleted_at IS NULL
-                """,
-                {"kbid": kbid},
-            )
-        except psycopg.errors.InvalidTextRepresentation:
-            logger.warning(
-                "Invalid UUID format in exists_kb() check, returning False",
-                extra={"kbid": kbid},
-            )
-            return False
+        await cur.execute(
+            """
+            SELECT 1 FROM kbs
+            WHERE kbid = %(kbid)s
+                AND slug IS NOT NULL
+                AND deleted_at IS NULL
+            """,
+            {"kbid": kbid},
+        )
         return await cur.fetchone() is not None
 
 
+@handle_invalid_uuid(default=None)
 async def get_config(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.KnowledgeBoxConfig | None:
     """Return the deserialised KnowledgeBoxConfig for a KB, or None."""
     async with _pg_cursor(txn) as cur:
@@ -159,6 +152,7 @@ async def get_config(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.Knowled
         return pb
 
 
+@handle_invalid_uuid(default=None)
 async def get_kb_uuid(txn: Transaction, *, slug: str) -> str | None:
     """Return the kbid for a given slug, or None if it does not exist."""
     async with _pg_cursor(txn) as cur:
@@ -187,6 +181,7 @@ async def get_kbs(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[t
                 yield (str(row[0]), row[1])
 
 
+@handle_invalid_uuid(default=None)
 async def get_kb_shards(
     txn: Transaction,
     *,

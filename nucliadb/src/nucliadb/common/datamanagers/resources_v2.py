@@ -37,7 +37,12 @@ from collections.abc import AsyncIterator
 
 import psycopg.errors
 
-from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_error, with_ro_transaction
+from nucliadb.common.datamanagers.utils import (
+    _pg_cursor,
+    handle_invalid_uuid,
+    logs_foreign_key_error,
+    with_ro_transaction,
+)
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb_protos import resources_pb2
@@ -248,23 +253,18 @@ async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+@handle_invalid_uuid(default=False)
 async def exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
     """Return True if the resource exists."""
     async with _pg_cursor(txn) as cur:
-        try:
-            await cur.execute(
-                "SELECT 1 FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
-                {"kbid": kbid, "rid": rid},
-            )
-        except psycopg.errors.InvalidTextRepresentation:
-            logger.warning(
-                "Invalid UUID format in exists() check, returning False",
-                extra={"kbid": kbid, "rid": rid},
-            )
-            return False
+        await cur.execute(
+            "SELECT 1 FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
+            {"kbid": kbid, "rid": rid},
+        )
         return await cur.fetchone() is not None
 
 
+@handle_invalid_uuid(default=None)
 async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str) -> str | None:
     """Return the resource UUID for the given slug within a KB, or None."""
     async with _pg_cursor(txn) as cur:
@@ -276,6 +276,7 @@ async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str)
         return _to_rid(row[0]) if row is not None else None
 
 
+@handle_invalid_uuid(default=False)
 async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
     """Return True if a resource with the given slug exists within a KB."""
     async with _pg_cursor(txn) as cur:
@@ -286,6 +287,7 @@ async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
         return await cur.fetchone() is not None
 
 
+@handle_invalid_uuid(default=None)
 async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Basic | None:
     """Return the deserialised Basic for a resource, or None."""
     async with _pg_cursor(txn) as cur:
@@ -303,6 +305,7 @@ async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.B
         return pb
 
 
+@handle_invalid_uuid(default=None)
 async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Origin | None:
     """Return the deserialised Origin for a resource, or None."""
     async with _pg_cursor(txn) as cur:
@@ -318,6 +321,7 @@ async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.
         return pb
 
 
+@handle_invalid_uuid(default=None)
 async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Security | None:
     """Return the deserialised Security for a resource, or None."""
     async with _pg_cursor(txn) as cur:
@@ -333,6 +337,7 @@ async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb
         return pb
 
 
+@handle_invalid_uuid(default=None)
 async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Extra | None:
     """Return the deserialised Extra for a resource, or None."""
     async with _pg_cursor(txn) as cur:
@@ -360,6 +365,7 @@ async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
                 yield _to_rid(rid)
 
 
+@handle_invalid_uuid(default=0)
 async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
     """Return the total number of resources in a knowledge box."""
     async with _pg_cursor(txn) as cur:
@@ -371,6 +377,7 @@ async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
         return row[0] if row else 0
 
 
+@handle_invalid_uuid(default=None)
 async def get_resource_shard_id(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
 ) -> str | None:

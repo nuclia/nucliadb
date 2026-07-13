@@ -204,7 +204,9 @@ async def test_get_statuses_returns_in_order(maindb_driver: Driver, kbid: str, r
     ]
 
     async with maindb_driver.ro_transaction() as txn:
-        statuses = await fields_v2.get_statuses(txn, kbid=kbid, rid=rid, fields=field_ids)
+        statuses: list[wpb2.FieldStatus] = await fields_v2.get_statuses(
+            txn, kbid=kbid, rid=rid, fields=field_ids
+        )
 
     assert len(statuses) == 3
     assert statuses[0].status == wpb2.FieldStatus.Status.PROCESSED  # f1
@@ -215,7 +217,7 @@ async def test_get_statuses_returns_in_order(maindb_driver: Driver, kbid: str, r
 @pytest.mark.asyncio
 async def test_get_statuses_empty_input(maindb_driver: Driver, kbid: str, rid: str) -> None:
     async with maindb_driver.ro_transaction() as txn:
-        result = await fields_v2.get_statuses(txn, kbid=kbid, rid=rid, fields=[])
+        result: list[wpb2.FieldStatus] = await fields_v2.get_statuses(txn, kbid=kbid, rid=rid, fields=[])
     assert result == []
 
 
