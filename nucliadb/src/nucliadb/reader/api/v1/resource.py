@@ -410,51 +410,48 @@ async def _get_resource_field(
 
         if ResourceFieldProperties.VALUE in show:
             value = await field.get_value()
+            if value is None and not isinstance(field, Conversation):
+                raise HTTPException(status_code=404, detail="Resource field value does not exist")
 
             if isinstance(value, resources_pb2.FieldText):
-                value = await field.get_value()
                 resource_field.value = from_proto.field_text(value)
 
             if isinstance(value, resources_pb2.FieldFile):
-                value = await field.get_value()
                 resource_field.value = from_proto.field_file(value)
 
             if isinstance(value, resources_pb2.FieldLink):
-                value = await field.get_value()
                 resource_field.value = from_proto.field_link(value)
 
             if isinstance(value, resources_pb2.FieldKeyValue):
                 resource_field.value = from_proto.field_key_value(value)
 
-            if field_type is FieldTypeName.KEY_VALUE and value is None:
-                raise HTTPException(status_code=404, detail="Key-value field does not exist")
-
             if isinstance(field, Conversation):
                 conversation_metadata = await field.get_metadata()
-                if conversation_metadata is not None:
-                    if page == "first":
-                        page_to_fetch = 1
-                    elif page == "last":
-                        page_to_fetch = conversation_metadata.pages
-                    else:
-                        page_to_fetch = int(page)
+                if conversation_metadata is None:
+                    raise HTTPException(status_code=404, detail="Resource field value does not exist")
+                if page == "first":
+                    page_to_fetch = 1
+                elif page == "last":
+                    page_to_fetch = conversation_metadata.pages
+                else:
+                    page_to_fetch = int(page)
 
-                    page_value = await field.get_value(page=page_to_fetch)
-                    if page_value is not None:
-                        splits_metadata = await field.get_splits_metadata()
-                        deleted_messages = set(splits_metadata.deleted_splits)
-                        resource_field.value = from_proto.conversation_page(
-                            page_value,
-                            total=conversation_metadata.total,
-                            pages=conversation_metadata.pages,
-                            page=page_to_fetch,
-                        )
-                        # Skip deleted messages
-                        resource_field.value.messages = [
-                            msg
-                            for msg in (resource_field.value.messages or [])
-                            if msg.ident not in deleted_messages
-                        ]
+                page_value = await field.get_value(page=page_to_fetch)
+                if page_value is not None:
+                    splits_metadata = await field.get_splits_metadata()
+                    deleted_messages = set(splits_metadata.deleted_splits)
+                    resource_field.value = from_proto.conversation_page(
+                        page_value,
+                        total=conversation_metadata.total,
+                        pages=conversation_metadata.pages,
+                        page=page_to_fetch,
+                    )
+                    # Skip deleted messages
+                    resource_field.value.messages = [
+                        msg
+                        for msg in (resource_field.value.messages or [])
+                        if msg.ident not in deleted_messages
+                    ]
         if (
             ResourceFieldProperties.EXTRACTED in show
             and extracted

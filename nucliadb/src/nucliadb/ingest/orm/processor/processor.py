@@ -453,6 +453,11 @@ class Processor:
                 # As we are in the middle of a transaction, we cannot let the exception raise directly
                 # as we need to do some cleanup. The exception will be reraised at the end of the function
                 # and then handled by the top caller, so errors can be handled in the same place.
+                logger.error(
+                    "Error processing message. Broker message stored in dead letter bucket.",
+                    exc_info=True,
+                    extra={"kbid": kbid, "rid": uuid, "seqid": seqid, "partition": partition},
+                )
                 await self.deadletter(message, partition, seqid)
                 await self.notify_abort(
                     partition=partition,
