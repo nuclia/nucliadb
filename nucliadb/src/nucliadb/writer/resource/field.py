@@ -39,7 +39,7 @@ from nucliadb.models.internal.processing import (
     PushGeneratedConversation,
     PushPayload,
 )
-from nucliadb.writer import SERVICE_NAME
+from nucliadb.writer import SERVICE_NAME, logger
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
@@ -136,6 +136,17 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             continue
 
         field_pb = await field.get_value()
+        if field_pb is None:
+            logger.warning(
+                f"Field no longer exists or it does not have a value",
+                extra={
+                    "kbid": toprocess.kbid,
+                    "rid": toprocess.uuid,
+                    "field_id": field_id,
+                    "field_type": field_type_name.name,
+                },
+            )
+            continue
         classif_labels = resource_classifications.for_field(field_id, field_type)
         if field_type_name is FieldTypeName.FILE:
             toprocess.filefield[field_id] = await _to_push_filefield(

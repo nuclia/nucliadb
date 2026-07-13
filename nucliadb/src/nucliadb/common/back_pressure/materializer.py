@@ -109,16 +109,16 @@ class BackPressureMaterializer:
             try:
                 with back_pressure_observer({"type": "get_processing_pending"}):
                     pending = await self._get_processing_pending(kbid)
-            except TimeoutError:  # pragma: no cover
+            except (TimeoutError, OSError) as exc:  # pragma: no cover
                 logger.warning(
-                    "Timeout getting pending messages to process. Back pressure on proccessing for KB can't be applied.",
-                    extra={"kbid": kbid},
+                    "Transient error getting pending messages to process. Back pressure on processing for KB can't be applied.",
+                    extra={"kbid": kbid, "error": str(exc)},
                 )
                 return 0
             except Exception:  # pragma: no cover
                 # Do not cache if there was an error
                 logger.exception(
-                    "Error getting pending messages to process. Back pressure on proccessing for KB can't be applied.",
+                    "Error getting pending messages to process. Back pressure on processing for KB can't be applied.",
                     exc_info=True,
                     extra={"kbid": kbid},
                 )
@@ -162,6 +162,11 @@ class BackPressureMaterializer:
                     with back_pressure_observer({"type": "get_ingest_pending"}):
                         status = await self.processing_http_client.pull_status()
                         self.ingest_pending = status.pending
+                except (TimeoutError, OSError) as exc:  # pragma: no cover
+                    logger.warning(
+                        "Transient error getting pending messages to ingest",
+                        extra={"error": str(exc)},
+                    )
                 except Exception:  # pragma: no cover
                     logger.exception(
                         "Error getting pending messages to ingest",
