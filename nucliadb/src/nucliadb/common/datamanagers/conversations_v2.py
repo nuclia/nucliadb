@@ -39,7 +39,7 @@ Deleting a single conversation field requires an explicit DELETE by (kbid, rid, 
 because there is no FK from kb_conversations to kb_fields.
 """
 
-from nucliadb.common.datamanagers.utils import _pg_cursor, handle_invalid_uuid, logs_foreign_key_error
+from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_error
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import FieldConversation, SplitsMetadata
@@ -53,7 +53,6 @@ _SPLITS_METADATA_PAGE = 0
 # ---------------------------------------------------------------------------
 
 
-@handle_invalid_uuid(default=None)
 async def get_metadata(
     txn: Transaction,
     *,
@@ -111,7 +110,6 @@ async def set_metadata(
 # ---------------------------------------------------------------------------
 
 
-@handle_invalid_uuid(default=None)
 async def get_page(
     txn: Transaction,
     *,
@@ -176,7 +174,6 @@ async def set_page(
 # ---------------------------------------------------------------------------
 
 
-@handle_invalid_uuid(default=None)
 async def get_splits_metadata(
     txn: Transaction,
     *,
