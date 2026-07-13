@@ -327,7 +327,7 @@ class S3StorageField(StorageField):
                     destination_uri=destination_uri,
                     destination_bucket_name=destination_bucket_name,
                     text=str(e),
-                )
+                ) from e
             else:
                 raise
 
