@@ -44,8 +44,6 @@ async def test_vector_result_metadata(nucliadb_search: AsyncClient, test_search_
         SearchRequest(
             query="own text",
             features=[SearchOptions.SEMANTIC],
-            label_filters=[],  # type: ignore
-            keyword_filters=[],  # type: ignore
             faceted=[],
             top_k=20,
             min_score=MinScore(bm25=0, semantic=-1),

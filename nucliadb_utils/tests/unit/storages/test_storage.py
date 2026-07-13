@@ -56,9 +56,9 @@ class StorageTest(Storage):
         self.field_klass = lambda: MagicMock()  # type: ignore[ty:invalid-assignment]
         self.deadletter_bucket = "deadletter_bucket"
         self.indexing_bucket = "indexing_bucket"
-        self.chunked_upload_object = AsyncMock()  # type: ignore[ty:invalid-assignment]
-        self.upload_object = AsyncMock()  # type: ignore[ty:invalid-assignment]
-        self.move = AsyncMock()  # type: ignore[ty:invalid-assignment]
+        self.chunked_upload_object = AsyncMock()
+        self.upload_object = AsyncMock()
+        self.move = AsyncMock()
 
     def get_bucket_name(self, kbid):
         return "bucket"
@@ -99,7 +99,7 @@ class TestStorage:
     @pytest.fixture
     def storage(self):
         s = StorageTest()
-        s.delete_upload = AsyncMock()  # type: ignore[ty:invalid-assignment]
+        s.delete_upload = AsyncMock()
         yield s
 
     async def test_delete_resource(self, storage: StorageTest):
