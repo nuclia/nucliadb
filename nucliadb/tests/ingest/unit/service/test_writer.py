@@ -57,7 +57,7 @@ class TestWriterServicer:
     def field(self, field_value):
         val = Text("id", Mock())
         val.value = field_value.SerializeToString()
-        val.set_vectors = AsyncMock()  # ty:ignore[invalid-assignment]
+        val.set_vectors = AsyncMock()
         yield val
 
     @pytest.fixture(scope="function")

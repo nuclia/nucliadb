@@ -27,7 +27,7 @@ def test_relation_validator():
     )
 
     with pytest.raises(ValidationError):
-        metadata.UserMetadata(relations=["my-wrong-relation"])  # type: ignore
+        metadata.UserMetadata(relations=["my-wrong-relation"])
 
 
 def test_relation_entity_model_validator():

@@ -308,6 +308,7 @@ async def test_querying_kb_with_vectorsets(
         node_search_spy, result, error = query
         assert result is not None
         assert error is None
+        assert node_search_spy is not None
 
         request = node_search_spy.call_args[0][0]
         # there's only one model and we get it as the default
@@ -326,6 +327,7 @@ async def test_querying_kb_with_vectorsets(
         node_search_spy, result, error = query
         assert result is not None
         assert error is None
+        assert node_search_spy is not None
 
         request = node_search_spy.call_args[0][0]
         assert request.vectorset == "model"
@@ -375,6 +377,7 @@ async def test_querying_kb_with_vectorsets(
             node_search_spy, result, error = query
             assert result is not None
             assert error is None
+            assert node_search_spy is not None
 
             request = node_search_spy.call_args[0][0]
             assert request.vectorset == "model-A"
@@ -399,6 +402,7 @@ async def test_querying_kb_with_vectorsets(
             node_search_spy, result, error = query
             assert result is not None
             assert error is None
+            assert node_search_spy is not None
 
             request = node_search_spy.call_args[0][0]
             assert request.vectorset == "model-B"
@@ -421,6 +425,8 @@ async def test_querying_kb_with_vectorsets(
             )
             assert resp.status_code == 200
             node_search_spy, result, error = query
+            assert node_search_spy is not None
+
             request = node_search_spy.call_args[0][0]
             assert result is not None
             assert error is None

@@ -240,7 +240,7 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
             if len(file_select) > 0:
                 augmentations.append(
                     FileAugment(
-                        given=given,  # type: ignore
+                        given=given,  # type: ignore[arg-type]
                         select=file_select,
                     )
                 )
@@ -277,7 +277,7 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
             if len(conversation_select) > 0:
                 augmentations.append(
                     ConversationAugment(
-                        given=given,  # type: ignore
+                        given=given,  # type: ignore[arg-type]
                         select=conversation_select,
                     )
                 )

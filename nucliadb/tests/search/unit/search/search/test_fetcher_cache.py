@@ -67,5 +67,5 @@ def new_fetcher() -> Fetcher:
         generative_model=None,
         query_image=None,
     )
-    fetcher.get_vectorset = AsyncMock(return_value=vectorset)  # type: ignore
+    fetcher.get_vectorset = AsyncMock(return_value=vectorset)  # type: ignore[method-assign]
     return fetcher
