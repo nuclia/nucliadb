@@ -32,7 +32,6 @@ use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::shard_merge::{Limit, OrderBy};
-use crate::searcher::shard_search::PartialResponse;
 use crate::searcher::shard_selector::SearcherNode;
 
 use super::shard_selector::ShardSelector;
@@ -262,6 +261,11 @@ impl NidxSearcher for SearchServer {
     }
 }
 
+pub struct PartialResponse<T> {
+    pub data: T,
+    pub shards: Vec<Uuid>,
+}
+
 impl SearchServer {
     /// Perform a distributed query over a partitioned dataset across a cluster of nodes.
     ///
@@ -445,7 +449,23 @@ impl SearcherOp for SearchOp {
         request: Self::Request,
         shards: Vec<Uuid>,
     ) -> NidxResult<PartialResponse<Self::Response>> {
-        shard_search::search(shards, index_cache, request).await
+        let responses = shard_search::search(shards.clone(), index_cache, request.clone()).await?;
+        let merged = Self::merge(&request, responses);
+
+        let response = if merged.shard_ids.len() == shards.len() {
+            PartialResponse { data: merged, shards }
+        } else {
+            let successful_shards = merged
+                .shard_ids
+                .iter()
+                .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
+                .collect();
+            PartialResponse {
+                data: merged,
+                shards: successful_shards,
+            }
+        };
+        Ok(response)
     }
 
     async fn remote_query(

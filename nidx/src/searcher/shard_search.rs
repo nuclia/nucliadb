@@ -29,43 +29,27 @@ use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::query_planner::{GraphIndexQueries, IndexQueries};
-use crate::searcher::shard_merge;
-use crate::searcher::shard_merge::Limit;
-use crate::searcher::shard_merge::OrderBy;
 
 use super::index_cache::IndexCache;
 use super::query_planner;
 use super::query_planner::QueryPlan;
 
-pub struct PartialResponse<T> {
-    pub data: T,
-    pub shards: Vec<Uuid>,
-}
-
-/// Search in multiple shards and return either the full response, partial
-/// results or an error
-///
 pub async fn search(
     shards: Vec<uuid::Uuid>,
     index_cache: Arc<IndexCache>,
     search_request: SearchRequest,
-) -> NidxResult<PartialResponse<SearchResponse>> {
-    let order_by = OrderBy::from(&search_request);
-    let limit = Limit(search_request.result_per_page as usize);
+) -> NidxResult<Vec<SearchResponse>> {
     let query_plan = query_planner::build_query_plan(search_request)?;
 
-    let response = if shards.len() == 1 {
+    let responses = if shards.len() == 1 {
         let shard_id = shards[0];
         let response = shard_search(shard_id, Arc::clone(&index_cache), query_plan).await?;
-        PartialResponse {
-            data: response,
-            shards: vec![shard_id],
-        }
+        vec![response]
     } else {
         let mut tasks = JoinSet::new();
-        for shard_id in &shards {
+        for shard_id in shards {
             tasks.spawn(
-                shard_search(*shard_id, Arc::clone(&index_cache), query_plan.clone()).instrument(Span::current()),
+                shard_search(shard_id, Arc::clone(&index_cache), query_plan.clone()).instrument(Span::current()),
             );
         }
 
@@ -89,28 +73,9 @@ pub async fn search(
         if responses.is_empty() {
             return Err(NidxError::NotFound);
         }
-
-        let merged = if responses.len() == 1 {
-            responses.pop().unwrap()
-        } else {
-            shard_merge::merge(responses, order_by, limit)
-        };
-
-        if merged.shard_ids.len() == shards.len() {
-            PartialResponse { data: merged, shards }
-        } else {
-            let successful_shards = merged
-                .shard_ids
-                .iter()
-                .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
-                .collect();
-            PartialResponse {
-                data: merged,
-                shards: successful_shards,
-            }
-        }
+        responses
     };
-    Ok(response)
+    Ok(responses)
 }
 
 #[instrument(skip_all, fields(shard_id = shard_id.to_string()))]
