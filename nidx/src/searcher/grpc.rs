@@ -238,20 +238,6 @@ impl NidxSearcher for SearchServer {
     }
 }
 
-pub struct PartialResponse<T> {
-    pub data: T,
-    pub shards: Vec<Uuid>,
-}
-
-impl<T: Sharded> From<T> for PartialResponse<T> {
-    fn from(value: T) -> Self {
-        let shards = value
-            .shards()
-            .expect("This is an internal response, we always send valid UUIDs");
-        PartialResponse { data: value, shards }
-    }
-}
-
 impl SearchServer {
     async fn shards_request<Op>(&self, request: tonic::Request<Op::Request>) -> Result<Response<Op::Response>>
     where
@@ -269,9 +255,7 @@ impl SearchServer {
             // This is a hopped node, i.e., another searcher has delegated this part of the query to
             // us. We must query our shards and return either a full or partial response or an error.
             // We won't hop to any other node
-            local_query::<Op>(Arc::clone(&self.index_cache), request, shards)
-                .await?
-                .data
+            local_query::<Op>(Arc::clone(&self.index_cache), request, shards).await?
         };
         Ok(Response::new(response))
     }
@@ -295,12 +279,15 @@ impl SearchServer {
         let mut responses = vec![];
         let mut pending: HashSet<Uuid> = HashSet::from_iter(shards.clone());
         while !pending.is_empty() {
-            for PartialResponse { data: response, shards } in self
+            for response in self
                 .scatter_gather::<Op>(&mut partitioner, request.clone(), &pending)
                 .await?
             {
                 // The response includes a list of successful shards, that may be a subset of the
                 // requested ones. This is the way we communicate partial failures.
+                let shards = response
+                    .shards()
+                    .expect("This is an internal response, we always send valid UUIDs");
                 for shard_id in shards {
                     pending.remove(&shard_id);
                 }
@@ -328,7 +315,7 @@ impl SearchServer {
         partitioner: &mut QueryPartitioner,
         request: Op::Request,
         shards: &HashSet<Uuid>,
-    ) -> NidxResult<Vec<PartialResponse<Op::Response>>>
+    ) -> NidxResult<Vec<Op::Response>>
     where
         Op: SearcherOp,
     {
@@ -395,7 +382,7 @@ impl SearchServer {
         node: SearcherNode,
         shards: Vec<Uuid>,
         request: Op::Request,
-    ) -> NidxResult<Pin<Box<dyn Future<Output = NidxResult<PartialResponse<Op::Response>>> + Send + 'static>>>
+    ) -> NidxResult<Pin<Box<dyn Future<Output = NidxResult<Op::Response>> + Send + 'static>>>
     where
         Op: SearcherOp,
     {
@@ -433,17 +420,17 @@ async fn local_query<Op: SearcherOp>(
     index_cache: Arc<IndexCache>,
     request: Op::Request,
     shards: Vec<Uuid>,
-) -> NidxResult<PartialResponse<Op::Response>> {
+) -> NidxResult<Op::Response> {
     let parts = Op::local(index_cache, request.clone(), shards).await?;
     let merged = Op::merge(&request, parts);
-    Ok(PartialResponse::from(merged))
+    Ok(merged)
 }
 
 async fn remote_query<Op: SearcherOp>(
     client: SearcherClient,
     mut request: Op::Request,
     shards: Vec<Uuid>,
-) -> NidxResult<PartialResponse<Op::Response>> {
+) -> NidxResult<Op::Response> {
     // Send the query to a different node specifying only a subset of shards
     request.set_shards(&shards);
 
@@ -456,7 +443,7 @@ async fn remote_query<Op: SearcherOp>(
         .await
         .map_err(NidxError::GrpcError)?
         .into_inner();
-    Ok(PartialResponse::from(response))
+    Ok(response)
 }
 
 trait SearcherOp: Clone + Send {
