@@ -266,6 +266,17 @@ pub struct PartialResponse<T> {
     pub shards: Vec<Uuid>,
 }
 
+impl From<SearchResponse> for PartialResponse<SearchResponse> {
+    fn from(value: SearchResponse) -> Self {
+        let shards = value
+            .shard_ids
+            .iter()
+            .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
+            .collect();
+        PartialResponse { data: value, shards }
+    }
+}
+
 impl SearchServer {
     /// Perform a distributed query over a partitioned dataset across a cluster of nodes.
     ///
@@ -451,21 +462,7 @@ impl SearcherOp for SearchOp {
     ) -> NidxResult<PartialResponse<Self::Response>> {
         let responses = shard_search::search(shards.clone(), index_cache, request.clone()).await?;
         let merged = Self::merge(&request, responses);
-
-        let response = if merged.shard_ids.len() == shards.len() {
-            PartialResponse { data: merged, shards }
-        } else {
-            let successful_shards = merged
-                .shard_ids
-                .iter()
-                .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
-                .collect();
-            PartialResponse {
-                data: merged,
-                shards: successful_shards,
-            }
-        };
-        Ok(response)
+        Ok(PartialResponse::from(merged))
     }
 
     async fn remote_query(
@@ -483,21 +480,7 @@ impl SearcherOp for SearchOp {
         request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
 
         let response = client.search(request).await.map_err(NidxError::GrpcError)?.into_inner();
-
-        let result = if response.shard_ids.len() == shards.len() {
-            PartialResponse { data: response, shards }
-        } else {
-            let successful_shards = response
-                .shard_ids
-                .iter()
-                .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
-                .collect();
-            PartialResponse {
-                data: response,
-                shards: successful_shards,
-            }
-        };
-        Ok(result)
+        Ok(PartialResponse::from(response))
     }
 
     fn merge(request: &Self::Request, mut partitions: Vec<Self::Response>) -> Self::Response {
