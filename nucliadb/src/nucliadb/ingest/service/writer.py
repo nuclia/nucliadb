@@ -27,6 +27,7 @@ from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
+from nucliadb.common.ids import valid_kbid
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.entities import EntitiesManager
@@ -107,6 +108,11 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         # model metadata in the request
 
         try:
+            if not valid_kbid(request.kbid):
+                return writer_pb2.NewKnowledgeBoxV2Response(
+                    status=KnowledgeBoxResponseStatus.ERROR,
+                    error_message=f"Invalid kbid: {request.kbid}. Should be a valid UUID4 string.",
+                )
             kbid, _ = await KnowledgeBoxORM.create(
                 self.driver,
                 kbid=request.kbid,
