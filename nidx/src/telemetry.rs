@@ -76,6 +76,7 @@ pub fn init(settings: &TelemetrySettings) -> anyhow::Result<()> {
     };
 
     // Trace propagation is done in Zipkin format (b3-* headers)
+    #[allow(deprecated)]
     opentelemetry::global::set_text_map_propagator(opentelemetry_zipkin::Propagator::new());
 
     // Traces go to the collector in OTLP format

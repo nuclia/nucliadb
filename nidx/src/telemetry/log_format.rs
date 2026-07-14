@@ -39,12 +39,12 @@
 // IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
+use opentelemetry::trace::TraceContextExt as _;
 use serde::ser::{SerializeMap, Serializer as _};
 use serde_json::Serializer;
 use std::fmt;
 use tracing::Subscriber;
 use tracing_core::Event;
-use tracing_opentelemetry::OtelData;
 use tracing_serde::AsSerde;
 use tracing_subscriber::{
     fmt::{
@@ -93,11 +93,21 @@ where
                 .parent()
                 .and_then(|id| ctx.span(id))
                 .or_else(|| ctx.lookup_current());
-            if let Some(span) = span
-                && let Some(otel_data) = span.extensions().get::<OtelData>()
-                && let Some(trace_id) = otel_data.trace_id()
-            {
-                serializer.serialize_entry("trace_id", &trace_id.to_string())?;
+            if let Some(span) = span {
+                let span_id = span.id();
+                let trace_id = tracing::dispatcher::get_default(|dispatch| {
+                    tracing_opentelemetry::get_otel_context(&span_id, dispatch).and_then(|cx| {
+                        let trace_id = cx.span().span_context().trace_id();
+                        if trace_id != opentelemetry::trace::TraceId::INVALID {
+                            Some(trace_id)
+                        } else {
+                            None
+                        }
+                    })
+                });
+                if let Some(trace_id) = trace_id {
+                    serializer.serialize_entry("trace_id", &trace_id.to_string())?;
+                }
             }
 
             serializer.end()
