@@ -156,11 +156,12 @@ class NatsTaskConsumer(Generic[MsgType]):
                 await msg.nak()
             except Exception as e:
                 errors.capture_exception(e)
-                logger.error(
+                logger.exception(
                     f"Unexpected error while handling task",
                     extra={
                         "consumer_name": self.name,
                     },
+                    exc_info=e,
                 )
                 # Nak the message to retry
                 await asyncio.sleep(BEFORE_NAK_SLEEP_SECONDS)
