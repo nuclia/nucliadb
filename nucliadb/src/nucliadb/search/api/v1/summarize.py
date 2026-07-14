@@ -22,11 +22,11 @@ from fastapi import Header, Request
 from fastapi_versioning import version
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.fastapi import KbId
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.summarize import NoResourcesToSummarize, summarize
-from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import SummarizedResponse, SummarizeRequest
 from nucliadb_utils.authentication import requires

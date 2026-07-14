@@ -23,9 +23,9 @@ from starlette.requests import Request
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.fastapi import KbId
 from nucliadb.common.models_utils import to_proto
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
-from nucliadb_models.common import KbId
 from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.kv_schemas import MAX_KV_SCHEMAS, KVSchema, UpdateKVSchema
 from nucliadb_models.labels import LabelSet

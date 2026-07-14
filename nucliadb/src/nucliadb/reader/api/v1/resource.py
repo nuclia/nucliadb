@@ -23,6 +23,7 @@ from fastapi import Header, HTTPException, Query, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.common import datamanagers
+from nucliadb.common.fastapi import KbId, RId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb.ingest.fields.conversation import Conversation
@@ -40,7 +41,7 @@ from nucliadb.reader.api.models import (
     ResourceField,
 )
 from nucliadb.reader.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
-from nucliadb_models.common import FieldTypeName, KbId, RId
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import (
     Error,
     ExtractedDataTypeName,

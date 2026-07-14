@@ -22,6 +22,7 @@ from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.common import datamanagers
+from nucliadb.common.fastapi import KbId, RId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RESOURCE_SLUG_PREFIX, api
@@ -35,7 +36,6 @@ from nucliadb_models.agents.ingestion import (
     ResourceAgentsResponse,
 )
 from nucliadb_models.agents.ingestion import AugmentedField as PublicAugmentedField
-from nucliadb_models.common import KbId, RId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 

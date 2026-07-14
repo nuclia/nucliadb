@@ -21,11 +21,11 @@
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
+from nucliadb.common.fastapi import KbId
 from nucliadb.common.models_utils import to_proto
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import FeedbackRequest, NucliaDBClientType
 from nucliadb_telemetry import errors

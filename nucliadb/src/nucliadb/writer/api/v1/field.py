@@ -29,6 +29,7 @@ from starlette.requests import Request
 import nucliadb_models as models
 from nucliadb.common import datamanagers
 from nucliadb.common.back_pressure import maybe_back_pressure
+from nucliadb.common.fastapi import KbId, RId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -59,7 +60,6 @@ from nucliadb.writer.resource.field import (
     parse_text_field,
 )
 from nucliadb.writer.utilities import get_processing
-from nucliadb_models.common import KbId, RId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import KeyValueField, ResourceFieldAdded, ResourceUpdated

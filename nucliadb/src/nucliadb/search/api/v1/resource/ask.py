@@ -24,9 +24,9 @@ from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
 from nucliadb.common import datamanagers
+from nucliadb.common.fastapi import KbId
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_SLUG_PREFIX, api
-from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import AskRequest, NucliaDBClientType, SyncAskResponse
 from nucliadb_models.security import RequestSecurity

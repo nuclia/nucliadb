@@ -21,9 +21,9 @@ from fastapi import Header, Request
 from fastapi_versioning import version
 from nuclia_models.config.proto import ExtractConfig, SplitConfiguration
 
+from nucliadb.common.fastapi import KbId
 from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
-from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 

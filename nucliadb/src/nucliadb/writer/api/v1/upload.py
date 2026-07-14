@@ -33,6 +33,7 @@ from starlette.requests import Request as StarletteRequest
 
 from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.back_pressure import maybe_back_pressure
+from nucliadb.common.fastapi import KbId, PathRId, RId
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.models.internal.processing import PushPayload, Source
@@ -72,7 +73,6 @@ from nucliadb.writer.tus.storage import FileStorageManager
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models import content_types
-from nucliadb_models.common import KbId, PathRId, RId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded

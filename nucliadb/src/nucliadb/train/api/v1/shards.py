@@ -26,6 +26,7 @@ from fastapi.responses import StreamingResponse
 from fastapi_versioning import version
 
 from nucliadb.common.cluster.exceptions import ShardNotFound
+from nucliadb.common.fastapi import KbId
 from nucliadb.train.api.utils import get_kb_partitions
 from nucliadb.train.api.v1.router import KB_PREFIX, api
 from nucliadb.train.generator import generate_train_data
@@ -46,7 +47,7 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def object_get_response(
     request: Request,
-    kbid: str,
+    kbid: KbId,
     shard: str,
 ) -> StreamingResponse:
     try:

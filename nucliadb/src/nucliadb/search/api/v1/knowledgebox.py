@@ -32,13 +32,13 @@ from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
 from nucliadb.common.counters import IndexCounts
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
+from nucliadb.common.fastapi import KbId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.search.shards import get_shard
 from nucliadb.search.settings import settings
-from nucliadb_models.common import KbId
 from nucliadb_models.internal.shards import KnowledgeboxShards
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (

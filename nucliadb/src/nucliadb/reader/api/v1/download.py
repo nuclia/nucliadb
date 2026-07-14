@@ -27,10 +27,11 @@ from fastapi_versioning import version
 from starlette.responses import StreamingResponse
 
 from nucliadb.common import datamanagers
+from nucliadb.common.fastapi import KbId, RId
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.common.models_utils import to_proto
 from nucliadb.reader import RANGE_HEADER, SERVICE_NAME, logger
-from nucliadb_models.common import FieldTypeName, KbId, RId
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.storages.storage import ObjectMetadata, Range, StorageField

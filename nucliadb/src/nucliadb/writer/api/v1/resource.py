@@ -29,6 +29,7 @@ from starlette.requests import Request
 from nucliadb.common import datamanagers
 from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.fastapi import KbId, RId
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
@@ -61,7 +62,6 @@ from nucliadb.writer.resource.field import (
 )
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.utilities import get_processing
-from nucliadb_models.common import KbId, RId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.writer import (
     CreateResourcePayload,

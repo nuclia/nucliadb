@@ -22,10 +22,10 @@ from fastapi import Header, Request
 from fastapi_versioning import version
 from nuclia_models.config.proto import ExtractConfig, SplitConfiguration
 
+from nucliadb.common.fastapi import KbId
 from nucliadb.learning_proxy import learning_config_proxy
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
-from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one
 from nucliadb_utils.settings import is_onprem_nucliadb

@@ -27,13 +27,13 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.fastapi import KbId
 from nucliadb.export_import import exceptions as export_exceptions
 from nucliadb.export_import import exporter
 from nucliadb.export_import.datamanager import ExportImportDataManager
 from nucliadb.export_import.exceptions import MetadataNotFound
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
-from nucliadb_models.common import KbId
 from nucliadb_models.export_import import Status, StatusResponse
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_utils.authentication import requires_one

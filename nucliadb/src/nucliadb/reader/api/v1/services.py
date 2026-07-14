@@ -29,6 +29,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.fastapi import KbId
 from nucliadb.common.http_clients import processing
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto
@@ -37,7 +38,6 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.reader import SERVICE_NAME
 from nucliadb.reader.api.v1.router import KB_PREFIX, api
 from nucliadb.reader.reader.notifications import kb_notifications_stream
-from nucliadb_models.common import KbId
 from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.entities import (
     EntitiesGroup,

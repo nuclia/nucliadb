@@ -24,11 +24,11 @@ from fastapi.responses import Response, StreamingResponse
 from fastapi_versioning import version
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.fastapi import KbId
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search.predict_proxy import PredictProxiedEndpoints, predict_proxy
-from nucliadb_models.common import KbId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import NucliaDBClientType
 from nucliadb_utils.authentication import requires

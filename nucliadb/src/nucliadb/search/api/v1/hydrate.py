@@ -24,6 +24,7 @@ from async_lru import alru_cache
 from fastapi import Request, Response
 from fastapi_versioning import version
 
+from nucliadb.common.fastapi import KbId
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, FieldId, ParagraphId
 from nucliadb.ingest.fields.base import Field
 from nucliadb.search.api.v1.router import KB_PREFIX, api
@@ -35,7 +36,6 @@ from nucliadb.search.search.hydrator.images import (
 )
 from nucliadb.search.search.hydrator.paragraphs import ParagraphIndex, hydrate_paragraph
 from nucliadb.search.search.hydrator.resources import hydrate_resource
-from nucliadb_models.common import KbId
 from nucliadb_models.hydration import (
     Hydrated,
     HydratedConversationField,

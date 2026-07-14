@@ -24,11 +24,11 @@ from starlette.requests import Request
 
 from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
+from nucliadb.common.fastapi import KbId
 from nucliadb.ingest.orm.exceptions import VectorSetConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.writer import logger
 from nucliadb.writer.api.v1.router import KB_PREFIX, api
-from nucliadb_models.common import KbId
 from nucliadb_models.resource import (
     NucliaDBRoles,
 )

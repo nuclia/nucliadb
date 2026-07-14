@@ -29,6 +29,7 @@ from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.fastapi import KbId
 from nucliadb.export_import import importer
 from nucliadb.export_import.datamanager import ExportImportDataManager
 from nucliadb.export_import.exceptions import (
@@ -46,7 +47,6 @@ from nucliadb.writer import logger
 from nucliadb.writer.api.utils import only_for_onprem
 from nucliadb.writer.api.v1.knowledgebox import create_kb
 from nucliadb.writer.api.v1.router import KB_PREFIX, KBS_PREFIX, api
-from nucliadb_models.common import KbId
 from nucliadb_models.export_import import (
     CreateExportResponse,
     CreateImportResponse,

@@ -24,6 +24,7 @@ from typing import cast
 from fastapi import Header, Request
 from fastapi_versioning import version
 
+from nucliadb.common.fastapi import KbId
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.models_utils import to_proto
 from nucliadb.models.internal import augment as internal_augment
@@ -80,7 +81,7 @@ from nucliadb_models.augment import (
     AugmentResources,
     AugmentResponse,
 )
-from nucliadb_models.common import FieldTypeName, KbId
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import NucliaDBClientType, ResourceProperties
 from nucliadb_utils.authentication import requires

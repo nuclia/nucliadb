@@ -15,11 +15,9 @@
 import base64
 import hashlib
 import re
-import uuid
 from enum import Enum
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import Depends, HTTPException, Path
 from pydantic import (
     BaseModel,
     Field,
@@ -303,40 +301,3 @@ class QuestionAnswer(BaseModel):
 
 class QuestionAnswers(BaseModel):
     question_answer: list[QuestionAnswer]
-
-
-# ---------------------------------------------------------------------------
-# FastAPI path-parameter dependencies that return 404 for non-UUID values.
-#
-# Use these instead of plain ``str`` for ``kbid`` and ``rid`` path parameters
-# so that requests with syntactically invalid identifiers are rejected at the
-# API layer before reaching the database, while preserving the existing
-# behaviour of returning 404 (not 422) for bad input.
-#
-# Usage::
-#
-#     from nucliadb_models.common import KbId, RId
-#
-#     @router.get("/kb/{kbid}/resource/{rid}")
-#     async def get_resource(kbid: KbId, rid: RId): ...
-# ---------------------------------------------------------------------------
-
-
-def _uuid_path_param(name: str, not_found_detail: str) -> Any:
-    """Return a FastAPI ``Depends`` callable that validates *name* as a UUID."""
-
-    def _validate(value: str = Path(alias=name)) -> str:
-
-        try:
-            uuid.UUID(value)
-        except ValueError:
-            raise HTTPException(status_code=404, detail=not_found_detail)
-        return value
-
-    _validate.__name__ = f"validate_{name}"
-    return Depends(_validate)
-
-
-KbId = Annotated[str, _uuid_path_param("kbid", "KnowledgeBox not found. UUID expected.")]
-RId = Annotated[str, _uuid_path_param("rid", "Resource not found. UUID expected.")]
-PathRId = Annotated[str, _uuid_path_param("path_rid", "Resource not found. UUID expected.")]

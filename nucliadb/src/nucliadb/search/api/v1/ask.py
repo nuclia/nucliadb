@@ -25,13 +25,13 @@ from pydantic import ValidationError
 from starlette.responses import StreamingResponse
 
 from nucliadb.common import datamanagers
+from nucliadb.common.fastapi import KbId
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.ask import AskResult, ask, handled_ask_exceptions
 from nucliadb.search.search.chat.exceptions import AnswerJsonSchemaTooLong
 from nucliadb.search.search.utils import maybe_log_request_payload
-from nucliadb_models.common import KbId
 from nucliadb_models.configuration import AskConfig
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (

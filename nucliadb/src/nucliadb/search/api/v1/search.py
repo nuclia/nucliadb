@@ -27,6 +27,7 @@ from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.exceptions import InvalidQueryError
+from nucliadb.common.fastapi import KbId
 from nucliadb.common.models_utils import to_proto
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
@@ -43,7 +44,7 @@ from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
 from nucliadb.search.search.utils import (
     min_score_from_query_params,
 )
-from nucliadb_models.common import FieldTypeName, KbId
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
 from nucliadb_models.search import (

@@ -20,6 +20,7 @@
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
+from nucliadb.common.fastapi import KbId
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.graph_merge import (
@@ -32,7 +33,6 @@ from nucliadb.search.search.query_parser.parsers import (
     parse_graph_relation_search,
     parse_graph_search,
 )
-from nucliadb_models.common import KbId
 from nucliadb_models.graph.requests import (
     GraphNodesSearchRequest,
     GraphRelationsSearchRequest,

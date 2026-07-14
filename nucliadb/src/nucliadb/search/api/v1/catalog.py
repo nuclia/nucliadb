@@ -27,6 +27,7 @@ from pydantic import ValidationError
 from nucliadb.common.catalog import catalog_facets, catalog_search
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.exceptions import InvalidQueryError
+from nucliadb.common.fastapi import KbId
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
@@ -38,7 +39,7 @@ from nucliadb.search.search.query_parser.parsers import parse_catalog
 from nucliadb.search.search.utils import (
     maybe_log_request_payload,
 )
-from nucliadb_models.common import FieldTypeName, KbId
+from nucliadb_models.common import FieldTypeName
 from nucliadb_models.filters import CatalogFilterExpression
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_models.resource import NucliaDBRoles
