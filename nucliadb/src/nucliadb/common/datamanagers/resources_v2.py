@@ -39,7 +39,6 @@ import psycopg.errors
 
 from nucliadb.common.datamanagers.utils import (
     _pg_cursor,
-    handle_invalid_uuid,
     logs_foreign_key_error,
     with_ro_transaction,
 )
@@ -253,7 +252,6 @@ async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-@handle_invalid_uuid(default=False)
 async def exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
     """Return True if the resource exists."""
     async with _pg_cursor(txn) as cur:
@@ -264,7 +262,6 @@ async def exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
         return await cur.fetchone() is not None
 
 
-@handle_invalid_uuid(default=None)
 async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str) -> str | None:
     """Return the resource UUID for the given slug within a KB, or None."""
     async with _pg_cursor(txn) as cur:
@@ -276,7 +273,6 @@ async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str)
         return _to_rid(row[0]) if row is not None else None
 
 
-@handle_invalid_uuid(default=False)
 async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
     """Return True if a resource with the given slug exists within a KB."""
     async with _pg_cursor(txn) as cur:
@@ -287,7 +283,6 @@ async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
         return await cur.fetchone() is not None
 
 
-@handle_invalid_uuid(default=None)
 async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Basic | None:
     """Return the deserialised Basic for a resource, or None."""
     async with _pg_cursor(txn) as cur:

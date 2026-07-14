@@ -23,6 +23,7 @@ This module aims to centralize how we build ids for resources, fields,
 paragraphs... Avoiding spread of id construction and parsing everywhere
 """
 
+import uuid
 from dataclasses import dataclass
 
 from nucliadb_models.common import FieldTypeName
@@ -310,3 +311,31 @@ def extract_data_augmentation_id(generated_field_id: str) -> str | None:
         return None
 
     return parts[1] or None
+
+
+def is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+        return True
+    except ValueError:
+        return False
+
+
+def valid_kbid(kbid: str) -> bool:
+    # Must be a UUID in canonical dashed format.
+    if len(kbid) != 36 or kbid.count("-") != 4:
+        return False
+    try:
+        return str(uuid.UUID(kbid)) == kbid.lower()
+    except ValueError:
+        return False
+
+
+def valid_rid(rid: str) -> bool:
+    # Must be a UUID in hex format.
+    if len(rid) != 32 or "-" in rid:
+        return False
+    try:
+        return uuid.UUID(rid).hex == rid.lower()
+    except ValueError:
+        return False

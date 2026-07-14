@@ -18,10 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, Callable
 
 from fastapi import Depends, HTTPException, Path
+
+from nucliadb.common.ids import valid_kbid, valid_rid
 
 # ---------------------------------------------------------------------------
 # FastAPI path-parameter dependencies that return 404 for non-UUID values.
@@ -40,14 +41,11 @@ from fastapi import Depends, HTTPException, Path
 # ---------------------------------------------------------------------------
 
 
-def _uuid_path_param(name: str, not_found_detail: str) -> Any:
+def _uuid_path_param(name: str, not_found_detail: str, validator_func: Callable[[str], bool]) -> Any:
     """Return a FastAPI ``Depends`` callable that validates *name* as a UUID."""
 
     def _validate(value: str = Path(alias=name)) -> str:
-
-        try:
-            uuid.UUID(value)
-        except ValueError:
+        if not validator_func(value):
             raise HTTPException(status_code=404, detail=not_found_detail)
         return value
 
@@ -55,6 +53,6 @@ def _uuid_path_param(name: str, not_found_detail: str) -> Any:
     return Depends(_validate)
 
 
-KbId = Annotated[str, _uuid_path_param("kbid", "KnowledgeBox not found. UUID expected.")]
-RId = Annotated[str, _uuid_path_param("rid", "Resource not found. UUID expected.")]
-PathRId = Annotated[str, _uuid_path_param("path_rid", "Resource not found. UUID expected.")]
+KbId = Annotated[str, _uuid_path_param("kbid", "Knowledge box not found. UUID expected.", valid_kbid)]
+RId = Annotated[str, _uuid_path_param("rid", "Resource not found. UUID expected.", valid_rid)]
+PathRId = Annotated[str, _uuid_path_param("path_rid", "Resource not found. UUID expected.", valid_rid)]

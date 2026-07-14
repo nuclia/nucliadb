@@ -27,6 +27,8 @@ from nucliadb.common.ids import (
     ParagraphId,
     VectorId,
     extract_data_augmentation_id,
+    valid_kbid,
+    valid_rid,
 )
 from nucliadb_protos.resources_pb2 import FieldType
 
@@ -179,3 +181,31 @@ def test_invalid_data_augmentation_id_extraction_2(
     gen_field_id: str,
 ):
     assert extract_data_augmentation_id(gen_field_id) is None
+
+
+@pytest.mark.parametrize(
+    "kbid,expected",
+    [
+        ("d6fcb6d1-4525-4a1d-84a5-35c7be5dbfbb", True),
+        ("D6FCB6D1-4525-4A1D-84A5-35C7BE5DBFBB", True),
+        ("d6fcb6d145254a1d84a535c7be5dbfbb", False),
+        ("d6fcb6d1-4525-4a1d84a5-35c7be5dbfbb", False),
+        ("not-a-uuid", False),
+    ],
+)
+def test_valid_kbid(kbid: str, expected: bool):
+    assert valid_kbid(kbid) is expected
+
+
+@pytest.mark.parametrize(
+    "rid,expected",
+    [
+        ("d6fcb6d145254a1d84a535c7be5dbfbb", True),
+        ("D6FCB6D145254A1D84A535C7BE5DBFBB", True),
+        ("d6fcb6d1-4525-4a1d-84a5-35c7be5dbfbb", False),
+        ("d6fcb6d145254a1d84a535c7be5dbfb", False),
+        ("not-a-uuid", False),
+    ],
+)
+def test_valid_rid(rid: str, expected: bool):
+    assert valid_rid(rid) is expected

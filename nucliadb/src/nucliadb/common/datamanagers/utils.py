@@ -24,7 +24,6 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Callable, Concatenate, Coroutine, ParamSpec, TypeVar, cast
 
 import psycopg
-import psycopg.sql
 from google.protobuf.message import Message
 
 from nucliadb.common.maindb.driver import Transaction
@@ -75,51 +74,6 @@ def logs_foreign_key_error(
         return None
 
     return wrapper
-
-
-_D = TypeVar("_D")
-
-
-def handle_invalid_uuid(
-    default: _D,
-) -> Callable[
-    [Callable[_P, Coroutine[Any, Any, _R]]],
-    Callable[_P, Coroutine[Any, Any, _R | _D]],
-]:
-    """Decorator that catches ``psycopg.errors.InvalidTextRepresentation`` and
-    returns *default* instead of propagating the exception.
-
-    Use this on read functions that accept a ``kbid`` or ``rid`` parameter that
-    may arrive as a non-UUID string, so callers receive a safe fallback value
-    rather than an unhandled database error.
-
-    Example::
-
-        @handle_invalid_uuid(default=None)
-        async def get_basic(txn, *, kbid, rid): ...
-
-        @handle_invalid_uuid(default=False)
-        async def exists(txn, *, kbid, rid): ...
-    """
-
-    def decorator(
-        func: Callable[_P, Coroutine[Any, Any, _R]],
-    ) -> Callable[_P, Coroutine[Any, Any, _R | _D]]:
-        @functools.wraps(func)
-        async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R | _D:
-            try:
-                return await func(*args, **kwargs)
-            except psycopg.errors.InvalidTextRepresentation:
-                logger.warning(
-                    "Invalid UUID format in %s(), returning default value %r",
-                    getattr(func, "__qualname__", repr(func)),
-                    default,
-                )
-                return default
-
-        return wrapper
-
-    return decorator
 
 
 async def get_kv_pb(

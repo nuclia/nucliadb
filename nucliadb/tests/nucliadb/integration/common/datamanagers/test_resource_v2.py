@@ -294,12 +294,3 @@ async def test_resource_set_get(
         assert await resources_v2.calculate_number_of_resources(txn, kbid=kbid) == 0
         assert [rid async for rid in resources_v2.iterate_resource_ids(kbid=kbid)] == []
         assert await resources_v2.get_basic(txn, kbid=kbid, rid=rid) is None
-
-
-@pytest.mark.asyncio
-async def test_exists_returns_false_for_invalid_uuid(
-    maindb_driver: Driver,
-) -> None:
-    async with maindb_driver.ro_transaction() as txn:
-        result = await resources_v2.exists(txn, kbid="not-a-valid-uuid", rid="also-not-valid")
-    assert result is False
