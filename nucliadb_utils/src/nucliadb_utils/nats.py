@@ -265,8 +265,14 @@ class NatsConnectionManager:
 
         self._reconnect_task = None
 
-    async def error_cb(self, e):  # pragma: no cover
-        logger.error(f"There was an error on consumer: {e}", exc_info=e)
+    async def error_cb(self, exc: Exception):  # pragma: no cover
+        # This error callback is called before reconnecting, thus, there are
+        # some exceptions we don't need to propagate to sentry as they'll be
+        # retried and handled by the retry callback anyway.
+        if isinstance(exc, (nats.errors.UnexpectedEOF, nats.errors.TimeoutError)):
+            logger.info(f"There was a retriable error on a consumer: {exc}", exc_info=exc)
+            return
+        logger.error(f"There was an error on consumer: {exc}", exc_info=exc)
 
     async def closed_cb(self):  # pragma: no cover
         logger.info("Connection is closed on NATS")
