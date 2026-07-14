@@ -72,7 +72,7 @@ from nucliadb.writer.tus.storage import FileStorageManager
 from nucliadb.writer.tus.utils import parse_tus_metadata
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models import content_types
-from nucliadb_models.common import KbId, RId
+from nucliadb_models.common import KbId, PathRId, RId
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import CreateResourcePayload, ResourceFileUploaded
@@ -126,8 +126,8 @@ TUS_HEADERS = {
 @version(1)
 def tus_options(
     request: Request,
-    kbid: str,
-    rid: str | None = None,
+    kbid: KbId,
+    rid: RId | None = None,
     rslug: str | None = None,
     upload_id: str | None = None,
     field: str | None = None,
@@ -183,7 +183,7 @@ async def tus_post_rslug_prefix(
 async def tus_post_rid_prefix(
     request: Request,
     kbid: KbId,
-    path_rid: RId,
+    path_rid: PathRId,
     field: FieldIdString,
     item: CreateResourcePayload | None = None,
     x_extract_strategy: Annotated[str | None, X_EXTRACT_STRATEGY] = None,
@@ -383,7 +383,7 @@ async def tus_head_rslug_prefix(
 async def tus_head_rid_prefix(
     request: Request,
     kbid: KbId,
-    path_rid: RId,
+    path_rid: PathRId,
     field: FieldIdString,
     upload_id: str,
 ) -> Response:
@@ -683,7 +683,7 @@ async def upload_rslug_prefix(
 async def upload_rid_prefix(
     request: StarletteRequest,
     kbid: KbId,
-    path_rid: RId,
+    path_rid: PathRId,
     field: FieldIdString,
     x_filename: Annotated[str | None, X_FILENAME] = None,
     x_password: Annotated[str | None, X_PASSWORD] = None,

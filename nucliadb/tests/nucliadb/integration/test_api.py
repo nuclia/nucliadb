@@ -254,6 +254,20 @@ async def test_can_create_standalone_knowledgebox_with_colon_in_slug(
 
 
 @pytest.mark.deploy_modes("standalone")
+async def test_invalid_non_uuid_kbid_and_rid_return_specific_404_details(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    resp = await nucliadb_reader.get("/kb/not-a-uuid")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "KnowledgeBox not found. UUID expected."
+
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/not-a-uuid")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Resource not found. UUID expected."
+
+
+@pytest.mark.deploy_modes("standalone")
 async def test_serialize_errors(
     nucliadb_writer: AsyncClient,
     nucliadb_reader: AsyncClient,

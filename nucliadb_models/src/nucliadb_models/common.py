@@ -322,19 +322,21 @@ class QuestionAnswers(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _uuid_path_param(name: str) -> Any:
+def _uuid_path_param(name: str, not_found_detail: str) -> Any:
     """Return a FastAPI ``Depends`` callable that validates *name* as a UUID."""
 
     def _validate(value: str = Path(alias=name)) -> str:
+
         try:
             uuid.UUID(value)
         except ValueError:
-            raise HTTPException(status_code=404, detail="Not found")
+            raise HTTPException(status_code=404, detail=not_found_detail)
         return value
 
     _validate.__name__ = f"validate_{name}"
     return Depends(_validate)
 
 
-KbId = Annotated[str, _uuid_path_param("kbid")]
-RId = Annotated[str, _uuid_path_param("rid")]
+KbId = Annotated[str, _uuid_path_param("kbid", "KnowledgeBox not found. UUID expected.")]
+RId = Annotated[str, _uuid_path_param("rid", "Resource not found. UUID expected.")]
+PathRId = Annotated[str, _uuid_path_param("path_rid", "Resource not found. UUID expected.")]
