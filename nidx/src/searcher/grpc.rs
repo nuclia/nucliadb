@@ -153,33 +153,10 @@ macro_rules! shard_request {
     }};
 }
 
-/// Operation to multiple shards distributed across the searcher cluster
-macro_rules! shards_request {
-    ($self:ident, $op:ty, $request:ident) => {{
-        let coordinator = !$request.metadata().contains_key(HEADER_LOCAL_ONLY);
-        let request = $request.into_inner();
-
-        let shards = validate_shards(&request.shard_ids)?;
-
-        let response = if coordinator {
-            // We are the requested searcher to perform a distributed query
-            $self.distributed_query::<$op>(request, shards).await?
-        } else {
-            // This is a hopped node, i.e., another searcher has delegated this part of the query to
-            // us. We must query our shards and return either a full or partial response or an error.
-            // We won't hop to any other node
-            local_query::<$op>(Arc::clone(&$self.index_cache), request, shards)
-                .await?
-                .data
-        };
-        Ok(Response::new(response))
-    }};
-}
-
 #[tonic::async_trait]
 impl NidxSearcher for SearchServer {
     async fn search(&self, request: Request<SearchRequest>) -> Result<Response<SearchResponse>> {
-        shards_request!(self, SearchOp, request)
+        self.shards_request::<SearchOp>(request).await
     }
 
     async fn suggest(&self, request: Request<SuggestRequest>) -> Result<Response<SuggestResponse>> {
@@ -278,6 +255,29 @@ impl From<SearchResponse> for PartialResponse<SearchResponse> {
 }
 
 impl SearchServer {
+    async fn shards_request<Op>(&self, request: tonic::Request<Op::Request>) -> Result<Response<Op::Response>>
+    where
+        Op: SearcherOp,
+    {
+        let coordinator = !request.metadata().contains_key(HEADER_LOCAL_ONLY);
+        let request = request.into_inner();
+
+        let shards = Op::request_shards(&request)?;
+
+        let response = if coordinator {
+            // We are the requested searcher to perform a distributed query
+            self.distributed_query::<Op>(request, shards).await?
+        } else {
+            // This is a hopped node, i.e., another searcher has delegated this part of the query to
+            // us. We must query our shards and return either a full or partial response or an error.
+            // We won't hop to any other node
+            local_query::<Op>(Arc::clone(&self.index_cache), request, shards)
+                .await?
+                .data
+        };
+        Ok(Response::new(response))
+    }
+
     /// Perform a distributed query over a partitioned dataset across a cluster of nodes.
     ///
     /// The whole dataset is partitioned and distributed (with replication) across nidx-searcher
@@ -439,7 +439,7 @@ async fn local_query<Op: SearcherOp>(
     let parts = Op::local(index_cache, request.clone(), shards).await?;
     let merged = Op::merge(&request, parts);
     Ok(PartialResponse {
-        shards: Op::get_response_shards(&merged),
+        shards: Op::response_shards(&merged),
         data: merged,
     })
 }
@@ -462,7 +462,7 @@ async fn remote_query<Op: SearcherOp>(
         .map_err(NidxError::GrpcError)?
         .into_inner();
     Ok(PartialResponse {
-        shards: Op::get_response_shards(&response),
+        shards: Op::response_shards(&response),
         data: response,
     })
 }
@@ -487,8 +487,9 @@ trait SearcherOp: Clone + Send {
 
     // Helper functions to operate generically with requests/responses
 
+    fn request_shards(request: &Self::Request) -> NidxResult<Vec<Uuid>>;
     fn set_request_shards(request: &mut Self::Request, shards: &[Uuid]);
-    fn get_response_shards(response: &Self::Response) -> Vec<Uuid>;
+    fn response_shards(response: &Self::Response) -> Vec<Uuid>;
 }
 
 #[derive(Clone)]
@@ -523,11 +524,15 @@ impl SearcherOp for SearchOp {
         }
     }
 
+    fn request_shards(request: &Self::Request) -> NidxResult<Vec<Uuid>> {
+        validate_shards(&request.shard_ids)
+    }
+
     fn set_request_shards(request: &mut Self::Request, shards: &[Uuid]) {
         request.shard_ids = shards.iter().map(|x| x.to_string()).collect();
     }
 
-    fn get_response_shards(response: &Self::Response) -> Vec<Uuid> {
+    fn response_shards(response: &Self::Response) -> Vec<Uuid> {
         response
             .shard_ids
             .iter()
