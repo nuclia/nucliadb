@@ -313,14 +313,6 @@ def extract_data_augmentation_id(generated_field_id: str) -> str | None:
     return parts[1] or None
 
 
-def is_uuid(value: str) -> bool:
-    try:
-        uuid.UUID(value)
-        return True
-    except ValueError:
-        return False
-
-
 def valid_kbid(kbid: str) -> bool:
     # Must be a UUID in canonical dashed format.
     if len(kbid) != 36 or kbid.count("-") != 4:
