@@ -33,6 +33,7 @@ from nucliadb_protos.utils_pb2 import VectorSimilarity
 from nucliadb_utils.utilities import Utility, clean_utility, set_utility
 
 WRITER_MODULE = "nucliadb.ingest.service.writer"
+VALID_KBID = "d6fcb6d1-4525-4a1d-84a5-35c7be5dbfbb"
 
 
 class TestWriterServicer:
@@ -77,7 +78,7 @@ class TestWriterServicer:
 
     async def test_NewKnowledgeBoxV2(self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class):
         request = writer_pb2.NewKnowledgeBoxV2Request(
-            kbid="kbid",
+            kbid=VALID_KBID,
             slug="slug",
             title="Title",
             description="Description",
@@ -110,7 +111,7 @@ class TestWriterServicer:
         self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class
     ):
         request = writer_pb2.NewKnowledgeBoxV2Request(
-            kbid="kbid",
+            kbid=VALID_KBID,
             slug="slug",
             title="Title",
             description="Description",
@@ -144,7 +145,7 @@ class TestWriterServicer:
         self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class
     ):
         request = writer_pb2.NewKnowledgeBoxV2Request(
-            kbid="kbid",
+            kbid=VALID_KBID,
             slug="slug",
             title="Title",
             description="Description",
@@ -182,7 +183,7 @@ class TestWriterServicer:
     async def test_NewKnowledgeBoxV2_handle_conflict_error(
         self, writer: WriterServicer, knowledgebox_class
     ):
-        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid=VALID_KBID, slug="slug")
         knowledgebox_class.create.side_effect = KnowledgeBoxConflict()
 
         resp = await writer.NewKnowledgeBoxV2(request)
@@ -190,7 +191,7 @@ class TestWriterServicer:
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.CONFLICT
 
     async def test_NewKnowledgeBoxV2_handle_error(self, writer: WriterServicer, knowledgebox_class):
-        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid=VALID_KBID, slug="slug")
         knowledgebox_class.create.side_effect = Exception("error")
 
         resp = await writer.NewKnowledgeBoxV2(request)
@@ -200,13 +201,24 @@ class TestWriterServicer:
     async def test_NewKnowledgeBoxV2_handle_external_index_error(
         self, writer: WriterServicer, knowledgebox_class
     ):
-        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="kbid", slug="slug")
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid=VALID_KBID, slug="slug")
         knowledgebox_class.create.side_effect = ExternalIndexCreationError("unset", "foo")
 
         resp = await writer.NewKnowledgeBoxV2(request)
 
         assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR
         assert resp.error_message == "foo"
+
+    async def test_NewKnowledgeBoxV2_rejects_invalid_kbid(
+        self, writer: WriterServicer, hosted_nucliadb, knowledgebox_class
+    ):
+        request = writer_pb2.NewKnowledgeBoxV2Request(kbid="not-a-uuid", slug="slug")
+
+        resp = await writer.NewKnowledgeBoxV2(request)
+
+        assert resp.status == writer_pb2.KnowledgeBoxResponseStatus.ERROR
+        assert resp.error_message == "Invalid kbid: not-a-uuid. Should be a valid UUID4 string."
+        knowledgebox_class.create.assert_not_called()
 
     async def test_UpdateKnowledgeBox(self, writer: WriterServicer, knowledgebox_class):
         request = writer_pb2.KnowledgeBoxUpdate(slug="slug", uuid="uuid")
