@@ -467,16 +467,15 @@ impl SearcherOp for SearchOp {
 
     async fn remote_query(
         mut client: SearcherClient,
-        request: Self::Request,
+        mut request: Self::Request,
         shards: Vec<Uuid>,
     ) -> NidxResult<PartialResponse<Self::Response>> {
         // Send the query to a different node specifying only a subset of shards
-        let mut search_request = request.clone();
-        search_request.shard_ids = shards.iter().map(|x| x.to_string()).collect();
+        request.shard_ids = shards.iter().map(|x| x.to_string()).collect();
 
         // We do include a marker header to indicate we already hopped in
         // the cluster. This avoids an infinite loop across nodes
-        let mut request = Request::new(search_request);
+        let mut request = Request::new(request);
         request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
 
         let response = client.search(request).await.map_err(NidxError::GrpcError)?.into_inner();
