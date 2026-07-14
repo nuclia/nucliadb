@@ -35,9 +35,9 @@ use super::query_planner::QueryPlan;
 use super::shards_query::shards_query;
 
 pub async fn search(
-    shards: Vec<Uuid>,
     index_cache: Arc<IndexCache>,
     search_request: SearchRequest,
+    shards: Vec<Uuid>,
 ) -> NidxResult<Vec<SearchResponse>> {
     let query_plan = query_planner::build_query_plan(search_request)?;
     shards_query(index_cache, shards, query_plan, shard_search).await

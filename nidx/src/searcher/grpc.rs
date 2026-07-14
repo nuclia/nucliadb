@@ -168,7 +168,7 @@ macro_rules! shards_request {
             // This is a hopped node, i.e., another searcher has delegated this part of the query to
             // us. We must query our shards and return either a full or partial response or an error.
             // We won't hop to any other node
-            <$op>::local_query(Arc::clone(&$self.index_cache), request, shards)
+            local_query::<$op>(Arc::clone(&$self.index_cache), request, shards)
                 .await?
                 .data
         };
@@ -404,13 +404,15 @@ impl SearchServer {
         match node {
             SearcherNode::This => {
                 let index_cache = Arc::clone(&self.index_cache);
-                Ok(Box::pin(
-                    async move { Op::local_query(index_cache, request, shards).await },
-                ))
+                Ok(Box::pin(async move {
+                    local_query::<Op>(index_cache, request, shards).await
+                }))
             }
             SearcherNode::Remote(ref hostname) => {
                 match self.get_client(hostname).await {
-                    Ok(client) => Ok(Box::pin(async move { Op::remote_query(client, request, shards).await })),
+                    Ok(client) => Ok(Box::pin(
+                        async move { remote_query::<Op>(client, request, shards).await },
+                    )),
                     Err(e) => {
                         // A client for this node is not available, although we've seen it
                         // in the k8s cluster. We skip it and will retry those shards on
@@ -429,23 +431,64 @@ impl SearchServer {
     }
 }
 
+async fn local_query<Op: SearcherOp>(
+    index_cache: Arc<IndexCache>,
+    request: Op::Request,
+    shards: Vec<Uuid>,
+) -> NidxResult<PartialResponse<Op::Response>> {
+    let parts = Op::local(index_cache, request.clone(), shards).await?;
+    let merged = Op::merge(&request, parts);
+    Ok(PartialResponse {
+        shards: Op::get_response_shards(&merged),
+        data: merged,
+    })
+}
+
+async fn remote_query<Op: SearcherOp>(
+    client: SearcherClient,
+    mut request: Op::Request,
+    shards: Vec<Uuid>,
+) -> NidxResult<PartialResponse<Op::Response>> {
+    // Send the query to a different node specifying only a subset of shards
+    Op::set_request_shards(&mut request, &shards);
+
+    // We do include a marker header to indicate we already hopped in
+    // the cluster. This avoids an infinite loop across nodes
+    let mut request = Request::new(request);
+    request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
+
+    let response = Op::remote(client, request)
+        .await
+        .map_err(NidxError::GrpcError)?
+        .into_inner();
+    Ok(PartialResponse {
+        shards: Op::get_response_shards(&response),
+        data: response,
+    })
+}
+
 trait SearcherOp: Clone + Send {
     type Request: Clone + Send + 'static;
     type Response: Send + 'static;
 
-    fn local_query(
+    fn local(
         index_cache: Arc<IndexCache>,
         request: Self::Request,
         shards: Vec<Uuid>,
-    ) -> impl std::future::Future<Output = NidxResult<PartialResponse<Self::Response>>> + Send;
+    ) -> impl std::future::Future<Output = NidxResult<Vec<Self::Response>>> + Send;
 
-    fn remote_query(
+    /// Specific gRPC call for this operation
+    fn remote(
         client: SearcherClient,
-        request: Self::Request,
-        shards: Vec<Uuid>,
-    ) -> impl std::future::Future<Output = NidxResult<PartialResponse<Self::Response>>> + Send;
+        request: tonic::Request<Self::Request>,
+    ) -> impl std::future::Future<Output = tonic::Result<Response<Self::Response>>> + Send;
 
     fn merge(request: &Self::Request, partitions: Vec<Self::Response>) -> Self::Response;
+
+    // Helper functions to operate generically with requests/responses
+
+    fn set_request_shards(request: &mut Self::Request, shards: &[Uuid]);
+    fn get_response_shards(response: &Self::Response) -> Vec<Uuid>;
 }
 
 #[derive(Clone)]
@@ -455,31 +498,19 @@ impl SearcherOp for SearchOp {
     type Request = SearchRequest;
     type Response = SearchResponse;
 
-    async fn local_query(
+    async fn local(
         index_cache: Arc<IndexCache>,
         request: Self::Request,
         shards: Vec<Uuid>,
-    ) -> NidxResult<PartialResponse<Self::Response>> {
-        let responses = shard_search::search(shards.clone(), index_cache, request.clone()).await?;
-        let merged = Self::merge(&request, responses);
-        Ok(PartialResponse::from(merged))
+    ) -> NidxResult<Vec<Self::Response>> {
+        shard_search::search(index_cache, request, shards).await
     }
 
-    async fn remote_query(
+    async fn remote(
         mut client: SearcherClient,
-        mut request: Self::Request,
-        shards: Vec<Uuid>,
-    ) -> NidxResult<PartialResponse<Self::Response>> {
-        // Send the query to a different node specifying only a subset of shards
-        request.shard_ids = shards.iter().map(|x| x.to_string()).collect();
-
-        // We do include a marker header to indicate we already hopped in
-        // the cluster. This avoids an infinite loop across nodes
-        let mut request = Request::new(request);
-        request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
-
-        let response = client.search(request).await.map_err(NidxError::GrpcError)?.into_inner();
-        Ok(PartialResponse::from(response))
+        request: tonic::Request<Self::Request>,
+    ) -> tonic::Result<Response<Self::Response>> {
+        client.search(request).await
     }
 
     fn merge(request: &Self::Request, mut partitions: Vec<Self::Response>) -> Self::Response {
@@ -490,6 +521,18 @@ impl SearcherOp for SearchOp {
             let limit = Limit(request.result_per_page as usize);
             shard_merge::merge(partitions, order_by, limit)
         }
+    }
+
+    fn set_request_shards(request: &mut Self::Request, shards: &[Uuid]) {
+        request.shard_ids = shards.iter().map(|x| x.to_string()).collect();
+    }
+
+    fn get_response_shards(response: &Self::Response) -> Vec<Uuid> {
+        response
+            .shard_ids
+            .iter()
+            .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
+            .collect()
     }
 }
 
