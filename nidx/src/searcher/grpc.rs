@@ -243,13 +243,11 @@ pub struct PartialResponse<T> {
     pub shards: Vec<Uuid>,
 }
 
-impl From<SearchResponse> for PartialResponse<SearchResponse> {
-    fn from(value: SearchResponse) -> Self {
+impl<T: Sharded> From<T> for PartialResponse<T> {
+    fn from(value: T) -> Self {
         let shards = value
-            .shard_ids
-            .iter()
-            .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
-            .collect();
+            .shards()
+            .expect("This is an internal response, we always send valid UUIDs");
         PartialResponse { data: value, shards }
     }
 }
@@ -262,7 +260,7 @@ impl SearchServer {
         let coordinator = !request.metadata().contains_key(HEADER_LOCAL_ONLY);
         let request = request.into_inner();
 
-        let shards = Op::request_shards(&request)?;
+        let shards = request.shards()?;
 
         let response = if coordinator {
             // We are the requested searcher to perform a distributed query
@@ -438,10 +436,7 @@ async fn local_query<Op: SearcherOp>(
 ) -> NidxResult<PartialResponse<Op::Response>> {
     let parts = Op::local(index_cache, request.clone(), shards).await?;
     let merged = Op::merge(&request, parts);
-    Ok(PartialResponse {
-        shards: Op::response_shards(&merged),
-        data: merged,
-    })
+    Ok(PartialResponse::from(merged))
 }
 
 async fn remote_query<Op: SearcherOp>(
@@ -450,7 +445,7 @@ async fn remote_query<Op: SearcherOp>(
     shards: Vec<Uuid>,
 ) -> NidxResult<PartialResponse<Op::Response>> {
     // Send the query to a different node specifying only a subset of shards
-    Op::set_request_shards(&mut request, &shards);
+    request.set_shards(&shards);
 
     // We do include a marker header to indicate we already hopped in
     // the cluster. This avoids an infinite loop across nodes
@@ -461,15 +456,12 @@ async fn remote_query<Op: SearcherOp>(
         .await
         .map_err(NidxError::GrpcError)?
         .into_inner();
-    Ok(PartialResponse {
-        shards: Op::response_shards(&response),
-        data: response,
-    })
+    Ok(PartialResponse::from(response))
 }
 
 trait SearcherOp: Clone + Send {
-    type Request: Clone + Send + 'static;
-    type Response: Send + 'static;
+    type Request: Clone + Sharded + Send + 'static;
+    type Response: Send + Sharded + 'static;
 
     fn local(
         index_cache: Arc<IndexCache>,
@@ -484,12 +476,6 @@ trait SearcherOp: Clone + Send {
     ) -> impl std::future::Future<Output = tonic::Result<Response<Self::Response>>> + Send;
 
     fn merge(request: &Self::Request, partitions: Vec<Self::Response>) -> Self::Response;
-
-    // Helper functions to operate generically with requests/responses
-
-    fn request_shards(request: &Self::Request) -> NidxResult<Vec<Uuid>>;
-    fn set_request_shards(request: &mut Self::Request, shards: &[Uuid]);
-    fn response_shards(response: &Self::Response) -> Vec<Uuid>;
 }
 
 #[derive(Clone)]
@@ -523,22 +509,6 @@ impl SearcherOp for SearchOp {
             shard_merge::merge(partitions, order_by, limit)
         }
     }
-
-    fn request_shards(request: &Self::Request) -> NidxResult<Vec<Uuid>> {
-        validate_shards(&request.shard_ids)
-    }
-
-    fn set_request_shards(request: &mut Self::Request, shards: &[Uuid]) {
-        request.shard_ids = shards.iter().map(|x| x.to_string()).collect();
-    }
-
-    fn response_shards(response: &Self::Response) -> Vec<Uuid> {
-        response
-            .shard_ids
-            .iter()
-            .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
-            .collect()
-    }
 }
 
 struct QueryPartitioner {
@@ -568,6 +538,28 @@ impl QueryPartitioner {
         if !nodes.is_empty() { Some(nodes.remove(0)) } else { None }
     }
 }
+
+pub trait Sharded {
+    fn shards(&self) -> NidxResult<Vec<Uuid>>;
+    fn set_shards(&mut self, shards: &[Uuid]);
+}
+
+macro_rules! impl_sharded_trait {
+    ($message:ty, shards_field=$shards_field:ident) => {
+        impl Sharded for $message {
+            fn shards(&self) -> NidxResult<Vec<Uuid>> {
+                validate_shards(&self.$shards_field)
+            }
+
+            fn set_shards(&mut self, shards: &[Uuid]) {
+                self.$shards_field = shards.iter().map(|x| x.to_string()).collect();
+            }
+        }
+    };
+}
+
+impl_sharded_trait!(SearchRequest, shards_field = shard_ids);
+impl_sharded_trait!(SearchResponse, shards_field = shard_ids);
 
 fn validate_shards(shards: &[String]) -> NidxResult<Vec<Uuid>> {
     let mut valid = Vec::with_capacity(shards.len());
