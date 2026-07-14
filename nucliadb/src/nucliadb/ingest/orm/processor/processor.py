@@ -32,7 +32,7 @@ from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.external_index_providers.base import ExternalIndexManager
 from nucliadb.common.external_index_providers.manager import get_external_index_manager
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, valid_rid
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb.ingest.orm.exceptions import (
@@ -168,6 +168,12 @@ class Processor:
         partition: str | None = None,
         transaction_check: bool = True,
     ) -> None:
+
+        if message.uuid and not valid_rid(message.uuid):
+            raise InvalidBrokerMessage(
+                f"Invalid resource ID: {message.uuid}. UUID in hex format expected."
+            )
+
         partition = partition if self.partition is None else self.partition
         if partition is None:
             raise AttributeError("Can't process message from unknown partition")
