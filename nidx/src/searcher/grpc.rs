@@ -239,6 +239,8 @@ impl NidxSearcher for SearchServer {
 }
 
 impl SearchServer {
+    /// Perform a distributed operation across multiple nodes for the requested shards and return an
+    /// aggregated response
     async fn shards_request<Op>(&self, request: tonic::Request<Op::Request>) -> Result<Response<Op::Response>>
     where
         Op: SearcherOp,
@@ -255,21 +257,16 @@ impl SearchServer {
             // This is a hopped node, i.e., another searcher has delegated this part of the query to
             // us. We must query our shards and return either a full or partial response or an error.
             // We won't hop to any other node
-            local_query::<Op>(Arc::clone(&self.index_cache), request, shards).await?
+            Self::local_query::<Op>(Arc::clone(&self.index_cache), request, shards).await?
         };
         Ok(Response::new(response))
     }
 
     /// Perform a distributed query over a partitioned dataset across a cluster of nodes.
     ///
-    /// The whole dataset is partitioned and distributed (with replication) across nidx-searcher
-    /// nodes. To answer a query, we must query all partitions (shards) and merge the results into a
-    /// single respose.
-    ///
-    /// This function is responsible for partial failure handling and retry. As a node can be
-    /// requested to query several partitions and one or more can fail, it will then return a
-    /// partial result and is our responsibility to retry on other nodes.
-    ///
+    /// Partitions (shards) are distributed and replicated across the cluster. This function uses a
+    /// scatter-gather pattern to query all partitions and return an aggregated response. It handles
+    /// partial failure and retries failed partitions until success or exhaustion.
     async fn distributed_query<Op>(&self, request: Op::Request, shards: Vec<Uuid>) -> NidxResult<Op::Response>
     where
         Op: SearcherOp,
@@ -303,12 +300,12 @@ impl SearchServer {
         Ok(merged)
     }
 
-    /// Perform a scatter-gather cycle using the preferred node for each shard.
-    /// This operation will group shards by node and scatter the requests across
-    /// nodes. Then, we'll wait for all of them and gather the results
+    /// Perform a scatter-gather cycle using the preferred node for each shard. This operation will
+    /// group shards by node and scatter the requests across nodes. Then, we'll wait for all of them
+    /// and gather the results
     ///
-    /// NOTE that cycles are less time-efficient than immediately requesting
-    /// failed nodes, as tail latency can increase due to slow/faulty nodes
+    /// NOTE that cycles are less time-efficient than immediately requesting failed nodes, as tail
+    /// latency can increase due to slow/faulty nodes
     #[instrument(skip_all, fields(partitions = shards.len(), nodes = Empty))]
     async fn scatter_gather<Op>(
         &self,
@@ -390,14 +387,14 @@ impl SearchServer {
             SearcherNode::This => {
                 let index_cache = Arc::clone(&self.index_cache);
                 Ok(Box::pin(async move {
-                    local_query::<Op>(index_cache, request, shards).await
+                    Self::local_query::<Op>(index_cache, request, shards).await
                 }))
             }
             SearcherNode::Remote(ref hostname) => {
                 match self.get_client(hostname).await {
-                    Ok(client) => Ok(Box::pin(
-                        async move { remote_query::<Op>(client, request, shards).await },
-                    )),
+                    Ok(client) => Ok(Box::pin(async move {
+                        Self::remote_query::<Op>(client, request, shards).await
+                    })),
                     Err(e) => {
                         // A client for this node is not available, although we've seen it
                         // in the k8s cluster. We skip it and will retry those shards on
@@ -414,38 +411,49 @@ impl SearchServer {
             }
         }
     }
+
+    async fn local_query<Op>(
+        index_cache: Arc<IndexCache>,
+        request: Op::Request,
+        shards: Vec<Uuid>,
+    ) -> NidxResult<Op::Response>
+    where
+        Op: SearcherOp,
+    {
+        let parts = Op::local(index_cache, request.clone(), shards).await?;
+        let merged = Op::merge(&request, parts);
+        Ok(merged)
+    }
+
+    async fn remote_query<Op>(
+        client: SearcherClient,
+        mut request: Op::Request,
+        shards: Vec<Uuid>,
+    ) -> NidxResult<Op::Response>
+    where
+        Op: SearcherOp,
+    {
+        // Send the query to a different node specifying only a subset of shards
+        request.set_shards(&shards);
+
+        // We do include a marker header to indicate we already hopped in
+        // the cluster. This avoids an infinite loop across nodes
+        let mut request = Request::new(request);
+        request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
+
+        let response = Op::remote(client, request)
+            .await
+            .map_err(NidxError::GrpcError)?
+            .into_inner();
+        Ok(response)
+    }
 }
 
-async fn local_query<Op: SearcherOp>(
-    index_cache: Arc<IndexCache>,
-    request: Op::Request,
-    shards: Vec<Uuid>,
-) -> NidxResult<Op::Response> {
-    let parts = Op::local(index_cache, request.clone(), shards).await?;
-    let merged = Op::merge(&request, parts);
-    Ok(merged)
-}
-
-async fn remote_query<Op: SearcherOp>(
-    client: SearcherClient,
-    mut request: Op::Request,
-    shards: Vec<Uuid>,
-) -> NidxResult<Op::Response> {
-    // Send the query to a different node specifying only a subset of shards
-    request.set_shards(&shards);
-
-    // We do include a marker header to indicate we already hopped in
-    // the cluster. This avoids an infinite loop across nodes
-    let mut request = Request::new(request);
-    request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
-
-    let response = Op::remote(client, request)
-        .await
-        .map_err(NidxError::GrpcError)?
-        .into_inner();
-    Ok(response)
-}
-
+/// `SearcherOp` is a trait to abstract gRPC operations over multiple shards in
+/// order to compose generic distributed query algorithms on top.
+///
+/// Each operator can be executed locally or remotely and exposes how to merge
+/// multiple responses into a single aggregated one.
 trait SearcherOp: Clone + Send {
     type Request: Clone + Sharded + Send + 'static;
     type Response: Send + Sharded + 'static;
@@ -498,6 +506,10 @@ impl SearcherOp for SearchOp {
     }
 }
 
+/// Helper struct for a scatter-gather pattern.
+///
+/// For any given set of shards, it decides which are the best nodes to query
+/// each shard. The struct consumes itself while answering.
 struct QueryPartitioner {
     shard_nodes: HashMap<Uuid, Vec<SearcherNode>>,
 }
@@ -526,6 +538,8 @@ impl QueryPartitioner {
     }
 }
 
+/// Simple trait to abstract over request/response protobuffers that operate on
+/// a set of shards
 pub trait Sharded {
     fn shards(&self) -> NidxResult<Vec<Uuid>>;
     fn set_shards(&mut self, shards: &[Uuid]);
