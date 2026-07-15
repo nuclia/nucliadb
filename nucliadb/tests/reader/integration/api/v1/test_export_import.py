@@ -17,10 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import uuid
 
 import pytest
 from httpx import AsyncClient
+
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
 
 @pytest.mark.deploy_modes("component", "standalone")
@@ -37,7 +38,7 @@ async def test_api(nucliadb_reader: AsyncClient, knowledgebox: str):
     assert resp.status_code < 500
 
     # Check that for non-existing kbs, endpoints return a 404
-    idonotexist = str(uuid.uuid4())
+    idonotexist = KnowledgeBox.new_unique_kbid()
     for endpoint in (
         f"/kb/{idonotexist}/export/foo",
         f"/kb/{idonotexist}/export/foo/status",
