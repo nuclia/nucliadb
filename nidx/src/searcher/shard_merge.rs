@@ -18,8 +18,8 @@ use std::collections::{HashMap, HashSet};
 use itertools::Itertools;
 use nidx_protos::{
     DocumentResult, DocumentSearchResponse, FacetResult, FacetResults, GraphSearchResponse, ParagraphResult,
-    ParagraphSearchResponse, SearchRequest, SearchResponse, VectorSearchResponse, document_result, order_by,
-    paragraph_result,
+    ParagraphSearchResponse, RelationPrefixSearchResponse, SearchRequest, SearchResponse, SuggestResponse,
+    VectorSearchResponse, document_result, order_by, paragraph_result,
 };
 use tracing::field::Empty;
 use tracing::{Span, instrument};
@@ -47,7 +47,7 @@ pub struct Limit(pub usize);
 /// (this is validated before searching, so we don't care much here)
 ///
 #[instrument(skip_all, fields(shards_count = Empty, document_count = Empty, paragraph_count = Empty, vector_count = Empty, graph_count = Empty, limit = limit.0))]
-pub fn merge(shard_responses: Vec<SearchResponse>, order_by: OrderBy, limit: Limit) -> SearchResponse {
+pub fn merge_search(shard_responses: Vec<SearchResponse>, order_by: OrderBy, limit: Limit) -> SearchResponse {
     let mut shard_ids = vec![];
     let mut document_responses = Vec::with_capacity(shard_responses.len());
     let mut paragraph_responses = Vec::with_capacity(shard_responses.len());
@@ -79,7 +79,7 @@ pub fn merge(shard_responses: Vec<SearchResponse>, order_by: OrderBy, limit: Lim
     let paragraph =
         (!paragraph_responses.is_empty()).then(|| merge_paragraph_responses(paragraph_responses, order_by, limit));
     let vector = (!vector_responses.is_empty()).then(|| merge_vector_responses(vector_responses, limit));
-    let graph = (!graph_responses.is_empty()).then(|| merge_graph_responses(graph_responses, limit));
+    let graph = (!graph_responses.is_empty()).then(|| merge_graph_responses(graph_responses));
 
     SearchResponse {
         shard_ids,
@@ -88,6 +88,74 @@ pub fn merge(shard_responses: Vec<SearchResponse>, order_by: OrderBy, limit: Lim
         vector,
         graph,
     }
+}
+
+#[instrument(skip_all, fields(shards_count = Empty, paragraph_count = Empty, entities_count = Empty, limit = limit.0))]
+pub fn merge_suggest(shard_responses: Vec<SuggestResponse>, limit: Limit) -> SuggestResponse {
+    let mut merged = SuggestResponse::default();
+    let mut ematches = HashSet::new();
+    let mut results = vec![];
+    let mut graph_nodes = HashSet::new();
+    let mut paragraph_count = 0;
+    let mut entities_count = 0;
+
+    for response in shard_responses {
+        merged.shard_ids.extend(response.shard_ids);
+
+        merged.query = response.query;
+        merged.total += response.total;
+        ematches.extend(response.ematches);
+
+        paragraph_count += response.results.len();
+        results.push(response.results.into_iter());
+
+        if let Some(entities) = response.entity_results {
+            entities_count += entities.nodes.len();
+            graph_nodes.extend(entities.nodes.into_iter());
+        }
+    }
+
+    merged.ematches = ematches.into_iter().collect();
+    merged.results = results
+        .into_iter()
+        .kmerge_by(sort_paragraphs_fn(OrderBy {
+            expr: SortExpr::Score,
+            descending: true,
+        }))
+        .take(limit.0)
+        .collect();
+    if !graph_nodes.is_empty() {
+        merged.entity_results = Some(RelationPrefixSearchResponse {
+            nodes: graph_nodes.into_iter().collect(),
+        });
+    }
+
+    let span = Span::current();
+    span.record("shards_count", merged.shard_ids.len());
+    span.record("paragraph_count", paragraph_count);
+    span.record("entities_count", entities_count);
+
+    merged
+}
+
+// REVIEW: top_k is not enforced after merge. We can't do a good cut if we don't have scores though
+#[instrument(skip_all, fields(shards_count = Empty, graph_count = Empty))]
+pub fn merge_graph(shard_responses: Vec<GraphSearchResponse>) -> GraphSearchResponse {
+    if shard_responses.is_empty() {
+        return GraphSearchResponse::default();
+    }
+
+    let shard_ids = shard_responses
+        .iter()
+        .flat_map(|response| response.shard_ids.clone())
+        .collect();
+    let mut merged = merge_graph_responses(shard_responses);
+    merged.shard_ids = shard_ids;
+
+    let span = Span::current();
+    span.record("shards_count", merged.shard_ids.len());
+
+    merged
 }
 
 fn merge_document_responses(
@@ -255,7 +323,7 @@ fn merge_vector_responses(responses: Vec<VectorSearchResponse>, limit: Limit) ->
     VectorSearchResponse { documents: merged }
 }
 
-fn merge_graph_responses(responses: Vec<GraphSearchResponse>, _limit: Limit) -> GraphSearchResponse {
+fn merge_graph_responses(responses: Vec<GraphSearchResponse>) -> GraphSearchResponse {
     debug_assert!(!responses.is_empty(), "must pass at least 1 shard response");
     let mut merged = GraphSearchResponse::default();
 
@@ -361,11 +429,11 @@ mod tests {
 
     use crate::searcher::shard_merge::{Limit, OrderBy};
 
-    use super::merge;
+    use super::merge_search;
 
     #[test]
     fn test_merge_nothing() {
-        let merged = merge(vec![], OrderBy::default(), Limit(20));
+        let merged = merge_search(vec![], OrderBy::default(), Limit(20));
         assert!(merged.document.is_none());
         assert!(merged.paragraph.is_none());
         assert!(merged.vector.is_none());
@@ -378,7 +446,7 @@ mod tests {
             vector: None,
             graph: None,
         };
-        let merged = merge(vec![empty.clone(), empty], OrderBy::default(), Limit(20));
+        let merged = merge_search(vec![empty.clone(), empty], OrderBy::default(), Limit(20));
         assert!(merged.document.is_none());
         assert!(merged.paragraph.is_none());
         assert!(merged.vector.is_none());
@@ -393,7 +461,7 @@ mod tests {
         use crate::searcher::shard_merge::OrderBy;
         use crate::searcher::shard_merge::{Limit, SortExpr};
 
-        use super::merge;
+        use super::merge_search;
         use super::proto_facets;
 
         #[test]
@@ -409,14 +477,14 @@ mod tests {
             // `query` is taken from any request. As the fulltext query is common
             // across shards, it shouldn't mind which one to pick
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![document("my query"), document("my query")],
                 OrderBy::default(),
                 Limit(20),
             );
             assert_eq!(merged.document.unwrap().query, "my query");
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![document("my query"), document("my second query")],
                 OrderBy::default(),
                 Limit(20),
@@ -440,13 +508,13 @@ mod tests {
             // `total` is the count of matched documents (not necessarily
             // returned). The merged value is the sum of all
 
-            let merged = merge(vec![document(10), document(15)], OrderBy::default(), Limit(20));
+            let merged = merge_search(vec![document(10), document(15)], OrderBy::default(), Limit(20));
             assert_eq!(merged.document.unwrap().total, 25);
 
-            let merged = merge(vec![document(0), document(15)], OrderBy::default(), Limit(20));
+            let merged = merge_search(vec![document(0), document(15)], OrderBy::default(), Limit(20));
             assert_eq!(merged.document.unwrap().total, 15);
 
-            let merged = merge(vec![document(0), document(0)], OrderBy::default(), Limit(20));
+            let merged = merge_search(vec![document(0), document(0)], OrderBy::default(), Limit(20));
             assert_eq!(merged.document.unwrap().total, 0);
         }
 
@@ -463,7 +531,7 @@ mod tests {
             // `next_page` is true if any shard has next_page as true
             for a in [false, true] {
                 for b in [false, true] {
-                    let merged = merge(vec![document(a), document(b)], OrderBy::default(), Limit(20));
+                    let merged = merge_search(vec![document(a), document(b)], OrderBy::default(), Limit(20));
                     assert_eq!(merged.document.unwrap().next_page, a | b);
                 }
             }
@@ -481,7 +549,7 @@ mod tests {
 
             // `facets` are aggregated and counts are added together
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     document(vec![("/l/label-A", 10), ("/l/label-B", 5)]),
                     document(vec![("/l/label-A", 3), ("/l/label-C", 7), ("/e/table", 12)]),
@@ -532,12 +600,12 @@ mod tests {
                 ..Default::default()
             };
 
-            let merged = merge(vec![shard.clone(), shard.clone()], OrderBy::default(), Limit(50))
+            let merged = merge_search(vec![shard.clone(), shard.clone()], OrderBy::default(), Limit(50))
                 .document
                 .unwrap();
             assert_eq!(merged.results.len(), 40);
 
-            let merged = merge(vec![shard.clone(), shard.clone()], OrderBy::default(), Limit(20))
+            let merged = merge_search(vec![shard.clone(), shard.clone()], OrderBy::default(), Limit(20))
                 .document
                 .unwrap();
             assert_eq!(merged.results.len(), 20);
@@ -563,7 +631,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     response(vec![document("foo", 3.0, 1.0), document("bar", 2.0, 2.0)]),
                     response(vec![document("baz", 4.0, 1.0), document("quux", 2.0, 1.0)]),
@@ -600,7 +668,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     response(vec![document("foo", 3, 1), document("bar", 2, 2)]),
                     response(vec![document("baz", 4, 1), document("quux", 2, 1)]),
@@ -619,7 +687,7 @@ mod tests {
             assert_eq!(merged.results[2].uuid, "bar");
             assert_eq!(merged.results[3].uuid, "quux");
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     response(vec![document("bar", 2, 2), document("foo", 3, 1)]),
                     response(vec![document("quux", 2, 1), document("baz", 4, 1)]),
@@ -648,7 +716,7 @@ mod tests {
         use crate::searcher::shard_merge::OrderBy;
         use crate::searcher::shard_merge::{Limit, SortExpr};
 
-        use super::merge;
+        use super::merge_search;
         use super::proto_facets;
 
         #[test]
@@ -664,14 +732,14 @@ mod tests {
             // `query` is taken from any request. As the keyword query is common
             // across shards, it shouldn't mind which one to pick
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![paragraph("my query"), paragraph("my query")],
                 OrderBy::default(),
                 Limit(20),
             );
             assert_eq!(merged.paragraph.unwrap().query, "my query");
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![paragraph("my query"), paragraph("my second query")],
                 OrderBy::default(),
                 Limit(20),
@@ -695,13 +763,13 @@ mod tests {
             // `total` is the count of matched paragraphs (not necessarily
             // returned). The merged value is the sum of all
 
-            let merged = merge(vec![paragraph(10), paragraph(15)], OrderBy::default(), Limit(20));
+            let merged = merge_search(vec![paragraph(10), paragraph(15)], OrderBy::default(), Limit(20));
             assert_eq!(merged.paragraph.unwrap().total, 25);
 
-            let merged = merge(vec![paragraph(0), paragraph(15)], OrderBy::default(), Limit(20));
+            let merged = merge_search(vec![paragraph(0), paragraph(15)], OrderBy::default(), Limit(20));
             assert_eq!(merged.paragraph.unwrap().total, 15);
 
-            let merged = merge(vec![paragraph(0), paragraph(0)], OrderBy::default(), Limit(20));
+            let merged = merge_search(vec![paragraph(0), paragraph(0)], OrderBy::default(), Limit(20));
             assert_eq!(merged.paragraph.unwrap().total, 0);
         }
 
@@ -718,7 +786,7 @@ mod tests {
             // `next_page` is true if any shard has next_page as true
             for a in [false, true] {
                 for b in [false, true] {
-                    let merged = merge(vec![paragraph(a), paragraph(b)], OrderBy::default(), Limit(20));
+                    let merged = merge_search(vec![paragraph(a), paragraph(b)], OrderBy::default(), Limit(20));
                     assert_eq!(merged.paragraph.unwrap().next_page, a | b);
                 }
             }
@@ -736,7 +804,7 @@ mod tests {
 
             // `facets` are aggregated and counts are added together
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     paragraph(vec![("/l/label-A", 10), ("/l/label-B", 5)]),
                     paragraph(vec![("/l/label-A", 3), ("/l/label-C", 7), ("/e/table", 12)]),
@@ -783,7 +851,7 @@ mod tests {
 
             // `ematches` are aggregated without repetition
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     paragraph(vec!["A".to_string(), "B".to_string(), "C".to_string()]),
                     paragraph(vec!["A".to_string(), "D".to_string(), "E".to_string()]),
@@ -820,12 +888,12 @@ mod tests {
                 ..Default::default()
             };
 
-            let merged = merge(vec![shard.clone(), shard.clone()], OrderBy::default(), Limit(50))
+            let merged = merge_search(vec![shard.clone(), shard.clone()], OrderBy::default(), Limit(50))
                 .paragraph
                 .unwrap();
             assert_eq!(merged.results.len(), 40);
 
-            let merged = merge(vec![shard.clone(), shard.clone()], OrderBy::default(), Limit(20))
+            let merged = merge_search(vec![shard.clone(), shard.clone()], OrderBy::default(), Limit(20))
                 .paragraph
                 .unwrap();
             assert_eq!(merged.results.len(), 20);
@@ -851,7 +919,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     response(vec![paragraph("foo", 3.0, 1.0), paragraph("bar", 2.0, 2.0)]),
                     response(vec![paragraph("baz", 4.0, 1.0), paragraph("quux", 2.0, 1.0)]),
@@ -888,7 +956,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     response(vec![paragraph("foo", 3, 1), paragraph("bar", 2, 2)]),
                     response(vec![paragraph("baz", 4, 1), paragraph("quux", 2, 1)]),
@@ -907,7 +975,7 @@ mod tests {
             assert_eq!(merged.results[2].uuid, "bar");
             assert_eq!(merged.results[3].uuid, "quux");
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     response(vec![paragraph("bar", 2, 2), paragraph("foo", 3, 1)]),
                     response(vec![paragraph("quux", 2, 1), paragraph("baz", 4, 1)]),
@@ -933,7 +1001,7 @@ mod tests {
 
         use crate::searcher::shard_merge::{Limit, OrderBy};
 
-        use super::merge;
+        use super::merge_search;
 
         #[test]
         fn test_merge_vector_results() {
@@ -955,13 +1023,17 @@ mod tests {
                 response(vec![vector("c", 3.2), vector("d", 0.9)]),
             ];
 
-            let merged = merge(shards.clone(), OrderBy::default(), Limit(20)).vector.unwrap();
+            let merged = merge_search(shards.clone(), OrderBy::default(), Limit(20))
+                .vector
+                .unwrap();
             assert_eq!(merged.documents[0].doc_id.as_ref().unwrap().id, "c");
             assert_eq!(merged.documents[1].doc_id.as_ref().unwrap().id, "a");
             assert_eq!(merged.documents[2].doc_id.as_ref().unwrap().id, "d");
             assert_eq!(merged.documents[3].doc_id.as_ref().unwrap().id, "b");
 
-            let merged = merge(shards.clone(), OrderBy::default(), Limit(2)).vector.unwrap();
+            let merged = merge_search(shards.clone(), OrderBy::default(), Limit(2))
+                .vector
+                .unwrap();
             assert_eq!(merged.documents[0].doc_id.as_ref().unwrap().id, "c");
             assert_eq!(merged.documents[1].doc_id.as_ref().unwrap().id, "a");
         }
@@ -975,7 +1047,7 @@ mod tests {
 
         use crate::searcher::shard_merge::{Limit, OrderBy};
 
-        use super::merge;
+        use super::merge_search;
 
         #[test]
         fn test_merge_graph_results() {
@@ -1011,10 +1083,11 @@ mod tests {
                 ..Default::default()
             };
 
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     SearchResponse {
                         graph: Some(GraphSearchResponse {
+                            shard_ids: vec!["shard1".to_string()],
                             nodes: vec![cat.clone(), dog.clone()],
                             relations: vec![love.clone()],
                             graph: vec![
@@ -1029,6 +1102,7 @@ mod tests {
                     },
                     SearchResponse {
                         graph: Some(GraphSearchResponse {
+                            shard_ids: vec!["shard2".to_string(), "shard3".to_string()],
                             nodes: vec![table, cat, dog],
                             relations: vec![jump, love],
                             graph: vec![

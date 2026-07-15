@@ -290,13 +290,20 @@ fn blocking_search(
     )
 }
 
-#[instrument(skip_all, fields(shard_id = graph_request.shard))]
 pub async fn graph_search(
     index_cache: Arc<IndexCache>,
     graph_request: GraphSearchRequest,
-) -> NidxResult<GraphSearchResponse> {
-    let shard_id = Uuid::parse_str(&graph_request.shard)?;
+    shards: Vec<Uuid>,
+) -> NidxResult<Vec<GraphSearchResponse>> {
+    shards_query(index_cache, shards, graph_request, shard_graph_search).await
+}
 
+#[instrument(skip_all, fields(shard_id = shard_id.to_string()))]
+pub async fn shard_graph_search(
+    shard_id: Uuid,
+    index_cache: Arc<IndexCache>,
+    graph_request: GraphSearchRequest,
+) -> NidxResult<GraphSearchResponse> {
     let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
         return Err(NidxError::NotFound);
     };

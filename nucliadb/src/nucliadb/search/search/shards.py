@@ -80,5 +80,5 @@ async def suggest_shard(shard: str, query: SuggestRequest) -> SuggestResponse:
 async def graph_search_shard(shard: str, query: GraphSearchRequest) -> GraphSearchResponse:
     req = GraphSearchRequest()
     req.CopyFrom(query)
-    req.shard = shard
+    req.shard_ids[:] = [shard]
     return await get_nidx_searcher_client().GraphSearch(req)

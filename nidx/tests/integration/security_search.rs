@@ -148,7 +148,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(nidx_protos::GraphQuery {
                 path: Some(Default::default()),
             }),
@@ -179,7 +179,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(nidx_protos::GraphQuery {
                 path: Some(Default::default()),
             }),
@@ -210,7 +210,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(nidx_protos::GraphQuery {
                 path: Some(Default::default()),
             }),
@@ -241,7 +241,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(nidx_protos::GraphQuery {
                 path: Some(Default::default()),
             }),
@@ -275,7 +275,7 @@ async fn test_security_search(pool: PgPool) -> Result<(), Box<dyn std::error::Er
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(nidx_protos::GraphQuery {
                 path: Some(Default::default()),
             }),

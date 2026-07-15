@@ -95,7 +95,7 @@ async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path::default())),
@@ -114,7 +114,7 @@ async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -137,7 +137,7 @@ async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -160,7 +160,7 @@ async fn test_graph_search_nodes(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -195,7 +195,7 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path::default())),
@@ -213,7 +213,7 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -238,7 +238,7 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -268,7 +268,7 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -295,7 +295,7 @@ async fn test_graph_search__node_query(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -336,7 +336,7 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -365,7 +365,7 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -393,7 +393,7 @@ async fn test_graph_search__fuzzy_node_query(pool: PgPool) -> anyhow::Result<()>
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -431,7 +431,7 @@ async fn test_graph_search_relations(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -458,7 +458,7 @@ async fn test_graph_search_relations(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -484,7 +484,7 @@ async fn test_graph_search_relations(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -522,7 +522,7 @@ async fn test_graph_search__relation_query(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -549,7 +549,7 @@ async fn test_graph_search__relation_query(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -586,7 +586,7 @@ async fn test_graph_search__directed_path_query(pool: PgPool) -> anyhow::Result<
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -620,7 +620,7 @@ async fn test_graph_search__directed_path_query(pool: PgPool) -> anyhow::Result<
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -654,7 +654,7 @@ async fn test_graph_search__directed_path_query(pool: PgPool) -> anyhow::Result<
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -700,7 +700,7 @@ async fn test_graph_search__undirected_path_query(pool: PgPool) -> anyhow::Resul
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery {
                     query: Some(path_query::Query::Path(graph_query::Path {
@@ -744,7 +744,7 @@ async fn test_graph_search_prefilter(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery::default()),
             }),
@@ -759,7 +759,7 @@ async fn test_graph_search_prefilter(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery::default()),
             }),
@@ -779,7 +779,7 @@ async fn test_graph_search_prefilter(pool: PgPool) -> anyhow::Result<()> {
     let response = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(GraphQuery {
                 path: Some(graph_query::PathQuery::default()),
             }),

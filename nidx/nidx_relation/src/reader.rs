@@ -169,6 +169,7 @@ impl RelationsReaderService {
         }
 
         let response = nidx_protos::GraphSearchResponse {
+            shard_ids: vec![], // populated later
             nodes,
             relations,
             graph,
