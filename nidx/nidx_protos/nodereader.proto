@@ -427,7 +427,7 @@ enum SuggestFeatures {
 }
 
 message SuggestRequest {
-    string shard = 1;
+    repeated string shard_ids = 1;
 
     string body = 2;
     repeated SuggestFeatures features = 6;
@@ -441,6 +441,11 @@ message SuggestRequest {
 }
 
 message SuggestResponse {
+    // List of successfully queried shard ids. This is used in the multi-shard
+    // querying, where the caller must know which shards have been successfully
+    // searched to know about failures.
+    repeated string shard_ids = 7;
+
     int32 total = 1;
     repeated ParagraphResult results = 2;
 

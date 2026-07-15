@@ -70,7 +70,7 @@ async def get_shard(shard_id: str) -> Shard:
 async def suggest_shard(shard: str, query: SuggestRequest) -> SuggestResponse:
     req = SuggestRequest()
     req.CopyFrom(query)
-    req.shard = shard
+    req.shard_ids[:] = [shard]
     return await get_nidx_searcher_client().Suggest(req)
 
 
