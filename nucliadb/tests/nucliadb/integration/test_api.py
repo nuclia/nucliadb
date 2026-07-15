@@ -267,6 +267,29 @@ async def test_invalid_uuid_path_params_return_expected_error_detail(
     assert resp.json()["detail"] == "Resource not found. UUID expected."
 
 
+@pytest.mark.deploy_modes("component")
+async def test_component_reader_invalid_kbid_returns_expected_error_detail(
+    nucliadb_reader: AsyncClient,
+):
+    resp = await nucliadb_reader.get("/kb/not-a-uuid")
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "KnowledgeBox not found. UUID expected."
+
+
+@pytest.mark.deploy_modes("component")
+async def test_component_writer_invalid_kbid_returns_expected_error_detail(
+    nucliadb_writer: AsyncClient,
+):
+    resp = await nucliadb_writer.post(
+        "/kb/not-a-uuid/resources",
+        json={"title": "Resource should not be created"},
+    )
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "KnowledgeBox not found. UUID expected."
+
+
 @pytest.mark.deploy_modes("standalone")
 async def test_serialize_errors(
     nucliadb_writer: AsyncClient,
