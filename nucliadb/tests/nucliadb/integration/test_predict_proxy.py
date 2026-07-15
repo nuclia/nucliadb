@@ -95,3 +95,45 @@ async def test_predict_proxy_returns_404_on_non_existing_kb(
         json={"question": "foo", "query_context": ["foobar"], "user_id": "foo"},
     )
     assert resp.status_code == 404
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_predict_proxy_chat_with_too_large_audit_metadata_is_not_audited(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    stream_audit,
+):
+    kbid = standalone_knowledgebox
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/predict/chat",
+        json={
+            "question": "foo",
+            "query_context": ["foobar"],
+            "user_id": "foo",
+            "audit_metadata": {"oversized": "x" * (11 * 1024)},
+        },
+    )
+
+    assert resp.status_code == 422
+    assert "Audit metadata size is too large" in resp.text
+    stream_audit.chat.assert_not_called()
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_predict_proxy_chat_is_audited_on_success(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+    stream_audit,
+):
+    kbid = standalone_knowledgebox
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/predict/chat",
+        json={
+            "question": "foo",
+            "query_context": ["foobar"],
+            "user_id": "foo",
+            "audit_metadata": {},
+        },
+    )
+    assert resp.status_code == 200
+    stream_audit.chat.assert_called_once()
