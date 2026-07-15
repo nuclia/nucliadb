@@ -21,7 +21,7 @@ import asyncio
 import json
 from collections.abc import Sequence
 from enum import Enum, auto
-from typing import Any, Callable, Coroutine, TypeVar, overload
+from typing import TypeVar, overload
 
 from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
@@ -40,7 +40,7 @@ from typing_extensions import assert_never
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.search import logger
-from nucliadb.search.search.shards import graph_search_shard, query_shard, query_shards, suggest_shard
+from nucliadb.search.search.shards import graph_search_shards, query_shards, suggest_shards
 from nucliadb.search.settings import settings
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_telemetry import errors
@@ -53,6 +53,16 @@ class Method(Enum):
     SUGGEST = auto()
     GRAPH = auto()
 
+    def __str__(self):
+        if self == self.SEARCH:
+            return "search"
+        elif self == self.SUGGEST:
+            return "suggest"
+        elif self == self.GRAPH:
+            return "graph"
+        else:  # pragma: no cover
+            assert_never(self)
+
 
 REQUEST_TYPE = SuggestRequest | SearchRequest | GraphSearchRequest
 
@@ -62,6 +72,12 @@ T = TypeVar(
     SearchResponse,
     GraphSearchResponse,
 )
+
+METHODS = {
+    Method.SEARCH: query_shards,
+    Method.SUGGEST: suggest_shards,
+    Method.GRAPH: graph_search_shards,
+}
 
 
 @overload
@@ -110,41 +126,25 @@ async def nidx_query(
     ops = []
     queried_shards = []
 
-    func: (
-        Callable[[list[str], SearchRequest], Coroutine[Any, Any, SearchResponse]]
-        | Callable[[str, SuggestRequest], Coroutine[Any, Any, SuggestResponse]]
-        | Callable[[str, GraphSearchRequest], Coroutine[Any, Any, GraphSearchResponse]]
-    )
+    func = METHODS[method]
 
-    if method == Method.SEARCH:
-        assert isinstance(pb_query, SearchRequest), "type checked constraint"
+    if has_feature(
+        const.Features.BETTER_MULTI_SHARD_SEARCH, context={"kbid": kbid, "method": str(method)}
+    ):
+        for shard_obj in shard_groups:
+            if shard_obj.nidx_shard_id is not None:
+                queried_shards.append(shard_obj.nidx_shard_id)
 
-        if has_feature(const.Features.BETTER_MULTI_SHARD_SEARCH, context={"kbid": kbid}):
-            for shard_obj in shard_groups:
-                if shard_obj.nidx_shard_id is not None:
-                    queried_shards.append(shard_obj.nidx_shard_id)
-            ops.append(query_shards(queried_shards, pb_query))
-
-        else:
-            for shard_obj in shard_groups:
-                if shard_obj.nidx_shard_id is not None:
-                    ops.append(query_shard(shard_obj.nidx_shard_id, pb_query))
-                    queried_shards.append(shard_obj.nidx_shard_id)
+        if len(queried_shards) > 0:
+            ops.append(func(queried_shards, pb_query))  # type: ignore
 
     else:
-        if method == Method.SUGGEST:
-            func = suggest_shard
-        elif method == Method.GRAPH:
-            func = graph_search_shard
-        else:  # pragma: no cover
-            assert_never(method)
-
         for shard_obj in shard_groups:
             shard_id = shard_obj.nidx_shard_id
             if shard_id is not None:
                 # At least one node is alive for this shard group
                 # let's add it ot the query list if has a valid value
-                ops.append(func(shard_id, pb_query))  # type: ignore
+                ops.append(func([shard_id], pb_query))  # type: ignore
                 queried_shards.append(shard_id)
 
     if not ops:

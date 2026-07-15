@@ -61,15 +61,19 @@ async def get_shard(shard_id: str) -> Shard:
     return await get_nidx_api_client().GetShard(req)
 
 
-async def suggest_shard(shard: str, query: SuggestRequest) -> SuggestResponse:
+async def suggest_shards(shards: list[str], query: SuggestRequest) -> SuggestResponse:
     req = SuggestRequest()
     req.CopyFrom(query)
-    req.shard_ids[:] = [shard]
+    req.shard_ids[:] = shards
     return await get_nidx_searcher_client().Suggest(req)
 
 
 async def graph_search_shard(shard: str, query: GraphSearchRequest) -> GraphSearchResponse:
+    return await graph_search_shards([shard], query)
+
+
+async def graph_search_shards(shards: list[str], query: GraphSearchRequest) -> GraphSearchResponse:
     req = GraphSearchRequest()
     req.CopyFrom(query)
-    req.shard_ids[:] = [shard]
+    req.shard_ids[:] = shards
     return await get_nidx_searcher_client().GraphSearch(req)
