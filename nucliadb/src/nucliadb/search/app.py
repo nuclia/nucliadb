@@ -27,7 +27,11 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
-from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware, ProcessTimeHeaderMiddleware
+from nucliadb.middleware import (
+    ClientErrorPayloadLoggerMiddleware,
+    ProcessTimeHeaderMiddleware,
+    UUIDPathParamsValidationMiddleware,
+)
 from nucliadb.search import API_PREFIX
 from nucliadb.search.api.v1.router import api as api_v1
 from nucliadb.search.lifecycle import lifespan
@@ -46,6 +50,7 @@ from nucliadb_utils.utilities import get_audit
 middleware = []
 middleware.extend(
     [
+        Middleware(UUIDPathParamsValidationMiddleware),
         Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
         Middleware(AuditMiddleware, audit_utility_getter=get_audit),
         Middleware(ClientErrorPayloadLoggerMiddleware),

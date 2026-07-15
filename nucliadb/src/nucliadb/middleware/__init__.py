@@ -19,12 +19,15 @@
 
 import logging
 import time
+import uuid
 from collections import deque
-from typing import ClassVar
+from typing import Callable, ClassVar
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
+from starlette.routing import BaseRoute, Match, Mount
+from starlette.types import Scope
 
 PROCESS_TIME_HEADER = "X-PROCESS-TIME"
 ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
@@ -105,6 +108,104 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
                 background=response.background,
             )
         return response
+
+
+def valid_kbid(kbid: str) -> bool:
+    # Must be a UUID in canonical dashed format.
+    if len(kbid) != 36 or kbid.count("-") != 4:
+        return False
+    try:
+        return str(uuid.UUID(kbid)) == kbid.lower()
+    except ValueError:
+        return False
+
+
+def valid_rid(rid: str) -> bool:
+    # Must be a UUID in hex format.
+    if len(rid) != 32 or "-" in rid:
+        return False
+    try:
+        return uuid.UUID(rid).hex == rid.lower()
+    except ValueError:
+        return False
+
+
+class UUIDPathParamsValidationMiddleware(BaseHTTPMiddleware):
+    """
+    Validate UUID-like path params before endpoint execution.
+
+    Why this middleware does route/scope traversal instead of reading
+    request.path_params directly:
+    - request.path_params is not populated yet at middleware stage.
+    - Our standalone app is wrapped with VersionedFastAPI, which mounts
+        versioned sub-apps (for example /api/v1). The effective path params
+        can be defined inside nested mounted routers.
+
+    This middleware therefore reconstructs path params by matching the
+    incoming scope against router routes, recursing into Mount routes when
+    needed, and then validating kbid/rid/path_rid.
+    """
+
+    _VALIDATORS: ClassVar[dict[str, tuple[Callable[[str], bool], str]]] = {
+        "kbid": (valid_kbid, "KnowledgeBox not found. UUID expected."),
+        "rid": (valid_rid, "Resource not found. UUID expected."),
+        "path_rid": (valid_rid, "Resource not found. UUID expected."),
+    }
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        # Execute before endpoint code: if any tracked param is invalid,
+        # return the same 404 contract used by endpoint-level validation.
+        path_params = self._resolve_path_params(request)
+        for param_name, (validator, error_detail) in self._VALIDATORS.items():
+            value = path_params.get(param_name)
+            if value is not None and not validator(value):
+                return JSONResponse(status_code=404, content={"detail": error_detail})
+
+        return await call_next(request)
+
+    def _resolve_path_params(self, request: Request) -> dict[str, str]:
+        # Build a mutable copy of the current scope and normalize path from
+        # request URL so matching works consistently through mounted apps.
+        scope = dict(request.scope)
+        scope["path"] = request.url.path
+
+        router = getattr(request.app, "router", None)
+        if router is None:
+            return {}
+
+        return self._find_path_params(router.routes, scope) or {}
+
+    def _find_path_params(self, routes: list[BaseRoute], scope: Scope) -> dict[str, str] | None:
+        for route in routes:
+            match, child_scope = route.matches(scope)
+            if match == Match.NONE:
+                # This route is not a candidate for the current request scope
+                # (for example, different path/method or a sibling route).
+                continue
+
+            path_params = dict(child_scope.get("path_params", {}))
+
+            if isinstance(route, Mount):
+                route_app = getattr(route, "app", None)
+                route_router = getattr(route_app, "router", None)
+                if route_router is not None:
+                    # This happens for mounted sub-apps (for example the
+                    # VersionedFastAPI /api/v1 mount). The outer mount may
+                    # match, but endpoint params are defined in the nested app.
+                    nested_scope = dict(scope)
+                    nested_scope.update(child_scope)
+                    nested_params = self._find_path_params(route_router.routes, nested_scope)
+                    if nested_params is not None:
+                        path_params.update(nested_params)
+                        return path_params
+
+            if match == Match.FULL:
+                # FULL means this route resolves the current request path.
+                # At this point path_params represent what endpoint dispatch
+                # will use, so this is the correct branch to validate IDs.
+                return path_params
+
+        return None
 
 
 class EventCounter:
