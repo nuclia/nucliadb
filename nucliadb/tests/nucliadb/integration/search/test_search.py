@@ -1360,6 +1360,7 @@ async def test_api_does_not_show_tracebacks_on_api_errors(not_debug, nucliadb_re
         "nucliadb.search.api.v1.search.search",
         side_effect=Exception("Something went wrong"),
     ):
-        resp = await nucliadb_reader.get("/kb/foobar/search", timeout=None)
+        kbid = "00000000-0000-0000-0000-000000000000"
+        resp = await nucliadb_reader.get(f"/kb/{kbid}/search", timeout=None)
         assert resp.status_code == 500
         assert resp.json() == {"detail": "Something went wrong, please contact your administrator"}

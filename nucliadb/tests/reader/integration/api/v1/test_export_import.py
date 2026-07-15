@@ -37,7 +37,7 @@ async def test_api(nucliadb_reader: AsyncClient, knowledgebox: str):
     assert resp.status_code < 500
 
     # Check that for non-existing kbs, endpoints return a 404
-    idonotexist = uuid.uuid4().hex
+    idonotexist = str(uuid.uuid4())
     for endpoint in (
         f"/kb/{idonotexist}/export/foo",
         f"/kb/{idonotexist}/export/foo/status",

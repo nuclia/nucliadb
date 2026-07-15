@@ -43,14 +43,15 @@ ASSETS_PATH = os.path.dirname(__file__) + "/assets"
 @pytest.mark.deploy_modes("component")
 async def test_knowledgebox_file_tus_options(nucliadb_writer: AsyncClient, knowledgebox: str):
     kbid = knowledgebox
+    rid = uuid.uuid4().hex
 
-    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/resource/xxx/file/xxx/{TUSUPLOAD}/xxx")
+    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/resource/{rid}/file/xxx/{TUSUPLOAD}/xxx")
     assert resp.status_code == 204
     assert resp.headers["tus-resumable"] == "1.0.0"
     assert resp.headers["tus-version"] == "1.0.0"
     assert resp.headers["tus-extension"] == "creation-defer-length"
 
-    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/resource/xxx/file/xxx/{TUSUPLOAD}")
+    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/resource/{rid}/file/xxx/{TUSUPLOAD}")
     assert resp.status_code == 204
     assert resp.headers["tus-resumable"] == "1.0.0"
     assert resp.headers["tus-version"] == "1.0.0"
