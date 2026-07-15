@@ -23,99 +23,29 @@ use nidx_relation::{RelationSearcher, graph_query_parser::VectorQueryResults};
 use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::VectorSearcher;
-use tokio::task::JoinSet;
-use tracing::{Instrument, Span, instrument};
+use tracing::{Span, instrument};
 use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::query_planner::{GraphIndexQueries, IndexQueries};
-use crate::searcher::shard_merge;
-use crate::searcher::shard_merge::Limit;
-use crate::searcher::shard_merge::OrderBy;
 
 use super::index_cache::IndexCache;
 use super::query_planner;
 use super::query_planner::QueryPlan;
+use super::shards_query::shards_query;
 
-pub struct PartialResponse<T> {
-    pub data: T,
-    pub shards: Vec<Uuid>,
-}
-
-/// Search in multiple shards and return either the full response, partial
-/// results or an error
-///
 pub async fn search(
-    shards: Vec<uuid::Uuid>,
     index_cache: Arc<IndexCache>,
     search_request: SearchRequest,
-) -> NidxResult<PartialResponse<SearchResponse>> {
-    let order_by = OrderBy::from(&search_request);
-    let limit = Limit(search_request.result_per_page as usize);
+    shards: Vec<Uuid>,
+) -> NidxResult<Vec<SearchResponse>> {
     let query_plan = query_planner::build_query_plan(search_request)?;
-
-    let response = if shards.len() == 1 {
-        let shard_id = shards[0];
-        let response = shard_search(shard_id, Arc::clone(&index_cache), query_plan).await?;
-        PartialResponse {
-            data: response,
-            shards: vec![shard_id],
-        }
-    } else {
-        let mut tasks = JoinSet::new();
-        for shard_id in &shards {
-            tasks.spawn(
-                shard_search(*shard_id, Arc::clone(&index_cache), query_plan.clone()).instrument(Span::current()),
-            );
-        }
-
-        let mut responses = vec![];
-        while let Some(join) = tasks.join_next().await {
-            match join {
-                Ok(Ok(response)) => responses.push(response),
-                Ok(Err(NidxError::NotFound)) => {
-                    // shard not found in searcher, probably due to a
-                    // topology change the shard is not yet where it should
-                }
-                Ok(Err(search_error)) => {
-                    return Err(search_error);
-                }
-                Err(join_error) => {
-                    // Either a panic or a cancellation happened while searching
-                    return Err(NidxError::from(join_error));
-                }
-            }
-        }
-        if responses.is_empty() {
-            return Err(NidxError::NotFound);
-        }
-
-        let merged = if responses.len() == 1 {
-            responses.pop().unwrap()
-        } else {
-            shard_merge::merge(responses, order_by, limit)
-        };
-
-        if merged.shard_ids.len() == shards.len() {
-            PartialResponse { data: merged, shards }
-        } else {
-            let successful_shards = merged
-                .shard_ids
-                .iter()
-                .map(|s| Uuid::parse_str(s).expect("This is an internal response, we always send valid UUIDs"))
-                .collect();
-            PartialResponse {
-                data: merged,
-                shards: successful_shards,
-            }
-        }
-    };
-    Ok(response)
+    shards_query(index_cache, shards, query_plan, shard_search).await
 }
 
 #[instrument(skip_all, fields(shard_id = shard_id.to_string()))]
 async fn shard_search(
-    shard_id: uuid::Uuid,
+    shard_id: Uuid,
     index_cache: Arc<IndexCache>,
     query_plan: QueryPlan,
 ) -> NidxResult<SearchResponse> {
@@ -365,7 +295,7 @@ pub async fn graph_search(
     index_cache: Arc<IndexCache>,
     graph_request: GraphSearchRequest,
 ) -> NidxResult<GraphSearchResponse> {
-    let shard_id = uuid::Uuid::parse_str(&graph_request.shard)?;
+    let shard_id = Uuid::parse_str(&graph_request.shard)?;
 
     let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
         return Err(NidxError::NotFound);
