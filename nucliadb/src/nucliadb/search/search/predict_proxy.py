@@ -19,7 +19,7 @@
 #
 import json
 from enum import Enum
-from typing import Any
+from typing import Any, Type
 
 import aiohttp
 from fastapi.datastructures import QueryParams
@@ -32,7 +32,7 @@ from nuclia_models.predict.generative_responses import (
     StatusGenerativeResponse,
     TextGenerativeResponse,
 )
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from nucliadb.common import datamanagers
 from nucliadb.search import logger
@@ -46,6 +46,7 @@ from nucliadb.search.search.chat.query import maybe_audit_chat
 from nucliadb.search.search.metrics import AskMetrics
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import NucliaDBClientType
+from nucliadb_utils.audit.stream import AuditedChatRequest
 
 
 class PredictProxiedEndpoints(str, Enum):
@@ -60,6 +61,19 @@ class PredictProxiedEndpoints(str, Enum):
     SUMMARIZE = "summarize"
     RERANK = "rerank"
     REMI = "remi"
+
+
+# We only validate the chat request proactively because it is the sole proxied endpoint
+# whose request body is written to NucliaDB-owned audit stream.
+request_models: dict[PredictProxiedEndpoints, Type[BaseModel]] = {
+    PredictProxiedEndpoints.CHAT: AuditedChatRequest,
+}
+
+
+def validate_json_payload(payload: Any, endpoint: PredictProxiedEndpoints) -> None:
+    request_model = request_models.get(endpoint)
+    if request_model is not None:
+        request_model.model_validate(payload)
 
 
 ALLOWED_HEADERS = [
@@ -78,11 +92,14 @@ async def predict_proxy(
     user_id: str,
     client_type: NucliaDBClientType,
     origin: str,
-    json: Any | None = None,
+    json_payload: Any | None = None,
     headers: dict[str, str] = {},
 ) -> Response | StreamingResponse:
     if not await exists_kb(kbid=kbid):
         raise datamanagers.exceptions.KnowledgeBoxNotFound()
+
+    if json_payload is not None:
+        validate_json_payload(json_payload, endpoint)
 
     predict: PredictEngine = get_predict()
     predict_headers = predict.get_predict_headers(kbid)
@@ -93,7 +110,7 @@ async def predict_proxy(
     predict_response = await predict.make_request(
         method=method,
         url=predict.get_predict_url(endpoint, kbid),
-        json=json,
+        json=json_payload,
         params=params,
         headers={**user_headers, **predict_headers},
     )
@@ -105,7 +122,7 @@ async def predict_proxy(
 
     media_type = predict_response.headers.get("Content-Type")
     response: Response | StreamingResponse
-    user_query = json.get("question") if json is not None else ""
+    user_query = json_payload.get("question") if json_payload is not None else ""
     if predict_response.headers.get("Transfer-Encoding") == "chunked":
         if should_audit:
             streaming_generator = chat_streaming_generator(
