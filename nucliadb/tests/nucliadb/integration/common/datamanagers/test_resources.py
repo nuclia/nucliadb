@@ -104,7 +104,6 @@ async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, 
             field_id=field.field,
             value=FieldLink(uri="http://example.com"),
         )
-        await datamanagers.resources.set_all_field_ids(txn, kbid=kbid, rid=rid, allfields=pb)
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
@@ -117,9 +116,6 @@ async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, 
     # set no fields
 
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.resources.set_all_field_ids(
-            txn, kbid=kbid, rid=rid, allfields=resources_pb2.AllFieldIDs()
-        )
         await datamanagers.fields.fields_v2.delete(
             txn, kbid=kbid, rid=rid, field_type=field_type_abbr, field_id=field.field
         )

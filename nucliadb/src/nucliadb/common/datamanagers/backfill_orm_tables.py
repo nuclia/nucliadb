@@ -261,8 +261,6 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
 
     # --- Collect all field and conversation rows ---
     all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
-    if all_fields is None:
-        return
 
     # Add title and summary in the fields table, even though they are stored in the kb_resources.basic column.
     # We need to do this to have the status API work correctly for title and summary fields.

@@ -72,7 +72,7 @@ async def fetch_resource_fields(kbid: str, rid: str) -> list[FieldInfo]:
         resource = await Resource.get(txn, kbid=kbid, rid=rid)
         if resource is None:
             raise ResourceNotFoundError()
-        fields = await resource.get_fields(force=True)
+        fields = await resource.get_fields()
 
     tasks: list[asyncio.Task] = []
     for field in fields.values():

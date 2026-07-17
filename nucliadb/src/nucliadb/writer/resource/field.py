@@ -637,9 +637,7 @@ async def add_generated_conversations_to_pushpayload(
     For each conversation field (source_field_id), add the corresponding generated conversation fields to the push payload,
     so they can be sent to processing to generate new messages upon new messages being appended to the original conversation.
     """
-    all_field_ids = await datamanagers.atomic.resources.get_all_field_ids(
-        kbid=kbid, rid=resource_id, for_update=False
-    )
+    all_field_ids = await datamanagers.atomic.resources.get_all_field_ids(kbid=kbid, rid=resource_id)
     if all_field_ids is None:
         return
     generated_fields = [

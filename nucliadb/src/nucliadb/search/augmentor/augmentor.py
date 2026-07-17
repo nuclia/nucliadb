@@ -160,7 +160,7 @@ class AugmentorOps:
                 # augmenting resource fields
                 rid = id
                 all_field_ids = await datamanagers.atomic.resources.get_all_field_ids(
-                    kbid=self.kbid, rid=rid, for_update=False
+                    kbid=self.kbid, rid=rid
                 )
                 if all_field_ids is None:
                     continue

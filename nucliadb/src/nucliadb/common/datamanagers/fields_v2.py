@@ -140,6 +140,32 @@ async def delete(
 # ---------------------------------------------------------------------------
 
 
+async def exists(
+    txn: Transaction,
+    *,
+    kbid: str,
+    rid: str,
+    field_type: str,
+    field_id: str,
+) -> bool:
+    """Return True if a field row exists, False otherwise."""
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(
+            """
+            SELECT 1 FROM kb_fields
+            WHERE kbid = %(kbid)s AND rid = %(rid)s
+              AND field_type = %(field_type)s AND field_id = %(field_id)s
+            """,
+            {
+                "kbid": kbid,
+                "rid": rid,
+                "field_type": field_type,
+                "field_id": field_id,
+            },
+        )
+        return await cur.fetchone() is not None
+
+
 async def get_raw(
     txn: Transaction,
     *,

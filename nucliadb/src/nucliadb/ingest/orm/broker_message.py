@@ -73,7 +73,7 @@ class _BrokerMessageBuilder:
         if relations is not None:
             self.bm.user_relations.CopyFrom(relations)
 
-        fields = await resource.get_fields(force=True, load_values=True)
+        fields = await resource.get_fields(load_values=True)
         for (type_id, field_id), field in fields.items():
             # Value
             await self.generate_field(type_id, field_id, field)

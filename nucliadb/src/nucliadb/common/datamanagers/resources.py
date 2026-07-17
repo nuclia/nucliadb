@@ -155,16 +155,8 @@ async def set_number_of_resources(txn: Transaction, kbid: str, value: int) -> No
 # Fields (materialized key with all field ids)
 
 
-async def get_all_field_ids(
-    txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
-) -> resources_pb2.AllFieldIDs | None:
+async def get_all_field_ids(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.AllFieldIDs:
     return await fields_v2.get_all_field_ids(txn, kbid=kbid, rid=rid)
-
-
-async def set_all_field_ids(
-    txn: Transaction, *, kbid: str, rid: str, allfields: resources_pb2.AllFieldIDs
-):
-    pass
 
 
 async def has_field(txn: Transaction, *, kbid: str, rid: str, field_id: resources_pb2.FieldID) -> bool:

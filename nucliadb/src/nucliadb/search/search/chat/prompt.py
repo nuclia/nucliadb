@@ -641,7 +641,7 @@ async def get_matching_field_ids(
     if len(strategy.data_augmentation_field_prefixes) > 0:
         for resource_uuid in ordered_resources:
             all_field_ids = await datamanagers.atomic.resources.get_all_field_ids(
-                kbid=kbid, rid=resource_uuid, for_update=False
+                kbid=kbid, rid=resource_uuid
             )
             if all_field_ids is None:
                 continue
@@ -1345,7 +1345,7 @@ async def hydrate_resource_text(
     async with get_driver().ro_transaction() as txn:
         resource.txn = txn
         runner = ConcurrentRunner(max_tasks=max_concurrent_tasks)
-        for field_type, field_key in await resource.get_fields(force=True):
+        for field_type, field_key in await resource.get_fields():
             field_id = FieldId.from_pb(rid, field_type, field_key)
             runner.schedule(hydrate_field_text(kbid, field_id))
 

@@ -223,7 +223,7 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
             async with driver.ro_transaction() as txn:
                 kb = KnowledgeBox(txn, storage, kbid)
                 async for resource in kb.iterate_resources():
-                    fields.extend((await resource.get_fields(force=True)).values())
+                    fields.extend((await resource.get_fields()).values())
 
             logger.info(f"Purging {len(fields)} fields for vectorset {vectorset}", extra={"kbid": kbid})
             for fields_batch in batched(fields, n=20):
