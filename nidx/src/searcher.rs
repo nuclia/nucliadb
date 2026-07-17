@@ -22,6 +22,7 @@ mod shard_search;
 pub mod shard_selector;
 mod shard_suggest;
 mod shard_text;
+mod shards_query;
 mod streams;
 mod sync;
 
