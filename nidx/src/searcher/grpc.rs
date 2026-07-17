@@ -14,6 +14,7 @@
 //
 
 use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 use std::{pin::Pin, sync::Arc};
 
 use futures::Stream;
@@ -585,7 +586,7 @@ impl QueryPartitioner {
 
 /// Simple trait to abstract over request/response protobuffers that operate on
 /// a set of shards
-pub trait Sharded {
+pub trait Sharded: Debug {
     fn shards(&self) -> NidxResult<Vec<Uuid>>;
     fn set_shards(&mut self, shards: &[Uuid]);
 }

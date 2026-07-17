@@ -335,7 +335,10 @@ pub async fn shard_graph_search(
     };
 
     if matches!(prefilter, PrefilterResult::None) {
-        return Ok(GraphSearchResponse::default());
+        return Ok(GraphSearchResponse {
+            shard_ids: vec![shard_id.to_string()],
+            ..Default::default()
+        });
     }
 
     let graph_queries = GraphIndexQueries::build(graph_request);
@@ -364,7 +367,7 @@ pub async fn shard_graph_search(
 
     let relation_searcher = index_cache.get(&relation_index_id).await?;
     let current = Span::current();
-    let results = tokio::task::spawn_blocking(move || {
+    let mut results = tokio::task::spawn_blocking(move || {
         current.in_scope(|| {
             let context = run_semantic_graph_queries(
                 &graph_queries,
@@ -381,6 +384,7 @@ pub async fn shard_graph_search(
         })
     })
     .await??;
+    results.shard_ids.push(shard_id.to_string());
     Ok(results)
 }
 

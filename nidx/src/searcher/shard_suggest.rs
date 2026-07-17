@@ -76,7 +76,7 @@ pub async fn shard_suggest(
     let paragraph_searcher_arc = index_cache.get(&paragraph_index).await?;
 
     let current = Span::current();
-    let suggest_results = tokio::task::spawn_blocking(move || {
+    let mut suggest_results = tokio::task::spawn_blocking(move || {
         current.in_scope(|| {
             blocking_suggest(
                 request,
@@ -87,6 +87,7 @@ pub async fn shard_suggest(
         })
     })
     .await??;
+    suggest_results.shard_ids.push(shard_id.to_string());
 
     Ok(suggest_results)
 }
