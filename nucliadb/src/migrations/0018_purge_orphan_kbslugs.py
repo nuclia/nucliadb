@@ -28,10 +28,10 @@ orphan. Let's delete them!
 import logging
 
 from nucliadb.common import datamanagers
-from nucliadb.common.datamanagers.kb import KB_SLUGS_BASE
 from nucliadb.migrator.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
+KB_SLUGS_BASE = "/kbslugs/"
 
 
 async def migrate(context: ExecutionContext) -> None:

@@ -21,7 +21,6 @@ import uuid
 from unittest.mock import Mock, patch
 
 from nucliadb.common import datamanagers
-from nucliadb.common.datamanagers.conversations import KB_CONVERSATION_SPLITS_METADATA
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -31,6 +30,8 @@ from nucliadb_protos import resources_pb2
 from tests.nucliadb.migrations import get_migration
 
 migration: Migration = get_migration(39)
+
+KB_CONVERSATION_SPLITS_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
 
 
 async def test_migration_0039(maindb_driver: Driver):

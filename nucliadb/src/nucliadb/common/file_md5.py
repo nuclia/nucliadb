@@ -19,13 +19,10 @@
 #
 
 import logging
-from typing import cast, overload
+from typing import overload
 
 from nucliadb.common import file_md5_v2
-from nucliadb.common.datamanagers.utils import datamanagers_v2_read, datamanagers_v2_write
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.pg import PGDriver, PGTransaction
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb_telemetry import metrics
 
 logger = logging.getLogger(__name__)
@@ -33,59 +30,22 @@ logger = logging.getLogger(__name__)
 observer = metrics.Observer("nucliadb_file_md5", labels={"op": ""})
 
 
-def _pg_driver() -> PGDriver:
-    return cast(PGDriver, get_driver())
-
-
-def _pg_transaction(txn: Transaction) -> PGTransaction:
-    return cast(PGTransaction, txn)
-
-
 @observer.wrap({"op": "check"})
 async def exists(*, kbid: str, md5: str) -> bool:
     """Check if a file with the given MD5 hash already exists in the KB."""
-    if datamanagers_v2_read(kbid):
-        return await file_md5_v2.exists(kbid=kbid, md5=md5)
-
-    pg = _pg_driver()
-    async with pg._get_connection() as conn, conn.cursor() as cur:
-        await cur.execute(
-            "SELECT 1 FROM file_md5 WHERE kbid = %(kbid)s AND md5 = %(md5)s LIMIT 1",
-            {"kbid": kbid, "md5": md5},
-        )
-        return cur.rowcount > 0
+    return await file_md5_v2.exists(kbid=kbid, md5=md5)
 
 
 @observer.wrap({"op": "store"})
 async def set(txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str) -> None:
     """Set a file MD5 hash for a resource field."""
-    async with _pg_transaction(txn).connection.cursor() as cur:
-        await cur.execute(
-            """
-            INSERT INTO file_md5 (kbid, md5, rid, field_id)
-            VALUES (%(kbid)s, %(md5)s, %(rid)s, %(field_id)s)
-            ON CONFLICT (kbid, md5, rid, field_id) DO UPDATE SET
-                created_at = NOW()
-            """,
-            {"kbid": kbid, "md5": md5, "rid": rid, "field_id": f"f/{field_id}"},
-        )
-
-    if datamanagers_v2_write(kbid):
-        await file_md5_v2.set(txn, kbid=kbid, md5=md5, rid=rid, field_id=field_id)
+    await file_md5_v2.set(txn, kbid=kbid, md5=md5, rid=rid, field_id=field_id)
 
 
 @observer.wrap({"op": "get"})
 async def get(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> str | None:
     """Get the MD5 hash for a resource field, or None if not found."""
-    async with _pg_transaction(txn).connection.cursor() as cur:
-        await cur.execute(
-            "SELECT md5 FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_id = %(field_id)s",
-            {"kbid": kbid, "rid": rid, "field_id": f"f/{field_id}"},
-        )
-        row = await cur.fetchone()
-        if row is None:
-            return None
-        return row[0]
+    return await file_md5_v2.get(txn, kbid=kbid, rid=rid, field_id=field_id)
 
 
 @overload
@@ -114,34 +74,9 @@ async def delete(
     - kbid + rid: delete all records for a resource
     - kbid + rid + field_id: delete records for a specific field
     """
-    pg_txn = _pg_transaction(txn)
     if rid is None:
-        async with pg_txn.connection.cursor() as cur:
-            await cur.execute(
-                "DELETE FROM file_md5 WHERE kbid = %(kbid)s",
-                {"kbid": kbid},
-            )
-        if datamanagers_v2_write(kbid):
-            await file_md5_v2.delete(txn, kbid=kbid)
-
+        await file_md5_v2.delete(txn, kbid=kbid)
     elif field_id is None:
-        async with pg_txn.connection.cursor() as cur:
-            await cur.execute(
-                "DELETE FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s",
-                {"kbid": kbid, "rid": rid},
-            )
-        if datamanagers_v2_write(kbid):
-            await file_md5_v2.delete(txn, kbid=kbid, rid=rid)
-
+        await file_md5_v2.delete(txn, kbid=kbid, rid=rid)
     else:
-        async with pg_txn.connection.cursor() as cur:
-            await cur.execute(
-                "DELETE FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_id = %(field_id)s",
-                {
-                    "kbid": kbid,
-                    "rid": rid,
-                    "field_id": f"f/{field_id}",
-                },
-            )
-        if datamanagers_v2_write(kbid):
-            await file_md5_v2.delete(txn, kbid=kbid, rid=rid, field_id=field_id)
+        await file_md5_v2.delete(txn, kbid=kbid, rid=rid, field_id=field_id)

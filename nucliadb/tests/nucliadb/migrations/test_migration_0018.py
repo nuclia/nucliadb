@@ -22,12 +22,15 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from nucliadb.common import datamanagers
-from nucliadb.common.datamanagers.kb import KB_SLUGS
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.migrator.models import Migration
 from nucliadb_protos import knowledgebox_pb2
 from tests.nucliadb.migrations import get_migration
+
+KB_SLUGS_BASE = "/kbslugs/"
+KB_SLUGS = KB_SLUGS_BASE + "{slug}"
+
 
 migration: Migration = get_migration(18)
 

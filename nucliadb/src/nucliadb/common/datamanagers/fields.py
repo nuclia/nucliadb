@@ -24,23 +24,14 @@ from typing import Sequence
 from google.protobuf.message import Message
 
 from nucliadb.common.datamanagers import fields_v2
-from nucliadb.common.datamanagers.utils import datamanagers_v2_read, datamanagers_v2_write, get_kv_pb
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import writer_pb2
-
-KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
-KB_RESOURCE_FIELD_STATUS = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/status"
 
 
 async def get_raw(
     txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
 ) -> bytes | None:
-    if datamanagers_v2_read(kbid):
-        return await fields_v2.get_raw(txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id)
-
-    key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
-    return await txn.get(key)
+    return await fields_v2.get_raw(txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id)
 
 
 async def set(
@@ -52,21 +43,11 @@ async def set(
     field_id: str,
     value: Message,
 ):
-    key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
-    await txn.set(key, value.SerializeToString())
-
-    if datamanagers_v2_write(kbid):
-        await fields_v2.set(
-            txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id, value=value
-        )
+    await fields_v2.set(txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id, value=value)
 
 
 async def delete(txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str):
-    base_key = KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
-    await txn.delete_by_prefix(base_key)
-
-    if datamanagers_v2_write(kbid):
-        await fields_v2.delete(txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id)
+    await fields_v2.delete(txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id)
 
 
 # Status
@@ -75,38 +56,13 @@ async def delete(txn: Transaction, *, kbid: str, rid: str, field_type: str, fiel
 async def get_status(
     txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
 ) -> writer_pb2.FieldStatus | None:
-    if datamanagers_v2_read(kbid):
-        return await fields_v2.get_status(
-            txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id
-        )
-
-    key = KB_RESOURCE_FIELD_STATUS.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
-    return await get_kv_pb(txn, key, writer_pb2.FieldStatus)
+    return await fields_v2.get_status(txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id)
 
 
 async def get_statuses(
     txn: Transaction, *, kbid: str, rid: str, fields: Sequence[writer_pb2.FieldID]
 ) -> list[writer_pb2.FieldStatus]:
-    if datamanagers_v2_read(kbid):
-        return await fields_v2.get_statuses(txn, kbid=kbid, rid=rid, fields=fields)
-
-    keys = [
-        KB_RESOURCE_FIELD_STATUS.format(
-            kbid=kbid, uuid=rid, type=FIELD_TYPE_PB_TO_STR[fid.field_type], field=fid.field
-        )
-        for fid in fields
-    ]
-    serialized = await txn.batch_get(keys, for_update=False)
-    statuses = []
-    for serialized_status in serialized:
-        pb = writer_pb2.FieldStatus()
-        if serialized_status is not None:
-            pb.ParseFromString(serialized_status)
-        else:
-            pb = writer_pb2.FieldStatus()
-        statuses.append(pb)
-
-    return statuses
+    return await fields_v2.get_statuses(txn, kbid=kbid, rid=rid, fields=fields)
 
 
 async def set_status(
@@ -118,10 +74,6 @@ async def set_status(
     field_id: str,
     status: writer_pb2.FieldStatus,
 ):
-    key = KB_RESOURCE_FIELD_STATUS.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
-    await txn.set(key, status.SerializeToString())
-
-    if datamanagers_v2_write(kbid):
-        await fields_v2.set_status(
-            txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id, status=status
-        )
+    await fields_v2.set_status(
+        txn, kbid=kbid, rid=rid, field_type=field_type, field_id=field_id, status=status
+    )

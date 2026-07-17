@@ -41,7 +41,7 @@ from typing import Sequence
 
 from google.protobuf.message import Message
 
-from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_error
+from nucliadb.common.datamanagers.utils import _pg_cursor
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb_protos import resources_pb2 as rpb2
@@ -52,7 +52,6 @@ from nucliadb_protos import writer_pb2 as wpb2
 # ---------------------------------------------------------------------------
 
 
-@logs_foreign_key_error
 async def set_status(
     txn: Transaction,
     *,
@@ -81,7 +80,6 @@ async def set_status(
         )
 
 
-@logs_foreign_key_error
 async def set(
     txn: Transaction,
     *,

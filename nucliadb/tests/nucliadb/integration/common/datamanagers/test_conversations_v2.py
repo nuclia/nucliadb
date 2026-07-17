@@ -24,8 +24,6 @@ Covers: set_metadata, get_metadata, set_page, get_page,
         set_splits_metadata, get_splits_metadata, delete_field.
 """
 
-import logging
-
 import pytest
 
 from nucliadb.common.datamanagers import conversations_v2, fields_v2, kb_v2, resources_v2
@@ -353,53 +351,3 @@ async def test_delete_field_noop_when_no_rows_exist(maindb_driver: Driver, kbid:
     async with maindb_driver.rw_transaction() as txn:
         await conversations_v2.delete_field(txn, kbid=kbid, rid=rid, field_id="ghost")
         await txn.commit()  # must not raise
-
-
-# ---------------------------------------------------------------------------
-# logs_foreign_key_error on set_metadata / set_page / set_splits_metadata
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_set_metadata_missing_parent_logs_warning(
-    maindb_driver: Driver,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    kbid = KnowledgeBox.new_unique_kbid()
-    rid = Resource.new_unique_rid()
-
-    with caplog.at_level(logging.WARNING, logger="nucliadb.common.datamanagers.utils"):
-        async with maindb_driver.rw_transaction() as txn:
-            await conversations_v2.set_metadata(
-                txn,
-                kbid=kbid,
-                rid=rid,
-                field_id="chat",
-                metadata=make_metadata(),
-            )
-            await txn.commit()
-
-    assert any("Foreign key violation" in r.message for r in caplog.records)
-
-
-@pytest.mark.asyncio
-async def test_set_page_missing_parent_logs_warning(
-    maindb_driver: Driver,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    kbid = KnowledgeBox.new_unique_kbid()
-    rid = Resource.new_unique_rid()
-
-    with caplog.at_level(logging.WARNING, logger="nucliadb.common.datamanagers.utils"):
-        async with maindb_driver.rw_transaction() as txn:
-            await conversations_v2.set_page(
-                txn,
-                kbid=kbid,
-                rid=rid,
-                field_id="chat",
-                page=1,
-                value=make_conversation("hi"),
-            )
-            await txn.commit()
-
-    assert any("Foreign key violation" in r.message for r in caplog.records)

@@ -37,7 +37,7 @@ from collections.abc import AsyncIterator
 
 import psycopg.errors
 
-from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_error, with_ro_transaction
+from nucliadb.common.datamanagers.utils import _pg_cursor, with_ro_transaction
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb_protos import resources_pb2
@@ -55,7 +55,6 @@ def _to_rid(value: uuid.UUID) -> str:
 # ---------------------------------------------------------------------------
 
 
-@logs_foreign_key_error
 async def set_basic(
     txn: Transaction,
     *,
@@ -76,7 +75,6 @@ async def set_basic(
         )
 
 
-@logs_foreign_key_error
 async def set_origin(
     txn: Transaction,
     *,
@@ -97,7 +95,6 @@ async def set_origin(
         )
 
 
-@logs_foreign_key_error
 async def set_security(
     txn: Transaction,
     *,
@@ -118,7 +115,6 @@ async def set_security(
         )
 
 
-@logs_foreign_key_error
 async def set_extra(
     txn: Transaction,
     *,
@@ -153,7 +149,6 @@ async def get_slug(txn: Transaction, kbid: str, rid: str) -> str | None:
         return str(row[0]) if row is not None else None
 
 
-@logs_foreign_key_error
 async def set_slug(
     txn: Transaction,
     *,
@@ -181,7 +176,6 @@ async def set_slug(
             raise ConflictError(f"Slug '{slug}' already exists")
 
 
-@logs_foreign_key_error
 async def modify_slug(
     txn: Transaction,
     *,
@@ -199,6 +193,8 @@ async def modify_slug(
     old_slug = await get_slug(txn, kbid=kbid, rid=rid)
     if old_slug is None:
         raise NotFoundError()
+
+    previous = old_slug
     async with _pg_cursor(txn) as cur:
         try:
             await cur.execute(
@@ -208,12 +204,11 @@ async def modify_slug(
                 """,
                 {"kbid": kbid, "rid": rid, "slug": new_slug},
             )
-            return old_slug
+            return previous
         except psycopg.errors.UniqueViolation:
             raise ConflictError(f"Slug '{new_slug}' already exists")
 
 
-@logs_foreign_key_error
 async def set_resource_shard_id(
     txn: Transaction,
     *,

@@ -27,7 +27,6 @@ Backfill splits metadata on conversation fields
 import logging
 from typing import cast
 
-from nucliadb.common.datamanagers.conversations import KB_CONVERSATION_SPLITS_METADATA
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.ingest.fields.conversation import (
@@ -40,6 +39,8 @@ from nucliadb_protos.resources_pb2 import SplitsMetadata
 from nucliadb_utils.storages.storage import Storage
 
 logger = logging.getLogger(__name__)
+
+KB_CONVERSATION_SPLITS_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/splits_metadata"
 
 
 async def migrate(context: ExecutionContext) -> None: ...

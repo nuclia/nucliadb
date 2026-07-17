@@ -29,7 +29,7 @@ relying on the existing index on (kbid, md5) in kb_fields for efficient lookups.
 
 from typing import cast, overload
 
-from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_error
+from nucliadb.common.datamanagers.utils import _pg_cursor
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
@@ -50,7 +50,19 @@ async def exists(*, kbid: str, md5: str) -> bool:
         return cur.rowcount > 0
 
 
-@logs_foreign_key_error
+async def get(
+    txn: Transaction, *, kbid: str, rid: str, field_id: str, field_type: str = "f"
+) -> str | None:
+    """Get the MD5 hash for a resource field, or None if not found."""
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(
+            "SELECT md5 FROM kb_fields WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_id = %(field_id)s AND field_type = %(field_type)s",
+            {"kbid": kbid, "rid": rid, "field_id": field_id, "field_type": field_type},
+        )
+        row = await cur.fetchone()
+        return row[0] if row else None
+
+
 async def set(
     txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str, field_type: str = "f"
 ) -> None:

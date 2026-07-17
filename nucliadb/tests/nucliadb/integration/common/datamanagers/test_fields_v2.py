@@ -24,8 +24,6 @@ Covers: set, set_status, get_raw, get_status, get_statuses, get_all_field_ids,
         has_field, delete.
 """
 
-import logging
-
 import pytest
 
 from nucliadb.common.datamanagers import fields_v2, kb_v2, resources_v2
@@ -301,25 +299,3 @@ async def test_delete_nonexistent_field_is_noop(maindb_driver: Driver, kbid: str
     async with maindb_driver.rw_transaction() as txn:
         await fields_v2.delete(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="ghost")
         await txn.commit()  # must not raise
-
-
-# ---------------------------------------------------------------------------
-# logs_foreign_key_error on set / set_status
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_set_missing_parent_logs_warning_and_does_not_raise(
-    maindb_driver: Driver,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """Writing to kb_fields whose parent kb_resources row does not exist must not raise."""
-    kbid = KnowledgeBox.new_unique_kbid()
-    rid = Resource.new_unique_rid()
-
-    with caplog.at_level(logging.WARNING, logger="nucliadb.common.datamanagers.utils"):
-        async with maindb_driver.rw_transaction() as txn:
-            await fields_v2.set(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", value=b"data")
-            await txn.commit()
-
-    assert any("Foreign key violation" in r.message for r in caplog.records)
