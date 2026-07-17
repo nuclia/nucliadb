@@ -144,14 +144,6 @@ async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
     return await resources_v2.calculate_number_of_resources(txn, kbid=kbid)
 
 
-async def get_number_of_resources(txn: Transaction, *, kbid: str) -> int:
-    return await calculate_number_of_resources(txn, kbid=kbid)
-
-
-async def set_number_of_resources(txn: Transaction, kbid: str, value: int) -> None:
-    return
-
-
 # Fields (materialized key with all field ids)
 
 
