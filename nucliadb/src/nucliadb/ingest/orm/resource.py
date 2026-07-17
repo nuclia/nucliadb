@@ -89,7 +89,6 @@ class Resource:
         self.fields: dict[tuple[FieldType.ValueType, str], Field] = {}
         self.conversations: dict[int, PBConversation] = {}
         self.relations: PBRelations | None = None
-        self.all_fields_keys: list[tuple[FieldType.ValueType, str]] | None = None
         self.origin: PBOrigin | None = None
         self.extra: PBExtra | None = None
         self.security: utils_pb2.Security | None = None
@@ -215,9 +214,8 @@ class Resource:
         # Use a set to make sure we don't have duplicate field ids
         result = set()
         all_fields = await self.get_all_field_ids()
-        if all_fields is not None:
-            for f in all_fields.fields:
-                result.add((f.field_type, f.field))
+        for f in all_fields.fields:
+            result.add((f.field_type, f.field))
         # We make sure that title and summary are set to be added
         basic = await self.get_basic()
         if basic is not None:
@@ -253,10 +251,6 @@ class Resource:
         else:
             field_obj = self.fields[field]
         await field_obj.set_value(payload)
-        if self.all_fields_keys is None:
-            self.all_fields_keys = []
-        self.all_fields_keys.append(field)
-
         self.modified = True
         return field_obj
 
@@ -267,10 +261,7 @@ class Resource:
             del self.fields[field]
         else:
             field_obj = KB_FIELDS[type](id=key, resource=self)
-
-        if self.all_fields_keys is not None:
-            if field in self.all_fields_keys:
-                self.all_fields_keys.remove(field)
+        self.modified = True
         await field_obj.delete()
 
     async def _apply_delete_splits(self, payload: writer_pb2.DeleteSplits) -> None:
@@ -282,8 +273,6 @@ class Resource:
         self.modified = True
 
     async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
-        """Return whether this resource has this field or not."""
-
         return await datamanagers.fields.fields_v2.exists(
             self.txn,
             kbid=self.kbid,
@@ -292,7 +281,7 @@ class Resource:
             field_id=field,
         )
 
-    async def get_all_field_ids(self) -> PBAllFieldIDs | None:
+    async def get_all_field_ids(self) -> PBAllFieldIDs:
         return await datamanagers.resources.get_all_field_ids(self.txn, kbid=self.kbid, rid=self.uuid)
 
     async def apply_field_values(self, message: BrokerMessage):

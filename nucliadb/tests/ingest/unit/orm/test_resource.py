@@ -209,7 +209,7 @@ async def test_get_set_all_field_ids(txn, storage, kb, rid):
     resource = Resource(txn, storage, kb, rid)
 
     all_field_ids = await resource.get_all_field_ids()
-    assert all_field_ids is None or all_field_ids.fields == []
+    assert all_field_ids.fields == []
 
     all_fields = AllFieldIDs()
     all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text"))
@@ -224,7 +224,6 @@ async def test_get_set_all_field_ids(txn, storage, kb, rid):
     )
 
     final = await resource.get_all_field_ids()
-    assert final is not None
     assert final == all_fields
 
 
@@ -262,7 +261,6 @@ async def test_update_all_fields_key(txn, storage, kb, rid):
         txn, kbid=kb, rid=rid, field_type="f", field_id="file", value=FileExtractedData()
     )
     result = await resource.get_all_field_ids()
-    assert result is not None
     assert len(result.fields) == 3
     # Sort them by field_type and field to ensure consistent ordering for the assertion
     obtained = list(result.fields)
