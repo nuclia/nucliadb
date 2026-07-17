@@ -110,24 +110,20 @@ class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):
         return response
 
 
-def valid_kbid(kbid: str) -> bool:
-    # Must be a UUID in canonical dashed format.
-    if len(kbid) != 36 or kbid.count("-") != 4:
-        return False
+def is_uuid(value: str) -> bool:
     try:
-        return str(uuid.UUID(kbid)) == kbid.lower()
+        uuid.UUID(value)
+        return True
     except ValueError:
         return False
+
+
+def valid_kbid(kbid: str) -> bool:
+    return is_uuid(kbid)
 
 
 def valid_rid(rid: str) -> bool:
-    # Must be a UUID in hex format.
-    if len(rid) != 32 or "-" in rid:
-        return False
-    try:
-        return uuid.UUID(rid).hex == rid.lower()
-    except ValueError:
-        return False
+    return is_uuid(rid)
 
 
 class UUIDPathParamsValidationMiddleware(BaseHTTPMiddleware):
@@ -153,8 +149,6 @@ class UUIDPathParamsValidationMiddleware(BaseHTTPMiddleware):
     }
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        # Execute before endpoint code: if any tracked param is invalid,
-        # return the same 404 contract used by endpoint-level validation.
         path_params = self._resolve_path_params(request)
         for param_name, (validator, error_detail) in self._VALIDATORS.items():
             value = path_params.get(param_name)
