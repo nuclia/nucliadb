@@ -23,6 +23,7 @@ use nidx_protos::{
 };
 use tracing::field::Empty;
 use tracing::{Span, instrument};
+use uuid::Uuid;
 
 #[derive(Clone, Copy)]
 pub struct OrderBy {
@@ -55,12 +56,21 @@ pub fn merge_search(shard_responses: Vec<SearchResponse>, order_by: OrderBy, lim
     let mut graph_responses = Vec::with_capacity(shard_responses.len());
 
     for response in shard_responses {
+        let shard_id = response
+            .shard_ids
+            .first()
+            .and_then(|s| Uuid::parse_str(s).ok())
+            .map(|u| u.as_bytes().to_vec())
+            .unwrap_or_default();
         shard_ids.extend(response.shard_ids);
 
         if let Some(document) = response.document {
             document_responses.push(document);
         }
-        if let Some(paragraph) = response.paragraph {
+        if let Some(mut paragraph) = response.paragraph {
+            for result in &mut paragraph.results {
+                result.shard_id = shard_id.clone();
+            }
             paragraph_responses.push(paragraph);
         }
         if let Some(vector) = response.vector {
@@ -206,7 +216,7 @@ fn sort_documents_fn(order_by: OrderBy) -> Box<dyn Fn(&DocumentResult, &Document
                         bm25: b_bm25,
                         booster: b_booster,
                     })),
-                ) => a_bm25.total_cmp(&b_bm25).then(a_booster.total_cmp(&b_booster)).is_gt(),
+                ) => a_bm25.total_cmp(&b_bm25).then(a_booster.cmp(&b_booster)).is_gt(),
                 _ => {
                     unreachable!("index always return values with the same order_by as we have")
                 }
@@ -280,7 +290,11 @@ fn sort_paragraphs_fn(order_by: OrderBy) -> Box<dyn Fn(&ParagraphResult, &Paragr
                         bm25: b_bm25,
                         booster: b_booster,
                     })),
-                ) => a_bm25.total_cmp(&b_bm25).then(a_booster.total_cmp(&b_booster)).is_gt(),
+                ) => a_bm25
+                    .total_cmp(&b_bm25)
+                    .then(a.shard_id.cmp(&b.shard_id))
+                    .then(a_booster.cmp(&b_booster))
+                    .is_gt(),
                 _ => {
                     unreachable!("index always return values with the same order_by as we have")
                 }
@@ -613,7 +627,7 @@ mod tests {
 
         #[test]
         fn test_merge_document_results_by_score() {
-            let document = |rid: &str, score: f32, booster: f32| DocumentResult {
+            let document = |rid: &str, score: f32, booster: u64| DocumentResult {
                 uuid: rid.to_string(),
                 field: "a/title".to_string(),
                 sort_value: Some(document_result::SortValue::Score(nidx_protos::ResultScore {
@@ -633,8 +647,8 @@ mod tests {
 
             let merged = merge_search(
                 vec![
-                    response(vec![document("foo", 3.0, 1.0), document("bar", 2.0, 2.0)]),
-                    response(vec![document("baz", 4.0, 1.0), document("quux", 2.0, 1.0)]),
+                    response(vec![document("foo", 3.0, 1), document("bar", 2.0, 2)]),
+                    response(vec![document("baz", 4.0, 1), document("quux", 2.0, 1)]),
                 ],
                 OrderBy {
                     expr: SortExpr::Score,
@@ -712,6 +726,7 @@ mod tests {
         use nidx_protos::prost_types::Timestamp;
         use nidx_protos::{FacetResult, ParagraphSearchResponse, SearchResponse};
         use nidx_protos::{ParagraphResult, paragraph_result};
+        use uuid::Uuid;
 
         use crate::searcher::shard_merge::OrderBy;
         use crate::searcher::shard_merge::{Limit, SortExpr};
@@ -901,7 +916,7 @@ mod tests {
 
         #[test]
         fn test_merge_paragraph_results_by_score() {
-            let paragraph = |rid: &str, score: f32, booster: f32| ParagraphResult {
+            let paragraph = |rid: &str, score: f32, booster: u64| ParagraphResult {
                 uuid: rid.to_string(),
                 field: "a/title".to_string(),
                 sort_value: Some(paragraph_result::SortValue::Score(nidx_protos::ResultScore {
@@ -921,8 +936,8 @@ mod tests {
 
             let merged = merge_search(
                 vec![
-                    response(vec![paragraph("foo", 3.0, 1.0), paragraph("bar", 2.0, 2.0)]),
-                    response(vec![paragraph("baz", 4.0, 1.0), paragraph("quux", 2.0, 1.0)]),
+                    response(vec![paragraph("foo", 3.0, 1), paragraph("bar", 2.0, 2)]),
+                    response(vec![paragraph("baz", 4.0, 1), paragraph("quux", 2.0, 1)]),
                 ],
                 OrderBy {
                     expr: SortExpr::Score,
@@ -937,6 +952,90 @@ mod tests {
             assert_eq!(merged.results[1].uuid, "foo");
             assert_eq!(merged.results[2].uuid, "bar");
             assert_eq!(merged.results[3].uuid, "quux");
+        }
+
+        #[test]
+        fn test_merge_paragraph_results_shard_tiebreak() {
+            // Two valid UUIDs: "bb..." bytes sort higher than "aa..." bytes.
+            const SHARD_A: &str = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+            const SHARD_B: &str = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+            let shard_bytes = |s: &str| Uuid::parse_str(s).unwrap().as_bytes().to_vec();
+
+            let paragraph = |rid: &str, score: f32, booster: u64| ParagraphResult {
+                uuid: rid.to_string(),
+                field: "a/title".to_string(),
+                sort_value: Some(paragraph_result::SortValue::Score(nidx_protos::ResultScore {
+                    bm25: score,
+                    booster,
+                })),
+                ..Default::default()
+            };
+            // Response with an explicit shard_id so merge() can tag the results
+            let response = |shard_id: &str, paragraphs: Vec<ParagraphResult>| SearchResponse {
+                shard_ids: vec![shard_id.to_string()],
+                paragraph: Some(ParagraphSearchResponse {
+                    total: 100,
+                    results: paragraphs,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            // Equal score and booster: shard_id bytes are the tiebreaker.
+            // SHARD_B bytes sort higher than SHARD_A bytes, so "foo" (SHARD_B) wins.
+            let merged = merge(
+                vec![
+                    response(SHARD_B, vec![paragraph("foo", 2.0, 1)]),
+                    response(SHARD_A, vec![paragraph("bar", 2.0, 1)]),
+                ],
+                OrderBy {
+                    expr: SortExpr::Score,
+                    descending: true,
+                },
+                Limit(20),
+            )
+            .paragraph
+            .unwrap();
+            assert_eq!(merged.results[0].uuid, "foo");
+            assert_eq!(merged.results[0].shard_id, shard_bytes(SHARD_B));
+            assert_eq!(merged.results[1].uuid, "bar");
+            assert_eq!(merged.results[1].shard_id, shard_bytes(SHARD_A));
+
+            // Reversing shard assignment flips the order, confirming determinism.
+            let merged = merge(
+                vec![
+                    response(SHARD_A, vec![paragraph("foo", 2.0, 1)]),
+                    response(SHARD_B, vec![paragraph("bar", 2.0, 1)]),
+                ],
+                OrderBy {
+                    expr: SortExpr::Score,
+                    descending: true,
+                },
+                Limit(20),
+            )
+            .paragraph
+            .unwrap();
+            assert_eq!(merged.results[0].uuid, "bar");
+            assert_eq!(merged.results[0].shard_id, shard_bytes(SHARD_B));
+            assert_eq!(merged.results[1].uuid, "foo");
+            assert_eq!(merged.results[1].shard_id, shard_bytes(SHARD_A));
+
+            // When shard bytes are also equal, booster is the final tiebreaker.
+            let merged = merge(
+                vec![
+                    response(SHARD_A, vec![paragraph("foo", 2.0, 1)]),
+                    response(SHARD_A, vec![paragraph("bar", 2.0, 2)]),
+                ],
+                OrderBy {
+                    expr: SortExpr::Score,
+                    descending: true,
+                },
+                Limit(20),
+            )
+            .paragraph
+            .unwrap();
+            assert_eq!(merged.results[0].uuid, "bar"); // higher booster wins
+            assert_eq!(merged.results[1].uuid, "foo");
         }
 
         #[test]

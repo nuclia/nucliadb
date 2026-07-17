@@ -46,10 +46,10 @@ message FacetResults {
 }
 
 message ResultScore {
+    reserved 2;
+
     float bm25 = 1;
-    // In the case of two equal bm25 scores, booster
-    // decides
-    float booster = 2;
+    uint64 booster = 3;
 }
 
 message DocumentResult {
@@ -98,6 +98,8 @@ message ParagraphResult {
     noderesources.ParagraphMetadata metadata = 11;
 
     repeated string labels = 12;
+
+    bytes shard_id = 14;
 }
 
 message ParagraphSearchResponse {

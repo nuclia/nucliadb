@@ -306,7 +306,7 @@ impl TextReaderService {
                 Ok(doc) => {
                     let score = ResultScore {
                         bm25: score,
-                        booster: id as f32,
+                        booster: id as u64,
                     };
                     let uuid = String::from_utf8(
                         doc.get_first(self.schema.uuid)
