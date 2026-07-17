@@ -35,7 +35,6 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest.orm.knowledgebox import (
-    KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
 )
 from nucliadb.purge import (
@@ -95,10 +94,6 @@ async def test_purge_deletes_everything_from_maindb(
     resp = await nucliadb_reader_manager.get("/kbs")
     body = resp.json()
     assert len(body["kbs"]) == 0
-
-    keys_after_delete = await list_all_keys(maindb_driver)
-    # A marker key has been added to delete the KB asynchronously
-    assert any([key.startswith(KB_TO_DELETE_BASE) for key in keys_after_delete])
 
     await purge_kbs(maindb_driver)
     keys_after_purge_kb = await list_all_keys(maindb_driver)

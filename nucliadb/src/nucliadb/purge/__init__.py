@@ -31,7 +31,6 @@ from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import (
-    KB_TO_DELETE_BASE,
     KB_TO_DELETE_STORAGE_BASE,
     KB_VECTORSET_TO_DELETE_BASE,
     RESOURCE_TO_DELETE_STORAGE_BASE,
@@ -45,6 +44,14 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
 
 
+async def get_soft_deleted_kbs(driver: Driver) -> list[str]:
+    """
+    Return a list of kbs marked for deletion in maindb.
+    """
+    async with driver.ro_transaction() as txn:
+        return await datamanagers.kb.kb_v2.get_soft_deleted_kbs(txn)
+
+
 async def _iter_keys(driver: Driver, match: str) -> AsyncGenerator[str, None]:
     async with driver.ro_transaction() as keys_txn:
         async for key in keys_txn.keys(match=match):
@@ -53,43 +60,33 @@ async def _iter_keys(driver: Driver, match: str) -> AsyncGenerator[str, None]:
 
 async def purge_kbs(driver: Driver):
     logger.info("START PURGING KBS")
-    async for key in _iter_keys(driver, KB_TO_DELETE_BASE):
-        logger.info(f"Purging kb {key}")
-        try:
-            kbid = key.split("/")[2]
-        except Exception:
-            logger.warning(f"  X Skipping purge {key}, wrong key format, expected {KB_TO_DELETE_BASE}")
-            continue
-
+    to_purge = await get_soft_deleted_kbs(driver)
+    for kbid in to_purge:
+        logger.info("Purging KnowledgeBox", extra={"kbid": kbid})
         try:
             await KnowledgeBox.purge(driver, kbid)
-            logger.info(f"  √ Successfully Purged {kbid}")
+            logger.info("Successfully Purged KnowledgeBox", extra={"kbid": kbid})
         except ShardNotFound as exc:
             errors.capture_exception(exc)
-            logger.error(f"  X At least one shard was unavailable while purging {kbid}, skipping")
+            logger.error(
+                "At least one shard was unavailable while purging KnowledgeBox, skipping",
+                extra={"kbid": kbid},
+            )
             continue
         except NodeError as exc:
             errors.capture_exception(exc)
-            logger.error(f"  X At least one node was unavailable while purging {kbid}, skipping")
+            logger.error(
+                "At least one node was unavailable while purging KnowledgeBox, skipping",
+                extra={"kbid": kbid},
+            )
             continue
-
         except Exception as exc:
             errors.capture_exception(exc)
             logger.error(
-                f"  X ERROR while executing KnowledgeBox.purge of {kbid}, skipping: {exc.__class__.__name__} {exc}"
+                f"ERROR while executing KnowledgeBox.purge of {kbid}, skipping: {exc.__class__.__name__} {exc}",
+                extra={"kbid": kbid},
             )
             continue
-
-        # Now delete the delete mark
-        try:
-            async with driver.rw_transaction() as txn:
-                await KnowledgeBox.unmark_for_purge(txn, kbid)
-                await txn.commit()
-            logger.info(f"  √ Deleted {kbid}")
-        except Exception as exc:
-            errors.capture_exception(exc)
-            logger.error(f"  X Error while deleting key {kbid}")
-            await txn.abort()
     logger.info("END PURGING KB")
 
 
@@ -185,10 +182,7 @@ async def _purge_resources_storage_batch(driver: Driver, storage: Storage, batch
     tasks = []
     for key in to_delete_batch:
         kbid, resource_id = key.split("/")[-2:]
-        # Check if resource exists in maindb. This can happen if a file is deleted (marked for purge) and immediately
-        # reuploaded. Without this check, we will delete the data of the newly uploaded copy of the resource.
-        if not await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=resource_id):
-            tasks.append(asyncio.create_task(storage.delete_resource(kbid, resource_id)))
+        tasks.append(asyncio.create_task(storage.delete_resource(kbid, resource_id)))
 
     await asyncio.gather(*tasks)
 

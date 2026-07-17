@@ -84,6 +84,14 @@ async def soft_delete(txn: Transaction, *, kbid: str) -> None:
         )
 
 
+async def get_soft_deleted_kbs(txn: Transaction) -> list[str]:
+    """Return a list of kbs marked for deletion in maindb."""
+    async with _pg_cursor(txn) as cur:
+        await cur.execute("SELECT kbid FROM kbs WHERE slug IS NULL AND deleted_at IS NOT NULL")
+        rows = await cur.fetchall()
+        return [str(row[0]) for row in rows]
+
+
 async def set_kbid_for_slug(txn: Transaction, *, slug: str, kbid: str) -> None:
     """Set the slug for a given kbid, overwriting any existing slug. This is used when migrating from the old slug-based system to the new kbid-based system."""
     async with _pg_cursor(txn) as cur:

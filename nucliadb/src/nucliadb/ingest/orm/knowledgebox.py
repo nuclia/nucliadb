@@ -18,14 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from collections.abc import AsyncGenerator, Callable, Coroutine
-from datetime import datetime
 from functools import partial
 from typing import Any
 from uuid import uuid4
 
 from nidx_protos import nidx_pb2, noderesources_pb2
 
-from nucliadb.common import datamanagers, file_md5
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
 from nucliadb.common.maindb.driver import Driver, Transaction
@@ -61,13 +60,11 @@ from nucliadb_utils.utilities import (
 
 KB_KEYS = "/kbs/{kbid}/"
 
-KB_TO_DELETE_BASE = "/kbtodelete/"
 KB_TO_DELETE_STORAGE_BASE = "/storagetodelete/"
 
 RESOURCE_TO_DELETE_STORAGE_BASE = "/resourcestoragetodelete"
 RESOURCE_TO_DELETE_STORAGE = f"{RESOURCE_TO_DELETE_STORAGE_BASE}/{{kbid}}/{{uuid}}"
 
-KB_TO_DELETE = f"{KB_TO_DELETE_BASE}{{kbid}}"
 KB_TO_DELETE_STORAGE = f"{KB_TO_DELETE_STORAGE_BASE}{{kbid}}"
 
 KB_VECTORSET_TO_DELETE_BASE = "/vectorsettodelete"
@@ -350,23 +347,6 @@ class KnowledgeBox:
             await nidx_api.ConfigureShards(nidx_pb2.ShardsConfig(configs=configs))
 
     @classmethod
-    async def mark_for_purge(cls, txn: Transaction, kbid: str):
-        """
-        Mark KB to purge. Purge command will eventually delete all KB keys and objects in storage.
-        """
-        key = KB_TO_DELETE.format(kbid=kbid)
-        value = datetime.now().isoformat().encode()
-        await txn.set(key, value)
-
-    @classmethod
-    async def unmark_for_purge(cls, txn: Transaction, kbid: str):
-        """
-        Unmark KB to purge. To be called after purge is completed, to remove the KB from the list of KBs to purge.
-        """
-        key = KB_TO_DELETE.format(kbid=kbid)
-        await txn.delete(key)
-
-    @classmethod
     async def delete(cls, driver: Driver, kbid: str):
         """
         Delete a knowledge base (KB) and all its associated data.
@@ -390,8 +370,6 @@ class KnowledgeBox:
                 await datamanagers.kb.delete_kb_slug(txn, slug=slug)
 
             await datamanagers.kb.delete_config(txn, kbid=kbid)
-
-            await cls.mark_for_purge(txn, kbid=kbid)
 
             shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
 
@@ -441,9 +419,7 @@ class KnowledgeBox:
             # Mark storage to be deleted. This will
             storage_to_delete = KB_TO_DELETE_STORAGE.format(kbid=kbid)
             await txn.set(storage_to_delete, b"")
-
             await catalog_delete_kb(txn, kbid)
-            await file_md5.delete(txn, kbid=kbid)
             await txn.commit()
 
         # Delete by prefix in another transaction, as it can be slow and we don't want to block the previous one
