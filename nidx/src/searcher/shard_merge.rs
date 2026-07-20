@@ -200,16 +200,16 @@ fn sort_documents_fn(order_by: OrderBy) -> Box<dyn Fn(&DocumentResult, &Document
                 (
                     Some(document_result::SortValue::Score(nidx_protos::ResultScore {
                         bm25: a_bm25,
-                        booster: a_booster,
+                        docaddr: a_docaddr,
                     })),
                     Some(document_result::SortValue::Score(nidx_protos::ResultScore {
                         bm25: b_bm25,
-                        booster: b_booster,
+                        docaddr: b_docaddr,
                     })),
                 ) => a_bm25
                     .total_cmp(&b_bm25)
                     .then(a.shard_id.cmp(&b.shard_id))
-                    .then(a_booster.cmp(&b_booster))
+                    .then(a_docaddr.cmp(&b_docaddr))
                     .is_gt(),
                 _ => {
                     unreachable!("index always return values with the same order_by as we have")
@@ -278,16 +278,16 @@ fn sort_paragraphs_fn(order_by: OrderBy) -> Box<dyn Fn(&ParagraphResult, &Paragr
                 (
                     Some(paragraph_result::SortValue::Score(nidx_protos::ResultScore {
                         bm25: a_bm25,
-                        booster: a_booster,
+                        docaddr: a_docaddr,
                     })),
                     Some(paragraph_result::SortValue::Score(nidx_protos::ResultScore {
                         bm25: b_bm25,
-                        booster: b_booster,
+                        docaddr: b_docaddr,
                     })),
                 ) => a_bm25
                     .total_cmp(&b_bm25)
                     .then(a.shard_id.cmp(&b.shard_id))
-                    .then(a_booster.cmp(&b_booster))
+                    .then(a_docaddr.cmp(&b_docaddr).reverse())
                     .is_gt(),
                 _ => {
                     unreachable!("index always return values with the same order_by as we have")
@@ -622,12 +622,12 @@ mod tests {
 
         #[test]
         fn test_merge_document_results_by_score() {
-            let document = |rid: &str, score: f32, booster: u64| DocumentResult {
+            let document = |rid: &str, score: f32, docaddr: u64| DocumentResult {
                 uuid: rid.to_string(),
                 field: "a/title".to_string(),
                 sort_value: Some(document_result::SortValue::Score(nidx_protos::ResultScore {
                     bm25: score,
-                    booster,
+                    docaddr,
                 })),
                 ..Default::default()
             };
@@ -666,12 +666,12 @@ mod tests {
             const SHARD_B: &str = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
             let shard_bytes = |s: &str| Uuid::parse_str(s).unwrap().as_bytes().to_vec();
 
-            let document = |rid: &str, score: f32, booster: u64, shard_id: &str| DocumentResult {
+            let document = |rid: &str, score: f32, docaddr: u64, shard_id: &str| DocumentResult {
                 uuid: rid.to_string(),
                 field: "a/title".to_string(),
                 sort_value: Some(document_result::SortValue::Score(nidx_protos::ResultScore {
                     bm25: score,
-                    booster,
+                    docaddr,
                 })),
                 // shard_id is set by shard_search before merge; simulate that here
                 shard_id: shard_bytes(shard_id),
@@ -686,7 +686,7 @@ mod tests {
                 ..Default::default()
             };
 
-            // Equal score and booster: SHARD_B bytes sort higher, so "foo" wins.
+            // Equal score and docaddr: SHARD_B bytes sort higher, so "foo" wins.
             let merged = merge_search(
                 vec![
                     response(vec![document("foo", 2.0, 1, SHARD_B)]),
@@ -725,7 +725,7 @@ mod tests {
             assert_eq!(merged.results[1].uuid, "foo");
             assert_eq!(merged.results[1].shard_id, shard_bytes(SHARD_A));
 
-            // When shard bytes are equal, booster is the final tiebreaker.
+            // When shard bytes are equal, docaddr is the final tiebreaker.
             let merged = merge_search(
                 vec![
                     response(vec![document("foo", 2.0, 1, SHARD_A)]),
@@ -994,12 +994,12 @@ mod tests {
 
         #[test]
         fn test_merge_paragraph_results_by_score() {
-            let paragraph = |rid: &str, score: f32, booster: u64| ParagraphResult {
+            let paragraph = |rid: &str, score: f32, docaddr: u64| ParagraphResult {
                 uuid: rid.to_string(),
                 field: "a/title".to_string(),
                 sort_value: Some(paragraph_result::SortValue::Score(nidx_protos::ResultScore {
                     bm25: score,
-                    booster,
+                    docaddr,
                 })),
                 ..Default::default()
             };
@@ -1014,7 +1014,7 @@ mod tests {
 
             let merged = merge_search(
                 vec![
-                    response(vec![paragraph("foo", 3.0, 1), paragraph("bar", 2.0, 2)]),
+                    response(vec![paragraph("foo", 3.0, 1), paragraph("bar", 2.0, 0)]),
                     response(vec![paragraph("baz", 4.0, 1), paragraph("quux", 2.0, 1)]),
                 ],
                 OrderBy {
@@ -1039,12 +1039,12 @@ mod tests {
             const SHARD_B: &str = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
             let shard_bytes = |s: &str| Uuid::parse_str(s).unwrap().as_bytes().to_vec();
 
-            let paragraph = |rid: &str, score: f32, booster: u64, shard_id: &str| ParagraphResult {
+            let paragraph = |rid: &str, score: f32, docaddr: u64, shard_id: &str| ParagraphResult {
                 uuid: rid.to_string(),
                 field: "a/title".to_string(),
                 sort_value: Some(paragraph_result::SortValue::Score(nidx_protos::ResultScore {
                     bm25: score,
-                    booster,
+                    docaddr,
                 })),
                 shard_id: shard_bytes(shard_id),
                 ..Default::default()
@@ -1058,7 +1058,7 @@ mod tests {
                 ..Default::default()
             };
 
-            // Equal score and booster: shard_id bytes are the tiebreaker.
+            // Equal score and docaddr: shard_id bytes are the tiebreaker.
             // SHARD_B bytes sort higher than SHARD_A bytes, so "foo" (SHARD_B) wins.
             let merged = merge_search(
                 vec![
@@ -1098,11 +1098,11 @@ mod tests {
             assert_eq!(merged.results[1].uuid, "foo");
             assert_eq!(merged.results[1].shard_id, shard_bytes(SHARD_A));
 
-            // When shard bytes are also equal, booster is the final tiebreaker.
+            // When shard bytes are also equal, docaddr is the final tiebreaker.
             let merged = merge_search(
                 vec![
-                    response(vec![paragraph("foo", 2.0, 1, SHARD_A)]),
-                    response(vec![paragraph("bar", 2.0, 2, SHARD_A)]),
+                    response(vec![paragraph("foo", 2.0, 2, SHARD_A)]),
+                    response(vec![paragraph("bar", 2.0, 1, SHARD_A)]),
                 ],
                 OrderBy {
                     expr: SortExpr::Score,
@@ -1112,7 +1112,7 @@ mod tests {
             )
             .paragraph
             .unwrap();
-            assert_eq!(merged.results[0].uuid, "bar"); // higher booster wins
+            assert_eq!(merged.results[0].uuid, "bar"); // lower docaddr wins
             assert_eq!(merged.results[1].uuid, "foo");
         }
 

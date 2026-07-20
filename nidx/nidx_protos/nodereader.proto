@@ -49,7 +49,7 @@ message ResultScore {
     reserved 2;
 
     float bm25 = 1;
-    uint64 booster = 3;
+    uint64 docaddr = 3;
 }
 
 message DocumentResult {
@@ -379,6 +379,12 @@ message JsonFilterExpression {
     }
 }
 
+message SearchAfter {
+    float score = 1;
+    bytes shard_id = 2;
+    uint64 docaddr = 3;
+}
+
 message SearchRequest {
     reserved 7, 20, 21;
 
@@ -427,6 +433,8 @@ message SearchRequest {
     GraphSearch graph_search = 29;
 
     optional JsonFilterExpression json_filter = 32;
+
+    optional SearchAfter search_after = 35;
 }
 
 enum SuggestFeatures {

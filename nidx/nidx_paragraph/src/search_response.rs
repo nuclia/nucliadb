@@ -233,7 +233,7 @@ impl From<SearchBm25Response<'_>> for ParagraphSearchResponse {
                 Ok(doc) => {
                     let score = ResultScore {
                         bm25: score,
-                        booster: (doc_address.segment_ord as u64) << 32 | doc_address.doc_id as u64,
+                        docaddr: (doc_address.segment_ord as u64) << 32 | doc_address.doc_id as u64,
                     };
                     let schema = &response.text_service.schema;
                     let uuid = doc

@@ -13,6 +13,8 @@
 // limitations under the License.
 //
 
+use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::{Duration, Instant};
 
@@ -22,13 +24,14 @@ use nidx_types::prefilter::PrefilterResult;
 use tantivy::collector::{Collector, Count, FacetCollector, TopDocs};
 use tantivy::query::{AllQuery, Query};
 use tantivy::schema::{Facet, Field, Value};
-use tantivy::{DateTime, DocAddress, Index, IndexReader, Order, TantivyDocument};
+use tantivy::{DateTime, DocAddress, DocId, Index, IndexReader, Order, Score, SegmentReader, TantivyDocument};
 use tracing::*;
 
 use super::schema::ParagraphSchema;
 use crate::request_types::{ParagraphSearchRequest, ParagraphSuggestRequest};
 use crate::search_query::{SharedTermC, search_query, streaming_query, suggest_query};
 use crate::search_response::{SearchBm25Response, SearchFacetsResponse, SearchIntResponse, extract_labels};
+use crate::{SearchAfter, SearchAfterTieBreak};
 
 pub struct ParagraphReaderService {
     pub index: Index,
@@ -284,7 +287,7 @@ impl Searcher<'_> {
                     }))
                 }
                 None => {
-                    let topdocs_collector = TopDocs::with_limit(extra_result).order_by_score();
+                    let topdocs_collector = self.build_topdocs_search_after_collector(&searcher, extra_result);
                     let collector = &(Count, topdocs_collector);
                     let (total, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchBm25Response {
@@ -324,7 +327,7 @@ impl Searcher<'_> {
                     }))
                 }
                 None => {
-                    let topdocs_collector = TopDocs::with_limit(extra_result).order_by_score();
+                    let topdocs_collector = self.build_topdocs_search_after_collector(&searcher, extra_result);
                     let collector = &(Count, facet_collector, topdocs_collector);
                     let (total, facets_count, top_docs) = searcher.search(&query, collector)?;
                     Ok(ParagraphSearchResponse::from(SearchBm25Response {
@@ -342,5 +345,46 @@ impl Searcher<'_> {
                 }
             }
         }
+    }
+
+    fn build_topdocs_search_after_collector(
+        &self,
+        searcher: &tantivy::Searcher,
+        limit: usize,
+    ) -> impl Collector<Fruit = Vec<(Score, DocAddress)>> + 'static {
+        let segment_to_ord: HashMap<_, _> = searcher
+            .segment_readers()
+            .iter()
+            .enumerate()
+            .map(|(ord, reader)| (reader.segment_id(), ord as u64))
+            .collect();
+        let after = self.request.search_after.clone();
+
+        TopDocs::with_limit(limit).tweak_score(move |segment_reader: &SegmentReader| {
+            let segment_ord = segment_to_ord.get(&segment_reader.segment_id()).unwrap_or(&0);
+            let docaddr_base: u64 = segment_ord << 32;
+            let after = after.clone();
+            move |doc: DocId, score: Score| {
+                let docaddr = docaddr_base + doc as u64;
+                if is_after(&after, score, docaddr) {
+                    score
+                } else {
+                    f32::NEG_INFINITY
+                }
+            }
+        })
+    }
+}
+
+pub fn is_after(after: &Option<SearchAfter>, score: f32, docaddr: u64) -> bool {
+    let Some(after) = after else { return true };
+    match score.total_cmp(&after.score) {
+        Ordering::Less => true,
+        Ordering::Equal => match after.tie_break {
+            SearchAfterTieBreak::Keep => true,
+            SearchAfterTieBreak::KeepAfter(after_docaddr) => docaddr < after_docaddr,
+            _ => false,
+        },
+        Ordering::Greater => false,
     }
 }

@@ -15,7 +15,7 @@
 
 use anyhow::anyhow;
 use nidx_json::search::{JsonFilterExpression, JsonPathFilter, JsonPredicate, JsonSearchRequest};
-use nidx_paragraph::ParagraphSearchRequest;
+use nidx_paragraph::{ParagraphSearchRequest, SearchAfterTieBreak};
 use nidx_protos::filter_expression::Expr;
 use nidx_protos::graph_query::{PathQuery, node, path_query, relation};
 use nidx_protos::graph_search_request::QueryKind;
@@ -27,7 +27,9 @@ use nidx_types::prefilter::{FilterOperator, PrefilterResult};
 use nidx_types::query_language::*;
 use nidx_vector::SEGMENT_TAGS;
 use nidx_vector::VectorSearchRequest;
+use std::cmp::Ordering;
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use super::query_language::extract_label_filters;
 
@@ -179,11 +181,11 @@ pub(crate) fn proto_filter_operator(value: i32) -> anyhow::Result<FilterOperator
     }
 }
 
-pub fn build_query_plan(search_request: SearchRequest) -> anyhow::Result<QueryPlan> {
+pub fn build_query_plan(search_request: SearchRequest, shard_id: &Uuid) -> anyhow::Result<QueryPlan> {
     let graph_request = compute_graph_request(&search_request)?;
     let texts_request = compute_texts_request(&search_request);
     let vectors_request = compute_vectors_request(&search_request)?;
-    let paragraphs_request = compute_paragraphs_request(&search_request)?;
+    let paragraphs_request = compute_paragraphs_request(&search_request, shard_id)?;
     let json_request = compute_json_request(&search_request)?;
 
     let prefilter = compute_prefilters(&search_request);
@@ -288,10 +290,27 @@ fn compute_prefilters(search_request: &SearchRequest) -> Option<PreFilterRequest
     }
 }
 
-fn compute_paragraphs_request(search_request: &SearchRequest) -> anyhow::Result<Option<ParagraphSearchRequest>> {
+fn compute_paragraphs_request(
+    search_request: &SearchRequest,
+    shard_id: &Uuid,
+) -> anyhow::Result<Option<ParagraphSearchRequest>> {
     if !search_request.paragraph {
         return Ok(None);
     }
+
+    let search_after = if let Some(request_after) = &search_request.search_after {
+        let tiebreaker_shard = Uuid::from_slice(&request_after.shard_id)?;
+        Some(nidx_paragraph::SearchAfter {
+            score: request_after.score,
+            tie_break: match shard_id.cmp(&tiebreaker_shard) {
+                Ordering::Greater => SearchAfterTieBreak::Drop,
+                Ordering::Equal => SearchAfterTieBreak::KeepAfter(request_after.docaddr),
+                Ordering::Less => SearchAfterTieBreak::Keep,
+            },
+        })
+    } else {
+        None
+    };
 
     Ok(Some(ParagraphSearchRequest {
         uuid: "".to_string(),
@@ -310,6 +329,7 @@ fn compute_paragraphs_request(search_request: &SearchRequest) -> anyhow::Result<
             .map(filter_to_boolean_expression)
             .transpose()?,
         filter_operator: proto_filter_operator(search_request.filter_operator)?,
+        search_after,
     }))
 }
 
@@ -436,7 +456,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let query_plan = build_query_plan(request).unwrap();
+        let query_plan = build_query_plan(request, &Uuid::nil()).unwrap();
         let Some(prefilter) = query_plan.prefilter else {
             panic!("There should be a prefilter");
         };
