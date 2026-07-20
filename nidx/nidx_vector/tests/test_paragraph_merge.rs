@@ -65,14 +65,8 @@ fn build_resource(uuid: &str, vector0: Vec<f32>, vector1: Vec<f32>) -> Resource 
     }
 }
 
-/// Verifies that merging two paragraph segments—each carrying a self-referencing
-/// deletion for its own field—keeps both vectors alive in the merged output.
-///
-/// The deletion pattern (a deletion at the same seq as the segment) mirrors
-/// what happens during a resource update: the old version of a field is marked
-/// for deletion atomically with the new version being written.  When the two
-/// segments belong to *different* resources the deletions are disjoint and
-/// neither removes the other resource's vectors.
+/// Verifies that merging two segments that update a resource each are applied correctly.
+/// This requires that deletions are applied in the correct order during merging.
 #[test]
 fn test_paragraph_merge_with_deletions() -> anyhow::Result<()> {
     let config = VectorConfig::for_paragraphs(VectorType::DenseF32 { dimension: DIMENSION });
