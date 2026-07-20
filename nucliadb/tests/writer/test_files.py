@@ -28,6 +28,7 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX
 from nucliadb.writer.api.v1.upload import maybe_b64decode
@@ -43,14 +44,15 @@ ASSETS_PATH = os.path.dirname(__file__) + "/assets"
 @pytest.mark.deploy_modes("component")
 async def test_knowledgebox_file_tus_options(nucliadb_writer: AsyncClient, knowledgebox: str):
     kbid = knowledgebox
+    rid = uuid.uuid4().hex
 
-    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/resource/xxx/file/xxx/{TUSUPLOAD}/xxx")
+    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/resource/{rid}/file/xxx/{TUSUPLOAD}/xxx")
     assert resp.status_code == 204
     assert resp.headers["tus-resumable"] == "1.0.0"
     assert resp.headers["tus-version"] == "1.0.0"
     assert resp.headers["tus-extension"] == "creation-defer-length"
 
-    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/resource/xxx/file/xxx/{TUSUPLOAD}")
+    resp = await nucliadb_writer.options(f"/{KB_PREFIX}/{kbid}/resource/{rid}/file/xxx/{TUSUPLOAD}")
     assert resp.status_code == 204
     assert resp.headers["tus-resumable"] == "1.0.0"
     assert resp.headers["tus-version"] == "1.0.0"
@@ -536,7 +538,7 @@ async def test_file_tus_upload_urls_field_by_resource_id(
         "upload-defer-length": "1",
     }
 
-    idonotexist = uuid.uuid4().hex
+    idonotexist = KnowledgeBox.new_unique_kbid()
     resp = await nucliadb_writer.post(
         f"/{KB_PREFIX}/{kbid}/resource/{idonotexist}/file/field1/{TUSUPLOAD}",
         headers=headers,

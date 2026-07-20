@@ -32,7 +32,11 @@ from starlette.responses import HTMLResponse
 from starlette.routing import Mount
 
 import nucliadb_admin_assets  # type: ignore[import-untyped]
-from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware, ProcessTimeHeaderMiddleware
+from nucliadb.middleware import (
+    ClientErrorPayloadLoggerMiddleware,
+    ProcessTimeHeaderMiddleware,
+    UUIDPathParamsValidationMiddleware,
+)
 from nucliadb.reader import API_PREFIX
 from nucliadb.reader.api.v1.router import api as api_reader_v1
 from nucliadb.search.api.v1.router import api as api_search_v1
@@ -95,6 +99,9 @@ def application_factory(settings: Settings) -> FastAPI:
             AuthenticationMiddleware,
             backend=get_auth_backend(settings),
         ),
+        # Keep UUID path validation in the global middleware chain so invalid
+        # kbid/rid/path_rid are rejected before endpoint handlers run.
+        Middleware(UUIDPathParamsValidationMiddleware),
         Middleware(AuditMiddleware, audit_utility_getter=get_audit),
         Middleware(ClientErrorPayloadLoggerMiddleware),
     ]

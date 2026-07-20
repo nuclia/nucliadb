@@ -27,7 +27,11 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from nucliadb.middleware import EventCounter, ProcessTimeHeaderMiddleware
+from nucliadb.middleware import (
+    EventCounter,
+    ProcessTimeHeaderMiddleware,
+    UUIDPathParamsValidationMiddleware,
+)
 
 
 class TestCaseProcessTimeHeaderMiddleware:
@@ -66,3 +70,65 @@ def test_event_counter():
     assert counter.get_count() == 200
     time.sleep(2.1)
     assert counter.get_count() == 0
+
+
+class TestCaseUUIDPathParamsValidationMiddleware:
+    VALID_KBID = "d6fcb6d1-4525-4a1d-84a5-35c7be5dbfbb"
+    VALID_RID = "d6fcb6d145254a1d84a535c7be5dbfbb"
+
+    @pytest.fixture(scope="class")
+    def app(self):
+        calls = {"ok": 0}
+
+        def ok(request):
+            calls["ok"] += 1
+            return PlainTextResponse("ok")
+
+        app = Starlette(
+            routes=[
+                Route("/kb/{kbid}/resource/{rid}", ok),
+                Route("/kb/{kbid}/resource/{path_rid}/reprocess", ok),
+                Route("/status", ok),
+            ],
+            middleware=[
+                Middleware(UUIDPathParamsValidationMiddleware),
+            ],
+        )
+        app.state.calls = calls
+        yield app
+
+    @pytest.fixture
+    def client(self, app):
+        return TestClient(app)
+
+    def test_invalid_kbid_returns_404(self, client):
+        initial_calls = client.app.state.calls["ok"]
+        response = client.get(f"/kb/not-a-uuid/resource/{self.VALID_RID}")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "KnowledgeBox not found. UUID expected."
+        assert client.app.state.calls["ok"] == initial_calls
+
+    def test_invalid_rid_returns_404(self, client):
+        response = client.get(f"/kb/{self.VALID_KBID}/resource/not-a-uuid")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Resource not found. UUID expected."
+
+    def test_invalid_path_rid_returns_404(self, client):
+        response = client.get(f"/kb/{self.VALID_KBID}/resource/not-a-uuid/reprocess")
+
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Resource not found. UUID expected."
+
+    def test_valid_ids_are_accepted(self, client):
+        response = client.get(f"/kb/{self.VALID_KBID}/resource/{self.VALID_RID}")
+
+        assert response.status_code == 200
+        assert response.text == "ok"
+
+    def test_non_kb_paths_bypass_validation(self, client):
+        response = client.get("/status")
+
+        assert response.status_code == 200
+        assert response.text == "ok"

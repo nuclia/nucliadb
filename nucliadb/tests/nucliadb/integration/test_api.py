@@ -21,6 +21,7 @@ import base64
 import hashlib
 import json
 import random
+import uuid
 from typing import cast
 from unittest.mock import AsyncMock, patch
 
@@ -251,6 +252,75 @@ async def test_can_create_standalone_knowledgebox_with_colon_in_slug(
     resp = await nucliadb_reader_manager.get(f"/kbs")
     assert resp.status_code == 200
     assert resp.json()["kbs"][0]["slug"] == "something:else"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_invalid_uuid_path_params_return_expected_error_detail(
+    nucliadb_reader: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    resp = await nucliadb_reader.get("/kb/not-a-uuid")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "KnowledgeBox not found. UUID expected."
+
+    resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/not-a-uuid")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Resource not found. UUID expected."
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_hex_and_non_hex_resource_retrieval(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    """
+    Make sure that both hex-formatted UUIDs and non-hex-formatted UUIDs are accepted for resource retrieval,
+    and that non-existing resources return the expected error detail.
+    """
+    non_existing_rid = "00000000-0000-0000-0000-000000000000"
+    for _rid in [uuid.UUID(non_existing_rid).hex, non_existing_rid]:
+        resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{_rid}")
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Resource does not exist"
+
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": "Title",
+            "slug": "myresource",
+        },
+    )
+    assert resp.status_code == 201
+    existing_rid = resp.json()["uuid"]
+
+    # Make sure existing resource can be retrieved with hex-formatted UUID and non-hex-formatted UUID
+    for _rid in [uuid.UUID(existing_rid).hex, str(uuid.UUID(existing_rid))]:
+        resp = await nucliadb_reader.get(f"/kb/{standalone_knowledgebox}/resource/{_rid}")
+        assert resp.status_code == 200
+
+
+@pytest.mark.deploy_modes("component")
+async def test_component_reader_invalid_kbid_returns_expected_error_detail(
+    nucliadb_reader: AsyncClient,
+):
+    resp = await nucliadb_reader.get("/kb/not-a-uuid")
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "KnowledgeBox not found. UUID expected."
+
+
+@pytest.mark.deploy_modes("component")
+async def test_component_writer_invalid_kbid_returns_expected_error_detail(
+    nucliadb_writer: AsyncClient,
+):
+    resp = await nucliadb_writer.post(
+        "/kb/not-a-uuid/resources",
+        json={"title": "Resource should not be created"},
+    )
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "KnowledgeBox not found. UUID expected."
 
 
 @pytest.mark.deploy_modes("standalone")

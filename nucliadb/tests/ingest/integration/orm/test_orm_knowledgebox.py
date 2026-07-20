@@ -217,7 +217,7 @@ async def test_delete_knowledgebox(
 
 
 async def test_delete_knowledgebox_handles_unexisting_kb(storage: Storage, maindb_driver: Driver):
-    idonotexist = uuid.uuid4().hex
+    idonotexist = KnowledgeBox.new_unique_kbid()
     kbid = await KnowledgeBox.delete(maindb_driver, kbid=idonotexist)
     assert kbid is None
 
@@ -225,7 +225,7 @@ async def test_delete_knowledgebox_handles_unexisting_kb(storage: Storage, maind
 async def test_knowledgebox_purge_handles_unexisting_shard_payload(
     storage: Storage, maindb_driver: Driver, dummy_nidx_utility
 ):
-    idonotexist = uuid.uuid4().hex
+    idonotexist = KnowledgeBox.new_unique_kbid()
     await KnowledgeBox.purge(maindb_driver, kbid=idonotexist)
 
 
