@@ -83,10 +83,11 @@ from nucliadb_protos.utils_pb2 import RelationNode
 
 from .metrics import merge_observer
 
-Bm25Score = tuple[float, float]
+Bm25Score = tuple[float, int]
+ShardedBm25Score = tuple[float, bytes, int]
 TimestampScore = datetime.datetime
 TitleScore = str
-SortValue = Bm25Score | TimestampScore | TitleScore
+SortValue = Bm25Score | ShardedBm25Score | TimestampScore | TitleScore
 
 
 def entity_type_to_relation_node_type(node_type: EntityType) -> RelationNode.NodeType.ValueType:
@@ -94,7 +95,10 @@ def entity_type_to_relation_node_type(node_type: EntityType) -> RelationNode.Nod
 
 
 def sort_results_by_score(results: list[ParagraphResult] | list[DocumentResult]):
-    results.sort(key=lambda x: (x.score.bm25, x.score.booster), reverse=True)
+    if isinstance(results[0], ParagraphResult):
+        results.sort(key=lambda x: (x.score.bm25, x.shard_id, x.score.booster), reverse=True)
+    else:
+        results.sort(key=lambda x: (x.score.bm25, x.score.booster), reverse=True)
 
 
 async def merge_documents_results(
@@ -192,7 +196,7 @@ async def merge_suggest_paragraph_results(
     merged = heapq.merge(
         *(response.results for response in suggest_responses),
         reverse=True,
-        key=lambda x: (x.score.bm25, x.score.booster),
+        key=lambda x: (x.score.bm25, x.shard_id, x.score.booster),
     )
     # cut the best results
     matches = list(itertools.islice(merged, top_k))
@@ -363,7 +367,7 @@ async def merge_paragraph_results(
 
             sort_value: SortValue
             if sort.field == SortField.SCORE:
-                sort_value = (result.score.bm25, result.score.booster)
+                sort_value = (result.score.bm25, result.shard_id, result.score.booster)
             else:
                 sort_value = result.date.ToDatetime()
             if sort_value is not None:
