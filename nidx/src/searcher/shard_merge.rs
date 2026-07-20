@@ -64,7 +64,10 @@ pub fn merge_search(shard_responses: Vec<SearchResponse>, order_by: OrderBy, lim
             .unwrap_or_default();
         shard_ids.extend(response.shard_ids);
 
-        if let Some(document) = response.document {
+        if let Some(mut document) = response.document {
+            for result in &mut document.results {
+                result.shard_id = shard_id.clone();
+            }
             document_responses.push(document);
         }
         if let Some(mut paragraph) = response.paragraph {
@@ -216,7 +219,11 @@ fn sort_documents_fn(order_by: OrderBy) -> Box<dyn Fn(&DocumentResult, &Document
                         bm25: b_bm25,
                         booster: b_booster,
                     })),
-                ) => a_bm25.total_cmp(&b_bm25).then(a_booster.cmp(&b_booster)).is_gt(),
+                ) => a_bm25
+                    .total_cmp(&b_bm25)
+                    .then(a.shard_id.cmp(&b.shard_id))
+                    .then(a_booster.cmp(&b_booster))
+                    .is_gt(),
                 _ => {
                     unreachable!("index always return values with the same order_by as we have")
                 }
@@ -471,6 +478,7 @@ mod tests {
         use nidx_protos::document_result;
         use nidx_protos::prost_types::Timestamp;
         use nidx_protos::{DocumentResult, DocumentSearchResponse, FacetResult, SearchResponse};
+        use uuid::Uuid;
 
         use crate::searcher::shard_merge::OrderBy;
         use crate::searcher::shard_merge::{Limit, SortExpr};
@@ -663,6 +671,87 @@ mod tests {
             assert_eq!(merged.results[1].uuid, "foo");
             assert_eq!(merged.results[2].uuid, "bar");
             assert_eq!(merged.results[3].uuid, "quux");
+        }
+
+        #[test]
+        fn test_merge_document_results_shard_tiebreak() {
+            const SHARD_A: &str = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+            const SHARD_B: &str = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+            let shard_bytes = |s: &str| Uuid::parse_str(s).unwrap().as_bytes().to_vec();
+
+            let document = |rid: &str, score: f32, booster: u64| DocumentResult {
+                uuid: rid.to_string(),
+                field: "a/title".to_string(),
+                sort_value: Some(document_result::SortValue::Score(nidx_protos::ResultScore {
+                    bm25: score,
+                    booster,
+                })),
+                ..Default::default()
+            };
+            let response = |shard_id: &str, documents: Vec<DocumentResult>| SearchResponse {
+                shard_ids: vec![shard_id.to_string()],
+                document: Some(DocumentSearchResponse {
+                    total: 100,
+                    results: documents,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            };
+
+            // Equal score and booster: SHARD_B bytes sort higher, so "foo" wins.
+            let merged = merge(
+                vec![
+                    response(SHARD_B, vec![document("foo", 2.0, 1)]),
+                    response(SHARD_A, vec![document("bar", 2.0, 1)]),
+                ],
+                OrderBy {
+                    expr: SortExpr::Score,
+                    descending: true,
+                },
+                Limit(20),
+            )
+            .document
+            .unwrap();
+            assert_eq!(merged.results[0].uuid, "foo");
+            assert_eq!(merged.results[0].shard_id, shard_bytes(SHARD_B));
+            assert_eq!(merged.results[1].uuid, "bar");
+            assert_eq!(merged.results[1].shard_id, shard_bytes(SHARD_A));
+
+            // Reversing shard assignment flips the order.
+            let merged = merge(
+                vec![
+                    response(SHARD_A, vec![document("foo", 2.0, 1)]),
+                    response(SHARD_B, vec![document("bar", 2.0, 1)]),
+                ],
+                OrderBy {
+                    expr: SortExpr::Score,
+                    descending: true,
+                },
+                Limit(20),
+            )
+            .document
+            .unwrap();
+            assert_eq!(merged.results[0].uuid, "bar");
+            assert_eq!(merged.results[0].shard_id, shard_bytes(SHARD_B));
+            assert_eq!(merged.results[1].uuid, "foo");
+            assert_eq!(merged.results[1].shard_id, shard_bytes(SHARD_A));
+
+            // When shard bytes are equal, booster is the final tiebreaker.
+            let merged = merge(
+                vec![
+                    response(SHARD_A, vec![document("foo", 2.0, 1)]),
+                    response(SHARD_A, vec![document("bar", 2.0, 2)]),
+                ],
+                OrderBy {
+                    expr: SortExpr::Score,
+                    descending: true,
+                },
+                Limit(20),
+            )
+            .document
+            .unwrap();
+            assert_eq!(merged.results[0].uuid, "bar");
+            assert_eq!(merged.results[1].uuid, "foo");
         }
 
         #[test]

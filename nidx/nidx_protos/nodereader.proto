@@ -60,6 +60,7 @@ message DocumentResult {
     }
     string field = 4;
     repeated string labels = 5;
+    bytes shard_id = 7;
 }
 
 message DocumentSearchResponse {

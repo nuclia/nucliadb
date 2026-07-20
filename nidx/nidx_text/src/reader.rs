@@ -268,6 +268,7 @@ impl TextReaderService {
                         field,
                         sort_value,
                         labels,
+                        shard_id: vec![],
                     };
                     results.push(result);
                 }
@@ -295,10 +296,10 @@ impl TextReaderService {
         let retrieved_results = response.results_per_page;
         let next_page = total > retrieved_results;
         let results_per_page = response.results_per_page as usize;
-        let result_stream = response.top_docs.into_iter().take(results_per_page).enumerate();
+        let result_stream = response.top_docs.into_iter().take(results_per_page);
 
         let mut results = Vec::with_capacity(results_per_page);
-        for (id, (score, doc_address)) in result_stream {
+        for (score, doc_address) in result_stream {
             if score < min_score {
                 continue;
             }
@@ -306,7 +307,7 @@ impl TextReaderService {
                 Ok(doc) => {
                     let score = ResultScore {
                         bm25: score,
-                        booster: id as u64,
+                        booster: (doc_address.segment_ord as u64) << 32 | doc_address.doc_id as u64,
                     };
                     let uuid = String::from_utf8(
                         doc.get_first(self.schema.uuid)
@@ -335,6 +336,7 @@ impl TextReaderService {
                         field,
                         sort_value: Some(SortValue::Score(score)),
                         labels,
+                        shard_id: vec![],
                     };
                     results.push(result);
                 }
