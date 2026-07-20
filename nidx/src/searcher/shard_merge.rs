@@ -23,7 +23,6 @@ use nidx_protos::{
 };
 use tracing::field::Empty;
 use tracing::{Span, instrument};
-use uuid::Uuid;
 
 #[derive(Clone, Copy)]
 pub struct OrderBy {
@@ -56,24 +55,12 @@ pub fn merge_search(shard_responses: Vec<SearchResponse>, order_by: OrderBy, lim
     let mut graph_responses = Vec::with_capacity(shard_responses.len());
 
     for response in shard_responses {
-        let shard_id = response
-            .shard_ids
-            .first()
-            .and_then(|s| Uuid::parse_str(s).ok())
-            .map(|u| u.as_bytes().to_vec())
-            .unwrap_or_default();
         shard_ids.extend(response.shard_ids);
 
-        if let Some(mut document) = response.document {
-            for result in &mut document.results {
-                result.shard_id = shard_id.clone();
-            }
+        if let Some(document) = response.document {
             document_responses.push(document);
         }
-        if let Some(mut paragraph) = response.paragraph {
-            for result in &mut paragraph.results {
-                result.shard_id = shard_id.clone();
-            }
+        if let Some(paragraph) = response.paragraph {
             paragraph_responses.push(paragraph);
         }
         if let Some(vector) = response.vector {
@@ -679,17 +666,18 @@ mod tests {
             const SHARD_B: &str = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
             let shard_bytes = |s: &str| Uuid::parse_str(s).unwrap().as_bytes().to_vec();
 
-            let document = |rid: &str, score: f32, booster: u64| DocumentResult {
+            let document = |rid: &str, score: f32, booster: u64, shard_id: &str| DocumentResult {
                 uuid: rid.to_string(),
                 field: "a/title".to_string(),
                 sort_value: Some(document_result::SortValue::Score(nidx_protos::ResultScore {
                     bm25: score,
                     booster,
                 })),
+                shard_id: shard_bytes(shard_id),
                 ..Default::default()
             };
-            let response = |shard_id: &str, documents: Vec<DocumentResult>| SearchResponse {
-                shard_ids: vec![shard_id.to_string()],
+            // shard_id is stamped by shard_search before merge; simulate that here
+            let response = |documents: Vec<DocumentResult>| SearchResponse {
                 document: Some(DocumentSearchResponse {
                     total: 100,
                     results: documents,
@@ -701,8 +689,8 @@ mod tests {
             // Equal score and booster: SHARD_B bytes sort higher, so "foo" wins.
             let merged = merge(
                 vec![
-                    response(SHARD_B, vec![document("foo", 2.0, 1)]),
-                    response(SHARD_A, vec![document("bar", 2.0, 1)]),
+                    response(vec![document("foo", 2.0, 1, SHARD_B)]),
+                    response(vec![document("bar", 2.0, 1, SHARD_A)]),
                 ],
                 OrderBy {
                     expr: SortExpr::Score,
@@ -720,8 +708,8 @@ mod tests {
             // Reversing shard assignment flips the order.
             let merged = merge(
                 vec![
-                    response(SHARD_A, vec![document("foo", 2.0, 1)]),
-                    response(SHARD_B, vec![document("bar", 2.0, 1)]),
+                    response(vec![document("foo", 2.0, 1, SHARD_A)]),
+                    response(vec![document("bar", 2.0, 1, SHARD_B)]),
                 ],
                 OrderBy {
                     expr: SortExpr::Score,
@@ -739,8 +727,8 @@ mod tests {
             // When shard bytes are equal, booster is the final tiebreaker.
             let merged = merge(
                 vec![
-                    response(SHARD_A, vec![document("foo", 2.0, 1)]),
-                    response(SHARD_A, vec![document("bar", 2.0, 2)]),
+                    response(vec![document("foo", 2.0, 1, SHARD_A)]),
+                    response(vec![document("bar", 2.0, 2, SHARD_A)]),
                 ],
                 OrderBy {
                     expr: SortExpr::Score,
@@ -1050,18 +1038,17 @@ mod tests {
             const SHARD_B: &str = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
             let shard_bytes = |s: &str| Uuid::parse_str(s).unwrap().as_bytes().to_vec();
 
-            let paragraph = |rid: &str, score: f32, booster: u64| ParagraphResult {
+            let paragraph = |rid: &str, score: f32, booster: u64, shard_id: &str| ParagraphResult {
                 uuid: rid.to_string(),
                 field: "a/title".to_string(),
                 sort_value: Some(paragraph_result::SortValue::Score(nidx_protos::ResultScore {
                     bm25: score,
                     booster,
                 })),
+                shard_id: shard_bytes(shard_id),
                 ..Default::default()
             };
-            // Response with an explicit shard_id so merge() can tag the results
-            let response = |shard_id: &str, paragraphs: Vec<ParagraphResult>| SearchResponse {
-                shard_ids: vec![shard_id.to_string()],
+            let response = |paragraphs: Vec<ParagraphResult>| SearchResponse {
                 paragraph: Some(ParagraphSearchResponse {
                     total: 100,
                     results: paragraphs,
@@ -1074,8 +1061,8 @@ mod tests {
             // SHARD_B bytes sort higher than SHARD_A bytes, so "foo" (SHARD_B) wins.
             let merged = merge(
                 vec![
-                    response(SHARD_B, vec![paragraph("foo", 2.0, 1)]),
-                    response(SHARD_A, vec![paragraph("bar", 2.0, 1)]),
+                    response(vec![paragraph("foo", 2.0, 1, SHARD_B)]),
+                    response(vec![paragraph("bar", 2.0, 1, SHARD_A)]),
                 ],
                 OrderBy {
                     expr: SortExpr::Score,
@@ -1093,8 +1080,8 @@ mod tests {
             // Reversing shard assignment flips the order, confirming determinism.
             let merged = merge(
                 vec![
-                    response(SHARD_A, vec![paragraph("foo", 2.0, 1)]),
-                    response(SHARD_B, vec![paragraph("bar", 2.0, 1)]),
+                    response(vec![paragraph("foo", 2.0, 1, SHARD_A)]),
+                    response(vec![paragraph("bar", 2.0, 1, SHARD_B)]),
                 ],
                 OrderBy {
                     expr: SortExpr::Score,
@@ -1112,8 +1099,8 @@ mod tests {
             // When shard bytes are also equal, booster is the final tiebreaker.
             let merged = merge(
                 vec![
-                    response(SHARD_A, vec![paragraph("foo", 2.0, 1)]),
-                    response(SHARD_A, vec![paragraph("bar", 2.0, 2)]),
+                    response(vec![paragraph("foo", 2.0, 1, SHARD_A)]),
+                    response(vec![paragraph("bar", 2.0, 2, SHARD_A)]),
                 ],
                 OrderBy {
                     expr: SortExpr::Score,
