@@ -34,6 +34,7 @@ from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.search.predict import DummyPredictEngine
+from nucliadb.search.requesters.utils import METHODS, Method
 from nucliadb_models.internal.predict import (
     QueryInfo,
 )
@@ -290,7 +291,7 @@ async def test_querying_kb_with_vectorsets(
     await inject_message(nucliadb_ingest_grpc, bm)
 
     with (
-        patch("nucliadb.search.requesters.utils.query_shards", query_shards_wrapper),
+        patch.dict(METHODS, values={Method.SEARCH: query_shards_wrapper}, clear=True),
         patch.object(
             dummy_predict,
             "query",
