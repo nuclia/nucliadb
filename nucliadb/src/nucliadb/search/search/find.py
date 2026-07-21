@@ -149,9 +149,11 @@ async def _ndb_index_find(
             text_block_hydration_options=text_block_hydration_options,
         )
 
-    shown_results = set([r.paragraph_id.full() for r in text_blocks])
+    # Calculate search after token
+    shown_results = set(search_results.best_matches)
     if search_after is not None:
-        shown_results.update(search_after.skip)
+        # Keep paragraphs that have not been skipped yet. They might appear in future pages.
+        shown_results.update([pid for pid in search_after.skip if pid not in shown_results])
 
     if search_results.next_page:
         search_results.search_after = build_search_after_token(pb_response, shown_results)

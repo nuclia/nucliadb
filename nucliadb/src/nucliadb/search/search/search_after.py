@@ -23,7 +23,6 @@ from base64 import b64decode, b64encode
 from nidx_protos.nodereader_pb2 import SearchResponse
 from pydantic import BaseModel, Field
 
-from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.search.search.query_parser.models import SearchAfter
 
 
@@ -43,22 +42,19 @@ class SearchAfterToken(BaseModel):
 
 
 def build_search_after_token(response: SearchResponse, shown_results: set[str]) -> str:
-    found_first_not_shown = False
-
     token = SearchAfterToken()
 
     for paragraph in response.paragraph.results:
-        was_shown = paragraph.paragraph in shown_results
-        if not found_first_not_shown and was_shown:
+        if paragraph.paragraph in shown_results:
             # Mark top consecutive results to be skipped with search_after
             token.after = SearchAfter(
                 score=paragraph.score.bm25, shard=paragraph.shard_id, docaddr=paragraph.score.docaddr
             )
-        elif not found_first_not_shown:
-            # First results that was not shown, switch to listing ids
-            found_first_not_shown = True
-        elif was_shown:
-            # Mark other results to be skipped by matching ids
-            token.skip.append(paragraph.paragraph)
+            # This results is skipped by after, no need to include in skip list
+            shown_results.remove(paragraph.paragraph)
+        else:
+            break
+
+    token.skip += shown_results
 
     return token.encode()
