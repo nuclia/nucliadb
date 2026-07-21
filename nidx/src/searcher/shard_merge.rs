@@ -673,10 +673,10 @@ mod tests {
                     bm25: score,
                     booster,
                 })),
+                // shard_id is set by shard_search before merge; simulate that here
                 shard_id: shard_bytes(shard_id),
                 ..Default::default()
             };
-            // shard_id is stamped by shard_search before merge; simulate that here
             let response = |documents: Vec<DocumentResult>| SearchResponse {
                 document: Some(DocumentSearchResponse {
                     total: 100,
@@ -687,7 +687,7 @@ mod tests {
             };
 
             // Equal score and booster: SHARD_B bytes sort higher, so "foo" wins.
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     response(vec![document("foo", 2.0, 1, SHARD_B)]),
                     response(vec![document("bar", 2.0, 1, SHARD_A)]),
@@ -705,8 +705,9 @@ mod tests {
             assert_eq!(merged.results[1].uuid, "bar");
             assert_eq!(merged.results[1].shard_id, shard_bytes(SHARD_A));
 
-            // Reversing shard assignment flips the order.
-            let merged = merge(
+            // Reversing shard assignment flips the order. Since both documents have the same score
+            // the order is determined by shard in descending order
+            let merged = merge_search(
                 vec![
                     response(vec![document("foo", 2.0, 1, SHARD_A)]),
                     response(vec![document("bar", 2.0, 1, SHARD_B)]),
@@ -725,7 +726,7 @@ mod tests {
             assert_eq!(merged.results[1].shard_id, shard_bytes(SHARD_A));
 
             // When shard bytes are equal, booster is the final tiebreaker.
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     response(vec![document("foo", 2.0, 1, SHARD_A)]),
                     response(vec![document("bar", 2.0, 2, SHARD_A)]),
@@ -1059,7 +1060,7 @@ mod tests {
 
             // Equal score and booster: shard_id bytes are the tiebreaker.
             // SHARD_B bytes sort higher than SHARD_A bytes, so "foo" (SHARD_B) wins.
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     response(vec![paragraph("foo", 2.0, 1, SHARD_B)]),
                     response(vec![paragraph("bar", 2.0, 1, SHARD_A)]),
@@ -1077,8 +1078,9 @@ mod tests {
             assert_eq!(merged.results[1].uuid, "bar");
             assert_eq!(merged.results[1].shard_id, shard_bytes(SHARD_A));
 
-            // Reversing shard assignment flips the order, confirming determinism.
-            let merged = merge(
+            // Reversing shard assignment flips the order. Since both documents have the same score
+            // the order is determined by shard in descending order
+            let merged = merge_search(
                 vec![
                     response(vec![paragraph("foo", 2.0, 1, SHARD_A)]),
                     response(vec![paragraph("bar", 2.0, 1, SHARD_B)]),
@@ -1097,7 +1099,7 @@ mod tests {
             assert_eq!(merged.results[1].shard_id, shard_bytes(SHARD_A));
 
             // When shard bytes are also equal, booster is the final tiebreaker.
-            let merged = merge(
+            let merged = merge_search(
                 vec![
                     response(vec![paragraph("foo", 2.0, 1, SHARD_A)]),
                     response(vec![paragraph("bar", 2.0, 2, SHARD_A)]),
