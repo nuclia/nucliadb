@@ -47,12 +47,15 @@ from nucliadb.search.search.rerankers import (
     get_reranker,
 )
 from nucliadb.search.search.retrieval import text_block_search
+from nucliadb.search.search.search_after import SearchAfterToken, build_search_after_token
 from nucliadb.search.settings import settings
 from nucliadb_models.search import (
+    FindOptions,
     FindRequest,
     KnowledgeboxFindResults,
     MinScore,
     NucliaDBClientType,
+    RerankerName,
 )
 from nucliadb_utils.utilities import get_audit
 
@@ -89,6 +92,15 @@ async def _ndb_index_find(
     audit = get_audit()
     start_time = time()
 
+    # Disabled unsupported features for search_after and set the window to include enough results
+    if item.search_after is not None:
+        search_after = SearchAfterToken.decode(item.search_after)
+        item.features = [FindOptions.KEYWORD]
+        item.reranker = RerankerName.NOOP
+        item.top_k += len(search_after.skip)
+    else:
+        search_after = None
+
     with metrics.time("query_parse"):
         parsed = await parse_find(kbid, item)
         assert parsed.retrieval.rank_fusion is not None and parsed.retrieval.reranker is not None, (
@@ -98,10 +110,20 @@ async def _ndb_index_find(
         incomplete_results = is_incomplete(parsed.retrieval)
         rephrased_query = get_rephrased_query(parsed)
 
+    # Set retrieval to search after
+    if search_after is not None:
+        parsed.retrieval.after = search_after.after
+
     with metrics.time("index_search"):
         text_blocks, pb_query, pb_response, queried_shards = await text_block_search(
             kbid, parsed.retrieval
         )
+
+    # Remove skipped paragraphs for search_after
+    if search_after is not None:
+        text_blocks = [tb for tb in text_blocks if tb.paragraph_id.full() not in search_after.skip]
+        item.top_k -= len(search_after.skip)
+        parsed.retrieval.top_k -= len(search_after.skip)
 
     # Rank fusion merge, cut, hydrate and rerank
     with metrics.time("results_merge"):
@@ -126,6 +148,13 @@ async def _ndb_index_find(
             resource_hydration_options=resource_hydration_options,
             text_block_hydration_options=text_block_hydration_options,
         )
+
+    shown_results = set([r.paragraph_id.full() for r in text_blocks])
+    if search_after is not None:
+        shown_results.update(search_after.skip)
+
+    if search_results.next_page:
+        search_results.search_after = build_search_after_token(pb_response, shown_results)
 
     search_time = time() - start_time
     if audit is not None:

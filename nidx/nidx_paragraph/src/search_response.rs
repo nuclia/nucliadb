@@ -221,10 +221,11 @@ impl From<SearchBm25Response<'_>> for ParagraphSearchResponse {
         let min_score = response.min_score;
         let obtained = response.top_docs.len();
         let requested = response.results_per_page as usize;
-        let next_page = obtained > requested;
+        let next_page = response.top_docs.iter().filter(|(score, _)| score > &min_score).count() > requested;
         let no_results = std::cmp::min(obtained, requested);
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
         let searcher = response.searcher;
+
         for (score, doc_address) in response.top_docs.into_iter().take(no_results) {
             if score < min_score {
                 break;

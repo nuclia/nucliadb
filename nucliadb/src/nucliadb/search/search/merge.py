@@ -94,7 +94,7 @@ def entity_type_to_relation_node_type(node_type: EntityType) -> RelationNode.Nod
 
 
 def sort_results_by_score(results: list[ParagraphResult] | list[DocumentResult]):
-    results.sort(key=lambda x: (x.score.bm25, x.shard_id, x.score.docaddr), reverse=True)
+    results.sort(key=lambda x: (x.score.bm25, x.shard_id, -x.score.docaddr), reverse=True)
 
 
 async def merge_documents_results(
@@ -130,7 +130,7 @@ async def merge_documents_results(
                 continue
             sort_value: SortValue
             if query.order_by == SortField.SCORE:
-                sort_value = (result.score.bm25, result.shard_id, result.score.docaddr)
+                sort_value = (result.score.bm25, result.shard_id, -result.score.docaddr)
             else:
                 sort_value = result.date.ToDatetime()
             if sort_value is not None:
@@ -192,7 +192,7 @@ async def merge_suggest_paragraph_results(
     merged = heapq.merge(
         *(response.results for response in suggest_responses),
         reverse=True,
-        key=lambda x: (x.score.bm25, x.shard_id, x.score.docaddr),
+        key=lambda x: (x.score.bm25, x.shard_id, -x.score.docaddr),
     )
     # cut the best results
     matches = list(itertools.islice(merged, top_k))
@@ -363,7 +363,7 @@ async def merge_paragraph_results(
 
             sort_value: SortValue
             if sort.field == SortField.SCORE:
-                sort_value = (result.score.bm25, result.shard_id, result.score.docaddr)
+                sort_value = (result.score.bm25, result.shard_id, -result.score.docaddr)
             else:
                 sort_value = result.date.ToDatetime()
             if sort_value is not None:

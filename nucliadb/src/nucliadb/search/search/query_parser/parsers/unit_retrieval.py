@@ -52,6 +52,7 @@ class _Converter:
         self._apply_graph_query()
         self._apply_filters()
         self._apply_top_k()
+        self._apply_search_after()
 
         return self.req
 
@@ -252,6 +253,14 @@ class _Converter:
             rank_fusion_window,
             reranker_window,
         )
+
+    def _apply_search_after(self) -> None:
+        if self.retrieval.after is None:
+            return
+
+        self.req.search_after.score = self.retrieval.after.score
+        self.req.search_after.shard_id = self.retrieval.after.shard
+        self.req.search_after.docaddr = self.retrieval.after.docaddr
 
 
 def is_incomplete(retrieval: UnitRetrieval) -> bool:

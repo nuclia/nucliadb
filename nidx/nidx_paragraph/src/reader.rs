@@ -382,7 +382,7 @@ pub fn is_after(after: &Option<SearchAfter>, score: f32, docaddr: u64) -> bool {
         Ordering::Less => true,
         Ordering::Equal => match after.tie_break {
             SearchAfterTieBreak::Keep => true,
-            SearchAfterTieBreak::KeepAfter(after_docaddr) => docaddr < after_docaddr,
+            SearchAfterTieBreak::KeepAfter(after_docaddr) => docaddr > after_docaddr,
             _ => false,
         },
         Ordering::Greater => false,

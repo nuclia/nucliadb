@@ -1983,6 +1983,14 @@ class FindRequest(BaseSearchRequest):
         title="Generative model",
         description="The generative model used to rephrase the query. If not provided, the model configured for the Knowledge Box is used.",
     )
+    search_after: str | None = Field(
+        default=None,
+        title="Search After",
+        description=(
+            "Pass a token returned from another resquest to get the next results in the search. "
+            "Only results from the paragraph index will be returned. "
+        ),
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -2113,6 +2121,14 @@ class KnowledgeboxFindResults(JsonBaseModel):
             "Metrics information about the search operation. "
             "The metadata included in this field is subject to change and should not be used in production. "
             "This is only available if the `debug` parameter is set to true in the request."
+        ),
+    )
+    search_after: str | None = Field(
+        default=None,
+        title="Search After",
+        description=(
+            "Pass this token to another request to get the next results in the search. "
+            "Only results from the paragraph index will be returned. "
         ),
     )
 
