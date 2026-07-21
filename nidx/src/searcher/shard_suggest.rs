@@ -21,8 +21,10 @@ use nidx_relation::RelationSearcher;
 use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
 use nidx_types::prefilter::PrefilterResult;
 use tracing::{Span, instrument};
+use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
+use crate::searcher::shards_query::shards_query;
 
 use super::{
     index_cache::IndexCache,
@@ -40,10 +42,20 @@ const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 ///
 /// TODO: review implementation. Timestamps are not used and we are probably
 /// filtering twice in the prefilter and paragraphs filter
-#[instrument(skip_all, fields(shard_id = request.shard))]
-pub async fn suggest(index_cache: Arc<IndexCache>, request: SuggestRequest) -> NidxResult<SuggestResponse> {
-    let shard_id = uuid::Uuid::parse_str(&request.shard)?;
+pub async fn suggest(
+    index_cache: Arc<IndexCache>,
+    request: SuggestRequest,
+    shards: Vec<Uuid>,
+) -> NidxResult<Vec<SuggestResponse>> {
+    shards_query(index_cache, shards, request, shard_suggest).await
+}
 
+#[instrument(skip_all, fields(shard_id = shard_id.to_string()))]
+pub async fn shard_suggest(
+    shard_id: Uuid,
+    index_cache: Arc<IndexCache>,
+    request: SuggestRequest,
+) -> NidxResult<SuggestResponse> {
     let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
         return Err(NidxError::NotFound);
     };
@@ -64,7 +76,7 @@ pub async fn suggest(index_cache: Arc<IndexCache>, request: SuggestRequest) -> N
     let paragraph_searcher_arc = index_cache.get(&paragraph_index).await?;
 
     let current = Span::current();
-    let suggest_results = tokio::task::spawn_blocking(move || {
+    let mut suggest_results = tokio::task::spawn_blocking(move || {
         current.in_scope(|| {
             blocking_suggest(
                 request,
@@ -75,6 +87,7 @@ pub async fn suggest(index_cache: Arc<IndexCache>, request: SuggestRequest) -> N
         })
     })
     .await??;
+    suggest_results.shard_ids.push(shard_id.to_string());
 
     Ok(suggest_results)
 }

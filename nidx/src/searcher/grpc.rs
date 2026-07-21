@@ -14,6 +14,7 @@
 //
 
 use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 use std::{pin::Pin, sync::Arc};
 
 use futures::Stream;
@@ -160,29 +161,11 @@ impl NidxSearcher for SearchServer {
     }
 
     async fn suggest(&self, request: Request<SuggestRequest>) -> Result<Response<SuggestResponse>> {
-        let message = request.get_ref();
-        let shard_id = Uuid::parse_str(&message.shard).map_err(NidxError::from)?;
-        shard_request! {
-            "suggest",
-            self,
-            request,
-            shard_id,
-            LOCAL => shard_suggest::suggest(Arc::clone(&self.index_cache), message.clone()).await,
-            REMOTE => suggest
-        }
+        self.shards_request::<SuggestOp>(request).await
     }
 
     async fn graph_search(&self, request: Request<GraphSearchRequest>) -> Result<Response<GraphSearchResponse>> {
-        let message = request.get_ref();
-        let shard_id = Uuid::parse_str(&message.shard).map_err(NidxError::from)?;
-        shard_request! {
-            "graph_search",
-            self,
-            request,
-            shard_id,
-            LOCAL => shard_search::graph_search(Arc::clone(&self.index_cache), message.clone()).await,
-            REMOTE => graph_search
-        }
+        self.shards_request::<GraphSearchOp>(request).await
     }
 
     async fn extracted_texts(
@@ -501,7 +484,70 @@ impl SearcherOp for SearchOp {
         } else {
             let order_by = OrderBy::from(request);
             let limit = Limit(request.result_per_page as usize);
-            shard_merge::merge(partitions, order_by, limit)
+            shard_merge::merge_search(partitions, order_by, limit)
+        }
+    }
+}
+
+#[derive(Clone)]
+struct SuggestOp;
+
+impl SearcherOp for SuggestOp {
+    type Request = SuggestRequest;
+    type Response = SuggestResponse;
+
+    async fn local(
+        index_cache: Arc<IndexCache>,
+        request: Self::Request,
+        shards: Vec<Uuid>,
+    ) -> NidxResult<Vec<Self::Response>> {
+        shard_suggest::suggest(index_cache, request, shards).await
+    }
+
+    async fn remote(
+        mut client: SearcherClient,
+        request: tonic::Request<Self::Request>,
+    ) -> tonic::Result<Response<Self::Response>> {
+        client.suggest(request).await
+    }
+
+    fn merge(request: &Self::Request, mut partitions: Vec<Self::Response>) -> Self::Response {
+        if partitions.len() == 1 {
+            partitions.pop().unwrap()
+        } else {
+            let limit = Limit(request.top_k as usize);
+            shard_merge::merge_suggest(partitions, limit)
+        }
+    }
+}
+
+#[derive(Clone)]
+struct GraphSearchOp;
+
+impl SearcherOp for GraphSearchOp {
+    type Request = GraphSearchRequest;
+    type Response = GraphSearchResponse;
+
+    async fn local(
+        index_cache: Arc<IndexCache>,
+        request: Self::Request,
+        shards: Vec<Uuid>,
+    ) -> NidxResult<Vec<Self::Response>> {
+        shard_search::graph_search(index_cache, request, shards).await
+    }
+
+    async fn remote(
+        mut client: SearcherClient,
+        request: tonic::Request<Self::Request>,
+    ) -> tonic::Result<Response<Self::Response>> {
+        client.graph_search(request).await
+    }
+
+    fn merge(_: &Self::Request, mut partitions: Vec<Self::Response>) -> Self::Response {
+        if partitions.len() == 1 {
+            partitions.pop().unwrap()
+        } else {
+            shard_merge::merge_graph(partitions)
         }
     }
 }
@@ -540,7 +586,7 @@ impl QueryPartitioner {
 
 /// Simple trait to abstract over request/response protobuffers that operate on
 /// a set of shards
-pub trait Sharded {
+pub trait Sharded: Debug {
     fn shards(&self) -> NidxResult<Vec<Uuid>>;
     fn set_shards(&mut self, shards: &[Uuid]);
 }
@@ -561,6 +607,10 @@ macro_rules! impl_sharded_trait {
 
 impl_sharded_trait!(SearchRequest, shards_field = shard_ids);
 impl_sharded_trait!(SearchResponse, shards_field = shard_ids);
+impl_sharded_trait!(SuggestRequest, shards_field = shard_ids);
+impl_sharded_trait!(SuggestResponse, shards_field = shard_ids);
+impl_sharded_trait!(GraphSearchRequest, shards_field = shard_ids);
+impl_sharded_trait!(GraphSearchResponse, shards_field = shard_ids);
 
 fn validate_shards(shards: &[String]) -> NidxResult<Vec<Uuid>> {
     let mut valid = Vec::with_capacity(shards.len());

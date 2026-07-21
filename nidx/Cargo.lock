@@ -2575,6 +2575,7 @@ dependencies = [
  "opentelemetry_sdk",
  "prometheus-client",
  "rand 0.10.1",
+ "rstest",
  "sentry",
  "sentry-tracing",
  "serde",

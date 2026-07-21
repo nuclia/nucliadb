@@ -63,11 +63,7 @@ impl NidxFixture {
                 telemetry: Default::default(),
                 work_path: None,
                 control_socket: None,
-                searcher: Some(SearcherSettings {
-                    // tests can take advantage of faster refresh intervals
-                    metadata_refresh_interval: 0.1,
-                    ..Default::default()
-                }),
+                searcher: Some(SearcherSettings::default()),
                 audit: None,
             },
         };
@@ -138,6 +134,13 @@ impl NidxFixture {
 
     pub async fn wait_sync(&self) {
         // TODO: Check the searcher has synced? For now, waiting twice the sync interval
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs_f32(
+            2.0 * self
+                .settings
+                .searcher
+                .as_ref()
+                .map_or(1.0, |s| s.metadata_refresh_interval),
+        ))
+        .await;
     }
 }
