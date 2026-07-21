@@ -150,8 +150,25 @@ async fn shard_search(
         })
     })
     .await??;
-    search_results.shard_ids.push(shard_id.to_string());
+
+    apply_shard_id_to_response(&mut search_results, shard_id);
+
     Ok(search_results)
+}
+
+fn apply_shard_id_to_response(response: &mut SearchResponse, shard_id: Uuid) {
+    response.shard_ids.push(shard_id.to_string());
+    let shard_id_bytes = shard_id.as_bytes().to_vec();
+    if let Some(paragraph) = &mut response.paragraph {
+        for result in &mut paragraph.results {
+            result.shard_id = shard_id_bytes.clone();
+        }
+    }
+    if let Some(document) = &mut response.document {
+        for result in &mut document.results {
+            result.shard_id = shard_id_bytes.clone();
+        }
+    }
 }
 
 fn compute_prefilter(

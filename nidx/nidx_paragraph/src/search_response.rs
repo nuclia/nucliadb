@@ -191,6 +191,7 @@ impl From<SearchIntResponse<'_>> for ParagraphSearchResponse {
                         matches: terms,
                         sort_value,
                         metadata: schema.metadata(&doc),
+                        shard_id: vec![],
                     };
 
                     results.push(result);
@@ -224,7 +225,7 @@ impl From<SearchBm25Response<'_>> for ParagraphSearchResponse {
         let no_results = std::cmp::min(obtained, requested);
         let mut results: Vec<ParagraphResult> = Vec::with_capacity(no_results);
         let searcher = response.searcher;
-        for (i, (score, doc_address)) in response.top_docs.into_iter().take(no_results).enumerate() {
+        for (score, doc_address) in response.top_docs.into_iter().take(no_results) {
             if score < min_score {
                 break;
             }
@@ -232,7 +233,7 @@ impl From<SearchBm25Response<'_>> for ParagraphSearchResponse {
                 Ok(doc) => {
                     let score = ResultScore {
                         bm25: score,
-                        booster: (response.total - i) as f32,
+                        booster: (doc_address.segment_ord as u64) << 32 | doc_address.doc_id as u64,
                     };
                     let schema = &response.text_service.schema;
                     let uuid = doc
@@ -284,6 +285,7 @@ impl From<SearchBm25Response<'_>> for ParagraphSearchResponse {
                         end: end_pos,
                         matches: terms,
                         metadata: schema.metadata(&doc),
+                        shard_id: vec![],
                     };
 
                     results.push(result);
