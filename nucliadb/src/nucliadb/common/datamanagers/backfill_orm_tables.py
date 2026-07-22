@@ -73,16 +73,13 @@ logger = logging.getLogger("backfill_orm_tables")
 # Maximum number of resources migrated concurrently within a single KB backfill.
 # Each slot holds one distributed lock + one PG transaction, so keep this
 # conservative enough not to saturate the connection pool.
-_MAX_CONCURRENT_RESOURCES = 50
+_MAX_CONCURRENT_RESOURCES = 30
 
 # Maximum number of resource tasks to create at once.
 _RESOURCE_TASK_BATCH_SIZE = 1000
 
 # Maximum number of reconciliation iterations to perform for each KB.
 _MAX_RECONCILIATION_ITERATIONS = 2
-
-# Maximum number of KBs migrated concurrently in ALL_KBS mode.
-_MAX_CONCURRENT_KBS = 1
 
 _DEFAULT_CHECKPOINT_PATH = Path("backfill_orm_tables.completed_kbs")
 _DEFAULT_LOG_PATH = Path("backfill_orm_tables.log")
@@ -148,8 +145,25 @@ def _mark_kb_completed(checkpoint_path: Path, *, kbid: str) -> None:
         checkpoint_file.write(f"{kbid}\n")
 
 
+def _load_completed_resources(checkpoint_path: Path) -> set[str]:
+    if not checkpoint_path.exists():
+        return set()
+    completed: set[str] = set()
+    for line in checkpoint_path.read_text().splitlines():
+        rid = line.strip()
+        if rid:
+            completed.add(rid)
+    return completed
+
+
+def _mark_resource_completed(checkpoint_path: Path, *, rid: str) -> None:
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    with checkpoint_path.open("a") as f:
+        f.write(f"{rid}\n")
+
+
 async def backfill_all_kbs(*, checkpoint_path: Path) -> None:
-    """Iterate every KB in v1 and backfill it into the ORM tables."""
+    """Iterate every KB in v1 and backfill it into the ORM tables, one at a time."""
     completed_kbs = _load_completed_kbs(checkpoint_path)
     kbids_and_slugs = []
     async with with_ro_transaction() as txn:
@@ -158,24 +172,17 @@ async def backfill_all_kbs(*, checkpoint_path: Path) -> None:
 
     logger.info(f"Found {len(kbids_and_slugs)} KBs to backfill, {len(completed_kbs)} already completed")
 
-    pending_kbs = []
     for kbid, slug in kbids_and_slugs:
         if kbid in completed_kbs:
             logger.info(f"Skipping already migrated KB {kbid} ({slug})")
             continue
-        pending_kbs.append((kbid, slug))
-
-    async def _backfill_single_kb(kbid: str, slug: str) -> None:
+        resource_checkpoint_path = checkpoint_path.parent / f"{kbid}.completed_resources"
         try:
-            await backfill_kb(kbid=kbid)
+            await backfill_kb(kbid=kbid, resource_checkpoint_path=resource_checkpoint_path)
             _mark_kb_completed(checkpoint_path, kbid=kbid)
             completed_kbs.add(kbid)
         except Exception:
             logger.exception("Failed to backfill KB %s (%s), continuing", kbid, slug)
-
-    for batch_start in range(0, len(pending_kbs), _MAX_CONCURRENT_KBS):
-        batch = pending_kbs[batch_start : batch_start + _MAX_CONCURRENT_KBS]
-        await asyncio.gather(*(_backfill_single_kb(kbid, slug) for kbid, slug in batch))
 
 
 # ---------------------------------------------------------------------------
@@ -183,13 +190,20 @@ async def backfill_all_kbs(*, checkpoint_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def backfill_kb(*, kbid: str) -> None:
+async def backfill_kb(*, kbid: str, resource_checkpoint_path: Path | None = None) -> None:
     """Backfill one KB row and all of its resources.
 
     After migrating all resources, a reconciliation pass compares the v1 and v2
     resource listings to catch any resources created concurrently during the
     migration run.
+
+    Successfully backfilled resource IDs are persisted to *resource_checkpoint_path*
+    so that the run can be resumed without re-processing them.  The file is deleted
+    once the KB has been fully migrated.
     """
+    if resource_checkpoint_path is None:
+        resource_checkpoint_path = Path(f"{kbid}.completed_resources")
+
     logger.info(f"Backfilling KB {kbid}")
     start_time = time.monotonic()
 
@@ -201,12 +215,23 @@ async def backfill_kb(*, kbid: str) -> None:
             logger.exception(f"Failed to backfill KB metadata for {kbid}, skipping")
             return
 
+    completed_resources = _load_completed_resources(resource_checkpoint_path)
+    if completed_resources:
+        logger.info(
+            f"Resuming KB {kbid}: {len(completed_resources)} resource(s) already backfilled, skipping them"
+        )
+
     # Snapshot v1 resource IDs before starting the migration
     v1_rids: set[str] = set()
     async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
         v1_rids.add(rid)
 
-    await _backfill_resources(kbid=kbid, rids=v1_rids)
+    await _backfill_resources(
+        kbid=kbid,
+        rids=v1_rids,
+        completed_resources=completed_resources,
+        resource_checkpoint_path=resource_checkpoint_path,
+    )
 
     iteration = 0
     while True:
@@ -240,9 +265,19 @@ async def backfill_kb(*, kbid: str) -> None:
                     "missed_resource_ids": list(missed),
                 },
             )
-            await _backfill_resources(kbid=kbid, rids=missed)
+            await _backfill_resources(
+                kbid=kbid,
+                rids=missed,
+                completed_resources=completed_resources,
+                resource_checkpoint_path=resource_checkpoint_path,
+            )
         else:
             break
+
+    # KB is fully migrated — remove the per-KB resource checkpoint file.
+    if resource_checkpoint_path.exists():
+        resource_checkpoint_path.unlink()
+        logger.debug(f"Removed resource checkpoint file for KB {kbid}")
 
     elapsed = time.monotonic() - start_time
     logger.info(f"Backfilled KB {kbid} in {elapsed:.2f} seconds")
@@ -277,23 +312,48 @@ async def _backfill_kb_metadata(txn: Transaction, *, kbid: str) -> None:
         )
 
 
-async def _backfill_resources(*, kbid: str, rids: set[str]) -> None:
-    """Backfill a set of resources concurrently, bounded by _MAX_CONCURRENT_RESOURCES."""
+async def _backfill_resources(
+    *,
+    kbid: str,
+    rids: set[str],
+    completed_resources: set[str],
+    resource_checkpoint_path: Path,
+) -> None:
+    """Backfill a set of resources concurrently, bounded by _MAX_CONCURRENT_RESOURCES.
+
+    Resources already present in *completed_resources* are skipped.  Each
+    successfully migrated resource is appended to *resource_checkpoint_path* and
+    added to *completed_resources* in-memory so that reconciliation passes also
+    benefit from the skip logic.
+    """
     semaphore = asyncio.Semaphore(_MAX_CONCURRENT_RESOURCES)
-    rids_list = list(rids)
 
-    logger.info(f"Backfilling {len(rids)} resource(s) for KB {kbid}")
+    pending = [rid for rid in rids if rid not in completed_resources]
+    skipped = len(rids) - len(pending)
+    if skipped:
+        logger.info(f"Skipping {skipped} already backfilled resource(s) for KB {kbid}")
+    logger.info(f"Backfilling {len(pending)} resource(s) for KB {kbid}")
 
-    async def _guarded(rid: str, index: int) -> None:
+    async def _guarded(rid: str, index: int) -> str | None:
         async with semaphore:
             try:
                 await backfill_resource(kbid=kbid, rid=rid, index=index)
+                completed_resources.add(rid)
+                return rid
             except Exception:
                 logger.exception(f"Failed to backfill resource {kbid}/{rid}, continuing")
+                return None
 
-    for batch_start in range(0, len(rids_list), _RESOURCE_TASK_BATCH_SIZE):
-        batch = rids_list[batch_start : batch_start + _RESOURCE_TASK_BATCH_SIZE]
-        await asyncio.gather(*(_guarded(rid, batch_start + index) for index, rid in enumerate(batch)))
+    for batch_start in range(0, len(pending), _RESOURCE_TASK_BATCH_SIZE):
+        batch = pending[batch_start : batch_start + _RESOURCE_TASK_BATCH_SIZE]
+        results = await asyncio.gather(
+            *(_guarded(rid, batch_start + index) for index, rid in enumerate(batch))
+        )
+        batch_completed = [rid for rid in results if rid is not None]
+        if batch_completed:
+            resource_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            with resource_checkpoint_path.open("a") as f:
+                f.write("\n".join(batch_completed) + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -515,7 +575,8 @@ async def _main():
         if args.kbid == "ALL_KBS":
             await backfill_all_kbs(checkpoint_path=checkpoint_path)
         else:
-            await backfill_kb(kbid=args.kbid)
+            resource_checkpoint_path = checkpoint_path.parent / f"{args.kbid}.completed_resources"
+            await backfill_kb(kbid=args.kbid, resource_checkpoint_path=resource_checkpoint_path)
             _mark_kb_completed(checkpoint_path, kbid=args.kbid)
     finally:
         await context.finalize()
