@@ -89,26 +89,41 @@ _DEFAULT_LOG_PATH = Path("backfill_orm_tables.log")
 
 
 def _add_file_logging_handler(log_file_path: Path) -> None:
-    """Attach a file handler to the root logger if one for this file is not already present."""
+    """Attach a file handler that mirrors terminal logging behavior."""
     log_file_path.parent.mkdir(parents=True, exist_ok=True)
     resolved_log_file_path = log_file_path.resolve()
 
     root_logger = logging.getLogger()
+    stream_handler: logging.StreamHandler | None = None
     for handler in root_logger.handlers:
+        if (
+            stream_handler is None
+            and isinstance(handler, logging.StreamHandler)
+            and not isinstance(handler, logging.FileHandler)
+        ):
+            stream_handler = handler
         if isinstance(handler, logging.FileHandler):
             handler_path = getattr(handler, "baseFilename", None)
             if handler_path and Path(handler_path).resolve() == resolved_log_file_path:
                 return
 
     file_handler: Handler = logging.FileHandler(resolved_log_file_path, mode="a", encoding="utf-8")
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(
-        logging.Formatter(
-            "%(asctime)s %(levelname)s [%(name)s] %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
+    if stream_handler is not None:
+        file_handler.setLevel(stream_handler.level)
+        if stream_handler.formatter is not None:
+            file_handler.setFormatter(stream_handler.formatter)
+        for handler_filter in stream_handler.filters:
+            file_handler.addFilter(handler_filter)
+    else:
+        file_handler.setLevel(logging.NOTSET)
+        file_handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(levelname)s [%(name)s] %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
         )
-    )
     root_logger.addHandler(file_handler)
+
 
 # ---------------------------------------------------------------------------
 # Entry point
