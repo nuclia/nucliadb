@@ -40,6 +40,9 @@ end of the migration run.
 import asyncio
 import logging
 import time
+import uuid
+from logging import Handler
+from pathlib import Path
 
 from nucliadb.common import datamanagers, file_md5, locking
 from nucliadb.common.context import ApplicationContext
@@ -70,27 +73,94 @@ logger = logging.getLogger("backfill_orm_tables")
 # Maximum number of resources migrated concurrently within a single KB backfill.
 # Each slot holds one distributed lock + one PG transaction, so keep this
 # conservative enough not to saturate the connection pool.
-_MAX_CONCURRENT_RESOURCES = 10
+_MAX_CONCURRENT_RESOURCES = 50
+
+# Maximum number of resource tasks to create at once.
+_RESOURCE_TASK_BATCH_SIZE = 1000
 
 # Maximum number of reconciliation iterations to perform for each KB.
 _MAX_RECONCILIATION_ITERATIONS = 2
+
+# Maximum number of KBs migrated concurrently in ALL_KBS mode.
+_MAX_CONCURRENT_KBS = 1
+
+_DEFAULT_CHECKPOINT_PATH = Path("backfill_orm_tables.completed_kbs")
+_DEFAULT_LOG_PATH = Path("backfill_orm_tables.log")
+
+
+def _add_file_logging_handler(log_file_path: Path) -> None:
+    """Attach a file handler to the root logger if one for this file is not already present."""
+    log_file_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_log_file_path = log_file_path.resolve()
+
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            handler_path = getattr(handler, "baseFilename", None)
+            if handler_path and Path(handler_path).resolve() == resolved_log_file_path:
+                return
+
+    file_handler: Handler = logging.FileHandler(resolved_log_file_path, mode="a", encoding="utf-8")
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)s [%(name)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    root_logger.addHandler(file_handler)
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 
-async def backfill_all_kbs() -> None:
+def _load_completed_kbs(checkpoint_path: Path) -> set[str]:
+    if not checkpoint_path.exists():
+        return set()
+
+    completed_kbs = set()
+    for line in checkpoint_path.read_text().splitlines():
+        kbid = line.strip()
+        if kbid:
+            completed_kbs.add(kbid)
+    return completed_kbs
+
+
+def _mark_kb_completed(checkpoint_path: Path, *, kbid: str) -> None:
+    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+    with checkpoint_path.open("a") as checkpoint_file:
+        checkpoint_file.write(f"{kbid}\n")
+
+
+async def backfill_all_kbs(*, checkpoint_path: Path) -> None:
     """Iterate every KB in v1 and backfill it into the ORM tables."""
+    completed_kbs = _load_completed_kbs(checkpoint_path)
     kbids_and_slugs = []
     async with with_ro_transaction() as txn:
         async for kbid, slug in kb_v1.get_kbs(txn):
             kbids_and_slugs.append((kbid, slug))
+
+    logger.info(f"Found {len(kbids_and_slugs)} KBs to backfill, {len(completed_kbs)} already completed")
+
+    pending_kbs = []
     for kbid, slug in kbids_and_slugs:
+        if kbid in completed_kbs:
+            logger.info(f"Skipping already migrated KB {kbid} ({slug})")
+            continue
+        pending_kbs.append((kbid, slug))
+
+    async def _backfill_single_kb(kbid: str, slug: str) -> None:
         try:
             await backfill_kb(kbid=kbid)
+            _mark_kb_completed(checkpoint_path, kbid=kbid)
+            completed_kbs.add(kbid)
         except Exception:
             logger.exception("Failed to backfill KB %s (%s), continuing", kbid, slug)
+
+    for batch_start in range(0, len(pending_kbs), _MAX_CONCURRENT_KBS):
+        batch = pending_kbs[batch_start : batch_start + _MAX_CONCURRENT_KBS]
+        await asyncio.gather(*(_backfill_single_kb(kbid, slug) for kbid, slug in batch))
 
 
 # ---------------------------------------------------------------------------
@@ -141,12 +211,19 @@ async def backfill_kb(*, kbid: str) -> None:
 
         v1_rids_now: set[str] = set()
         async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
-            v1_rids_now.add(rid)
+            if "-" in rid:
+                logger.warning(f"Resource {kbid}/{rid} has a non-hex ID")
+                v1_rids_now.add(uuid.UUID(rid).hex)
+            else:
+                v1_rids_now.add(rid)
 
         missed = v1_rids_now - v2_rids
         if missed:
-            logger.info(
-                f"Reconciliation: {len(missed)} resource(s) missing from v2 for KB {kbid}, backfilling"
+            logger.warning(
+                f"Reconciliation: {len(missed)} resource(s) missing from v2 for KB {kbid}, backfilling",
+                extra={
+                    "missed_resource_ids": list(missed),
+                },
             )
             await _backfill_resources(kbid=kbid, rids=missed)
         else:
@@ -188,15 +265,20 @@ async def _backfill_kb_metadata(txn: Transaction, *, kbid: str) -> None:
 async def _backfill_resources(*, kbid: str, rids: set[str]) -> None:
     """Backfill a set of resources concurrently, bounded by _MAX_CONCURRENT_RESOURCES."""
     semaphore = asyncio.Semaphore(_MAX_CONCURRENT_RESOURCES)
+    rids_list = list(rids)
 
-    async def _guarded(rid: str) -> None:
+    logger.info(f"Backfilling {len(rids)} resource(s) for KB {kbid}")
+
+    async def _guarded(rid: str, index: int) -> None:
         async with semaphore:
             try:
-                await backfill_resource(kbid=kbid, rid=rid)
+                await backfill_resource(kbid=kbid, rid=rid, index=index)
             except Exception:
                 logger.exception(f"Failed to backfill resource {kbid}/{rid}, continuing")
 
-    await asyncio.gather(*(_guarded(rid) for rid in rids))
+    for batch_start in range(0, len(rids_list), _RESOURCE_TASK_BATCH_SIZE):
+        batch = rids_list[batch_start : batch_start + _RESOURCE_TASK_BATCH_SIZE]
+        await asyncio.gather(*(_guarded(rid, batch_start + index) for index, rid in enumerate(batch)))
 
 
 # ---------------------------------------------------------------------------
@@ -204,9 +286,12 @@ async def _backfill_resources(*, kbid: str, rids: set[str]) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def backfill_resource(*, kbid: str, rid: str) -> None:
+async def backfill_resource(*, kbid: str, rid: str, index: int) -> None:
     """Backfill one kb_resources row and all of its fields in a single transaction."""
-    logger.info(f"Backfilling resource {kbid}/{rid}")
+    if index % 50_000 == 0 and index > 0:
+        logger.info(f"Backfilling resource {kbid}/{rid} ({index})")
+    else:
+        logger.debug(f"Backfilling resource {kbid}/{rid}")
     async with locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=rid)):
         async with with_rw_transaction() as txn:
             await _backfill_resource_in_txn(txn, kbid=kbid, rid=rid)
@@ -240,7 +325,6 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
             INSERT INTO kb_resources (kbid, rid, slug, shard, basic, origin, extra, security)
             VALUES (%(kbid)s, %(rid)s, %(slug)s, %(shard)s, %(basic)s, %(origin)s, %(extra)s, %(security)s)
             ON CONFLICT (kbid, rid) DO UPDATE SET
-                slug     = EXCLUDED.slug,
                 shard    = EXCLUDED.shard,
                 basic    = EXCLUDED.basic,
                 origin   = EXCLUDED.origin,
@@ -377,7 +461,19 @@ async def _main():
         help="KB UUID to backfill, or the special value 'ALL_KBS' to backfill every KB.",
         required=True,
     )
+    parser.add_argument(
+        "--checkpoint-file",
+        default=str(_DEFAULT_CHECKPOINT_PATH),
+        help="Local file used to store completed KB IDs so ALL_KBS runs can resume.",
+    )
+    parser.add_argument(
+        "--log-file",
+        default=str(_DEFAULT_LOG_PATH),
+        help="Path to the log file where progress and errors will be appended.",
+    )
     args = parser.parse_args()
+    checkpoint_path = Path(args.checkpoint_file)
+    log_file_path = Path(args.log_file)
     setup_logging(
         settings=LogSettings(
             debug=True,
@@ -387,6 +483,8 @@ async def _main():
             },
         )
     )
+    _add_file_logging_handler(log_file_path)
+    logger.info(f"File logging enabled at: {log_file_path.resolve()}")
     context = ApplicationContext(
         kv_driver=True,
         blob_storage=False,
@@ -400,12 +498,14 @@ async def _main():
 
     try:
         if args.kbid == "ALL_KBS":
-            await backfill_all_kbs()
+            await backfill_all_kbs(checkpoint_path=checkpoint_path)
         else:
             await backfill_kb(kbid=args.kbid)
+            _mark_kb_completed(checkpoint_path, kbid=args.kbid)
     finally:
         await context.finalize()
 
 
 if __name__ == "__main__":
+    logger.setLevel(logging.WARNING)
     asyncio.run(_main())
