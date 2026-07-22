@@ -1988,7 +1988,7 @@ class FindRequest(BaseSearchRequest):
         title="Search After",
         description=(
             "Pass a token returned from another resquest to get the next results in the search. "
-            "Only results from the paragraph index will be returned. "
+            "Only results from the paragraph index will be returned and rerankers will be disabled. "
         ),
     )
 
@@ -2128,7 +2128,7 @@ class KnowledgeboxFindResults(JsonBaseModel):
         title="Search After",
         description=(
             "Pass this token to another request to get the next results in the search. "
-            "Only results from the paragraph index will be returned. "
+            "Only results from the paragraph index will be returned and rerankers will be disabled. "
         ),
     )
 

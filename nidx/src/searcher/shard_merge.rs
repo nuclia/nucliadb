@@ -209,7 +209,7 @@ fn sort_documents_fn(order_by: OrderBy) -> Box<dyn Fn(&DocumentResult, &Document
                 ) => a_bm25
                     .total_cmp(&b_bm25)
                     .then(a.shard_id.cmp(&b.shard_id))
-                    .then(a_docaddr.cmp(&b_docaddr))
+                    .then(a_docaddr.cmp(&b_docaddr).reverse())
                     .is_gt(),
                 _ => {
                     unreachable!("index always return values with the same order_by as we have")
@@ -642,8 +642,8 @@ mod tests {
 
             let merged = merge_search(
                 vec![
-                    response(vec![document("foo", 3.0, 1), document("bar", 2.0, 2)]),
-                    response(vec![document("baz", 4.0, 1), document("quux", 2.0, 1)]),
+                    response(vec![document("foo", 3.0, 2), document("bar", 2.0, 1)]),
+                    response(vec![document("baz", 4.0, 2), document("quux", 2.0, 2)]),
                 ],
                 OrderBy {
                     expr: SortExpr::Score,
@@ -728,8 +728,8 @@ mod tests {
             // When shard bytes are equal, docaddr is the final tiebreaker.
             let merged = merge_search(
                 vec![
-                    response(vec![document("foo", 2.0, 1, SHARD_A)]),
-                    response(vec![document("bar", 2.0, 2, SHARD_A)]),
+                    response(vec![document("foo", 2.0, 2, SHARD_A)]),
+                    response(vec![document("bar", 2.0, 1, SHARD_A)]),
                 ],
                 OrderBy {
                     expr: SortExpr::Score,

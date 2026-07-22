@@ -64,7 +64,7 @@ async def test_search_after_pagination_matches_single_request(
 
     baseline_ids = baseline_data["best_matches"]
 
-    assert len(baseline_ids) >= 5
+    assert len(baseline_ids) == 10  # 5 * 2 (title+content)
 
     # Paginated with k = 1, should iterate all resources one by one
     paginated_ids: list[str] = []
@@ -150,7 +150,7 @@ async def test_search_after_hybrid_pagination_exercises_skip(
     )
     assert resp.status_code == 200, resp.text
     baseline_ids = set(resp.json()["best_matches"])
-    assert len(baseline_ids) >= 7
+    assert len(baseline_ids) == 8  # 6 * 1 (title) + 1 * 2 (title + content)
 
     # Ensure the hybrid result is last by bm25 score
     assert resp.json()["best_matches"][-1].startswith(hybrid_rid)
