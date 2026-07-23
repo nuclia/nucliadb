@@ -527,13 +527,101 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
                     )
 
 
+# ---------------------------------------------------------------------------
+# Check mode
+# ---------------------------------------------------------------------------
+
+
+async def check_kb(*, kbid: str) -> bool:
+    """Check that a KB has the same number of resources in v1 and v2.
+
+    Returns True if counts match, False otherwise.
+    """
+    v1_rids: set[str] = set()
+    async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+        v1_rids.add(rid)
+
+    v2_rids: set[str] = set()
+    async for rid in resources_v2.iterate_resource_ids(kbid=kbid):
+        v2_rids.add(rid)
+
+    v1_count = len(v1_rids)
+    v2_count = len(v2_rids)
+
+    if v1_count == v2_count:
+        logger.info(f"KB {kbid}: ✓ Both v1 and v2 have {v1_count} resources")
+        return True
+    else:
+        logger.error(f"KB {kbid}: ✗ Mismatch - v1 has {v1_count} resources, v2 has {v2_count} resources")
+        missing_in_v2 = v1_rids - v2_rids
+        extra_in_v2 = v2_rids - v1_rids
+        if missing_in_v2:
+            logger.warning(f"  Missing in v2: {len(missing_in_v2)} resource(s)")
+        if extra_in_v2:
+            logger.warning(f"  Extra in v2: {len(extra_in_v2)} resource(s)")
+        return False
+
+
+async def check_all_kbs() -> None:
+    """Check all KBs for resource count mismatches between v1 and v2."""
+    v1_kbids: set[str] = set()
+    v1_kbids_and_slugs = []
+    async with with_ro_transaction() as txn:
+        async for kbid, slug in kb_v1.get_kbs(txn):
+            v1_kbids.add(kbid)
+            v1_kbids_and_slugs.append((kbid, slug))
+
+    # Collect KBIDs in v2 (ORM tables)
+    v2_kbids: set[str] = set()
+    async with with_ro_transaction() as txn:
+        async for kbid, slug in datamanagers.kb.kb_v2.get_kbs(txn):
+            v2_kbids.add(kbid)
+
+    # Check KB set consistency
+    missing_in_v2 = v1_kbids - v2_kbids
+    extra_in_v2 = v2_kbids - v1_kbids
+
+    if v1_kbids == v2_kbids:
+        logger.info(f"✓ Both v1 and v2 have the same {len(v1_kbids)} KB(s)")
+    else:
+        logger.error(f"✗ KB set mismatch - v1 has {len(v1_kbids)} KBs, v2 has {len(v2_kbids)} KBs")
+        if missing_in_v2:
+            logger.error(f"  Missing in v2: {len(missing_in_v2)} KB(s)")
+            for kbid in sorted(missing_in_v2):
+                logger.error(f"    - {kbid}")
+        if extra_in_v2:
+            logger.error(f"  Extra in v2: {len(extra_in_v2)} KB(s)")
+            for kbid in sorted(extra_in_v2):
+                logger.error(f"    - {kbid}")
+
+    logger.info(f"Checking resource counts in {len(v1_kbids_and_slugs)} KB(s)")
+
+    mismatches = []
+    for kbid, slug in v1_kbids_and_slugs:
+        if not await check_kb(kbid=kbid):
+            mismatches.append((kbid, slug))
+
+    if mismatches:
+        logger.error(f"Found {len(mismatches)} KB(s) with resource count mismatches:")
+        for kbid, slug in mismatches:
+            logger.error(f"  - {kbid} ({slug})")
+    else:
+        logger.info(f"✓ All {len(v1_kbids_and_slugs)} KB(s) passed the resource count check")
+
+
 async def _main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="Backfill ORM tables from the v1 KV store")
+    parser = argparse.ArgumentParser(description="Backfill ORM tables or check resource counts")
+    parser.add_argument(
+        "--mode",
+        choices=["backfill", "check"],
+        default="backfill",
+        help="Mode to run: 'backfill' to migrate resources or 'check' to verify resource counts match between v1 and v2",
+    )
     parser.add_argument(
         "--kbid",
-        help="KB UUID to backfill, or the special value 'ALL_KBS' to backfill every KB.",
+        help="KB UUID to process, or the special value 'ALL_KBS' to process every KB.",
         required=True,
     )
     parser.add_argument(
@@ -572,12 +660,18 @@ async def _main():
     await context.initialize()
 
     try:
-        if args.kbid == "ALL_KBS":
-            await backfill_all_kbs(checkpoint_path=checkpoint_path)
-        else:
-            resource_checkpoint_path = checkpoint_path.parent / f"{args.kbid}.completed_resources"
-            await backfill_kb(kbid=args.kbid, resource_checkpoint_path=resource_checkpoint_path)
-            _mark_kb_completed(checkpoint_path, kbid=args.kbid)
+        if args.mode == "backfill":
+            if args.kbid == "ALL_KBS":
+                await backfill_all_kbs(checkpoint_path=checkpoint_path)
+            else:
+                resource_checkpoint_path = checkpoint_path.parent / f"{args.kbid}.completed_resources"
+                await backfill_kb(kbid=args.kbid, resource_checkpoint_path=resource_checkpoint_path)
+                _mark_kb_completed(checkpoint_path, kbid=args.kbid)
+        elif args.mode == "check":
+            if args.kbid == "ALL_KBS":
+                await check_all_kbs()
+            else:
+                await check_kb(kbid=args.kbid)
     finally:
         await context.finalize()
 
