@@ -17,25 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import heapq
-import itertools
 from collections.abc import Iterable
 
 from nidx_protos.nodereader_pb2 import (
     DocumentScored,
     GraphSearchResponse,
     ParagraphResult,
-    ParagraphSearchResponse,
     SearchRequest,
     SearchResponse,
-    VectorSearchResponse,
 )
 
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, nidx_query
-from nucliadb.search.search.metrics import merge_observer, search_observer, searched_shards_histogram
+from nucliadb.search.search.metrics import search_observer, searched_shards_histogram
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb.search.search.rank_fusion import IndexSource, get_rank_fusion
@@ -92,111 +88,6 @@ async def text_block_search(
     text_blocks = merged_text_blocks[: retrieval.rank_fusion.window]
 
     return text_blocks, pb_query, shards_response, queried_shards
-
-
-# TODO: add this metric to nidx
-@merge_observer.wrap({"type": "shards_responses"})
-def merge_shard_responses(
-    responses: list[SearchResponse],
-) -> SearchResponse:
-    """Merge search responses into a single response as if there were no shards
-    involved.
-
-    ATENTION! This is not a complete merge, we are only merging the fields
-    needed to compose a /find response.
-
-    """
-    paragraphs = []
-    vectors = []
-    graphs = []
-    for response in responses:
-        paragraphs.append(response.paragraph)
-        vectors.append(response.vector)
-        graphs.append(response.graph)
-
-    merged = SearchResponse(
-        paragraph=merge_shards_keyword_responses(paragraphs),
-        vector=merge_shards_semantic_responses(vectors),
-        graph=merge_shards_graph_responses(graphs),
-    )
-    return merged
-
-
-def merge_shards_keyword_responses(
-    keyword_responses: list[ParagraphSearchResponse],
-) -> ParagraphSearchResponse:
-    """Merge keyword (paragraph) search responses into a single response as if
-    there were no shards involved.
-
-    ATENTION! This is not a complete merge, we are only merging the fields
-    needed to compose a /find response.
-
-    """
-    merged = ParagraphSearchResponse()
-    for response in keyword_responses:
-        merged.query = response.query
-        merged.next_page = merged.next_page or response.next_page
-        merged.total += response.total
-        merged.results.extend(response.results)
-        merged.ematches.extend(response.ematches)
-
-    return merged
-
-
-def merge_shards_semantic_responses(
-    semantic_responses: list[VectorSearchResponse], limit: int | None = None
-) -> VectorSearchResponse:
-    """Merge semantic (vector) search responses into a single response as if
-    there were no shards involved.
-
-    The `limit` parameter allow to cut and return at most this number of
-    results.
-
-    ATENTION! This is not a complete merge, we are only merging the fields
-    needed to compose a /find response.
-
-    """
-    merged = VectorSearchResponse()
-
-    # each shard returns results in sorted order, we can take advantage and keep
-    # sorted order, so we don't have to re-sort later
-    merged.documents.extend(
-        itertools.islice(
-            heapq.merge(
-                *(response.documents for response in semantic_responses),
-                reverse=True,
-                key=lambda x: x.score,
-            ),
-            limit,
-        )
-    )
-
-    return merged
-
-
-def merge_shards_graph_responses(
-    graph_responses: list[GraphSearchResponse],
-):
-    merged = GraphSearchResponse()
-
-    for response in graph_responses:
-        nodes_offset = len(merged.nodes)
-        relations_offset = len(merged.relations)
-
-        # paths contain indexes to nodes and relations, we must offset them
-        # while merging responses to maintain valid data
-        for path in response.graph:
-            merged_path = GraphSearchResponse.Path()
-            merged_path.CopyFrom(path)
-            merged_path.source += nodes_offset
-            merged_path.relation += relations_offset
-            merged_path.destination += nodes_offset
-            merged.graph.append(merged_path)
-
-        merged.nodes.extend(response.nodes)
-        merged.relations.extend(response.relations)
-
-    return merged
 
 
 def keyword_result_to_text_block_match(item: ParagraphResult) -> TextBlockMatch:
