@@ -81,7 +81,7 @@ async def get_status(
         )
 
     key = KB_RESOURCE_FIELD_STATUS.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
-    return await get_kv_pb(txn, key, writer_pb2.FieldStatus)
+    return await get_kv_pb(txn, key, writer_pb2.FieldStatus, for_update=False)
 
 
 async def get_statuses(

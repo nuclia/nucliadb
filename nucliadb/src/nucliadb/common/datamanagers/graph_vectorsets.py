@@ -30,11 +30,14 @@ class GraphVectorsetManager:
     def __init__(self, key: str):
         self.key = key
 
-    async def get_all(self, txn: Transaction, *, kbid: str) -> list[knowledgebox_pb2.VectorSetConfig]:
+    async def get_all(
+        self, txn: Transaction, *, kbid: str, for_update: bool = False
+    ) -> list[knowledgebox_pb2.VectorSetConfig]:
         stored = await get_kv_pb(
             txn,
             self.kbid_key(kbid),
             knowledgebox_pb2.KnowledgeBoxVectorSetsConfig,
+            for_update=for_update,
         )
         if stored:
             return [vs for vs in stored.vectorsets]
