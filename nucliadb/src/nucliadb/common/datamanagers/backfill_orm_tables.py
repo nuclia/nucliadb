@@ -611,7 +611,7 @@ async def check_all_kbs() -> None:
         logger.info(f"✓ All {len(v1_kbids_and_slugs)} KB(s) passed the resource count check")
 
 
-async def deep_check_kb(*, kbid: str, sample_size: int = 500) -> None:
+async def deep_check_kb(*, kbid: str, sample_size: int = 5_000) -> None:
     """Deep check: verify that field IDs and basic resource data match for a sample of resources."""
     # Collect all v1 resource IDs
     v1_rids: list[str] = []
@@ -652,6 +652,9 @@ async def deep_check_kb(*, kbid: str, sample_size: int = 500) -> None:
             if v1_all_fields:
                 for field in v1_all_fields.fields:
                     field_type_str = from_proto.field_type_name(field.field_type).abbreviation()
+                    if field_type_str == "a" and field.field in ("title", "summary"):
+                        # Skip title and summary fields in v1, since they are stored in the kb_resources.basic column
+                        continue
                     v1_field_ids.add((field_type_str, field.field))
 
             # Get field IDs from v2
@@ -659,7 +662,11 @@ async def deep_check_kb(*, kbid: str, sample_size: int = 500) -> None:
             v2_field_ids: set[tuple] = set()
             if v2_all_fields:
                 for field in v2_all_fields.fields:
-                    v2_field_ids.add((field.field_type, field.field_id))
+                    field_type_str = from_proto.field_type_name(field.field_type).abbreviation()
+                    if field_type_str == "a" and field.field in ("title", "summary"):
+                        # Skip title and summary fields in v2, since they are stored in the kb_resources.basic column
+                        continue
+                    v2_field_ids.add((field_type_str, field.field))
 
             # Compare field IDs
             if v1_field_ids != v2_field_ids:
