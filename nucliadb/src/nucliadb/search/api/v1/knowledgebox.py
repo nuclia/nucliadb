@@ -196,7 +196,6 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
         raise HTTPException(status_code=503, detail=f"No shards found")
 
     counts = IndexCounts(fields=0, paragraphs=0, sentences=0, size_bytes=0)
-    print(results)
     for shard in results:
         if isinstance(shard, BaseException):
             logger.error("Error getting shard info", exc_info=shard)
@@ -206,5 +205,4 @@ async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
         counts.paragraphs += shard.paragraphs
         counts.sentences += shard.sentences
         counts.size_bytes += shard.size_bytes
-    print(counts)
     return counts, queried_shards
