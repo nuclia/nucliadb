@@ -548,7 +548,7 @@ async def check_kb(*, kbid: str) -> bool:
     v1_count = len(v1_rids)
     v2_count = len(v2_rids)
 
-    if v1_count == v2_count:
+    if v1_rids == v2_rids:
         logger.info(f"KB {kbid}: ✓ Both v1 and v2 have {v1_count} resources")
         return True
     else:
