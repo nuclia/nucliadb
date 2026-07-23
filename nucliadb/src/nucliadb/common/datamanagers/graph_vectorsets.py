@@ -35,6 +35,7 @@ class GraphVectorsetManager:
             txn,
             self.kbid_key(kbid),
             knowledgebox_pb2.KnowledgeBoxVectorSetsConfig,
+            for_update=False,
         )
         if stored:
             return [vs for vs in stored.vectorsets]
