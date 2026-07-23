@@ -55,6 +55,6 @@ async def test_vector_result_metadata(nucliadb_search: AsyncClient, test_search_
     )
     pb_query = convert_retrieval_to_proto(parsed.retrieval)
 
-    results, _ = await nidx_query(kbid, Method.SEARCH, pb_query)
-    assert len(results[0].vector.documents) > 0
-    assert results[0].vector.documents[0].HasField("metadata")
+    result, _ = await nidx_query(kbid, Method.SEARCH, pb_query)
+    assert len(result.vector.documents) > 0
+    assert result.vector.documents[0].HasField("metadata")

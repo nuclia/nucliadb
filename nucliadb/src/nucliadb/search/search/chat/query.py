@@ -285,7 +285,7 @@ async def get_relations_results_from_entities(
     )
     request = convert_retrieval_to_proto(retrieval)
 
-    results: list[SearchResponse]
+    results: SearchResponse
     (
         results,
         _,
@@ -295,7 +295,7 @@ async def get_relations_results_from_entities(
         request,
         timeout=timeout,
     )
-    relations_results: list[GraphSearchResponse] = [result.graph for result in results]
+    relations_results: GraphSearchResponse = results.graph
     return await merge_relations_results(
         relations_results,
         entry_points,

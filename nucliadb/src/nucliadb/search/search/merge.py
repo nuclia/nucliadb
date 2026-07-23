@@ -19,8 +19,6 @@
 #
 import asyncio
 import datetime
-import heapq
-import itertools
 from collections.abc import Iterable
 from typing import Any
 
@@ -52,7 +50,6 @@ from nucliadb.search.search.fetch import get_labels_resource
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
-from nucliadb.search.search.retrieval import merge_shards_semantic_responses
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.resource import ExtractedDataTypeName
@@ -99,44 +96,40 @@ def sort_results_by_score(results: list[ParagraphResult] | list[DocumentResult])
 
 async def merge_documents_results(
     kbid: str,
-    responses: list[DocumentSearchResponse],
+    response: DocumentSearchResponse,
     *,
     query: FulltextQuery,
     top_k: int,
     offset: int,
     min_score: float,
 ) -> tuple[Resources, set[str]]:
-    raw_resource_list: list[tuple[DocumentResult, SortValue]] = []
+    total = response.total
+    next_page = response.next_page
+
     facets: dict[str, Any] = {}
-    total = 0
-    next_page = False
-    for document_response in responses:
-        if document_response.facets:
-            for key, value in document_response.facets.items():
-                key = translate_system_to_alias_label(key)
-                for facetresult in value.facetresults:
-                    facet_label = translate_system_to_alias_label(facetresult.tag)
-                    facets.setdefault(key, {}).setdefault(facet_label, 0)
-                    facets[key][facet_label] += facetresult.total
+    if response.facets:
+        for key, value in response.facets.items():
+            key = translate_system_to_alias_label(key)
+            for facetresult in value.facetresults:
+                facet_label = translate_system_to_alias_label(facetresult.tag)
+                facets.setdefault(key, {}).setdefault(facet_label, 0)
+                facets[key][facet_label] += facetresult.total
 
-        if document_response.next_page:
-            next_page = True
-        for result in document_response.results:
-            if result.score.bm25 < min_score:
-                logger.warning(
-                    f"Skipping document result with score {result.score.bm25} below min_score {min_score}. This should not happen, as nidx should have filtered it out.",
-                    extra={"kbid": kbid, "result_id": result.uuid},
-                )
-                continue
-            sort_value: SortValue
-            if query.order_by == SortField.SCORE:
-                sort_value = (result.score.bm25, result.shard_id, -result.score.docaddr)
-            else:
-                sort_value = result.date.ToDatetime()
-            if sort_value is not None:
-                raw_resource_list.append((result, sort_value))
-
-        total += document_response.total
+    raw_resource_list: list[tuple[DocumentResult, SortValue]] = []
+    for result in response.results:
+        if result.score.bm25 < min_score:
+            logger.warning(
+                f"Skipping document result with score {result.score.bm25} below min_score {min_score}. This should not happen, as nidx should have filtered it out.",
+                extra={"kbid": kbid, "result_id": result.uuid},
+            )
+            continue
+        sort_value: SortValue
+        if query.order_by == SortField.SCORE:
+            sort_value = (result.score.bm25, result.shard_id, -result.score.docaddr)
+        else:
+            sort_value = result.date.ToDatetime()
+        if sort_value is not None:
+            raw_resource_list.append((result, sort_value))
 
     # We need to cut first and then sort, otherwise the page will be wrong if the order is DESC
     raw_resource_list, has_more = cut_page(raw_resource_list[offset:], top_k)
@@ -176,26 +169,17 @@ async def merge_documents_results(
 
 
 async def merge_suggest_paragraph_results(
-    suggest_responses: list[SuggestResponse],
+    suggest_response: SuggestResponse,
     kbid: str,
     *,
     top_k: int,
     highlight: bool,
 ) -> Paragraphs:
-    query = ""
-    ematches: list[str] = []
-    for suggest_response in suggest_responses:
-        query = suggest_response.query
-        ematches.extend(suggest_response.ematches)
+    query = suggest_response.query
+    ematches: list[str] = suggest_response.ematches  # type: ignore
 
-    # merge while keeping sorted order by score
-    merged = heapq.merge(
-        *(response.results for response in suggest_responses),
-        reverse=True,
-        key=lambda x: (x.score.bm25, x.shard_id, -x.score.docaddr),
-    )
     # cut the best results
-    matches = list(itertools.islice(merged, top_k))
+    matches = suggest_response.results[:top_k]
 
     augmented_paragraphs: dict[ParagraphId, AugmentedParagraph] = await augment_paragraphs(
         kbid,
@@ -247,20 +231,17 @@ async def merge_suggest_paragraph_results(
 
 
 async def merge_vectors_results(
-    vector_responses: list[VectorSearchResponse],
+    vector_response: VectorSearchResponse,
     kbid: str,
     top_k: int,
     concurrency_control: asyncio.Semaphore | None = None,
     min_score: float | None = None,
 ) -> tuple[Sentences, set[str]]:
-    # merge keeping sorting and cut a page
-    merged = merge_shards_semantic_responses(vector_responses, limit=top_k)
-
     augments = []
     result_index_by_id = {}
     result_sentence_list: list[Sentence] = []
     result_resource_ids = set()
-    for result in merged.documents:
+    for result in vector_response.documents[:top_k]:
         if min_score is not None and result.score < min_score:
             logger.warning(
                 f"Skipping vector result with score {result.score} below min_score {min_score}. This should not happen, as nidx should have filtered it out.",
@@ -323,7 +304,7 @@ async def merge_vectors_results(
 
 async def merge_paragraph_results(
     kbid: str,
-    paragraph_responses: list[ParagraphSearchResponse],
+    paragraph_response: ParagraphSearchResponse,
     top_k: int,
     highlight: bool,
     sort: SortOptions,
@@ -331,45 +312,37 @@ async def merge_paragraph_results(
     offset: int,
     concurrency_control: asyncio.Semaphore | None = None,
 ) -> tuple[Paragraphs, set[str]]:
-    raw_paragraph_list: list[tuple[ParagraphId, ParagraphResult, SortValue]] = []
+    query = paragraph_response.query
+    ematches: list[str] = paragraph_response.ematches  # type: ignore
+    total = paragraph_response.total
+    next_page = paragraph_response.next_page
+
     facets: dict[str, Any] = {}
-    query = None
-    next_page = False
-    ematches: list[str] | None = None
-    total = 0
-    for paragraph_response in paragraph_responses:
-        if ematches is None:
-            ematches = paragraph_response.ematches  # type: ignore
-        if query is None:
-            query = paragraph_response.query
+    if paragraph_response.facets:
+        for key, value in paragraph_response.facets.items():
+            key = translate_system_to_alias_label(key)
+            for facetresult in value.facetresults:
+                facet_label = translate_system_to_alias_label(facetresult.tag)
+                facets.setdefault(key, {}).setdefault(facet_label, 0)
+                facets[key][facet_label] += facetresult.total
 
-        if paragraph_response.facets:
-            for key, value in paragraph_response.facets.items():
-                key = translate_system_to_alias_label(key)
-                for facetresult in value.facetresults:
-                    facet_label = translate_system_to_alias_label(facetresult.tag)
-                    facets.setdefault(key, {}).setdefault(facet_label, 0)
-                    facets[key][facet_label] += facetresult.total
-        if paragraph_response.next_page:
-            next_page = True
-        for result in paragraph_response.results:
-            if result.score.bm25 < min_score:
-                logger.warning(
-                    f"Skipping paragraph result with score {result.score.bm25} below min_score {min_score}. This should not happen, as nidx should have filtered it out.",
-                    extra={"kbid": kbid, "result_id": result.paragraph},
-                )
-                continue
-            paragraph_id = ParagraphId.from_string(result.paragraph)
+    raw_paragraph_list: list[tuple[ParagraphId, ParagraphResult, SortValue]] = []
+    for result in paragraph_response.results:
+        if result.score.bm25 < min_score:
+            logger.warning(
+                f"Skipping paragraph result with score {result.score.bm25} below min_score {min_score}. This should not happen, as nidx should have filtered it out.",
+                extra={"kbid": kbid, "result_id": result.paragraph},
+            )
+            continue
+        paragraph_id = ParagraphId.from_string(result.paragraph)
 
-            sort_value: SortValue
-            if sort.field == SortField.SCORE:
-                sort_value = (result.score.bm25, result.shard_id, -result.score.docaddr)
-            else:
-                sort_value = result.date.ToDatetime()
-            if sort_value is not None:
-                raw_paragraph_list.append((paragraph_id, result, sort_value))
-
-        total += paragraph_response.total
+        sort_value: SortValue
+        if sort.field == SortField.SCORE:
+            sort_value = (result.score.bm25, result.shard_id, -result.score.docaddr)
+        else:
+            sort_value = result.date.ToDatetime()
+        if sort_value is not None:
+            raw_paragraph_list.append((paragraph_id, result, sort_value))
 
     # Sort the list by score. It's important that this sort is stable, so the
     # ordering of results with same scores accross multiple shards doesn't change
@@ -440,18 +413,18 @@ async def merge_paragraph_results(
 
 @merge_observer.wrap({"type": "merge_relations"})
 async def merge_relations_results(
-    graph_responses: list[GraphSearchResponse],
+    graph_response: GraphSearchResponse,
     query_entry_points: Iterable[RelationNode],
     only_with_metadata: bool = False,
 ) -> Relations:
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
-        None, _merge_relations_results, graph_responses, query_entry_points, only_with_metadata
+        None, _merge_relations_results, graph_response, query_entry_points, only_with_metadata
     )
 
 
 def _merge_relations_results(
-    graph_responses: list[GraphSearchResponse],
+    graph_response: GraphSearchResponse,
     query_entry_points: Iterable[RelationNode],
     only_with_metadata: bool,
 ) -> Relations:
@@ -461,53 +434,52 @@ def _merge_relations_results(
     for entry_point in query_entry_points:
         relations.entities[entry_point.value] = EntitySubgraph(related_to=[])
 
-    for graph_response in graph_responses:
-        for path in graph_response.graph:
-            relation = graph_response.relations[path.relation]
-            origin = graph_response.nodes[path.source]
-            destination = graph_response.nodes[path.destination]
-            relation_type = RelationTypePbMap[relation.relation_type]
-            relation_label = relation.label
-            metadata = path.metadata if path.HasField("metadata") else None
-            if path.resource_field_id is not None:
-                resource_id = path.resource_field_id.split("/")[0]
+    for path in graph_response.graph:
+        relation = graph_response.relations[path.relation]
+        origin = graph_response.nodes[path.source]
+        destination = graph_response.nodes[path.destination]
+        relation_type = RelationTypePbMap[relation.relation_type]
+        relation_label = relation.label
+        metadata = path.metadata if path.HasField("metadata") else None
+        if path.resource_field_id is not None:
+            resource_id = path.resource_field_id.split("/")[0]
 
-            if only_with_metadata and not metadata:
-                continue
+        if only_with_metadata and not metadata:
+            continue
 
-            if origin.value in relations.entities:
-                relations.entities[origin.value].related_to.append(
-                    DirectionalRelation(
-                        entity=destination.value,
-                        entity_type=RelationNodeTypePbMap[destination.ntype],
-                        entity_subtype=destination.subtype,
-                        relation=relation_type,
-                        relation_label=relation_label,
-                        direction=RelationDirection.OUT,
-                        metadata=from_proto.relation_metadata(metadata) if metadata else None,
-                        resource_id=resource_id,
-                    )
+        if origin.value in relations.entities:
+            relations.entities[origin.value].related_to.append(
+                DirectionalRelation(
+                    entity=destination.value,
+                    entity_type=RelationNodeTypePbMap[destination.ntype],
+                    entity_subtype=destination.subtype,
+                    relation=relation_type,
+                    relation_label=relation_label,
+                    direction=RelationDirection.OUT,
+                    metadata=from_proto.relation_metadata(metadata) if metadata else None,
+                    resource_id=resource_id,
                 )
-            elif destination.value in relations.entities:
-                relations.entities[destination.value].related_to.append(
-                    DirectionalRelation(
-                        entity=origin.value,
-                        entity_type=RelationNodeTypePbMap[origin.ntype],
-                        entity_subtype=origin.subtype,
-                        relation=relation_type,
-                        relation_label=relation_label,
-                        direction=RelationDirection.IN,
-                        metadata=from_proto.relation_metadata(metadata) if metadata else None,
-                        resource_id=resource_id,
-                    )
+            )
+        elif destination.value in relations.entities:
+            relations.entities[destination.value].related_to.append(
+                DirectionalRelation(
+                    entity=origin.value,
+                    entity_type=RelationNodeTypePbMap[origin.ntype],
+                    entity_subtype=origin.subtype,
+                    relation=relation_type,
+                    relation_label=relation_label,
+                    direction=RelationDirection.IN,
+                    metadata=from_proto.relation_metadata(metadata) if metadata else None,
+                    resource_id=resource_id,
                 )
+            )
 
     return relations
 
 
 @merge_observer.wrap({"type": "merge"})
 async def merge_results(
-    search_responses: list[SearchResponse],
+    search_response: SearchResponse,
     retrieval: UnitRetrieval,
     kbid: str,
     show: list[ResourceProperties],
@@ -518,25 +490,13 @@ async def merge_results(
 ) -> KnowledgeboxSearchResults:
     concurrency_control = asyncio.Semaphore(50)
 
-    paragraphs = []
-    documents = []
-    vectors = []
-    graphs = []
-
-    for response in search_responses:
-        paragraphs.append(response.paragraph)
-        documents.append(response.document)
-        vectors.append(response.vector)
-        graphs.append(response.graph)
-
     api_results = KnowledgeboxSearchResults()
-
     resources = set()
 
     if retrieval.query.fulltext is not None:
         api_results.fulltext, matched_resources = await merge_documents_results(
             kbid,
-            documents,
+            search_response.document,
             query=retrieval.query.fulltext,
             top_k=retrieval.top_k,
             offset=offset,
@@ -551,7 +511,7 @@ async def merge_results(
         )
         api_results.paragraphs, matched_resources = await merge_paragraph_results(
             kbid,
-            paragraphs,
+            search_response.paragraph,
             retrieval.top_k,
             highlight,
             sort,
@@ -563,7 +523,7 @@ async def merge_results(
 
     if retrieval.query.semantic is not None:
         api_results.sentences, matched_resources = await merge_vectors_results(
-            vectors,
+            search_response.vector,
             kbid,
             retrieval.top_k,
             min_score=retrieval.query.semantic.min_score,
@@ -573,7 +533,7 @@ async def merge_results(
 
     if retrieval.query.relation is not None:
         api_results.relations = await merge_relations_results(
-            graphs, retrieval.query.relation.entry_points
+            search_response.graph, retrieval.query.relation.entry_points
         )
 
     api_results.resources = await augment_resources_deep(
@@ -589,21 +549,17 @@ async def merge_results(
 
 
 async def merge_paragraphs_results(
-    responses: list[SearchResponse],
+    response: SearchResponse,
     top_k: int,
     kbid: str,
     highlight_split: bool,
     min_score: float,
 ) -> ResourceSearchResults:
-    paragraphs = []
-    for result in responses:
-        paragraphs.append(result.paragraph)
-
     api_results = ResourceSearchResults()
 
     api_results.paragraphs, _ = await merge_paragraph_results(
         kbid,
-        paragraphs,
+        response.paragraph,
         top_k,
         highlight=highlight_split,
         sort=SortOptions(
@@ -617,20 +573,19 @@ async def merge_paragraphs_results(
 
 
 def merge_suggest_entities_results(
-    suggest_responses: list[SuggestResponse],
+    suggest_response: SuggestResponse,
 ) -> RelatedEntities:
     unique_entities: set[RelatedEntity] = set()
-    for response in suggest_responses:
-        response_entities = (
-            RelatedEntity(family=e.subtype, value=e.value) for e in response.entity_results.nodes
-        )
-        unique_entities.update(response_entities)
+    response_entities = (
+        RelatedEntity(family=e.subtype, value=e.value) for e in suggest_response.entity_results.nodes
+    )
+    unique_entities.update(response_entities)
 
     return RelatedEntities(entities=list(unique_entities), total=len(unique_entities))
 
 
 async def merge_suggest_results(
-    suggest_responses: list[SuggestResponse],
+    suggest_response: SuggestResponse,
     kbid: str,
     *,
     top_k: int,
@@ -639,7 +594,7 @@ async def merge_suggest_results(
     api_results = KnowledgeboxSuggestResults()
 
     api_results.paragraphs = await merge_suggest_paragraph_results(
-        suggest_responses, kbid, top_k=top_k, highlight=highlight
+        suggest_response, kbid, top_k=top_k, highlight=highlight
     )
-    api_results.entities = merge_suggest_entities_results(suggest_responses)
+    api_results.entities = merge_suggest_entities_results(suggest_response)
     return api_results

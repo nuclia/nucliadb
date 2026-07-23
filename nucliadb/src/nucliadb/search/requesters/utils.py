@@ -19,9 +19,8 @@
 
 import asyncio
 import json
-from collections.abc import Sequence
 from enum import Enum, auto
-from typing import TypeVar, overload
+from typing import Awaitable, Callable, overload
 
 from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
@@ -44,40 +43,12 @@ from nucliadb.search.search.shards import graph_search_shards, query_shards, sug
 from nucliadb.search.settings import settings
 from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
 from nucliadb_telemetry import errors
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 
 class Method(Enum):
     SEARCH = auto()
     SUGGEST = auto()
     GRAPH = auto()
-
-    def __str__(self):
-        if self == self.SEARCH:
-            return "search"
-        elif self == self.SUGGEST:
-            return "suggest"
-        elif self == self.GRAPH:
-            return "graph"
-        else:  # pragma: no cover
-            assert_never(self)
-
-
-REQUEST_TYPE = SuggestRequest | SearchRequest | GraphSearchRequest
-
-T = TypeVar(
-    "T",
-    SuggestResponse,
-    SearchResponse,
-    GraphSearchResponse,
-)
-
-METHODS = {
-    Method.SEARCH: query_shards,
-    Method.SUGGEST: suggest_shards,
-    Method.GRAPH: graph_search_shards,
-}
 
 
 @overload
@@ -86,7 +57,7 @@ async def nidx_query(
     method: Method,
     pb_query: SuggestRequest,
     timeout: float | None = None,
-) -> tuple[list[SuggestResponse], list[str]]: ...
+) -> tuple[SuggestResponse, list[str]]: ...
 
 
 @overload
@@ -95,7 +66,7 @@ async def nidx_query(
     method: Method,
     pb_query: SearchRequest,
     timeout: float | None = None,
-) -> tuple[list[SearchResponse], list[str]]: ...
+) -> tuple[SearchResponse, list[str]]: ...
 
 
 @overload
@@ -104,16 +75,15 @@ async def nidx_query(
     method: Method,
     pb_query: GraphSearchRequest,
     timeout: float | None = None,
-) -> tuple[list[GraphSearchResponse], list[str]]: ...
+) -> tuple[GraphSearchResponse, list[str]]: ...
 
 
 async def nidx_query(
     kbid: str,
     method: Method,
-    pb_query: REQUEST_TYPE,
+    pb_query: SearchRequest | SuggestRequest | GraphSearchRequest,
     timeout: float | None = None,
-) -> tuple[Sequence[T | BaseException], list[str]]:
-    timeout = timeout or settings.search_timeout
+) -> tuple[SearchResponse | SuggestResponse | GraphSearchResponse | BaseException, list[str]]:
     shard_manager = get_shard_manager()
     try:
         shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
@@ -123,95 +93,79 @@ async def nidx_query(
             detail="The knowledgebox or its shards configuration is missing",
         )
 
-    ops = []
     queried_shards = []
+    for shard_obj in shard_groups:
+        if shard_obj.nidx_shard_id is not None:
+            queried_shards.append(shard_obj.nidx_shard_id)
 
-    func = METHODS[method]
-
-    if has_feature(
-        const.Features.BETTER_MULTI_SHARD_SEARCH, context={"kbid": kbid, "method": str(method)}
-    ):
-        for shard_obj in shard_groups:
-            if shard_obj.nidx_shard_id is not None:
-                queried_shards.append(shard_obj.nidx_shard_id)
-
-        if len(queried_shards) > 0:
-            ops.append(func(queried_shards, pb_query))  # type: ignore
-
-    else:
-        for shard_obj in shard_groups:
-            shard_id = shard_obj.nidx_shard_id
-            if shard_id is not None:
-                # At least one node is alive for this shard group
-                # let's add it ot the query list if has a valid value
-                ops.append(func([shard_id], pb_query))  # type: ignore
-                queried_shards.append(shard_id)
-
-    if not ops:
+    if len(queried_shards) == 0:
         logger.warning(f"No shards found for kb", extra={"kbid": kbid})
         raise HTTPException(
             status_code=512,
             detail=f"No shards found for kb",
         )
 
+    func: (
+        Callable[[list[str], SearchRequest], Awaitable[SearchResponse]]
+        | Callable[[list[str], SuggestRequest], Awaitable[SuggestResponse]]
+        | Callable[[list[str], GraphSearchRequest], Awaitable[GraphSearchResponse]]
+    )
+    if method == Method.SEARCH:
+        func = query_shards
+    elif method == Method.SUGGEST:
+        func = suggest_shards
+    elif method == Method.GRAPH:
+        func = graph_search_shards
+    else:  # pragma: no cover
+        assert_never(method)
+
+    timeout = timeout or settings.search_timeout
+    result: SearchResponse | SuggestResponse | GraphSearchResponse
     try:
-        results: list[T | BaseException] = await asyncio.wait_for(  # type: ignore
-            asyncio.gather(*ops, return_exceptions=True),  # type: ignore[arg-type]
+        result = await asyncio.wait_for(
+            func(
+                queried_shards,
+                pb_query,  # type: ignore[arg-type,ty:invalid-argument-type]
+            ),
             timeout=timeout,
         )
-    except asyncio.TimeoutError as exc:  # pragma: no cover
-        logger.warning(
-            "Timeout while querying nidx",
-        )
-        results = [exc]
-
-    error = validate_nidx_query_results(results or [])
-    if error is not None:
+    except Exception as exc:
         query_dict = MessageToDict(pb_query)
         query_dict.pop("vector", None)
-        logger.error(
-            "Error while querying nidx",
-            extra={
-                "kbid": kbid,
-                "query": json.dumps(query_dict),
-            },
-        )
-        raise error
+        extra = {
+            "kbid": kbid,
+            "query": json.dumps(query_dict),
+        }
+        raise handle_nidx_exception(exc, extra=extra)
 
-    return results, queried_shards
+    return result, queried_shards
 
 
-def validate_nidx_query_results(results: list[T | BaseException]) -> HTTPException | None:
-    """
-    Validate the results of a nidx query and return an exception if any error is found
+def handle_nidx_exception(exc: Exception, *, extra: dict[str, str]) -> HTTPException:
+    """Parse a nidx exception, log necessary details and return an equivalent
+    HTTP exception to raise to the user."""
 
-    Handling of exception is responsibility of caller.
-    """
-    if len(results) == 0:
-        return HTTPException(status_code=500, detail=f"Error while executing shard queries. No results.")
-
-    for result in results:
-        if isinstance(result, Exception):
-            status_code = 500
-            reason = "Error while querying shard data."
-            if isinstance(result, AioRpcError):
-                if result.code() is GrpcStatusCode.INTERNAL:
-                    # handle nidx response errors
-                    details = result.details() or "gRPC error without details"
-                    if "AllButQueryForbidden" in details:
-                        status_code = 412
-                        reason = details.split(":")[-1].strip().strip("'")
-                    else:
-                        reason = details
-                        logger.exception(f"Unhandled nidx error", exc_info=result)
-                else:
-                    logger.error(
-                        f"Unhandled GRPC error while querying shard data: {result.debug_error_string()}"
-                    )
+    status_code = 500
+    reason = "Error while querying shard data."
+    if isinstance(exc, AioRpcError):
+        if exc.code() is GrpcStatusCode.INTERNAL:
+            # handle nidx response errors
+            details = exc.details() or "gRPC error without details"
+            if "AllButQueryForbidden" in details:
+                status_code = 412
+                reason = details.split(":")[-1].strip().strip("'")
             else:
-                errors.capture_exception(result)
-                logger.exception(f"Error while querying shard data {result}", exc_info=result)
+                reason = details
+                logger.exception(f"Unhandled nidx error", extra=extra, exc_info=exc)
+        else:
+            logger.error(
+                f"Unhandled GRPC error while querying nidx: {exc.debug_error_string()}", extra=extra
+            )
 
-            return HTTPException(status_code=status_code, detail=reason)
+    elif isinstance(exc, asyncio.TimeoutError):
+        logger.warning("Timeout while querying nidx", extra=extra)
+    else:
+        errors.capture_exception(exc)
+        logger.exception(f"Error while querying nidx: {exc}", extra=extra, exc_info=exc)
 
-    return None
+    return HTTPException(status_code=status_code, detail=reason)

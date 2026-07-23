@@ -34,7 +34,6 @@ from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.search.predict import DummyPredictEngine
-from nucliadb.search.requesters.utils import METHODS, Method
 from nucliadb_models.internal.predict import (
     QueryInfo,
 )
@@ -127,7 +126,7 @@ async def test_vectorset_parameter_without_default_vectorset(
 
     async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
         calls.append(pb_query)
-        results = [nodereader_pb2.SearchResponse()]
+        results = nodereader_pb2.SearchResponse()
         queried_nodes = []  # type: ignore[var-annotated]
         return (results, queried_nodes)
 
@@ -186,7 +185,7 @@ async def test_vectorset_parameter_with_default_vectorset(
 
     async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
         calls.append(pb_query)
-        results = [nodereader_pb2.SearchResponse()]
+        results = nodereader_pb2.SearchResponse()
         queried_nodes = []  # type: ignore[var-annotated]
         return (results, queried_nodes)
 
@@ -291,7 +290,7 @@ async def test_querying_kb_with_vectorsets(
     await inject_message(nucliadb_ingest_grpc, bm)
 
     with (
-        patch.dict(METHODS, values={Method.SEARCH: query_shards_wrapper}, clear=True),
+        patch("nucliadb.search.requesters.utils.query_shards", query_shards_wrapper),
         patch.object(
             dummy_predict,
             "query",

@@ -54,8 +54,7 @@ async def nidx_search(kbid: str, pb_query: SearchRequest) -> tuple[SearchRespons
     remove this.
 
     """
-    shards_responses, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)
-    response = merge_shard_responses(shards_responses)
+    response, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)
     return response, queried_shards
 
 
@@ -95,6 +94,7 @@ async def text_block_search(
     return text_blocks, pb_query, shards_response, queried_shards
 
 
+# TODO: add this metric to nidx
 @merge_observer.wrap({"type": "shards_responses"})
 def merge_shard_responses(
     responses: list[SearchResponse],

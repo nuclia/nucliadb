@@ -19,7 +19,12 @@
 #
 from unittest.mock import patch
 
-from nidx_protos.nodereader_pb2 import DocumentScored, DocumentVectorIdentifier, VectorSearchResponse
+from nidx_protos.nodereader_pb2 import (
+    DocumentScored,
+    DocumentVectorIdentifier,
+    SearchResponse,
+    VectorSearchResponse,
+)
 
 from nucliadb.search.search.merge import ResourceSearchResults, merge_paragraphs_results
 from nucliadb.search.search.retrieval import (
@@ -30,14 +35,14 @@ from nucliadb.search.search.retrieval import (
 @patch("nucliadb.search.search.merge.augment_paragraphs", return_value={})
 async def test_str_model(_mock):
     # make sure __str__ works as advertised
-    res = await merge_paragraphs_results([], 1, "kbid", False, 1)
+    res = await merge_paragraphs_results(SearchResponse(), 1, "kbid", False, 1)
     assert str(res) == res.model_dump_json()
 
 
 @patch("nucliadb.search.search.merge.augment_paragraphs", return_value={})
 async def test_str_model_fallback(_mock):
     with patch.object(ResourceSearchResults, "model_dump_json", side_effect=Exception("ERROR")):
-        res = await merge_paragraphs_results([], 1, "kbid", False, 1)
+        res = await merge_paragraphs_results(SearchResponse(), 1, "kbid", False, 1)
         assert "sentences=None" in str(res)
 
 
