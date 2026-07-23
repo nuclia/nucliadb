@@ -39,6 +39,7 @@ end of the migration run.
 
 import asyncio
 import logging
+import random
 import time
 import uuid
 from logging import Handler
@@ -53,13 +54,14 @@ from nucliadb.common.datamanagers import (
     fields as fields_v1,
 )
 from nucliadb.common.datamanagers import (
+    fields_v2,
+    resources_v2,
+)
+from nucliadb.common.datamanagers import (
     kb as kb_v1,
 )
 from nucliadb.common.datamanagers import (
     resources as resources_v1,
-)
-from nucliadb.common.datamanagers import (
-    resources_v2,
 )
 from nucliadb.common.datamanagers.utils import _pg_cursor, with_ro_transaction, with_rw_transaction
 from nucliadb.common.maindb.driver import Transaction
@@ -609,15 +611,97 @@ async def check_all_kbs() -> None:
         logger.info(f"✓ All {len(v1_kbids_and_slugs)} KB(s) passed the resource count check")
 
 
+async def deep_check_kb(*, kbid: str, sample_size: int = 500) -> None:
+    """Deep check: verify that field IDs and basic resource data match for a sample of resources."""
+    # Collect all v1 resource IDs
+    v1_rids: list[str] = []
+    async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+        v1_rids.append(rid)
+
+    if not v1_rids:
+        logger.info(f"KB {kbid}: No resources to deep check")
+        return
+
+    # Sample up to sample_size resources
+    sample_rids = v1_rids if len(v1_rids) <= sample_size else random.sample(v1_rids, sample_size)
+    logger.info(f"KB {kbid}: Deep checking {len(sample_rids)} resource(s) (out of {len(v1_rids)} total)")
+
+    mismatches = []
+    async with with_ro_transaction() as txn:
+        for rid in sample_rids:
+            # Get basic data from v1
+            v1_basic = await resources_v1.get_basic(txn, kbid=kbid, rid=rid)
+            # Get basic data from v2
+            v2_basic = await resources_v2.get_basic(txn, kbid=kbid, rid=rid)
+
+            if v1_basic is None and v2_basic is None:
+                pass  # Both missing, no mismatch
+
+            elif v1_basic is not None and v2_basic is not None:
+                # Compare basic data
+                if v1_basic.SerializeToString() != v2_basic.SerializeToString():
+                    mismatches.append((rid, "basic data mismatch"))
+                    continue
+            else:
+                mismatches.append((rid, "basic data presence mismatch"))
+                continue
+
+            # Get field IDs from v1
+            v1_all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
+            v1_field_ids: set[tuple] = set()
+            if v1_all_fields:
+                for field in v1_all_fields.fields:
+                    field_type_str = from_proto.field_type_name(field.field_type).abbreviation()
+                    v1_field_ids.add((field_type_str, field.field))
+
+            # Get field IDs from v2
+            v2_all_fields = await fields_v2.get_all_field_ids(txn, kbid=kbid, rid=rid)
+            v2_field_ids: set[tuple] = set()
+            if v2_all_fields:
+                for field in v2_all_fields.fields:
+                    v2_field_ids.add((field.field_type, field.field_id))
+
+            # Compare field IDs
+            if v1_field_ids != v2_field_ids:
+                missing_in_v2 = v1_field_ids - v2_field_ids
+                extra_in_v2 = v2_field_ids - v1_field_ids
+                if missing_in_v2 or extra_in_v2:
+                    mismatches.append((rid, "field ids mismatch"))
+
+    if mismatches:
+        logger.error(f"KB {kbid}: ✗ Found {len(mismatches)} deep check mismatch(es):")
+        for rid, issue in mismatches:
+            logger.error(f"  - {rid}: {issue}")
+    else:
+        logger.info(f"KB {kbid}: ✓ Deep check passed for {len(sample_rids)} resource(s)")
+
+
+async def deep_check_all_kbs() -> None:
+    """Run all checks (standard + deep) for all KBs."""
+    logger.info("Starting full deep check...")
+    await check_all_kbs()
+    logger.info("Running deep resource checks...")
+
+    v1_kbids_and_slugs = []
+    async with with_ro_transaction() as txn:
+        async for kbid, slug in kb_v1.get_kbs(txn):
+            v1_kbids_and_slugs.append((kbid, slug))
+
+    for kbid, slug in v1_kbids_and_slugs:
+        await deep_check_kb(kbid=kbid)
+
+    logger.info("Deep check complete")
+
+
 async def _main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Backfill ORM tables or check resource counts")
     parser.add_argument(
         "--mode",
-        choices=["backfill", "check"],
+        choices=["backfill", "check", "deep_check"],
         default="backfill",
-        help="Mode to run: 'backfill' to migrate resources or 'check' to verify resource counts match between v1 and v2",
+        help="Mode to run: 'backfill' to migrate resources, 'check' to verify resource counts match between v1 and v2, or 'deep_check' to perform detailed field and basic data comparisons",
     )
     parser.add_argument(
         "--kbid",
@@ -672,6 +756,11 @@ async def _main():
                 await check_all_kbs()
             else:
                 await check_kb(kbid=args.kbid)
+        elif args.mode == "deep_check":
+            if args.kbid == "ALL_KBS":
+                await deep_check_all_kbs()
+            else:
+                await deep_check_kb(kbid=args.kbid)
     finally:
         await context.finalize()
 
