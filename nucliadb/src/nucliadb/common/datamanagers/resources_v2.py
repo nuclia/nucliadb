@@ -290,16 +290,14 @@ async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.B
     """Return the deserialised Basic for a resource, or None."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
-            "SELECT slug, basic FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
+            "SELECT basic FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
             {"kbid": kbid, "rid": rid},
         )
         row = await cur.fetchone()
-        if row is None or row[1] is None:
+        if row is None or row[0] is None:
             return None
-        slug = row[0]
         pb = resources_pb2.Basic()
-        pb.ParseFromString(bytes(row[1]))
-        pb.slug = slug
+        pb.ParseFromString(bytes(row[0]))
         return pb
 
 
