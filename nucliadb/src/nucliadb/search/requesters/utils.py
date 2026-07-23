@@ -57,7 +57,7 @@ async def nidx_query(
     method: Method,
     pb_query: SuggestRequest,
     timeout: float | None = None,
-) -> tuple[SuggestResponse, list[str]]: ...
+) -> SuggestResponse: ...
 
 
 @overload
@@ -66,7 +66,7 @@ async def nidx_query(
     method: Method,
     pb_query: SearchRequest,
     timeout: float | None = None,
-) -> tuple[SearchResponse, list[str]]: ...
+) -> SearchResponse: ...
 
 
 @overload
@@ -75,7 +75,7 @@ async def nidx_query(
     method: Method,
     pb_query: GraphSearchRequest,
     timeout: float | None = None,
-) -> tuple[GraphSearchResponse, list[str]]: ...
+) -> GraphSearchResponse: ...
 
 
 async def nidx_query(
@@ -83,7 +83,7 @@ async def nidx_query(
     method: Method,
     pb_query: SearchRequest | SuggestRequest | GraphSearchRequest,
     timeout: float | None = None,
-) -> tuple[SearchResponse | SuggestResponse | GraphSearchResponse | BaseException, list[str]]:
+) -> SearchResponse | SuggestResponse | GraphSearchResponse:
     shard_manager = get_shard_manager()
     try:
         shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
@@ -93,12 +93,12 @@ async def nidx_query(
             detail="The knowledgebox or its shards configuration is missing",
         )
 
-    queried_shards = []
+    shards = []
     for shard_obj in shard_groups:
         if shard_obj.nidx_shard_id is not None:
-            queried_shards.append(shard_obj.nidx_shard_id)
+            shards.append(shard_obj.nidx_shard_id)
 
-    if len(queried_shards) == 0:
+    if len(shards) == 0:
         logger.warning(f"No shards found for kb", extra={"kbid": kbid})
         raise HTTPException(
             status_code=512,
@@ -124,7 +124,7 @@ async def nidx_query(
     try:
         result = await asyncio.wait_for(
             func(
-                queried_shards,
+                shards,
                 pb_query,  # type: ignore[arg-type,ty:invalid-argument-type]
             ),
             timeout=timeout,
@@ -138,7 +138,7 @@ async def nidx_query(
         }
         raise handle_nidx_exception(exc, extra=extra)
 
-    return result, queried_shards
+    return result
 
 
 def handle_nidx_exception(exc: Exception, *, extra: dict[str, str]) -> HTTPException:

@@ -75,7 +75,7 @@ async def graph_search_knowledgebox(
 async def graph_path_search(kbid: str, item: GraphSearchRequest) -> GraphSearchResponse:
     pb_query = await parse_graph_search(kbid, item)
 
-    result, _ = await nidx_query(kbid, Method.GRAPH, pb_query)
+    result = await nidx_query(kbid, Method.GRAPH, pb_query)
 
     return build_graph_response(result)
 
@@ -106,7 +106,7 @@ async def graph_nodes_search_knowledgebox(
 async def graph_nodes_search(kbid: str, item: GraphNodesSearchRequest) -> GraphNodesSearchResponse:
     pb_query = await parse_graph_node_search(kbid, item)
 
-    result, _ = await nidx_query(kbid, Method.GRAPH, pb_query)
+    result = await nidx_query(kbid, Method.GRAPH, pb_query)
 
     return build_graph_nodes_response(result)
 
@@ -139,6 +139,6 @@ async def graph_relations_search(
 ) -> GraphRelationsSearchResponse:
     pb_query = await parse_graph_relation_search(kbid, item)
 
-    result, _ = await nidx_query(kbid, Method.GRAPH, pb_query)
+    result = await nidx_query(kbid, Method.GRAPH, pb_query)
 
     return build_graph_relations_response(result)

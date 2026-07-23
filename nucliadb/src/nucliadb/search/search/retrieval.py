@@ -42,18 +42,6 @@ from nucliadb_models.search import SCORE_TYPE, TextPosition
 FAKE_GRAPH_SCORE = 1.0
 
 
-async def nidx_search(kbid: str, pb_query: SearchRequest) -> tuple[SearchResponse, list[str]]:
-    """Wrapper around nidx_query for SEARCH that merges shards results in a
-    single response.
-
-    At some point, nidx will provide this functionality and we'll be able to
-    remove this.
-
-    """
-    response, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)
-    return response, queried_shards
-
-
 @search_observer.wrap({"type": "text_block_search"})
 async def text_block_search(
     kbid: str, retrieval: UnitRetrieval
@@ -68,7 +56,8 @@ async def text_block_search(
     assert retrieval.rank_fusion is not None, "text block search requries a rank fusion algorithm"
 
     pb_query = convert_retrieval_to_proto(retrieval)
-    shards_response, queried_shards = await nidx_search(kbid, pb_query)
+    shards_response = await nidx_query(kbid, Method.SEARCH, pb_query)
+    queried_shards = list(shards_response.shard_ids)
     searched_shards_histogram.observe(len(queried_shards), {"type": "search"})
 
     keyword_results = keyword_results_to_text_block_matches(shards_response.paragraph.results)

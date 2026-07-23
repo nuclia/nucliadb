@@ -108,7 +108,8 @@ async def resource_search(
             detail = json.loads(exc.json())
             return HTTPClientError(status_code=422, detail=detail)
 
-        results, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)
+        results = await nidx_query(kbid, Method.SEARCH, pb_query)
+        queried_shards = list(results.shard_ids)
 
         # We need to merge
         search_results = await merge_paragraphs_results(

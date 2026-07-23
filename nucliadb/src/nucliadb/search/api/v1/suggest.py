@@ -177,7 +177,8 @@ async def suggest(
             range_modification_end,
             security_groups,
         )
-        results, queried_shards = await nidx_query(kbid, Method.SUGGEST, pb_query)
+        results = await nidx_query(kbid, Method.SUGGEST, pb_query)
+        queried_shards = list(results.shard_ids)
 
         # We need to merge
         search_results = await merge_suggest_results(

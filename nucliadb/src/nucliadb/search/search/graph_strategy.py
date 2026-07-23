@@ -487,7 +487,7 @@ async def fuzzy_search_entities(
         request.query.path.bool_or.operands.append(subquery)
 
     try:
-        response, _ = await nidx_query(kbid, Method.GRAPH, request)
+        response = await nidx_query(kbid, Method.GRAPH, request)
     except Exception as exc:
         capture_exception(exc)
         logger.exception("Error in finding entities in query for graph strategy")
@@ -973,5 +973,5 @@ async def find_graph_neighbours(
         exclude_processor.facet.facet = "/g"
         graph_query.query.path.bool_and.operands.append(exclude_processor)
 
-    (relations_results, _) = await nidx_query(kbid, Method.GRAPH, graph_query, timeout=5.0)
+    relations_results = await nidx_query(kbid, Method.GRAPH, graph_query, timeout=5.0)
     return relations_results

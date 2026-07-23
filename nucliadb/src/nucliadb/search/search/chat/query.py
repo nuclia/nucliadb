@@ -20,7 +20,7 @@
 import asyncio
 from collections.abc import AsyncGenerator, Iterable
 
-from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
+from nidx_protos.nodereader_pb2 import GraphSearchResponse
 from nuclia_models.predict.generative_responses import GenerativeChunk
 
 from nucliadb.common.models_utils import to_proto
@@ -285,17 +285,13 @@ async def get_relations_results_from_entities(
     )
     request = convert_retrieval_to_proto(retrieval)
 
-    results: SearchResponse
-    (
-        results,
-        _,
-    ) = await nidx_query(
+    result = await nidx_query(
         kbid,
         Method.SEARCH,
         request,
         timeout=timeout,
     )
-    relations_results: GraphSearchResponse = results.graph
+    relations_results: GraphSearchResponse = result.graph
     return await merge_relations_results(
         relations_results,
         entry_points,
