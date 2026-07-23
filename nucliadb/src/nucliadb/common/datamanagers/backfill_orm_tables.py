@@ -75,7 +75,7 @@ logger = logging.getLogger("backfill_orm_tables")
 # Maximum number of resources migrated concurrently within a single KB backfill.
 # Each slot holds one distributed lock + one PG transaction, so keep this
 # conservative enough not to saturate the connection pool.
-_MAX_CONCURRENT_RESOURCES = 30
+_MAX_CONCURRENT_RESOURCES = 20
 
 # Maximum number of resource tasks to create at once.
 _RESOURCE_TASK_BATCH_SIZE = 1000
