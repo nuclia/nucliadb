@@ -17,6 +17,19 @@ use nidx_types::prefilter::FilterOperator;
 use nidx_types::query_language::BooleanExpression;
 use tantivy::schema::Facet;
 
+#[derive(Clone)]
+pub enum SearchAfterTieBreak {
+    Drop,
+    KeepAfter(u64),
+    Keep,
+}
+
+#[derive(Clone)]
+pub struct SearchAfter {
+    pub score: f32,
+    pub tie_break: SearchAfterTieBreak,
+}
+
 #[derive(Clone, Default)]
 pub struct ParagraphSearchRequest {
     pub uuid: String,
@@ -33,6 +46,8 @@ pub struct ParagraphSearchRequest {
     pub filtering_formula: Option<BooleanExpression<String>>,
     /// Whether to do an OR/AND between prefilter results and filtering_formula
     pub filter_operator: FilterOperator,
+
+    pub search_after: Option<SearchAfter>,
 }
 
 pub struct ParagraphSuggestRequest {

@@ -406,4 +406,5 @@ def expected_find_response():
         "shards": None,
         "total": 1,
         "metrics": None,
+        "search_after": None,
     }

@@ -39,16 +39,17 @@ pub async fn search(
     search_request: SearchRequest,
     shards: Vec<Uuid>,
 ) -> NidxResult<Vec<SearchResponse>> {
-    let query_plan = query_planner::build_query_plan(search_request)?;
-    shards_query(index_cache, shards, query_plan, shard_search).await
+    shards_query(index_cache, shards, search_request, shard_search).await
 }
 
 #[instrument(skip_all, fields(shard_id = shard_id.to_string()))]
 async fn shard_search(
     shard_id: Uuid,
     index_cache: Arc<IndexCache>,
-    query_plan: QueryPlan,
+    search_request: SearchRequest,
 ) -> NidxResult<SearchResponse> {
+    let query_plan = query_planner::build_query_plan(search_request, &shard_id)?;
+
     let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
         return Err(NidxError::NotFound);
     };
