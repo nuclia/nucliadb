@@ -14,6 +14,7 @@
 //
 
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 
 use itertools::Itertools;
 use nidx_protos::{
@@ -23,6 +24,9 @@ use nidx_protos::{
 };
 use tracing::field::Empty;
 use tracing::{Span, instrument};
+
+use crate::metrics::searcher::SHARD_SEARCH_MERGE;
+use crate::metrics::{ShardMergeKind, ShardMergeLabels};
 
 #[derive(Clone, Copy)]
 pub struct OrderBy {
@@ -48,6 +52,7 @@ pub struct Limit(pub usize);
 ///
 #[instrument(skip_all, fields(shards_count = Empty, document_count = Empty, paragraph_count = Empty, vector_count = Empty, graph_count = Empty, limit = limit.0))]
 pub fn merge_search(shard_responses: Vec<SearchResponse>, order_by: OrderBy, limit: Limit) -> SearchResponse {
+    let t = Instant::now();
     let mut shard_ids = vec![];
     let mut document_responses = Vec::with_capacity(shard_responses.len());
     let mut paragraph_responses = Vec::with_capacity(shard_responses.len());
@@ -81,6 +86,9 @@ pub fn merge_search(shard_responses: Vec<SearchResponse>, order_by: OrderBy, lim
     let vector = (!vector_responses.is_empty()).then(|| merge_vector_responses(vector_responses, limit));
     let graph = (!graph_responses.is_empty()).then(|| merge_graph_responses(graph_responses));
 
+    SHARD_SEARCH_MERGE
+        .get_or_create(&ShardMergeLabels::new(ShardMergeKind::Search))
+        .observe(t.elapsed().as_secs_f64());
     SearchResponse {
         shard_ids,
         document,
@@ -92,6 +100,7 @@ pub fn merge_search(shard_responses: Vec<SearchResponse>, order_by: OrderBy, lim
 
 #[instrument(skip_all, fields(shards_count = Empty, paragraph_count = Empty, entities_count = Empty, limit = limit.0))]
 pub fn merge_suggest(shard_responses: Vec<SuggestResponse>, limit: Limit) -> SuggestResponse {
+    let t = Instant::now();
     let mut merged = SuggestResponse::default();
     let mut ematches = HashSet::new();
     let mut results = vec![];
@@ -135,12 +144,16 @@ pub fn merge_suggest(shard_responses: Vec<SuggestResponse>, limit: Limit) -> Sug
     span.record("paragraph_count", paragraph_count);
     span.record("entities_count", entities_count);
 
+    SHARD_SEARCH_MERGE
+        .get_or_create(&ShardMergeLabels::new(ShardMergeKind::Suggest))
+        .observe(t.elapsed().as_secs_f64());
     merged
 }
 
 // REVIEW: top_k is not enforced after merge. We can't do a good cut if we don't have scores though
 #[instrument(skip_all, fields(shards_count = Empty, graph_count = Empty))]
 pub fn merge_graph(shard_responses: Vec<GraphSearchResponse>) -> GraphSearchResponse {
+    let t = Instant::now();
     if shard_responses.is_empty() {
         return GraphSearchResponse::default();
     }
@@ -155,6 +168,9 @@ pub fn merge_graph(shard_responses: Vec<GraphSearchResponse>) -> GraphSearchResp
     let span = Span::current();
     span.record("shards_count", merged.shard_ids.len());
 
+    SHARD_SEARCH_MERGE
+        .get_or_create(&ShardMergeLabels::new(ShardMergeKind::Graph))
+        .observe(t.elapsed().as_secs_f64());
     merged
 }
 
