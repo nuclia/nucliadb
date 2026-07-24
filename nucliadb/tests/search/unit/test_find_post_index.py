@@ -45,6 +45,7 @@ from nucliadb_models.search import SCORE_TYPE, ResourceProperties
 async def test_find_post_index_search(expected_find_response: dict[str, Any], predict_mock):
     query = "How should I validate this?"
     search_response = nodereader_pb2.SearchResponse(
+        shard_ids=["my-queried-shard"],
         paragraph=nodereader_pb2.ParagraphSearchResponse(
             total=1,
             results=[
@@ -166,10 +167,7 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
 
     with (
         patch("nucliadb.search.search.retrieval.convert_retrieval_to_proto"),
-        patch(
-            "nucliadb.search.search.retrieval.nidx_search",
-            return_value=(search_response, ["my-queried-shard"]),
-        ),
+        patch("nucliadb.search.search.retrieval.nidx_query", return_value=search_response),
     ):
         text_blocks, _, _, _ = await text_block_search("kbid", retrieval)
 
