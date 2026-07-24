@@ -257,7 +257,8 @@ async def search(
     pb_query = convert_retrieval_to_proto(parsed.retrieval)
 
     # We need to query all nodes
-    results, queried_shards = await nidx_query(kbid, Method.SEARCH, pb_query)
+    results = await nidx_query(kbid, Method.SEARCH, pb_query)
+    queried_shards = list(results.shard_ids)
 
     # We need to merge
     search_results = await merge_results(

@@ -389,17 +389,16 @@ async def get_graph_results(
             break
 
         # Get the relations for the new entities
-        relations_results = []
         with metrics.time("graph_strat_neighbor_relations"):
             try:
-                relations_results = await find_graph_neighbours(
+                relations_result = await find_graph_neighbours(
                     kbid,
                     entities_to_explore,
                     explored_entities,
                     exclude_processor_relations=graph_strategy.exclude_processor_relations,
                 )
                 new_relations = await merge_relations_results(
-                    relations_results,
+                    relations_result,
                     entities_to_explore,
                     only_with_metadata=not graph_strategy.relation_text_as_paragraphs,
                 )
@@ -411,10 +410,9 @@ async def get_graph_results(
             relations.entities.update(new_relations.entities)
             discovered_entities = []
 
-            for shard in relations_results:
-                for node in shard.nodes:
-                    if node not in entities_to_explore and freeze_node(node) not in explored_entities:
-                        discovered_entities.append(node)
+            for node in relations_result.nodes:
+                if node not in entities_to_explore and freeze_node(node) not in explored_entities:
+                    discovered_entities.append(node)
 
             if not discovered_entities:
                 break
@@ -489,7 +487,7 @@ async def fuzzy_search_entities(
         request.query.path.bool_or.operands.append(subquery)
 
     try:
-        results, _ = await nidx_query(kbid, Method.GRAPH, request)
+        response = await nidx_query(kbid, Method.GRAPH, request)
     except Exception as exc:
         capture_exception(exc)
         logger.exception("Error in finding entities in query for graph strategy")
@@ -497,8 +495,7 @@ async def fuzzy_search_entities(
 
     # merge shard results while deduplicating repeated entities across shards
     unique_entities: set[RelatedEntity] = set()
-    for response in results:
-        unique_entities.update(RelatedEntity(family=e.subtype, value=e.value) for e in response.nodes)
+    unique_entities.update(RelatedEntity(family=e.subtype, value=e.value) for e in response.nodes)
 
     return RelatedEntities(entities=list(unique_entities), total=len(unique_entities))
 
@@ -936,7 +933,7 @@ async def find_graph_neighbours(
     entities_to_explore: list[RelationNode],
     explored_entities: set[FrozenRelationNode],
     exclude_processor_relations: bool,
-) -> list[nodereader_pb2.GraphSearchResponse]:
+) -> nodereader_pb2.GraphSearchResponse:
     graph_query = nodereader_pb2.GraphSearchRequest(
         kind=nodereader_pb2.GraphSearchRequest.QueryKind.PATH, top_k=100
     )
@@ -976,5 +973,5 @@ async def find_graph_neighbours(
         exclude_processor.facet.facet = "/g"
         graph_query.query.path.bool_and.operands.append(exclude_processor)
 
-    (relations_results, _) = await nidx_query(kbid, Method.GRAPH, graph_query, timeout=5.0)
+    relations_results = await nidx_query(kbid, Method.GRAPH, graph_query, timeout=5.0)
     return relations_results

@@ -52,31 +52,20 @@ def shard_manager():
         set_utility(Utility.SHARD_MANAGER, original)
 
 
-def test_validate_nidx_query_results():
-    assert utils.validate_nidx_query_results([Mock()]) is None
-
-
-def test_validate_nidx_query_results_no_results():
-    assert isinstance(utils.validate_nidx_query_results([]), HTTPException)
-
-
 def test_validate_nidx_query_results_unhandled_error():
-    errors: list[BaseException] = [Exception()]
-    error = utils.validate_nidx_query_results(errors)
+    error = utils.handle_nidx_exception(Exception(), extra={})
     assert isinstance(error, HTTPException)
 
 
 def test_validate_nidx_query_results_invalid_query():
-    errors: list[BaseException] = [
-        AioRpcError(
-            code=StatusCode.INTERNAL,
-            initial_metadata=Mock(),
-            trailing_metadata=Mock(),
-            details="An invalid argument was passed: 'Query is invalid. AllButQueryForbidden'",
-            debug_error_string="",
-        )
-    ]
-    result = utils.validate_nidx_query_results(errors)
+    error = AioRpcError(
+        code=StatusCode.INTERNAL,
+        initial_metadata=Mock(),
+        trailing_metadata=Mock(),
+        details="An invalid argument was passed: 'Query is invalid. AllButQueryForbidden'",
+        debug_error_string="",
+    )
+    result = utils.handle_nidx_exception(error, extra={})
 
     assert isinstance(result, HTTPException)
     assert result.status_code == 412
@@ -84,16 +73,14 @@ def test_validate_nidx_query_results_invalid_query():
 
 
 def test_validate_nidx_query_results_internal_unhandled():
-    errors: list[BaseException] = [
-        AioRpcError(
-            code=StatusCode.INTERNAL,
-            initial_metadata=Mock(),
-            trailing_metadata=Mock(),
-            details="There is something wrong with your query, my friend!",
-            debug_error_string="This query is simply wrong",
-        )
-    ]
-    result = utils.validate_nidx_query_results(errors)
+    error = AioRpcError(
+        code=StatusCode.INTERNAL,
+        initial_metadata=Mock(),
+        trailing_metadata=Mock(),
+        details="There is something wrong with your query, my friend!",
+        debug_error_string="This query is simply wrong",
+    )
+    result = utils.handle_nidx_exception(error, extra={})
     assert isinstance(result, HTTPException)
     assert result.status_code == 500
     assert result.detail == "There is something wrong with your query, my friend!"
