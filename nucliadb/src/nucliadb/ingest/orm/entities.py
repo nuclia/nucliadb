@@ -23,16 +23,13 @@ from collections.abc import AsyncGenerator
 from nidx_protos.nodereader_pb2 import (
     Faceted,
     GraphSearchRequest,
-    GraphSearchResponse,
     SearchRequest,
-    SearchResponse,
 )
 
-from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.settings import settings
-from nucliadb.search.search.shards import graph_search_shard, query_shard
+from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroup,
     EntitiesGroupSummary,
@@ -82,28 +79,22 @@ class EntitiesManager:
         return await self.get_indexed_entities_group(group)
 
     async def get_indexed_entities_group(self, group: str) -> EntitiesGroup | None:
-        shard_manager = get_shard_manager()
 
-        async def do_entities_search(shard_id: str) -> GraphSearchResponse:
-            request = GraphSearchRequest()
-            # XXX: this is a wild guess. Are those enough or too many?
-            request.top_k = 500
-            request.kind = GraphSearchRequest.QueryKind.NODES
-            request.query.path.path.source.node_type = RelationNode.NodeType.ENTITY
-            request.query.path.path.source.node_subtype = group
-            request.query.path.path.undirected = True
-            response = await graph_search_shard(shard_id, request)
-            return response
+        # Entities search
+        request = GraphSearchRequest()
+        # XXX: this is a wild guess. Are those enough or too many?
+        request.top_k = 500
+        request.kind = GraphSearchRequest.QueryKind.NODES
+        request.query.path.path.source.node_type = RelationNode.NodeType.ENTITY
+        request.query.path.path.source.node_subtype = group
+        request.query.path.path.undirected = True
 
-        results = await shard_manager.apply_for_all_shards(
-            self.kbid,
-            do_entities_search,
-            settings.relation_search_timeout,
+        result = await nidx_query(
+            self.kbid, Method.GRAPH, request, timeout=settings.relation_search_timeout
         )
 
         entities = {}
-        for result in results:
-            entities.update({node.value: Entity(value=node.value) for node in result.nodes})
+        entities.update({node.value: Entity(value=node.value) for node in result.nodes})
 
         if not entities:
             return None
@@ -138,34 +129,24 @@ class EntitiesManager:
     async def get_indexed_entities_groups_names(
         self,
     ) -> set[str]:
-        shard_manager = get_shard_manager()
-
-        async def query_indexed_entities_group_names(shard_id: str) -> set[str]:
-            """Search all relation types"""
-            request = SearchRequest(
-                shard_ids=[shard_id],
-                result_per_page=0,
-                body="",
-                document=True,
-                paragraph=False,
-                faceted=Faceted(labels=["/e"]),
-            )
-            response: SearchResponse = await query_shard(shard_id, request)
-            try:
-                facetresults = response.document.facets["/e"].facetresults
-            except KeyError:
-                # No entities found
-                return set()
-            else:
-                return {facet.tag.split("/")[-1] for facet in facetresults}
-
-        results = await shard_manager.apply_for_all_shards(
-            self.kbid, query_indexed_entities_group_names, settings.relation_types_timeout
+        # search all relation types
+        request = SearchRequest(
+            result_per_page=0,
+            body="",
+            document=True,
+            paragraph=False,
+            faceted=Faceted(labels=["/e"]),
         )
-
-        if not results:
+        response = await nidx_query(
+            self.kbid, Method.SEARCH, request, timeout=settings.relation_types_timeout
+        )
+        try:
+            facetresults = response.document.facets["/e"].facetresults
+        except KeyError:
+            # No entities found
             return set()
-        return set.union(*results)
+        else:
+            return {facet.tag.split("/")[-1] for facet in facetresults}
 
     @staticmethod
     def merge_entities_groups(indexed: EntitiesGroup, stored: EntitiesGroup):
