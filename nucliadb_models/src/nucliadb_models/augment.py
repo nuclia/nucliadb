@@ -264,7 +264,7 @@ class AugmentRequest(BaseModel, extra="forbid"):
 # Response
 
 
-class AugmentedParagraph(BaseModel, extra="forbid"):
+class AugmentedParagraph(BaseModel):
     text: str | None = None
     position: TextPosition | None = None
 
@@ -276,7 +276,7 @@ class AugmentedParagraph(BaseModel, extra="forbid"):
     page_preview_image: str | None = None
 
 
-class AugmentedField(BaseModel, extra="forbid"):
+class AugmentedField(BaseModel):
     text: str | None = None
 
     classification_labels: dict[str, list[str]] | None = None
@@ -285,7 +285,7 @@ class AugmentedField(BaseModel, extra="forbid"):
     entities: dict[str, list[str]] | None = None
 
 
-class AugmentedFileField(BaseModel, extra="forbid"):
+class AugmentedFileField(BaseModel):
     text: str | None = None
 
     classification_labels: dict[str, list[str]] | None = None
@@ -299,13 +299,13 @@ class AugmentedFileField(BaseModel, extra="forbid"):
     thumbnail_image: str | None = None
 
 
-class AugmentedConversationMessage(BaseModel, extra="forbid"):
+class AugmentedConversationMessage(BaseModel):
     ident: str
     text: str | None = None
     attachments: list[FieldId] | None = None
 
 
-class AugmentedConversationField(BaseModel, extra="forbid"):
+class AugmentedConversationField(BaseModel):
     classification_labels: dict[str, list[str]] | None = None
     # former ners
     entities: dict[str, list[str]] | None = None
@@ -344,7 +344,7 @@ class AugmentedConversationField(BaseModel, extra="forbid"):
             return None
 
 
-class AugmentedResource(Resource, extra="forbid"):
+class AugmentedResource(Resource):
     classification_labels: dict[str, list[str]] | None = None
 
     def updated_from(self, origin: Resource):
@@ -352,7 +352,7 @@ class AugmentedResource(Resource, extra="forbid"):
             self.__setattr__(key, getattr(origin, key))
 
 
-class AugmentResponse(BaseModel, extra="forbid"):
+class AugmentResponse(BaseModel):
     resources: dict[ResourceId, AugmentedResource]
     fields: dict[FieldId, AugmentedField | AugmentedFileField | AugmentedConversationField]
     paragraphs: dict[ParagraphId, AugmentedParagraph]
