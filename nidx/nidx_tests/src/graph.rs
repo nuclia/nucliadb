@@ -50,7 +50,7 @@ pub fn friendly_print(result: &nidx_protos::GraphSearchResponse) {
         println!(
             "({:?})-[{:?}]->({:?})",
             (&source.value, &source.subtype),
-            &relation.label,
+            relation.label,
             (&destination.value, &destination.subtype)
         );
     }
