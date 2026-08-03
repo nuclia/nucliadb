@@ -23,7 +23,6 @@ Backfill: copy data from the v1 key-value store into the new ORM tables
 
 Hierarchy
 ---------
-  backfill_all_kbs
   └── backfill_kb                  (slug, config, shards)
       └── backfill_resource        (slug, shard, basic, origin, extra, security,
                                     all fields, all conversation pages)
@@ -39,14 +38,10 @@ end of the migration run.
 
 import asyncio
 import logging
-import random
 import time
 import uuid
-from logging import Handler
-from pathlib import Path
 
 from nucliadb.common import datamanagers, file_md5, locking
-from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers import (
     conversations as conversations_v1,
 )
@@ -54,21 +49,15 @@ from nucliadb.common.datamanagers import (
     fields as fields_v1,
 )
 from nucliadb.common.datamanagers import (
-    fields_v2,
-    resources_v2,
-)
-from nucliadb.common.datamanagers import (
-    kb as kb_v1,
-)
-from nucliadb.common.datamanagers import (
     resources as resources_v1,
 )
-from nucliadb.common.datamanagers.utils import _pg_cursor, with_ro_transaction, with_rw_transaction
+from nucliadb.common.datamanagers import (
+    resources_v2,
+)
+from nucliadb.common.datamanagers.utils import _pg_cursor, with_rw_transaction
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto
 from nucliadb_protos import resources_pb2, writer_pb2
-from nucliadb_telemetry.logs import setup_logging
-from nucliadb_telemetry.settings import LogLevel, LogSettings
 
 logger = logging.getLogger("backfill_orm_tables")
 
@@ -83,116 +72,13 @@ _RESOURCE_TASK_BATCH_SIZE = 1000
 # Maximum number of reconciliation iterations to perform for each KB.
 _MAX_RECONCILIATION_ITERATIONS = 2
 
-_DEFAULT_CHECKPOINT_PATH = Path("backfill_orm_tables.completed_kbs")
-_DEFAULT_LOG_PATH = Path("backfill_orm_tables.log")
-
-
-def _add_file_logging_handler(log_file_path: Path) -> None:
-    """Attach a file handler that mirrors terminal logging behavior."""
-    log_file_path.parent.mkdir(parents=True, exist_ok=True)
-    resolved_log_file_path = log_file_path.resolve()
-
-    root_logger = logging.getLogger()
-    stream_handler: logging.StreamHandler | None = None
-    for handler in root_logger.handlers:
-        if (
-            stream_handler is None
-            and isinstance(handler, logging.StreamHandler)
-            and not isinstance(handler, logging.FileHandler)
-        ):
-            stream_handler = handler
-        if isinstance(handler, logging.FileHandler):
-            handler_path = getattr(handler, "baseFilename", None)
-            if handler_path and Path(handler_path).resolve() == resolved_log_file_path:
-                return
-
-    file_handler: Handler = logging.FileHandler(resolved_log_file_path, mode="a", encoding="utf-8")
-    if stream_handler is not None:
-        file_handler.setLevel(stream_handler.level)
-        if stream_handler.formatter is not None:
-            file_handler.setFormatter(stream_handler.formatter)
-        for handler_filter in stream_handler.filters:
-            file_handler.addFilter(handler_filter)
-    else:
-        file_handler.setLevel(logging.NOTSET)
-        file_handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s %(levelname)s [%(name)s] %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
-        )
-    root_logger.addHandler(file_handler)
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-
-def _load_completed_kbs(checkpoint_path: Path) -> set[str]:
-    if not checkpoint_path.exists():
-        return set()
-
-    completed_kbs = set()
-    for line in checkpoint_path.read_text().splitlines():
-        kbid = line.strip()
-        if kbid:
-            completed_kbs.add(kbid)
-    return completed_kbs
-
-
-def _mark_kb_completed(checkpoint_path: Path, *, kbid: str) -> None:
-    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-    with checkpoint_path.open("a") as checkpoint_file:
-        checkpoint_file.write(f"{kbid}\n")
-
-
-def _load_completed_resources(checkpoint_path: Path) -> set[str]:
-    if not checkpoint_path.exists():
-        return set()
-    completed: set[str] = set()
-    for line in checkpoint_path.read_text().splitlines():
-        rid = line.strip()
-        if rid:
-            completed.add(rid)
-    return completed
-
-
-def _mark_resource_completed(checkpoint_path: Path, *, rid: str) -> None:
-    checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-    with checkpoint_path.open("a") as f:
-        f.write(f"{rid}\n")
-
-
-async def backfill_all_kbs(*, checkpoint_path: Path) -> None:
-    """Iterate every KB in v1 and backfill it into the ORM tables, one at a time."""
-    completed_kbs = _load_completed_kbs(checkpoint_path)
-    kbids_and_slugs = []
-    async with with_ro_transaction() as txn:
-        async for kbid, slug in kb_v1.get_kbs(txn):
-            kbids_and_slugs.append((kbid, slug))
-
-    logger.info(f"Found {len(kbids_and_slugs)} KBs to backfill, {len(completed_kbs)} already completed")
-
-    for kbid, slug in kbids_and_slugs:
-        if kbid in completed_kbs:
-            logger.info(f"Skipping already migrated KB {kbid} ({slug})")
-            continue
-        resource_checkpoint_path = checkpoint_path.parent / f"{kbid}.completed_resources"
-        try:
-            await backfill_kb(kbid=kbid, resource_checkpoint_path=resource_checkpoint_path)
-            _mark_kb_completed(checkpoint_path, kbid=kbid)
-            completed_kbs.add(kbid)
-        except Exception:
-            logger.exception("Failed to backfill KB %s (%s), continuing", kbid, slug)
-
 
 # ---------------------------------------------------------------------------
 # KB
 # ---------------------------------------------------------------------------
 
 
-async def backfill_kb(*, kbid: str, resource_checkpoint_path: Path | None = None) -> None:
+async def backfill_kb(*, kbid: str) -> None:
     """Backfill one KB row and all of its resources.
 
     After migrating all resources, a reconciliation pass compares the v1 and v2
@@ -203,9 +89,6 @@ async def backfill_kb(*, kbid: str, resource_checkpoint_path: Path | None = None
     so that the run can be resumed without re-processing them.  The file is deleted
     once the KB has been fully migrated.
     """
-    if resource_checkpoint_path is None:
-        resource_checkpoint_path = Path(f"{kbid}.completed_resources")
-
     logger.info(f"Backfilling KB {kbid}")
     start_time = time.monotonic()
 
@@ -217,12 +100,6 @@ async def backfill_kb(*, kbid: str, resource_checkpoint_path: Path | None = None
             logger.exception(f"Failed to backfill KB metadata for {kbid}, skipping")
             return
 
-    completed_resources = _load_completed_resources(resource_checkpoint_path)
-    if completed_resources:
-        logger.info(
-            f"Resuming KB {kbid}: {len(completed_resources)} resource(s) already backfilled, skipping them"
-        )
-
     # Snapshot v1 resource IDs before starting the migration
     v1_rids: set[str] = set()
     async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
@@ -231,8 +108,6 @@ async def backfill_kb(*, kbid: str, resource_checkpoint_path: Path | None = None
     await _backfill_resources(
         kbid=kbid,
         rids=v1_rids,
-        completed_resources=completed_resources,
-        resource_checkpoint_path=resource_checkpoint_path,
     )
 
     iteration = 0
@@ -270,17 +145,11 @@ async def backfill_kb(*, kbid: str, resource_checkpoint_path: Path | None = None
             await _backfill_resources(
                 kbid=kbid,
                 rids=missed,
-                completed_resources=completed_resources,
-                resource_checkpoint_path=resource_checkpoint_path,
             )
         else:
             break
 
     # KB is fully migrated — remove the per-KB resource checkpoint file.
-    if resource_checkpoint_path.exists():
-        resource_checkpoint_path.unlink()
-        logger.debug(f"Removed resource checkpoint file for KB {kbid}")
-
     elapsed = time.monotonic() - start_time
     logger.info(f"Backfilled KB {kbid} in {elapsed:.2f} seconds")
 
@@ -318,8 +187,6 @@ async def _backfill_resources(
     *,
     kbid: str,
     rids: set[str],
-    completed_resources: set[str],
-    resource_checkpoint_path: Path,
 ) -> None:
     """Backfill a set of resources concurrently, bounded by _MAX_CONCURRENT_RESOURCES.
 
@@ -330,7 +197,7 @@ async def _backfill_resources(
     """
     semaphore = asyncio.Semaphore(_MAX_CONCURRENT_RESOURCES)
 
-    pending = [rid for rid in rids if rid not in completed_resources]
+    pending = [rid for rid in rids]
     skipped = len(rids) - len(pending)
     if skipped:
         logger.info(f"Skipping {skipped} already backfilled resource(s) for KB {kbid}")
@@ -340,7 +207,6 @@ async def _backfill_resources(
         async with semaphore:
             try:
                 await backfill_resource(kbid=kbid, rid=rid, index=index)
-                completed_resources.add(rid)
                 return rid
             except Exception:
                 logger.exception(f"Failed to backfill resource {kbid}/{rid}, continuing")
@@ -348,14 +214,7 @@ async def _backfill_resources(
 
     for batch_start in range(0, len(pending), _RESOURCE_TASK_BATCH_SIZE):
         batch = pending[batch_start : batch_start + _RESOURCE_TASK_BATCH_SIZE]
-        results = await asyncio.gather(
-            *(_guarded(rid, batch_start + index) for index, rid in enumerate(batch))
-        )
-        batch_completed = [rid for rid in results if rid is not None]
-        if batch_completed:
-            resource_checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
-            with resource_checkpoint_path.open("a") as f:
-                f.write("\n".join(batch_completed) + "\n")
+        await asyncio.gather(*(_guarded(rid, batch_start + index) for index, rid in enumerate(batch)))
 
 
 # ---------------------------------------------------------------------------
@@ -527,251 +386,3 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
                             "value": page.SerializeToString(),
                         },
                     )
-
-
-# ---------------------------------------------------------------------------
-# Check mode
-# ---------------------------------------------------------------------------
-
-
-async def check_kb(*, kbid: str) -> bool:
-    """Check that a KB has the same number of resources in v1 and v2.
-
-    Returns True if counts match, False otherwise.
-    """
-    v1_rids: set[str] = set()
-    async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
-        v1_rids.add(rid)
-
-    v2_rids: set[str] = set()
-    async for rid in resources_v2.iterate_resource_ids(kbid=kbid):
-        v2_rids.add(rid)
-
-    v1_count = len(v1_rids)
-    v2_count = len(v2_rids)
-
-    if v1_rids == v2_rids:
-        logger.info(f"KB {kbid}: ✓ Both v1 and v2 have {v1_count} resources")
-        return True
-    else:
-        logger.error(f"KB {kbid}: ✗ Mismatch - v1 has {v1_count} resources, v2 has {v2_count} resources")
-        missing_in_v2 = v1_rids - v2_rids
-        extra_in_v2 = v2_rids - v1_rids
-        if missing_in_v2:
-            logger.warning(f"  Missing in v2: {len(missing_in_v2)} resource(s)")
-        if extra_in_v2:
-            logger.warning(f"  Extra in v2: {len(extra_in_v2)} resource(s)")
-        return False
-
-
-async def check_all_kbs() -> None:
-    """Check all KBs for resource count mismatches between v1 and v2."""
-    v1_kbids: set[str] = set()
-    v1_kbids_and_slugs = []
-    async with with_ro_transaction() as txn:
-        async for kbid, slug in kb_v1.get_kbs(txn):
-            v1_kbids.add(kbid)
-            v1_kbids_and_slugs.append((kbid, slug))
-
-    # Collect KBIDs in v2 (ORM tables)
-    v2_kbids: set[str] = set()
-    async with with_ro_transaction() as txn:
-        async for kbid, slug in datamanagers.kb.kb_v2.get_kbs(txn):
-            v2_kbids.add(kbid)
-
-    # Check KB set consistency
-    missing_in_v2 = v1_kbids - v2_kbids
-    extra_in_v2 = v2_kbids - v1_kbids
-
-    if v1_kbids == v2_kbids:
-        logger.info(f"✓ Both v1 and v2 have the same {len(v1_kbids)} KB(s)")
-    else:
-        logger.error(f"✗ KB set mismatch - v1 has {len(v1_kbids)} KBs, v2 has {len(v2_kbids)} KBs")
-        if missing_in_v2:
-            logger.error(f"  Missing in v2: {len(missing_in_v2)} KB(s)")
-            for kbid in sorted(missing_in_v2):
-                logger.error(f"    - {kbid}")
-        if extra_in_v2:
-            logger.error(f"  Extra in v2: {len(extra_in_v2)} KB(s)")
-            for kbid in sorted(extra_in_v2):
-                logger.error(f"    - {kbid}")
-
-    logger.info(f"Checking resource counts in {len(v1_kbids_and_slugs)} KB(s)")
-
-    mismatches = []
-    for kbid, slug in v1_kbids_and_slugs:
-        if not await check_kb(kbid=kbid):
-            mismatches.append((kbid, slug))
-
-    if mismatches:
-        logger.error(f"Found {len(mismatches)} KB(s) with resource count mismatches:")
-        for kbid, slug in mismatches:
-            logger.error(f"  - {kbid} ({slug})")
-    else:
-        logger.info(f"✓ All {len(v1_kbids_and_slugs)} KB(s) passed the resource count check")
-
-
-async def deep_check_kb(*, kbid: str, sample_size: int = 5_000) -> None:
-    """Deep check: verify that field IDs and basic resource data match for a sample of resources."""
-    # Collect all v1 resource IDs
-    v1_rids: list[str] = []
-    async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
-        v1_rids.append(rid)
-
-    if not v1_rids:
-        logger.info(f"KB {kbid}: No resources to deep check")
-        return
-
-    # Sample up to sample_size resources
-    sample_rids = v1_rids if len(v1_rids) <= sample_size else random.sample(v1_rids, sample_size)
-    logger.info(f"KB {kbid}: Deep checking {len(sample_rids)} resource(s) (out of {len(v1_rids)} total)")
-
-    mismatches = []
-    async with with_ro_transaction() as txn:
-        for rid in sample_rids:
-            # Get basic data from v1
-            v1_basic = await resources_v1.get_basic(txn, kbid=kbid, rid=rid)
-            # Get basic data from v2
-            v2_basic = await resources_v2.get_basic(txn, kbid=kbid, rid=rid)
-
-            if v1_basic is None and v2_basic is None:
-                pass  # Both missing, no mismatch
-
-            elif v1_basic is not None and v2_basic is not None:
-                # Compare basic data
-                if v1_basic.SerializeToString() != v2_basic.SerializeToString():
-                    mismatches.append((rid, "basic data mismatch"))
-                    continue
-            else:
-                mismatches.append((rid, "basic data presence mismatch"))
-                continue
-
-            # Get field IDs from v1
-            v1_all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
-            v1_field_ids: set[tuple] = set()
-            if v1_all_fields:
-                for field in v1_all_fields.fields:
-                    field_type_str = from_proto.field_type_name(field.field_type).abbreviation()
-                    if field_type_str == "a" and field.field in ("title", "summary"):
-                        # Skip title and summary fields in v1, since they are stored in the kb_resources.basic column
-                        continue
-                    v1_field_ids.add((field_type_str, field.field))
-
-            # Get field IDs from v2
-            v2_all_fields = await fields_v2.get_all_field_ids(txn, kbid=kbid, rid=rid)
-            v2_field_ids: set[tuple] = set()
-            if v2_all_fields:
-                for field in v2_all_fields.fields:
-                    field_type_str = from_proto.field_type_name(field.field_type).abbreviation()
-                    if field_type_str == "a" and field.field in ("title", "summary"):
-                        # Skip title and summary fields in v2, since they are stored in the kb_resources.basic column
-                        continue
-                    v2_field_ids.add((field_type_str, field.field))
-
-            # Compare field IDs
-            if v1_field_ids != v2_field_ids:
-                missing_in_v2 = v1_field_ids - v2_field_ids
-                extra_in_v2 = v2_field_ids - v1_field_ids
-                if missing_in_v2 or extra_in_v2:
-                    mismatches.append((rid, "field ids mismatch"))
-
-    if mismatches:
-        logger.error(f"KB {kbid}: ✗ Found {len(mismatches)} deep check mismatch(es):")
-        for rid, issue in mismatches:
-            logger.error(f"  - {rid}: {issue}")
-    else:
-        logger.info(f"KB {kbid}: ✓ Deep check passed for {len(sample_rids)} resource(s)")
-
-
-async def deep_check_all_kbs() -> None:
-    """Run all checks (standard + deep) for all KBs."""
-    logger.info("Starting full deep check...")
-    await check_all_kbs()
-    logger.info("Running deep resource checks...")
-
-    v1_kbids_and_slugs = []
-    async with with_ro_transaction() as txn:
-        async for kbid, slug in kb_v1.get_kbs(txn):
-            v1_kbids_and_slugs.append((kbid, slug))
-
-    for kbid, slug in v1_kbids_and_slugs:
-        await deep_check_kb(kbid=kbid)
-
-    logger.info("Deep check complete")
-
-
-async def _main():
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Backfill ORM tables or check resource counts")
-    parser.add_argument(
-        "--mode",
-        choices=["backfill", "check", "deep_check"],
-        default="backfill",
-        help="Mode to run: 'backfill' to migrate resources, 'check' to verify resource counts match between v1 and v2, or 'deep_check' to perform detailed field and basic data comparisons",
-    )
-    parser.add_argument(
-        "--kbid",
-        help="KB UUID to process, or the special value 'ALL_KBS' to process every KB.",
-        required=True,
-    )
-    parser.add_argument(
-        "--checkpoint-file",
-        default=str(_DEFAULT_CHECKPOINT_PATH),
-        help="Local file used to store completed KB IDs so ALL_KBS runs can resume.",
-    )
-    parser.add_argument(
-        "--log-file",
-        default=str(_DEFAULT_LOG_PATH),
-        help="Path to the log file where progress and errors will be appended.",
-    )
-    args = parser.parse_args()
-    checkpoint_path = Path(args.checkpoint_file)
-    log_file_path = Path(args.log_file)
-    setup_logging(
-        settings=LogSettings(
-            debug=True,
-            log_level=LogLevel.INFO,
-            logger_levels={
-                "backfill_orm_tables": LogLevel.INFO,
-            },
-        )
-    )
-    _add_file_logging_handler(log_file_path)
-    logger.info(f"File logging enabled at: {log_file_path.resolve()}")
-    context = ApplicationContext(
-        kv_driver=True,
-        blob_storage=False,
-        shard_manager=False,
-        partitioning=False,
-        nats_manager=False,
-        transaction=False,
-        nidx=False,
-    )
-    await context.initialize()
-
-    try:
-        if args.mode == "backfill":
-            if args.kbid == "ALL_KBS":
-                await backfill_all_kbs(checkpoint_path=checkpoint_path)
-            else:
-                resource_checkpoint_path = checkpoint_path.parent / f"{args.kbid}.completed_resources"
-                await backfill_kb(kbid=args.kbid, resource_checkpoint_path=resource_checkpoint_path)
-                _mark_kb_completed(checkpoint_path, kbid=args.kbid)
-        elif args.mode == "check":
-            if args.kbid == "ALL_KBS":
-                await check_all_kbs()
-            else:
-                await check_kb(kbid=args.kbid)
-        elif args.mode == "deep_check":
-            if args.kbid == "ALL_KBS":
-                await deep_check_all_kbs()
-            else:
-                await deep_check_kb(kbid=args.kbid)
-    finally:
-        await context.finalize()
-
-
-if __name__ == "__main__":
-    logger.setLevel(logging.WARNING)
-    asyncio.run(_main())
