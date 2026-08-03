@@ -190,13 +190,15 @@ async def test_modify_slug(
     Test that modifying a slug for a resource works correctly.
     """
     rid = Resource.new_unique_rid()
-
+    initial_slug = "initial-slug"
     async with maindb_driver.rw_transaction() as txn:
+        basic = resources_pb2.Basic(slug=initial_slug, title="Test Title")
+        await resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
         await resources.set_slug(
             txn,
             kbid=kbid,
             rid=rid,
-            slug="initial-slug",
+            slug=initial_slug,
         )
         await txn.commit()
 
@@ -210,7 +212,7 @@ async def test_modify_slug(
         )
         await txn.commit()
 
-    assert old_slug == "initial-slug", f"Expected old slug to be 'initial-slug', got {old_slug}"
+    assert old_slug == initial_slug, f"Expected old slug to be 'initial-slug', got {old_slug}"
 
 
 async def test_resource_set_get(
