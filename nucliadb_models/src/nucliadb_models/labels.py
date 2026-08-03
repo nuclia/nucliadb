@@ -111,7 +111,7 @@ class LabelSet(BaseModel):
     color: str | None = "blue"
     multiple: bool = True
     kind: list[LabelSetKind] = Field(
-        default_factory=lambda: [LabelSetKind.RESOURCES],
+        default=[LabelSetKind.RESOURCES],
         description="The kind of labels in the labelset. This is used to determine where the labels can be applied.",
         min_length=1,
     )
