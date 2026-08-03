@@ -20,6 +20,7 @@
 from unittest.mock import AsyncMock, patch
 
 from nucliadb.search.search.query_parser.fetcher import Fetcher
+from nucliadb_protos import knowledgebox_pb2
 
 
 async def test_matryoshka_dimension_cache() -> None:
@@ -53,6 +54,60 @@ async def test_validate_vectorset_cache() -> None:
         # but not across requests (to avoid need for invalidation)
         await fetcher.validate_vectorset("kbid", "vectorset")
         assert mock.call_count == 2
+
+
+async def test_labelset_kind_cache() -> None:
+    labelsets = {
+        "animals": knowledgebox_pb2.LabelSet(
+            title="Animals",
+            kind=[knowledgebox_pb2.LabelSet.LabelSetKind.RESOURCES],
+            labels=[
+                knowledgebox_pb2.Label(text="dog"),
+                knowledgebox_pb2.Label(text="cat"),
+            ],
+        ),
+        "objects": knowledgebox_pb2.LabelSet(
+            title="Objects",
+            kind=[knowledgebox_pb2.LabelSet.LabelSetKind.PARAGRAPHS],
+            labels=[
+                knowledgebox_pb2.Label(text="table"),
+                knowledgebox_pb2.Label(text="chair"),
+            ],
+        ),
+    }
+
+    with (
+        patch("nucliadb.search.search.query_parser.fetcher.datamanagers.with_ro_transaction"),
+        patch(
+            "nucliadb.search.search.query_parser.fetcher.datamanagers.labels.list_labelset_ids",
+            return_value=list(labelsets.keys()),
+        ) as list_ids,
+        patch(
+            "nucliadb.search.search.query_parser.fetcher.datamanagers.labels.get_labelset",
+            side_effect=lambda txn, kbid, labelset_id: labelsets.get(labelset_id),
+        ) as get,
+    ):
+        fetcher = new_fetcher()
+
+        assert (await fetcher.get_labelset_kinds("animals")) == labelsets["animals"].kind
+        assert list_ids.call_count == 1
+        assert get.call_count == 1
+
+        assert (await fetcher.get_labelset_kinds("objects")) == labelsets["objects"].kind
+        # labelset ids already cached
+        assert list_ids.call_count == 1
+        # new labelset is not
+        assert get.call_count == 2
+
+        assert (await fetcher.get_labelset_kinds("objects")) == labelsets["objects"].kind
+        # ids and labelset are cached
+        assert list_ids.call_count == 1
+        assert get.call_count == 2
+
+        assert (await fetcher.get_labelset_kinds("plants")) is None
+        assert list_ids.call_count == 1
+        # not in valid ids, so we don't even call get
+        assert get.call_count == 2
 
 
 def new_fetcher() -> Fetcher:

@@ -58,7 +58,9 @@ class FetcherCache:
     # semantic search
     vectorset: str | NotCached = not_cached
 
-    labels: knowledgebox_pb2.Labels | NotCached = not_cached
+    labelset_kinds: dict[str, list[knowledgebox_pb2.LabelSet.LabelSetKind] | NotCached] | NotCached = (
+        not_cached
+    )
 
     synonyms: knowledgebox_pb2.Synonyms | None | NotCached = not_cached
 
@@ -224,14 +226,37 @@ class Fetcher:
 
     # Labels
 
-    async def get_classification_labels(self) -> knowledgebox_pb2.Labels:
+    @query_parse_dependency_observer.wrap({"type": "labelset_kind"})
+    async def get_labelset_kinds(
+        self, labelset_id: str
+    ) -> list[knowledgebox_pb2.LabelSet.LabelSetKind] | None:
         async with self.locks.setdefault("classification_labels", asyncio.Lock()):
-            if is_cached(self.cache.labels):
-                return self.cache.labels
+            if not is_cached(self.cache.labelset_kinds):
+                # Populate the cache with all KB labelsets (not cached)
+                self.cache.labelset_kinds = {}
+                async with datamanagers.with_ro_transaction() as txn:
+                    labelset_ids = await datamanagers.labels.list_labelset_ids(txn, kbid=self.kbid)
+                    for id in labelset_ids or []:
+                        self.cache.labelset_kinds[id] = not_cached
 
-            labels = await get_classification_labels(self.kbid)
-            self.cache.labels = labels
-            return labels
+            if labelset_id not in self.cache.labelset_kinds:
+                # labelset not in KB
+                return None
+
+            if is_cached(self.cache.labelset_kinds[labelset_id]):
+                return self.cache.labelset_kinds[labelset_id]  # type: ignore[return-value,ty:invalid-return-type]
+
+            # fetch and cache the labelset
+            async with datamanagers.with_ro_transaction() as txn:
+                labelset = await datamanagers.labels.get_labelset(
+                    txn, kbid=self.kbid, labelset_id=labelset_id
+                )
+
+            if labelset is None:  # pragma: no cover
+                # unrepeatable read between caching the ids and reading the labelset
+                return None
+            self.cache.labelset_kinds[labelset_id] = labelset.kind  # type: ignore[assignment,ty:invalid-assignment]
+            return self.cache.labelset_kinds[labelset_id]  # type: ignore[return-value,ty:invalid-return-type]
 
     # Entities
 
@@ -391,12 +416,6 @@ async def get_matryoshka_dimension(kbid: str, vectorset: str | None) -> int | No
                 matryoshka_dimension = vectorset_config.vectorset_index_config.vector_dimension
 
         return matryoshka_dimension
-
-
-@query_parse_dependency_observer.wrap({"type": "classification_labels"})
-async def get_classification_labels(kbid: str) -> knowledgebox_pb2.Labels:
-    async with get_driver().ro_transaction() as txn:
-        return await datamanagers.labels.get_labels(txn, kbid=kbid)
 
 
 @query_parse_dependency_observer.wrap({"type": "synonyms"})
