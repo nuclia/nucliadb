@@ -348,18 +348,7 @@ class Resource:
         """
         Record file MD5 hashes for deduplication checks.
         """
-        if not file.md5:
-            # To be safe, delete any existing MD5 record for this field if the new file doesn't have an MD5.
-            # This is for PUT operations where the file is being replaced but the new md5 is not provided.
-            await self.delete_file_field_md5(field_id)
-        else:
-            await file_md5.set(self.txn, kbid=self.kbid, md5=file.md5, rid=self.uuid, field_id=field_id)
-
-    async def delete_file_field_md5(self, field_id: str):
-        """
-        Delete file MD5 hash records for a given field.
-        """
-        await file_md5.delete(self.txn, kbid=self.kbid, rid=self.uuid, field_id=field_id)
+        await file_md5.set(self.txn, kbid=self.kbid, md5=file.md5, rid=self.uuid, field_id=field_id)
 
     def _trim_field_status_errors(
         self,
