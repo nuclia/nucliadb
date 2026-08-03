@@ -62,7 +62,7 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     let response = fixture
         .searcher_client
         .suggest(Request::new(SuggestRequest {
-            shard: shard.id.clone(),
+            shard_ids: vec![shard.id.clone()],
             body: "prince".to_string(),
             top_k: 20,
             features: vec![SuggestFeatures::Paragraphs as i32],
@@ -82,7 +82,7 @@ async fn test_suggest_paragraphs(pool: PgPool) -> Result<(), Box<dyn std::error:
     // filter by language (set as a label) - "prince" appears in english sources
     // but not in german ones
     let request = SuggestRequest {
-        shard: shard.id.clone(),
+        shard_ids: vec![shard.id.clone()],
         body: "prince".to_string(),
         top_k: 20,
         features: vec![SuggestFeatures::Paragraphs as i32],
@@ -307,7 +307,7 @@ async fn suggest_paragraphs(
     query: impl Into<String>,
 ) -> SuggestResponse {
     let request = Request::new(SuggestRequest {
-        shard: shard_id.into(),
+        shard_ids: vec![shard_id.into()],
         body: query.into(),
         top_k: 20,
         features: vec![SuggestFeatures::Paragraphs as i32],
@@ -341,7 +341,7 @@ async fn suggest_entities(
     query: impl Into<String>,
 ) -> SuggestResponse {
     let request = Request::new(SuggestRequest {
-        shard: shard_id.into(),
+        shard_ids: vec![shard_id.into()],
         body: query.into(),
         top_k: 20,
         features: vec![SuggestFeatures::Entities as i32],

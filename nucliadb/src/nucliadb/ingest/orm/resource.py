@@ -66,6 +66,8 @@ from nucliadb_utils.utilities import get_storage
 
 logger = logging.getLogger(__name__)
 
+MAX_FIELD_STATUS_ERRORS = 300
+
 KB_FIELDS: dict[int, type] = {
     FieldType.TEXT: Text,
     FieldType.FILE: File,
@@ -403,6 +405,30 @@ class Resource:
         """
         await file_md5.delete(self.txn, kbid=self.kbid, rid=self.uuid, field_id=field_id)
 
+    def _trim_field_status_errors(
+        self,
+        status: writer_pb2.FieldStatus,
+        field_type: FieldType.ValueType,
+        field: str,
+    ) -> None:
+        if len(status.errors) <= MAX_FIELD_STATUS_ERRORS:
+            return
+
+        errors_to_trim = len(status.errors) - MAX_FIELD_STATUS_ERRORS
+        logger.warning(
+            "Field status error limit exceeded, trimming tail errors",
+            extra={
+                "kbid": self.kbid,
+                "rid": self.uuid,
+                "field_type": field_type,
+                "field": field,
+                "stored_errors": len(status.errors),
+                "max_errors": MAX_FIELD_STATUS_ERRORS,
+                "trimmed_errors": errors_to_trim,
+            },
+        )
+        del status.errors[-errors_to_trim:]
+
     async def apply_fields_status(self, message: BrokerMessage):
         # Update the status for fields for which the extracted text has been updated.
         updated_fields = [et.field for et in message.extracted_text]
@@ -442,6 +468,8 @@ class Resource:
                 )
                 field_error.created.GetCurrentTime()
                 status.errors.append(field_error)
+
+            self._trim_field_status_errors(status, field_type, field)
 
             # We infer the status for processor messages
             if message.source == BrokerMessage.MessageSource.PROCESSOR:
@@ -487,6 +515,7 @@ class Resource:
             )
             field_error.created.GetCurrentTime()
             status.errors.append(field_error)
+            self._trim_field_status_errors(status, field_type, field_name)
             if severity == writer_pb2.Error.Severity.ERROR:
                 status.status = writer_pb2.FieldStatus.Status.ERROR
             await field.set_status(status)

@@ -66,8 +66,8 @@ def test_kb_services(sdk: nucliadb_sdk.NucliaDB, kb):
 
 def test_resource_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     # Create, Get, List, Update
-    nonexistent = uuid.uuid4().hex
-    assert not sdk.exists_resource(kbid=kb.uuid, rid=nonexistent)
+    nonexistent_resource = uuid.uuid4().hex
+    assert not sdk.exists_resource(kbid=kb.uuid, rid=nonexistent_resource)
     assert not sdk.exists_resource_by_slug(kbid=kb.uuid, slug="nonexistent")
     sdk.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
     resource = sdk.get_resource_by_slug(kbid=kb.uuid, slug="resource")

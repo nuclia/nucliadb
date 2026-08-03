@@ -56,9 +56,11 @@ class RolloverStateNotFoundError(Exception):
     ...
 
 
-async def get_kb_rollover_shards(txn: Transaction, *, kbid: str) -> writer_pb2.Shards | None:
+async def get_kb_rollover_shards(
+    txn: Transaction, *, kbid: str, for_update: bool = False
+) -> writer_pb2.Shards | None:
     key = KB_ROLLOVER_SHARDS.format(kbid=kbid)
-    return await get_kv_pb(txn, key, writer_pb2.Shards)
+    return await get_kv_pb(txn, key, writer_pb2.Shards, for_update=for_update)
 
 
 async def update_kb_rollover_shards(

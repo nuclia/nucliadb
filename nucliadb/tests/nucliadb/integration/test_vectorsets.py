@@ -126,9 +126,8 @@ async def test_vectorset_parameter_without_default_vectorset(
 
     async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
         calls.append(pb_query)
-        results = [nodereader_pb2.SearchResponse()]
-        queried_nodes = []  # type: ignore[var-annotated]
-        return (results, queried_nodes)
+        results = nodereader_pb2.SearchResponse()
+        return results
 
     def set_predict_default_vectorset(query_info: QueryInfo) -> QueryInfo:
         assert query_info.sentence is not None
@@ -185,9 +184,8 @@ async def test_vectorset_parameter_with_default_vectorset(
 
     async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
         calls.append(pb_query)
-        results = [nodereader_pb2.SearchResponse()]
-        queried_nodes = []  # type: ignore[var-annotated]
-        return (results, queried_nodes)
+        results = nodereader_pb2.SearchResponse()
+        return results
 
     with (
         patch(

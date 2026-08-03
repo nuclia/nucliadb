@@ -281,27 +281,36 @@ async def test_kv_schema_delete_not_found(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_kv_schema_name_is_immutable_after_create(
+async def test_kv_schema_update_with_id_in_body(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox,
 ):
-    """The schema name is set at creation and the URL path is the identifier.
-    PUT only accepts description and fields — there is no 'name' field in UpdateKVSchema,
-    so any attempt to pass a name in the update body is rejected by the model."""
+    """Passing the schema id in the PUT body is allowed for convenience (e.g. re-using
+    the create payload).  If the body id matches the URL it is silently accepted;
+    if it conflicts with the URL a 422 is returned."""
     kbid = standalone_knowledgebox
 
     resp = await nucliadb_writer.post(f"/kb/{kbid}/kv-schemas", json=PRODUCT_SCHEMA)
     assert resp.status_code == 201
 
-    # Passing 'name' in PUT body should be rejected (extra fields forbidden)
+    # id matching the URL is accepted
     resp = await nucliadb_writer.put(
         f"/kb/{kbid}/kv-schemas/product",
-        json={"id": "renamed", "description": "Trying to rename"},
+        json={"id": "product", "description": "Same id as URL"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["description"] == "Same id as URL"
+
+    # id conflicting with the URL is rejected
+    resp = await nucliadb_writer.put(
+        f"/kb/{kbid}/kv-schemas/product",
+        json={"id": "other", "description": "Conflicting id"},
     )
     assert resp.status_code == 422
 
-    # Original name still intact
+    # Schema is unchanged after the rejected update
     resp = await nucliadb_reader.get(f"/kb/{kbid}/kv-schemas/product")
     assert resp.status_code == 200
     assert resp.json()["id"] == "product"
+    assert resp.json()["description"] == "Same id as URL"

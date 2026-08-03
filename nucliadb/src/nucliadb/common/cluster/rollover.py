@@ -429,7 +429,9 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
         previously_active_shards = await datamanagers.cluster.get_kb_shards(
             txn, kbid=kbid, for_update=True
         )
-        rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(txn, kbid=kbid)
+        rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(
+            txn, kbid=kbid, for_update=True
+        )
         if previously_active_shards is None or rollover_shards is None:
             raise UnexpectedRolloverError("Shards for kb not found")
 

@@ -19,9 +19,10 @@
 #
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Annotated
 
 from nidx_protos import nodereader_pb2
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, PlainValidator
 
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb_models import search as search_models
@@ -140,7 +141,20 @@ class PredictReranker(BaseModel):
 
 Reranker = NoopReranker | PredictReranker
 
+
 # retrieval and generation operations
+
+SerializableBytes = Annotated[
+    bytes,
+    PlainSerializer(bytes.hex),
+    PlainValidator(lambda b: bytes.fromhex(b) if isinstance(b, str) else b),
+]
+
+
+class SearchAfter(BaseModel):
+    score: float
+    shard: SerializableBytes
+    docaddr: int
 
 
 class UnitRetrieval(BaseModel):
@@ -149,6 +163,7 @@ class UnitRetrieval(BaseModel):
     filters: Filters = Field(default_factory=Filters)
     rank_fusion: RankFusion | None = None
     reranker: Reranker | None = None
+    after: SearchAfter | None = None
 
 
 # TODO: augmentation things: hydration...

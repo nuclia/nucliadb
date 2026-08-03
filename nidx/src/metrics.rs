@@ -100,6 +100,24 @@ impl IndexKindLabels {
     }
 }
 
+#[derive(Clone, Debug, EncodeLabelSet, PartialEq, Eq, Hash)]
+pub struct ShardMergeLabels {
+    kind: ShardMergeKind,
+}
+
+impl ShardMergeLabels {
+    pub fn new(kind: ShardMergeKind) -> Self {
+        Self { kind }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, EncodeLabelValue)]
+pub enum ShardMergeKind {
+    Search,
+    Suggest,
+    Graph,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, EncodeLabelValue)]
 enum OperationStatus {
     Success,
@@ -189,6 +207,10 @@ pub mod searcher {
         INDEX_CACHE_COUNT: Gauge as "searcher_index_cache_count" ("Number of indexes in the searcher cache"),
         INDEX_CACHE_BYTES: Gauge as "searcher_index_cache_size_bytes" ("Total size of open indexes in the searcher cache"),
         INDEX_CACHE_PREWARM_BYTES: Gauge as "searcher_index_cache_prewarm_size_bytes" ("Total size of open prewarmed indexes in the searcher cache"),
+
+        // Buckets from 5µs to 1ms. If merge takes more than 1ms, we should review the
+        // implementation and probably run it in a non-blocking thread
+        SHARD_SEARCH_MERGE: Family<ShardMergeLabels, Histogram>{exponential_buckets(0.000_005, 2.0, 8)} as "searcher_merge" ("Time spent merging results from multiple shards"),
     }
 }
 

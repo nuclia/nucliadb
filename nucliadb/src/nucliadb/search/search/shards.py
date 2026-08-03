@@ -41,10 +41,6 @@ def should_giveup(e: Exception):
     return False
 
 
-async def query_shard(shard: str, query: SearchRequest) -> SearchResponse:
-    return await query_shards([shard], query)
-
-
 @backoff.on_exception(
     backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
 )
@@ -67,18 +63,18 @@ async def get_shard(shard_id: str) -> Shard:
 @backoff.on_exception(
     backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
 )
-async def suggest_shard(shard: str, query: SuggestRequest) -> SuggestResponse:
+async def suggest_shards(shards: list[str], query: SuggestRequest) -> SuggestResponse:
     req = SuggestRequest()
     req.CopyFrom(query)
-    req.shard = shard
+    req.shard_ids[:] = shards
     return await get_nidx_searcher_client().Suggest(req)
 
 
 @backoff.on_exception(
     backoff.expo, Exception, jitter=None, factor=0.1, max_tries=3, giveup=should_giveup
 )
-async def graph_search_shard(shard: str, query: GraphSearchRequest) -> GraphSearchResponse:
+async def graph_search_shards(shards: list[str], query: GraphSearchRequest) -> GraphSearchResponse:
     req = GraphSearchRequest()
     req.CopyFrom(query)
-    req.shard = shard
+    req.shard_ids[:] = shards
     return await get_nidx_searcher_client().GraphSearch(req)

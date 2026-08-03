@@ -19,6 +19,7 @@
 #
 import json
 
+import pydantic
 from fastapi import Header, Request
 from fastapi.responses import Response, StreamingResponse
 from fastapi_versioning import version
@@ -69,9 +70,9 @@ async def predict_proxy_endpoint(
     x_forwarded_for: str = Header(""),
 ) -> Response | StreamingResponse | HTTPClientError:
     try:
-        payload = await request.json()
+        json_payload = await request.json()
     except json.JSONDecodeError:
-        payload = None
+        json_payload = None
 
     try:
         response = await predict_proxy(
@@ -79,7 +80,7 @@ async def predict_proxy_endpoint(
             endpoint,
             request.method,
             params=request.query_params,
-            json=payload,
+            json_payload=json_payload,
             headers=dict(request.headers),
             user_id=x_nucliadb_user,
             client_type=x_ndb_client,
@@ -95,4 +96,9 @@ async def predict_proxy_endpoint(
         return HTTPClientError(
             status_code=err.status,
             detail=err.detail,
+        )
+    except pydantic.ValidationError as err:
+        return HTTPClientError(
+            status_code=422,
+            detail=err.json(),
         )

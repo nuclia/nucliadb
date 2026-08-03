@@ -176,7 +176,7 @@ async fn test_relation_node_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let results = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id,
+            shard_ids: vec![shard_id],
             query: Some(graph_query.clone()),
             kind: QueryKind::Nodes as i32,
             top_k: 100,
@@ -226,7 +226,7 @@ async fn test_relation_path_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let results = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id.clone(),
+            shard_ids: vec![shard_id.clone()],
             query: Some(graph_query.clone()),
             kind: QueryKind::Path as i32,
             top_k: 100,
@@ -338,7 +338,7 @@ async fn test_relation_edge_search(pool: sqlx::PgPool) -> anyhow::Result<()> {
     let results = fixture
         .searcher_client
         .graph_search(GraphSearchRequest {
-            shard: shard_id,
+            shard_ids: vec![shard_id],
             query: Some(graph_query.clone()),
             kind: QueryKind::Relations as i32,
             top_k: 100,

@@ -31,76 +31,71 @@ from nucliadb_models.graph.responses import (
 )
 
 
-def build_graph_response(results: list[nodereader_pb2.GraphSearchResponse]) -> GraphSearchResponse:
+def build_graph_response(result: nodereader_pb2.GraphSearchResponse) -> GraphSearchResponse:
     paths = []
-    for shard_results in results:
-        for pb_path, score in zip(shard_results.graph, shard_results.scores):
-            source = shard_results.nodes[pb_path.source]
-            relation = shard_results.relations[pb_path.relation]
-            destination = shard_results.nodes[pb_path.destination]
+    for pb_path, score in zip(result.graph, result.scores):
+        source = result.nodes[pb_path.source]
+        relation = result.relations[pb_path.relation]
+        destination = result.nodes[pb_path.destination]
 
-            metadata = None
-            field_id = pb_path.resource_field_id or None
-            paragraph_id = None
-            if pb_path.HasField("metadata") and pb_path.metadata.paragraph_id:
-                paragraph_id = pb_path.metadata.paragraph_id
-            if field_id or paragraph_id:
-                metadata = PathMetadata(field_id=field_id, paragraph_id=paragraph_id)
+        metadata = None
+        field_id = pb_path.resource_field_id or None
+        paragraph_id = None
+        if pb_path.HasField("metadata") and pb_path.metadata.paragraph_id:
+            paragraph_id = pb_path.metadata.paragraph_id
+        if field_id or paragraph_id:
+            metadata = PathMetadata(field_id=field_id, paragraph_id=paragraph_id)
 
-            path = graph_responses.GraphPath(
-                source=graph_responses.GraphNode(
-                    value=source.value,
-                    type=RelationNodeTypePbMap[source.ntype],
-                    group=source.subtype,
-                ),
-                relation=graph_responses.GraphRelation(
-                    label=relation.label,
-                    type=RelationTypePbMap[relation.relation_type],
-                ),
-                destination=graph_responses.GraphNode(
-                    value=destination.value,
-                    type=RelationNodeTypePbMap[destination.ntype],
-                    group=destination.subtype,
-                ),
-                metadata=metadata,
-                score=score,
-            )
-            paths.append(path)
+        path = graph_responses.GraphPath(
+            source=graph_responses.GraphNode(
+                value=source.value,
+                type=RelationNodeTypePbMap[source.ntype],
+                group=source.subtype,
+            ),
+            relation=graph_responses.GraphRelation(
+                label=relation.label,
+                type=RelationTypePbMap[relation.relation_type],
+            ),
+            destination=graph_responses.GraphNode(
+                value=destination.value,
+                type=RelationNodeTypePbMap[destination.ntype],
+                group=destination.subtype,
+            ),
+            metadata=metadata,
+            score=score,
+        )
+        paths.append(path)
 
     response = GraphSearchResponse(paths=paths)
     return response
 
 
-def build_graph_nodes_response(
-    results: list[nodereader_pb2.GraphSearchResponse],
-) -> GraphNodesSearchResponse:
+def build_graph_nodes_response(result: nodereader_pb2.GraphSearchResponse) -> GraphNodesSearchResponse:
     nodes = []
-    for shard_results in results:
-        for node, score in zip(shard_results.nodes, shard_results.scores):
-            nodes.append(
-                graph_responses.GraphNode(
-                    value=node.value,
-                    type=RelationNodeTypePbMap[node.ntype],
-                    group=node.subtype,
-                    score=score,
-                )
+    for node, score in zip(result.nodes, result.scores):
+        nodes.append(
+            graph_responses.GraphNode(
+                value=node.value,
+                type=RelationNodeTypePbMap[node.ntype],
+                group=node.subtype,
+                score=score,
             )
+        )
     response = GraphNodesSearchResponse(nodes=nodes)
     return response
 
 
 def build_graph_relations_response(
-    results: list[nodereader_pb2.GraphSearchResponse],
+    result: nodereader_pb2.GraphSearchResponse,
 ) -> GraphRelationsSearchResponse:
     relations = []
-    for shard_results in results:
-        for relation, score in zip(shard_results.relations, shard_results.scores):
-            relations.append(
-                graph_responses.GraphRelation(
-                    label=relation.label,
-                    type=RelationTypePbMap[relation.relation_type],
-                    score=score,
-                )
+    for relation, score in zip(result.relations, result.scores):
+        relations.append(
+            graph_responses.GraphRelation(
+                label=relation.label,
+                type=RelationTypePbMap[relation.relation_type],
+                score=score,
             )
+        )
     response = GraphRelationsSearchResponse(relations=relations)
     return response

@@ -590,8 +590,9 @@ async def test_ask_rag_strategies_validation(
     nucliadb_reader: AsyncClient, invalid_payload, expected_error_msg
 ):
     # Invalid strategy as a string
+    kbid = "00000000-0000-0000-0000-000000000000"
     resp = await nucliadb_reader.post(
-        f"/kb/kbid/ask",
+        f"/kb/{kbid}/ask",
         json=invalid_payload,
     )
     assert resp.status_code == 422

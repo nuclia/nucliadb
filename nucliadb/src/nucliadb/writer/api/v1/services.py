@@ -284,6 +284,12 @@ async def update_kv_schema(
         if schema is None:
             raise HTTPException(status_code=404, detail="KV schema does not exist")
 
+        if item.id is not None and item.id != schema_id:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Schema id in body '{item.id}' does not match id in URL '{schema_id}'",
+            )
+
         if item.description is not None:
             schema.description = item.description
         if item.fields is not None:

@@ -186,7 +186,7 @@ async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.
         return await resources_v2.get_origin(txn, kbid=kbid, rid=rid)
 
     key = KB_RESOURCE_ORIGIN.format(kbid=kbid, uuid=rid)
-    return await get_kv_pb(txn, key, resources_pb2.Origin)
+    return await get_kv_pb(txn, key, resources_pb2.Origin, for_update=False)
 
 
 async def set_origin(txn: Transaction, *, kbid: str, rid: str, origin: resources_pb2.Origin):
@@ -205,7 +205,7 @@ async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.E
         return await resources_v2.get_extra(txn, kbid=kbid, rid=rid)
 
     key = KB_RESOURCE_EXTRA.format(kbid=kbid, uuid=rid)
-    return await get_kv_pb(txn, key, resources_pb2.Extra)
+    return await get_kv_pb(txn, key, resources_pb2.Extra, for_update=False)
 
 
 async def set_extra(txn: Transaction, *, kbid: str, rid: str, extra: resources_pb2.Extra):
@@ -224,7 +224,7 @@ async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb
         return await resources_v2.get_security(txn, kbid=kbid, rid=rid)
 
     key = KB_RESOURCE_SECURITY.format(kbid=kbid, uuid=rid)
-    return await get_kv_pb(txn, key, resources_pb2.Security)
+    return await get_kv_pb(txn, key, resources_pb2.Security, for_update=False)
 
 
 async def set_security(txn: Transaction, *, kbid: str, rid: str, security: resources_pb2.Security):

@@ -98,7 +98,7 @@ async def build_find_response(
     entry_points = []
     if retrieval.query.relation is not None:
         entry_points = retrieval.query.relation.entry_points
-    relations = await merge_relations_results([graph_response], entry_points)
+    relations = await merge_relations_results(graph_response, entry_points)
 
     # compose response
     find_resources = compose_find_resources(text_blocks, resources)

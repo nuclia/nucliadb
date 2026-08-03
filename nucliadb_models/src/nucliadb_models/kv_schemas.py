@@ -97,6 +97,7 @@ class KVSchema(BaseModel):
 
 
 class UpdateKVSchema(BaseModel, extra="forbid"):
+    id: str | None = Field(default=None, pattern=r"^[^/.]{1,64}$")
     description: str | None = None
     fields: list[KVSchemaField] | None = Field(default=None, max_length=MAX_KV_SCHEMA_FIELDS)
 

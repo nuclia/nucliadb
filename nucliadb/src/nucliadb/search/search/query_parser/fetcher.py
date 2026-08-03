@@ -165,6 +165,7 @@ class Fetcher:
             return vectorset
 
     async def get_query_vector(self) -> list[float] | None:
+        vectorset = await self.get_vectorset()
         if self.user_vector is not None:
             query_vector = self.user_vector
         else:
@@ -172,7 +173,6 @@ class Fetcher:
             if query_info is None or query_info.sentence is None:
                 return None
 
-            vectorset = await self.get_vectorset()
             if vectorset not in query_info.sentence.vectors:
                 logger.warning(
                     "Predict is not responding with a valid query nucliadb vectorset",

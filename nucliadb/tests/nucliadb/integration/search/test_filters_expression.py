@@ -102,8 +102,9 @@ async def test_filtering_expression_validation(
     nucliadb_reader: AsyncClient, nucliadb_writer: AsyncClient
 ):
     # Make sure we only allow one operator per filter
+    kbid = "00000000-0000-0000-0000-000000000000"
     resp = await nucliadb_reader.post(
-        f"/kb/foobar/find",
+        f"/kb/{kbid}/find",
         json={
             "query": "",
             "filters": [{"all": ["/origin.path/folder1"], "any": ["/origin.path/folder2"]}],
@@ -114,7 +115,7 @@ async def test_filtering_expression_validation(
 
     # Empty lists of filter operators are not allowed
     resp = await nucliadb_reader.post(
-        f"/kb/foobar/find",
+        f"/kb/{kbid}/find",
         json={"query": "", "filters": [{"all": []}]},
     )
     assert resp.status_code == 422
@@ -122,7 +123,7 @@ async def test_filtering_expression_validation(
 
     # But we ignore None values
     resp = await nucliadb_reader.post(
-        f"/kb/foobar/find",
+        f"/kb/{kbid}/find",
         json={"query": "", "filters": [{"all": ["/origin.path/folder1"], "any": None}]},
     )
     assert resp.status_code != 422

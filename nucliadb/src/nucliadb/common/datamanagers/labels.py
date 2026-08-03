@@ -43,9 +43,7 @@ async def get_labels(txn: Transaction, *, kbid: str) -> kb_pb2.Labels:
         labelset = await txn.get(KB_LABELSET.format(kbid=kbid, id=labelset_id))
         if not labelset:
             continue
-        ls = kb_pb2.LabelSet()
-        ls.ParseFromString(labelset)
-        labels.labelset[labelset_id].CopyFrom(ls)
+        labels.labelset[labelset_id].ParseFromString(labelset)
     return labels
 
 

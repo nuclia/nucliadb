@@ -18,13 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import uuid
 
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consumer
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 
 
 @pytest.fixture(scope="function")
@@ -52,7 +52,7 @@ async def test_api(nucliadb_writer: AsyncClient, knowledgebox: str, export_impor
     assert resp.status_code < 500
 
     # Check that for non-existing kbs, endpoints return a 404
-    idonotexist = uuid.uuid4().hex
+    idonotexist = KnowledgeBox.new_unique_kbid()
     for endpoint in (f"/kb/{idonotexist}/import", f"/kb/{idonotexist}/export"):
         resp = await nucliadb_writer.post(endpoint)
         assert resp.status_code == 404

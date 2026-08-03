@@ -89,6 +89,7 @@ telemetry = [
 [dev-dependencies]
 nidx_tests = { path = "nidx_tests" }
 rand = "0.10.1"
+rstest = "0.26.1"
 
 [profile.samply]
 inherits = "release"

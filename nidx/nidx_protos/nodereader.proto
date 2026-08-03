@@ -46,10 +46,10 @@ message FacetResults {
 }
 
 message ResultScore {
+    reserved 2;
+
     float bm25 = 1;
-    // In the case of two equal bm25 scores, booster
-    // decides
-    float booster = 2;
+    uint64 docaddr = 3;
 }
 
 message DocumentResult {
@@ -60,6 +60,7 @@ message DocumentResult {
     }
     string field = 4;
     repeated string labels = 5;
+    bytes shard_id = 7;
 }
 
 message DocumentSearchResponse {
@@ -98,6 +99,8 @@ message ParagraphResult {
     noderesources.ParagraphMetadata metadata = 11;
 
     repeated string labels = 12;
+
+    bytes shard_id = 14;
 }
 
 message ParagraphSearchResponse {
@@ -228,7 +231,7 @@ message GraphQuery {
 }
 
 message GraphSearchRequest {
-    string shard = 1;
+    repeated string shard_ids = 1;
     GraphQuery query = 2;
 
     // Decides what do we want in return: paths (triplets), nodes or relations.
@@ -269,6 +272,11 @@ message GraphSearchResponse {
         optional string resource_field_id = 5;
         repeated string facets = 6;
     }
+
+    // List of successfully queried shard ids. This is used in the multi-shard
+    // querying, where the caller must know which shards have been successfully
+    // searched to know about failures.
+    repeated string shard_ids = 5;
 
     repeated utils.RelationNode nodes = 1;
     repeated Relation relations = 2;
@@ -371,6 +379,12 @@ message JsonFilterExpression {
     }
 }
 
+message SearchAfter {
+    float score = 1;
+    bytes shard_id = 2;
+    uint64 docaddr = 3;
+}
+
 message SearchRequest {
     reserved 7, 20, 21;
 
@@ -419,6 +433,8 @@ message SearchRequest {
     GraphSearch graph_search = 29;
 
     optional JsonFilterExpression json_filter = 32;
+
+    optional SearchAfter search_after = 35;
 }
 
 enum SuggestFeatures {
@@ -427,7 +443,7 @@ enum SuggestFeatures {
 }
 
 message SuggestRequest {
-    string shard = 1;
+    repeated string shard_ids = 1;
 
     string body = 2;
     repeated SuggestFeatures features = 6;
@@ -441,6 +457,11 @@ message SuggestRequest {
 }
 
 message SuggestResponse {
+    // List of successfully queried shard ids. This is used in the multi-shard
+    // querying, where the caller must know which shards have been successfully
+    // searched to know about failures.
+    repeated string shard_ids = 7;
+
     int32 total = 1;
     repeated ParagraphResult results = 2;
 

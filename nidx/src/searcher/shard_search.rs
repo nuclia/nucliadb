@@ -39,16 +39,17 @@ pub async fn search(
     search_request: SearchRequest,
     shards: Vec<Uuid>,
 ) -> NidxResult<Vec<SearchResponse>> {
-    let query_plan = query_planner::build_query_plan(search_request)?;
-    shards_query(index_cache, shards, query_plan, shard_search).await
+    shards_query(index_cache, shards, search_request, shard_search).await
 }
 
 #[instrument(skip_all, fields(shard_id = shard_id.to_string()))]
 async fn shard_search(
     shard_id: Uuid,
     index_cache: Arc<IndexCache>,
-    query_plan: QueryPlan,
+    search_request: SearchRequest,
 ) -> NidxResult<SearchResponse> {
+    let query_plan = query_planner::build_query_plan(search_request, &shard_id)?;
+
     let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
         return Err(NidxError::NotFound);
     };
@@ -150,8 +151,25 @@ async fn shard_search(
         })
     })
     .await??;
-    search_results.shard_ids.push(shard_id.to_string());
+
+    apply_shard_id_to_response(&mut search_results, shard_id);
+
     Ok(search_results)
+}
+
+fn apply_shard_id_to_response(response: &mut SearchResponse, shard_id: Uuid) {
+    response.shard_ids.push(shard_id.to_string());
+    let shard_id_bytes = shard_id.as_bytes().to_vec();
+    if let Some(paragraph) = &mut response.paragraph {
+        for result in &mut paragraph.results {
+            result.shard_id = shard_id_bytes.clone();
+        }
+    }
+    if let Some(document) = &mut response.document {
+        for result in &mut document.results {
+            result.shard_id = shard_id_bytes.clone();
+        }
+    }
 }
 
 fn compute_prefilter(
@@ -290,13 +308,20 @@ fn blocking_search(
     )
 }
 
-#[instrument(skip_all, fields(shard_id = graph_request.shard))]
 pub async fn graph_search(
     index_cache: Arc<IndexCache>,
     graph_request: GraphSearchRequest,
-) -> NidxResult<GraphSearchResponse> {
-    let shard_id = Uuid::parse_str(&graph_request.shard)?;
+    shards: Vec<Uuid>,
+) -> NidxResult<Vec<GraphSearchResponse>> {
+    shards_query(index_cache, shards, graph_request, shard_graph_search).await
+}
 
+#[instrument(skip_all, fields(shard_id = shard_id.to_string()))]
+pub async fn shard_graph_search(
+    shard_id: Uuid,
+    index_cache: Arc<IndexCache>,
+    graph_request: GraphSearchRequest,
+) -> NidxResult<GraphSearchResponse> {
     let Some(indexes) = index_cache.get_shard_indexes(&shard_id).await else {
         return Err(NidxError::NotFound);
     };
@@ -328,7 +353,10 @@ pub async fn graph_search(
     };
 
     if matches!(prefilter, PrefilterResult::None) {
-        return Ok(GraphSearchResponse::default());
+        return Ok(GraphSearchResponse {
+            shard_ids: vec![shard_id.to_string()],
+            ..Default::default()
+        });
     }
 
     let graph_queries = GraphIndexQueries::build(graph_request);
@@ -357,7 +385,7 @@ pub async fn graph_search(
 
     let relation_searcher = index_cache.get(&relation_index_id).await?;
     let current = Span::current();
-    let results = tokio::task::spawn_blocking(move || {
+    let mut results = tokio::task::spawn_blocking(move || {
         current.in_scope(|| {
             let context = run_semantic_graph_queries(
                 &graph_queries,
@@ -374,6 +402,7 @@ pub async fn graph_search(
         })
     })
     .await??;
+    results.shard_ids.push(shard_id.to_string());
     Ok(results)
 }
 
