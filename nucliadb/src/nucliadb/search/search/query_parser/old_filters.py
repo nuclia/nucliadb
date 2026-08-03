@@ -53,11 +53,9 @@ async def parse_old_filters(
 
     # Labels
     if old.label_filters:
-        classification_labels = await fetcher.get_classification_labels()
-
         paragraph_exprs = []
         for fltr in old.label_filters:
-            field_expr, paragraph_expr = convert_label_filter_to_expressions(fltr, classification_labels)
+            field_expr, paragraph_expr = await convert_label_filter_to_expressions(fltr, fetcher)
             if field_expr:
                 filters.append(field_expr)
             if paragraph_expr:
@@ -148,32 +146,33 @@ async def parse_old_filters(
         return f, paragraph_filter_expression
 
 
-def convert_label_filter_to_expressions(
-    fltr: str | Filter, classification_labels: knowledgebox_pb2.Labels
+async def convert_label_filter_to_expressions(
+    fltr: str | Filter,
+    fetcher: Fetcher,
 ) -> tuple[FilterExpression | None, FilterExpression | None]:
     if isinstance(fltr, str):
         fltr = translate_label(fltr)
         f = FilterExpression()
         f.facet.facet = fltr
-        if is_paragraph_label(fltr, classification_labels):
+        if await is_paragraph_label(fltr, fetcher):
             return None, f
         else:
             return f, None
 
     if fltr.all:
-        return split_labels(fltr.all, classification_labels, "bool_and", negate=False)
+        return await split_labels(fltr.all, fetcher, "bool_and", negate=False)
     if fltr.any:
-        return split_labels(fltr.any, classification_labels, "bool_or", negate=False)
+        return await split_labels(fltr.any, fetcher, "bool_or", negate=False)
     if fltr.none:
-        return split_labels(fltr.none, classification_labels, "bool_and", negate=True)
+        return await split_labels(fltr.none, fetcher, "bool_and", negate=True)
     if fltr.not_all:
-        return split_labels(fltr.not_all, classification_labels, "bool_or", negate=True)
+        return await split_labels(fltr.not_all, fetcher, "bool_or", negate=True)
 
     return None, None
 
 
-def split_labels(
-    labels: list[str], classification_labels: knowledgebox_pb2.Labels, combinator: str, negate: bool
+async def split_labels(
+    labels: list[str], fetcher: Fetcher, combinator: str, negate: bool
 ) -> tuple[FilterExpression | None, FilterExpression | None]:
     field = []
     paragraph = []
@@ -185,7 +184,7 @@ def split_labels(
         else:
             expr.facet.facet = label
 
-        if is_paragraph_label(label, classification_labels):
+        if await is_paragraph_label(label, fetcher):
             paragraph.append(expr)
         else:
             field.append(expr)
@@ -217,7 +216,7 @@ def split_labels(
     return field_expr, paragraph_expr
 
 
-def is_paragraph_label(label: str, classification_labels: knowledgebox_pb2.Labels) -> bool:
+async def is_paragraph_label(label: str, fetcher: Fetcher) -> bool:
     if len(label) == 0 or label[0] != "/":
         return False
     if not label.startswith("/l/"):
@@ -229,14 +228,12 @@ def is_paragraph_label(label: str, classification_labels: knowledgebox_pb2.Label
         return False
     labelset_id = parts[2]
 
-    try:
-        labelset: knowledgebox_pb2.LabelSet | None = classification_labels.labelset.get(labelset_id)
-        if labelset is None:
-            return False
-        return knowledgebox_pb2.LabelSet.LabelSetKind.PARAGRAPHS in labelset.kind
-    except KeyError:
-        # labelset_id not found
+    kinds: list[knowledgebox_pb2.LabelSet.LabelSetKind] | None = await fetcher.get_labelset_kinds(
+        labelset_id
+    )
+    if kinds is None:
         return False
+    return knowledgebox_pb2.LabelSet.LabelSetKind.PARAGRAPHS in kinds
 
 
 def convert_keyword_filter_to_expression(fltr: str | Filter) -> FilterExpression:

@@ -47,6 +47,14 @@ async def get_labels(txn: Transaction, *, kbid: str) -> kb_pb2.Labels:
     return labels
 
 
+async def list_labelset_ids(txn: Transaction, *, kbid: str) -> list[str] | None:
+    key = KB_LABELSET_IDS.format(kbid=kbid)
+    data = await txn.get(key)
+    if not data:
+        return None
+    return orjson.loads(data)
+
+
 async def _get_labelset_ids(txn: Transaction, *, kbid: str) -> list[str] | None:
     key = KB_LABELSET_IDS.format(kbid=kbid)
     data = await txn.get(key, for_update=True)
