@@ -100,7 +100,15 @@ async def should_backfill_kb(kbid: str) -> bool:
                 extra={"kbid": kbid},
             )
             return True
-        resources_v1 = {rid async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid)}
+
+        resources_v1: set[str] = set()
+        async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+            if "-" in rid:
+                logger.warning(f"Resource {kbid}/{rid} has a non-hex ID")
+                resources_v1.add(uuid.UUID(rid).hex)
+            else:
+                resources_v1.add(rid)
+
         resources_v2 = {
             rid async for rid in datamanagers.resources.resources_v2.iterate_resource_ids(kbid=kbid)
         }
