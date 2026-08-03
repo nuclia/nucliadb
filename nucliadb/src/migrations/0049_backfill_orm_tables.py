@@ -20,12 +20,13 @@
 
 """Migration #48
 
-Backfills the new orm tables. This migration should not be executed in production, as it has already been ran manually.
+Backfills the KB to the new orm tables only if the KB has not been backfilled yet.
 
 """
 
 import logging
 
+from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.backfill_orm_tables import backfill_kb
 from nucliadb.migrator.context import ExecutionContext
 
@@ -36,4 +37,34 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
+
+    if not await should_backfill_kb(kbid):
+        logger.info("KB does not need to be backfilled", extra={"kbid": kbid})
+        return
+
     await backfill_kb(kbid=kbid)
+
+
+async def should_backfill_kb(kbid: str) -> bool:
+    async with datamanagers.with_ro_transaction() as txn:
+        if not await datamanagers.kb.kb_v2.exists_kb(txn, kbid=kbid):
+            logger.warning(
+                "KB should be backfilled, as it does not exist in the new orm tables",
+                extra={"kbid": kbid},
+            )
+            return True
+        resources_count_v1 = await datamanagers.resources.calculate_number_of_resources(txn, kbid=kbid)
+        resources_count_v2 = await datamanagers.resources.resources_v2.calculate_number_of_resources(
+            txn, kbid=kbid
+        )
+        if resources_count_v1 != resources_count_v2:
+            logger.warning(
+                "KB should be backfilled, as the number of resources in the new orm tables does not match the old ones",
+                extra={
+                    "kbid": kbid,
+                    "resources_count_v1": resources_count_v1,
+                    "resources_count_v2": resources_count_v2,
+                },
+            )
+            return True
+    return False
