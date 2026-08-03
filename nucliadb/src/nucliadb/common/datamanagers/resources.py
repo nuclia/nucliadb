@@ -189,24 +189,31 @@ async def modify_slug(
     rid: str,
     new_slug: str,
 ) -> str:
-    """Update only the slug column of an existing resource row.
+    """Update the slug and basic columns of an existing resource row.
 
     Returns the old slug value.
     Raises NotFoundError if the resource does not exist.
     Raises ConflictError if the slug already belongs to another resource in
     the same knowledge box.
     """
+    basic = await get_basic(txn, kbid=kbid, rid=rid, for_update=True)
     old_slug = await get_slug(txn, kbid=kbid, rid=rid)
-    if old_slug is None:
+    if old_slug is None or basic is None:
         raise NotFoundError()
+    basic.slug = new_slug
     async with _pg_cursor(txn) as cur:
         try:
             await cur.execute(
                 """
-                UPDATE kb_resources SET slug = %(slug)s
+                UPDATE kb_resources SET slug = %(slug)s, basic = %(basic)s
                 WHERE kbid = %(kbid)s AND rid = %(rid)s
                 """,
-                {"kbid": kbid, "rid": rid, "slug": new_slug},
+                {
+                    "kbid": kbid,
+                    "rid": rid,
+                    "slug": new_slug,
+                    "basic": basic.SerializeToString(),
+                },
             )
             return old_slug
         except psycopg.errors.UniqueViolation:
