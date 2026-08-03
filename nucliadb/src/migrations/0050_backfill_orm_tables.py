@@ -133,10 +133,6 @@ async def backfill_kb(*, kbid: str) -> None:
     After migrating all resources, a reconciliation pass compares the v1 and v2
     resource listings to catch any resources created concurrently during the
     migration run.
-
-    Successfully backfilled resource IDs are persisted to *resource_checkpoint_path*
-    so that the run can be resumed without re-processing them.  The file is deleted
-    once the KB has been fully migrated.
     """
     logger.info(f"Backfilling KB {kbid}")
     start_time = time.monotonic()
@@ -198,7 +194,6 @@ async def backfill_kb(*, kbid: str) -> None:
         else:
             break
 
-    # KB is fully migrated — remove the per-KB resource checkpoint file.
     elapsed = time.monotonic() - start_time
     logger.info(f"Backfilled KB {kbid} in {elapsed:.2f} seconds")
 
@@ -237,19 +232,10 @@ async def _backfill_resources(
     kbid: str,
     rids: set[str],
 ) -> None:
-    """Backfill a set of resources concurrently, bounded by _MAX_CONCURRENT_RESOURCES.
-
-    Resources already present in *completed_resources* are skipped.  Each
-    successfully migrated resource is appended to *resource_checkpoint_path* and
-    added to *completed_resources* in-memory so that reconciliation passes also
-    benefit from the skip logic.
-    """
+    """Backfill a set of resources concurrently, bounded by _MAX_CONCURRENT_RESOURCES."""
     semaphore = asyncio.Semaphore(_MAX_CONCURRENT_RESOURCES)
 
-    pending = [rid for rid in rids]
-    skipped = len(rids) - len(pending)
-    if skipped:
-        logger.info(f"Skipping {skipped} already backfilled resource(s) for KB {kbid}")
+    pending = list(rids)
     logger.info(f"Backfilling {len(pending)} resource(s) for KB {kbid}")
 
     async def _guarded(rid: str, index: int) -> str | None:
