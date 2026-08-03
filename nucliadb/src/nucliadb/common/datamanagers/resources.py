@@ -289,11 +289,16 @@ async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
         return await cur.fetchone() is not None
 
 
-async def get_basic(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Basic | None:
+async def get_basic(
+    txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
+) -> resources_pb2.Basic | None:
     """Return the deserialised Basic for a resource, or None."""
     async with _pg_cursor(txn) as cur:
+        statement = "SELECT basic FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s"
+        if for_update:
+            statement += " FOR UPDATE"
         await cur.execute(
-            "SELECT basic FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
+            statement,
             {"kbid": kbid, "rid": rid},
         )
         row = await cur.fetchone()
