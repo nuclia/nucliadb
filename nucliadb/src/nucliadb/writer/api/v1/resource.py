@@ -68,7 +68,7 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
-from nucliadb_protos.resources_pb2 import Basic, FieldID, Metadata
+from nucliadb_protos.resources_pb2 import FieldID, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus, IndexResource
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
@@ -373,12 +373,7 @@ async def update_resource_slug(
     new_slug: str,
 ):
     async with driver.rw_transaction() as txn:
-        basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid, for_update=True)
         old_slug = await datamanagers.resources.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
-        if basic is None:
-            basic = Basic()
-        basic.slug = new_slug
-        await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
         await txn.commit()
         return old_slug
 
