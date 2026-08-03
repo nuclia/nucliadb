@@ -55,7 +55,6 @@ class Conversation(Field[PBConversation]):
             self.resource.txn,
             kbid=self.kbid,
             rid=self.rid,
-            field_type=self.type,
             field_id=self.id,
         )
         self._splits_metadata = None
@@ -187,7 +186,6 @@ class Conversation(Field[PBConversation]):
                 self.resource.txn,
                 kbid=self.kbid,
                 rid=self.rid,
-                field_type=self.type,
                 field_id=self.id,
             )
         return self.metadata
@@ -201,7 +199,6 @@ class Conversation(Field[PBConversation]):
                 self.resource.txn,
                 kbid=self.kbid,
                 rid=self.rid,
-                field_type=self.type,
                 field_id=self.id,
                 page=page,
             )
@@ -215,7 +212,6 @@ class Conversation(Field[PBConversation]):
             self.resource.txn,
             kbid=self.kbid,
             rid=self.rid,
-            field_type=self.type,
             field_id=self.id,
             page=page,
             value=payload,
@@ -228,7 +224,6 @@ class Conversation(Field[PBConversation]):
             self.resource.txn,
             kbid=self.kbid,
             rid=self.rid,
-            field_type=self.type,
             field_id=self.id,
             metadata=payload,
         )
@@ -241,7 +236,6 @@ class Conversation(Field[PBConversation]):
                 self.resource.txn,
                 kbid=self.kbid,
                 rid=self.rid,
-                field_type=self.type,
                 field_id=self.id,
             )
             if pb is None:
@@ -254,7 +248,6 @@ class Conversation(Field[PBConversation]):
             self.resource.txn,
             kbid=self.kbid,
             rid=self.rid,
-            field_type=self.type,
             field_id=self.id,
             splits_metadata=payload,
         )

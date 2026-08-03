@@ -45,25 +45,34 @@ import asyncio
 import logging
 import time
 import uuid
+from collections.abc import AsyncGenerator, AsyncIterator
+from typing import cast
 
-from nucliadb.common import datamanagers, file_md5, locking
+import backoff
+
+from nucliadb.common import datamanagers, locking
 from nucliadb.common.datamanagers import (
-    conversations as conversations_v1,
+    kb as kbs_v2,
 )
 from nucliadb.common.datamanagers import (
-    fields as fields_v1,
+    resources as resources_v2,
 )
-from nucliadb.common.datamanagers import (
-    resources as resources_v1,
+from nucliadb.common.datamanagers.utils import (
+    _pg_cursor,
+    get_kv_pb,
+    with_ro_transaction,
+    with_rw_transaction,
 )
-from nucliadb.common.datamanagers import (
-    resources_v2,
-)
-from nucliadb.common.datamanagers.utils import _pg_cursor, with_rw_transaction
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.common.models_utils import from_proto
+from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb_protos import resources_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2, resources_pb2, writer_pb2
+
+#
+from nucliadb_protos.resources_pb2 import Conversation as PBConversation
+from nucliadb_protos.resources_pb2 import FieldConversation, SplitsMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -94,27 +103,25 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
 
 async def should_backfill_kb(kbid: str) -> bool:
     async with datamanagers.with_ro_transaction() as txn:
-        if not await datamanagers.kb.kb_v2.exists_kb(txn, kbid=kbid):
+        if not await kbs_v2.exists_kb(txn, kbid=kbid):
             logger.warning(
                 "KB should be backfilled, as it does not exist in the new orm tables",
                 extra={"kbid": kbid},
             )
             return True
 
-        resources_v1: set[str] = set()
-        async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+        all_resources_v1: set[str] = set()
+        async for rid in resources_v1.iterate_resource_ids(kbid=kbid):
             if "-" in rid:
                 logger.warning(f"Resource {kbid}/{rid} has a non-hex ID")
-                resources_v1.add(uuid.UUID(rid).hex)
+                all_resources_v1.add(uuid.UUID(rid).hex)
             else:
-                resources_v1.add(rid)
+                all_resources_v1.add(rid)
 
-        resources_v2 = {
-            rid async for rid in datamanagers.resources.resources_v2.iterate_resource_ids(kbid=kbid)
-        }
-        if resources_v1 != resources_v2:
-            missing_v1 = resources_v2 - resources_v1
-            missing_v2 = resources_v1 - resources_v2
+        all_resources_v2 = {rid async for rid in resources_v2.iterate_resource_ids(kbid=kbid)}
+        if all_resources_v1 != all_resources_v2:
+            missing_v1 = all_resources_v2 - all_resources_v1
+            missing_v2 = all_resources_v1 - all_resources_v2
             logger.warning(
                 "KB should be backfilled, as the set of resources in the new orm tables does not match the old ones",
                 extra={
@@ -147,7 +154,7 @@ async def backfill_kb(*, kbid: str) -> None:
 
     # Snapshot v1 resource IDs before starting the migration
     v1_rids: set[str] = set()
-    async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+    async for rid in resources_v1.iterate_resource_ids(kbid=kbid):
         v1_rids.add(rid)
 
     await _backfill_resources(
@@ -172,7 +179,7 @@ async def backfill_kb(*, kbid: str) -> None:
             v2_rids.add(rid)
 
         v1_rids_now: set[str] = set()
-        async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+        async for rid in resources_v1.iterate_resource_ids(kbid=kbid):
             if "-" in rid:
                 logger.warning(f"Resource {kbid}/{rid} has a non-hex ID")
                 v1_rids_now.add(uuid.UUID(rid).hex)
@@ -200,11 +207,11 @@ async def backfill_kb(*, kbid: str) -> None:
 
 async def _backfill_kb_metadata(txn: Transaction, *, kbid: str) -> None:
     """Read all KB metadata from v1 and write it to the kbs table in a single INSERT."""
-    config = await datamanagers.kb.get_config(txn, kbid=kbid, for_update=True)
+    config = await kbs_v1.get_config(txn, kbid=kbid, for_update=True)
     if config is None:
         raise ValueError(f"KB {kbid} has no config, skipping backfill")
 
-    shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
+    shards = await cluster_v1.get_kb_shards(txn, kbid=kbid, for_update=True)
     if shards is None:
         raise ValueError(f"KB {kbid} has no shards, skipping backfill")
 
@@ -315,7 +322,7 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
         )
 
     # --- Collect all field and conversation rows ---
-    all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
+    all_fields = await resources_v1.get_all_field_ids(txn, kbid=kbid, rid=rid)
     if all_fields is None:
         return
 
@@ -421,3 +428,262 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
                             "value": page.SerializeToString(),
                         },
                     )
+
+
+class cluster_v1:
+    KB_SHARDS = "/kbs/{kbid}/shards"
+
+    @classmethod
+    async def get_kb_shards(
+        cls, txn: Transaction, *, kbid: str, for_update: bool = False
+    ) -> writer_pb2.Shards | None:
+        key = cls.KB_SHARDS.format(kbid=kbid)
+        return await get_kv_pb(txn, key, writer_pb2.Shards, for_update=for_update)
+
+
+class kbs_v1:
+    KB_UUID = "/kbs/{kbid}/config"
+    KB_SLUGS_BASE = "/kbslugs/"
+    KB_SLUGS = KB_SLUGS_BASE + "{slug}"
+
+    @classmethod
+    async def get_kbs(cls, txn: Transaction, *, prefix: str = "") -> AsyncIterator[tuple[str, str]]:
+        async for key in txn.keys(cls.KB_SLUGS.format(slug=prefix)):
+            slug = key.replace(cls.KB_SLUGS_BASE, "")
+            uuid = await cls.get_kb_uuid(txn, slug=slug)
+            if uuid is None:
+                logger.error(f"KB with slug ({slug}) but without uuid?")
+                continue
+            yield (uuid, slug)
+
+    @classmethod
+    async def get_kb_uuid(cls, txn: Transaction, *, slug: str) -> str | None:
+        uuid = await txn.get(cls.KB_SLUGS.format(slug=slug), for_update=False)
+        if uuid is not None:
+            return uuid.decode()
+        else:
+            return None
+
+    @classmethod
+    async def get_config(
+        cls, txn: Transaction, *, kbid: str, for_update: bool = False
+    ) -> knowledgebox_pb2.KnowledgeBoxConfig | None:
+        key = cls.KB_UUID.format(kbid=kbid)
+        payload = await txn.get(key, for_update=for_update)
+        if payload is None:
+            return None
+        response = knowledgebox_pb2.KnowledgeBoxConfig()
+        response.ParseFromString(payload)
+        return response
+
+
+class resources_v1:
+    KB_RESOURCE_BASIC = "/kbs/{kbid}/r/{uuid}"
+    KB_RESOURCE_BASIC_FS = "/kbs/{kbid}/r/{uuid}/basic"  # Only used on FS driver
+    KB_RESOURCE_ORIGIN = "/kbs/{kbid}/r/{uuid}/origin"
+    KB_RESOURCE_EXTRA = "/kbs/{kbid}/r/{uuid}/extra"
+    KB_RESOURCE_SECURITY = "/kbs/{kbid}/r/{uuid}/security"
+
+    KB_RESOURCE_SLUG_BASE = "/kbs/{kbid}/s/"
+    KB_RESOURCE_SLUG = f"{KB_RESOURCE_SLUG_BASE}{{slug}}"
+
+    KB_RESOURCE_FIELDS = "/kbs/{kbid}/r/{uuid}/f/"
+
+    KB_RESOURCE_ALL_FIELDS = "/kbs/{kbid}/r/{uuid}/allfields"
+    KB_MATERIALIZED_RESOURCES_COUNT = "/kbs/{kbid}/materialized/resources/count"
+
+    KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
+
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
+    @classmethod
+    async def get_resource_shard_id(
+        cls, txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
+    ) -> str | None:
+        key = cls.KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid)
+        shard = await txn.get(key, for_update=for_update)
+        if shard is not None:
+            return shard.decode()
+        else:
+            return None
+
+    @classmethod
+    async def get_basic(cls, txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Basic | None:
+        raw = await cls.get_basic_raw(txn, kbid=kbid, rid=rid)
+        if raw is None:
+            return None
+        basic = resources_pb2.Basic()
+        basic.ParseFromString(raw)
+        return basic
+
+    @classmethod
+    async def get_basic_raw(cls, txn: Transaction, *, kbid: str, rid: str) -> bytes | None:
+        if ingest_settings.driver == "local":
+            raw_basic = await txn.get(cls.KB_RESOURCE_BASIC_FS.format(kbid=kbid, uuid=rid))
+        else:
+            raw_basic = await txn.get(cls.KB_RESOURCE_BASIC.format(kbid=kbid, uuid=rid))
+        return raw_basic
+
+    @classmethod
+    async def get_origin(cls, txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Origin | None:
+        key = cls.KB_RESOURCE_ORIGIN.format(kbid=kbid, uuid=rid)
+        return await get_kv_pb(txn, key, resources_pb2.Origin, for_update=False)
+
+    @classmethod
+    async def get_extra(cls, txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Extra | None:
+        key = cls.KB_RESOURCE_EXTRA.format(kbid=kbid, uuid=rid)
+        return await get_kv_pb(txn, key, resources_pb2.Extra, for_update=False)
+
+    @classmethod
+    async def get_security(
+        cls, txn: Transaction, *, kbid: str, rid: str
+    ) -> resources_pb2.Security | None:
+        key = cls.KB_RESOURCE_SECURITY.format(kbid=kbid, uuid=rid)
+        return await get_kv_pb(txn, key, resources_pb2.Security, for_update=False)
+
+    @classmethod
+    async def iterate_resource_ids(cls, *, kbid: str) -> AsyncGenerator[str, None]:
+        """
+        Currently, the implementation of this is optimizing for reducing
+        how long a transaction will be open since the caller controls
+        how long each item that is yielded will be processed.
+
+        For this reason, it is not using the `txn` argument passed in.
+        """
+        batch = []
+        async for slug in cls._iter_resource_slugs(kbid=kbid):
+            batch.append(slug)
+            if len(batch) >= 200:
+                for rid in await cls._get_resource_ids_from_slugs(kbid=kbid, slugs=batch):
+                    yield rid
+                batch = []
+        if len(batch) > 0:
+            for rid in await cls._get_resource_ids_from_slugs(kbid=kbid, slugs=batch):
+                yield rid
+
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
+    @classmethod
+    async def _iter_resource_slugs(cls, *, kbid: str) -> AsyncGenerator[str, None]:
+        async with with_ro_transaction() as txn:
+            async for key in txn.keys(match=cls.KB_RESOURCE_SLUG_BASE.format(kbid=kbid)):
+                yield key.split("/")[-1]
+
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
+    @classmethod
+    async def _get_resource_ids_from_slugs(cls, kbid: str, slugs: list[str]) -> list[str]:
+        async with with_ro_transaction() as txn:
+            rids = await txn.batch_get(
+                [cls.KB_RESOURCE_SLUG.format(kbid=kbid, slug=slug) for slug in slugs]
+            )
+        return [rid.decode() for rid in rids if rid is not None]
+
+    @classmethod
+    async def get_all_field_ids(
+        cls, txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
+    ) -> resources_pb2.AllFieldIDs | None:
+        key = cls.KB_RESOURCE_ALL_FIELDS.format(kbid=kbid, uuid=rid)
+        return await get_kv_pb(txn, key, resources_pb2.AllFieldIDs, for_update=for_update)
+
+
+class fields_v1:
+    KB_RESOURCE_FIELD = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
+    KB_RESOURCE_FIELD_STATUS = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/status"
+
+    @classmethod
+    async def get_raw(
+        cls, txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
+    ) -> bytes | None:
+        key = cls.KB_RESOURCE_FIELD.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
+        return await txn.get(key)
+
+    @classmethod
+    async def get_status(
+        cls, txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str
+    ) -> writer_pb2.FieldStatus | None:
+        key = cls.KB_RESOURCE_FIELD_STATUS.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
+        return await get_kv_pb(txn, key, writer_pb2.FieldStatus, for_update=False)
+
+
+class conversations_v1:
+    KB_CONVERSATION_PAGE = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/{page}"
+    KB_CONVERSATION_SPLITS_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/splits_metadata"
+    KB_CONVERSATION_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}"
+
+    @classmethod
+    async def get_page(
+        cls,
+        txn: Transaction,
+        *,
+        kbid: str,
+        rid: str,
+        field_type: str,
+        field_id: str,
+        page: int,
+    ) -> PBConversation | None:
+        if page <= 0:
+            raise ValueError("Conversation pages start at index 1")
+        key = cls.KB_CONVERSATION_PAGE.format(
+            kbid=kbid, uuid=rid, type=field_type, field=field_id, page=page
+        )
+        payload = await txn.get(key)
+        if payload is None:
+            return None
+        pb = PBConversation()
+        pb.ParseFromString(payload)
+        return pb
+
+    @classmethod
+    async def get_metadata(
+        cls,
+        txn: Transaction,
+        *,
+        kbid: str,
+        rid: str,
+        field_type: str,
+        field_id: str,
+    ) -> FieldConversation | None:
+        key = cls.KB_CONVERSATION_METADATA.format(kbid=kbid, uuid=rid, type=field_type, field=field_id)
+        payload = await txn.get(key)
+        if payload is None:
+            return None
+        pb = FieldConversation()
+        pb.ParseFromString(payload)
+        return pb
+
+    @classmethod
+    async def get_splits_metadata(
+        cls,
+        txn: Transaction,
+        *,
+        kbid: str,
+        rid: str,
+        field_type: str,
+        field_id: str,
+    ) -> SplitsMetadata | None:
+        key = cls.KB_CONVERSATION_SPLITS_METADATA.format(
+            kbid=kbid, uuid=rid, type=field_type, field=field_id
+        )
+        payload = await txn.get(key)
+        if payload is None:
+            return None
+        pb = SplitsMetadata()
+        pb.ParseFromString(payload)
+        return pb
+
+
+class file_md5:
+    @classmethod
+    async def get(cls, txn: Transaction, *, kbid: str, rid: str, field_id: str) -> str | None:
+        """Get the MD5 hash for a resource field, or None if not found."""
+        async with _pg_transaction(txn).connection.cursor() as cur:
+            await cur.execute(
+                "SELECT md5 FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_id = %(field_id)s",
+                {"kbid": kbid, "rid": rid, "field_id": f"f/{field_id}"},
+            )
+            row = await cur.fetchone()
+            if row is None:
+                return None
+            return row[0]
+
+
+def _pg_transaction(txn: Transaction) -> PGTransaction:
+    return cast(PGTransaction, txn)

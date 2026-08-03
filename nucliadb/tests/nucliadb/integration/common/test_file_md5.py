@@ -22,7 +22,7 @@
 import pytest
 
 from nucliadb.common import file_md5
-from nucliadb.common.datamanagers import fields_v2, kb_v2, resources_v2
+from nucliadb.common.datamanagers import fields, kb, resources
 from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
@@ -40,7 +40,7 @@ async def driver(pg_maindb_driver: PGDriver):
 async def kbid(driver: PGDriver) -> str:
     kb_id = KnowledgeBox.new_unique_kbid()
     async with driver.rw_transaction() as txn:
-        await kb_v2.set_kbid_for_slug(txn, kbid=kb_id, slug=f"slug-{kb_id}")
+        await kb.set_kbid_for_slug(txn, kbid=kb_id, slug=f"slug-{kb_id}")
         await txn.commit()
     return kb_id
 
@@ -49,7 +49,7 @@ async def kbid(driver: PGDriver) -> str:
 async def rid(driver: PGDriver, kbid: str) -> str:
     r_id = Resource.new_unique_rid()
     async with driver.rw_transaction() as txn:
-        await resources_v2.set_slug(txn, kbid=kbid, rid=r_id, slug=f"slug-{r_id}")
+        await resources.set_slug(txn, kbid=kbid, rid=r_id, slug=f"slug-{r_id}")
         await txn.commit()
     return r_id
 
@@ -102,7 +102,7 @@ async def test_delete_by_field(driver: PGDriver, kbid: str, rid: str):
 
     async with driver.rw_transaction() as txn:
         await file_md5.delete(txn, kbid=kbid, rid=rid, field_id="file1")
-        await fields_v2.delete(txn, kbid=kbid, rid=rid, field_id="file1", field_type="f")
+        await fields.delete(txn, kbid=kbid, rid=rid, field_id="file1", field_type="f")
         await txn.commit()
 
     assert await file_md5.exists(kbid=kbid, md5="aaa") is False
@@ -112,7 +112,7 @@ async def test_delete_by_field(driver: PGDriver, kbid: str, rid: str):
 async def test_delete_by_resource(driver: PGDriver, kbid: str, rid: str):
     r2 = Resource.new_unique_rid()
     async with driver.rw_transaction() as txn:
-        await resources_v2.set_slug(txn, kbid=kbid, rid=r2, slug=f"slug-{r2}")
+        await resources.set_slug(txn, kbid=kbid, rid=r2, slug=f"slug-{r2}")
         await txn.commit()
 
     async with driver.rw_transaction() as txn:
@@ -123,7 +123,7 @@ async def test_delete_by_resource(driver: PGDriver, kbid: str, rid: str):
 
     async with driver.rw_transaction() as txn:
         await file_md5.delete(txn, kbid=kbid, rid=rid)
-        await resources_v2.delete(txn, kbid=kbid, rid=rid)
+        await resources.delete(txn, kbid=kbid, rid=rid)
         await txn.commit()
 
     assert await file_md5.exists(kbid=kbid, md5="aaa") is False
@@ -135,9 +135,9 @@ async def test_delete_by_kb(driver: PGDriver, kbid: str, rid: str):
     other_kb = KnowledgeBox.new_unique_kbid()
     r2 = Resource.new_unique_rid()
     async with driver.rw_transaction() as txn:
-        await kb_v2.set_kbid_for_slug(txn, kbid=other_kb, slug=f"slug-{other_kb}")
-        await resources_v2.set_slug(txn, kbid=kbid, rid=r2, slug=f"slug-{r2}")
-        await resources_v2.set_slug(txn, kbid=other_kb, rid=rid, slug=f"slug-{rid}")
+        await kb.set_kbid_for_slug(txn, kbid=other_kb, slug=f"slug-{other_kb}")
+        await resources.set_slug(txn, kbid=kbid, rid=r2, slug=f"slug-{r2}")
+        await resources.set_slug(txn, kbid=other_kb, rid=rid, slug=f"slug-{rid}")
         await txn.commit()
 
     async with driver.rw_transaction() as txn:
@@ -148,7 +148,7 @@ async def test_delete_by_kb(driver: PGDriver, kbid: str, rid: str):
 
     async with driver.rw_transaction() as txn:
         await file_md5.delete(txn, kbid=kbid)
-        await kb_v2.delete(txn, kbid=kbid)
+        await kb.delete(txn, kbid=kbid)
         await txn.commit()
 
     assert await file_md5.exists(kbid=kbid, md5="aaa") is False

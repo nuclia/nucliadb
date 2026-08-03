@@ -216,7 +216,7 @@ class Resource:
     async def _inner_get_fields_ids(self) -> list[tuple[FieldType.ValueType, str]]:
         # Use a set to make sure we don't have duplicate field ids
         result = set()
-        all_fields = await self.get_all_field_ids(for_update=False)
+        all_fields = await self.get_all_field_ids()
         if all_fields is not None:
             for f in all_fields.fields:
                 result.add((f.field_type, f.field))
@@ -300,47 +300,8 @@ class Resource:
                 return True
         return False
 
-    async def get_all_field_ids(self, *, for_update: bool) -> PBAllFieldIDs | None:
-        return await datamanagers.resources.get_all_field_ids(
-            self.txn, kbid=self.kbid, rid=self.uuid, for_update=for_update
-        )
-
-    async def set_all_field_ids(self, all_fields: PBAllFieldIDs):
-        return await datamanagers.resources.set_all_field_ids(
-            self.txn, kbid=self.kbid, rid=self.uuid, allfields=all_fields
-        )
-
-    async def update_all_field_ids(
-        self,
-        *,
-        updated: list[FieldID] | None = None,
-        deleted: list[FieldID] | None = None,
-        errors: list[writer_pb2.Error] | None = None,
-    ):
-        needs_update = False
-        all_fields = await self.get_all_field_ids(for_update=True)
-        if all_fields is None:
-            needs_update = True
-            all_fields = PBAllFieldIDs()
-
-        for field in updated or []:
-            if field not in all_fields.fields:
-                all_fields.fields.append(field)
-                needs_update = True
-
-        for error in errors or []:
-            field_id = FieldID(field_type=error.field_type, field=error.field)
-            if field_id not in all_fields.fields:
-                all_fields.fields.append(field_id)
-                needs_update = True
-
-        for field in deleted or []:
-            if field in all_fields.fields:
-                all_fields.fields.remove(field)
-                needs_update = True
-
-        if needs_update:
-            await self.set_all_field_ids(all_fields)
+    async def get_all_field_ids(self) -> PBAllFieldIDs | None:
+        return await datamanagers.fields.get_all_field_ids(self.txn, kbid=self.kbid, rid=self.uuid)
 
     async def apply_field_values(self, message: BrokerMessage):
         message_updated_fields = []
@@ -379,11 +340,6 @@ class Resource:
             await self._apply_delete_splits(delete_splits)
 
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
-            await self.update_all_field_ids(
-                updated=message_updated_fields,
-                deleted=message.delete_fields,  # type: ignore
-                errors=message.errors,  # type: ignore
-            )
             self.modified = True
 
         await self.apply_fields_status(message)

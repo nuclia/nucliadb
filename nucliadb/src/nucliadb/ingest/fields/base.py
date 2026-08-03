@@ -196,7 +196,6 @@ class Field(Generic[PbType]):
                 self.resource.txn,
                 kbid=self.kbid,
                 rid=self.rid,
-                field_type=self.type,
                 field_id=self.id,
             )
         # Delete from storage

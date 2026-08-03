@@ -19,7 +19,7 @@
 #
 import unittest
 import unittest.mock
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -40,12 +40,9 @@ from nucliadb.ingest.orm.resource import (
 )
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.resources_pb2 import (
-    AllFieldIDs,
     Basic,
     CloudFile,
-    FieldID,
     FieldText,
-    FieldType,
     FileExtractedData,
     PagePositions,
 )
@@ -185,7 +182,7 @@ def storage():
 async def kb(maindb_driver: Driver):
     kbid = KnowledgeBox.new_unique_kbid()
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.kb.kb_v2.set_kbid_for_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
+        await datamanagers.kb.set_kbid_for_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid
 
@@ -194,7 +191,7 @@ async def kb(maindb_driver: Driver):
 async def rid(maindb_driver: Driver, kb: str):
     r_id = Resource.new_unique_rid()
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.resources.resources_v2.set_slug(txn, kbid=kb, rid=r_id, slug=f"slug-{r_id}")
+        await datamanagers.resources.set_slug(txn, kbid=kb, rid=r_id, slug=f"slug-{r_id}")
         await txn.commit()
     return r_id
 
@@ -203,141 +200,6 @@ async def rid(maindb_driver: Driver, kb: str):
 def file_md5_mock():
     with unittest.mock.patch("nucliadb.ingest.orm.resource.file_md5", AsyncMock()) as mock:
         yield mock
-
-
-async def test_get_fields_ids_caches_keys(txn, storage, kb: str, rid: str):
-    resource = Resource(txn, storage, kb, rid)
-    cached_field_keys: list[tuple[FieldType.ValueType, str]] = [
-        (FieldType.FILE, "foo"),
-        (FieldType.TEXT, "bar"),
-    ]
-    new_field_keys: list[tuple[FieldType.ValueType, str]] = [(FieldType.LINK, "baz")]
-    resource._inner_get_fields_ids = AsyncMock(return_value=new_field_keys)  # type: ignore[method-assign]
-    resource.all_fields_keys = cached_field_keys
-
-    assert await resource.get_fields_ids() == cached_field_keys
-    resource._inner_get_fields_ids.assert_not_awaited()
-
-    assert await resource.get_fields_ids(force=True) == new_field_keys
-    resource._inner_get_fields_ids.assert_awaited_once()
-    assert resource.all_fields_keys == new_field_keys
-
-    # If the all_field_keys is an empty list,
-    # we should not be calling the inner_get_fields_ids
-    resource.all_fields_keys = []
-    resource._inner_get_fields_ids.reset_mock()
-    assert await resource.get_fields_ids() == []
-    resource._inner_get_fields_ids.assert_not_awaited()
-
-
-async def test_get_set_all_field_ids(txn, storage, kb, rid):
-    resource = Resource(txn, storage, kb, rid)
-
-    all_field_ids = await resource.get_all_field_ids(for_update=False)
-    assert all_field_ids is None or all_field_ids.fields == []
-
-    all_fields = AllFieldIDs()
-    all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text"))
-
-    await datamanagers.fields.fields_v2.set(
-        txn,
-        kbid=kb,
-        rid=rid,
-        field_type="t",
-        field_id="text",
-        value=FieldText(body="text", format=FieldText.Format.PLAIN),
-    )
-
-    await resource.set_all_field_ids(all_fields)
-
-    final = await resource.get_all_field_ids(for_update=False)
-    assert final is not None
-    assert final == all_fields
-
-
-async def test_update_all_fields_key(txn, storage, kb, rid):
-    resource = Resource(txn, storage, kb, rid)
-
-    await resource.update_all_field_ids(updated=[], deleted=[])
-
-    # Initial value is Empty
-    assert (await resource.get_all_field_ids(for_update=False)) == AllFieldIDs()
-
-    all_fields = AllFieldIDs()
-    all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text1"))
-    all_fields.fields.append(FieldID(field_type=FieldType.TEXT, field="text2"))
-    await datamanagers.fields.fields_v2.set(
-        txn,
-        kbid=kb,
-        rid=rid,
-        field_type="t",
-        field_id="text1",
-        value=FieldText(body="text1", format=FieldText.Format.PLAIN),
-    )
-    await datamanagers.fields.fields_v2.set(
-        txn,
-        kbid=kb,
-        rid=rid,
-        field_type="t",
-        field_id="text2",
-        value=FieldText(body="text2", format=FieldText.Format.PLAIN),
-    )
-
-    await resource.update_all_field_ids(updated=list(all_fields.fields))
-
-    # Check updates
-    assert await resource.get_all_field_ids(for_update=False) == all_fields
-
-    file_field = FieldID(field_type=FieldType.FILE, field="file")
-    await datamanagers.fields.fields_v2.set(
-        txn, kbid=kb, rid=rid, field_type="f", field_id="file", value=FileExtractedData()
-    )
-    await resource.update_all_field_ids(updated=[file_field])
-
-    result = await resource.get_all_field_ids(for_update=False)
-    assert result is not None
-    assert len(result.fields) == 3
-    # Sort them by field_type and field to ensure consistent ordering for the assertion
-    obtained = list(result.fields)
-    obtained.sort(key=lambda x: (x.field_type, x.field))
-    expected = [*list(all_fields.fields), file_field]
-    expected.sort(key=lambda x: (x.field_type, x.field))
-    assert obtained == expected
-
-    # Check deletes
-    await datamanagers.fields.fields_v2.delete(txn, kbid=kb, rid=rid, field_type="f", field_id="file")
-    await resource.update_all_field_ids(deleted=[file_field])
-
-    assert await resource.get_all_field_ids(for_update=False) == all_fields
-
-
-async def test_apply_fields_calls_update_all_field_ids(txn, storage, kb, rid):
-    resource = Resource(txn, storage, kb, rid)
-    resource.update_all_field_ids = AsyncMock()
-    resource.set_field = AsyncMock()
-    resource.delete_field = AsyncMock()
-    resource.set_file_field_md5 = AsyncMock()
-
-    bm = MagicMock()
-    bm.texts = {"text": MagicMock()}
-    bm.links = {"link": MagicMock()}
-    bm.files = {"file": MagicMock()}
-    bm.conversations = {"conversation": MagicMock()}
-    bm.delete_fields = [FieldID(field_type=FieldType.CONVERSATION, field="to_delete")]
-
-    await resource.apply_field_values(bm)
-
-    resource.update_all_field_ids.assert_awaited_once()
-
-    assert resource.update_all_field_ids.call_args[1]["updated"] == [
-        FieldID(field_type=FieldType.TEXT, field="text"),
-        FieldID(field_type=FieldType.LINK, field="link"),
-        FieldID(field_type=FieldType.FILE, field="file"),
-        FieldID(field_type=FieldType.CONVERSATION, field="conversation"),
-    ]
-    assert resource.update_all_field_ids.call_args[1]["deleted"] == [
-        FieldID(field_type=FieldType.CONVERSATION, field="to_delete"),
-    ]
 
 
 async def test_apply_extracted_vectors_cut_by_dimension(txn, storage, kb, rid):

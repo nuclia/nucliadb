@@ -17,75 +17,54 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+"""
+V2 implementation of file MD5 tracking using the kb_fields.md5 column
+(migration 0016).
 
-import logging
+Instead of the dedicated `file_md5` table, the MD5 hash is stored directly
+in the `kb_fields` row for the corresponding file field (field_type = 'f').
+This avoids a separate table and keeps the hash co-located with the field data,
+relying on the existing index on (kbid, md5) in kb_fields for efficient lookups.
+"""
+
 from typing import cast, overload
 
-from nucliadb.common import file_md5_v2
-from nucliadb.common.datamanagers.utils import datamanagers_v2_read, datamanagers_v2_write
+from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_error
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.pg import PGDriver, PGTransaction
+from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb_telemetry import metrics
-
-logger = logging.getLogger(__name__)
-
-observer = metrics.Observer("nucliadb_file_md5", labels={"op": ""})
 
 
 def _pg_driver() -> PGDriver:
     return cast(PGDriver, get_driver())
 
 
-def _pg_transaction(txn: Transaction) -> PGTransaction:
-    return cast(PGTransaction, txn)
-
-
-@observer.wrap({"op": "check"})
 async def exists(*, kbid: str, md5: str) -> bool:
     """Check if a file with the given MD5 hash already exists in the KB."""
-    if datamanagers_v2_read(kbid):
-        return await file_md5_v2.exists(kbid=kbid, md5=md5)
-
     pg = _pg_driver()
     async with pg._get_connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            "SELECT 1 FROM file_md5 WHERE kbid = %(kbid)s AND md5 = %(md5)s LIMIT 1",
+            "SELECT 1 FROM kb_fields WHERE kbid = %(kbid)s AND md5 = %(md5)s LIMIT 1",
             {"kbid": kbid, "md5": md5},
         )
         return cur.rowcount > 0
 
 
-@observer.wrap({"op": "store"})
-async def set(txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str) -> None:
-    """Set a file MD5 hash for a resource field."""
-    async with _pg_transaction(txn).connection.cursor() as cur:
+@logs_foreign_key_error
+async def set(
+    txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str, field_type: str = "f"
+) -> None:
+    """Set the MD5 hash on the kb_fields row for the given file field."""
+    async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
-            INSERT INTO file_md5 (kbid, md5, rid, field_id)
-            VALUES (%(kbid)s, %(md5)s, %(rid)s, %(field_id)s)
-            ON CONFLICT (kbid, md5, rid, field_id) DO UPDATE SET
-                created_at = NOW()
+            INSERT INTO kb_fields (kbid, rid, field_type, field_id, md5)
+            VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(md5)s)
+            ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
+                md5 = EXCLUDED.md5
             """,
-            {"kbid": kbid, "md5": md5, "rid": rid, "field_id": f"f/{field_id}"},
+            {"kbid": kbid, "md5": md5, "rid": rid, "field_id": field_id, "field_type": field_type},
         )
-
-    if datamanagers_v2_write(kbid):
-        await file_md5_v2.set(txn, kbid=kbid, md5=md5, rid=rid, field_id=field_id)
-
-
-@observer.wrap({"op": "get"})
-async def get(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> str | None:
-    """Get the MD5 hash for a resource field, or None if not found."""
-    async with _pg_transaction(txn).connection.cursor() as cur:
-        await cur.execute(
-            "SELECT md5 FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_id = %(field_id)s",
-            {"kbid": kbid, "rid": rid, "field_id": f"f/{field_id}"},
-        )
-        row = await cur.fetchone()
-        if row is None:
-            return None
-        return row[0]
 
 
 @overload
@@ -100,48 +79,32 @@ async def delete(txn: Transaction, *, kbid: str, rid: str) -> None: ...
 async def delete(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None: ...
 
 
-@observer.wrap({"op": "delete"})
 async def delete(
     txn: Transaction,
     *,
     kbid: str,
     rid: str | None = None,
     field_id: str | None = None,
+    field_type: str = "f",
 ) -> None:
-    """Delete file MD5 records.
+    """Clear the MD5 hash for a specific file field.
 
-    - kbid only: delete all records for the KB
-    - kbid + rid: delete all records for a resource
-    - kbid + rid + field_id: delete records for a specific field
+    - kbid + rid + field_id: nulls out the md5 column for that field row.
+    - kbid only / kbid + rid: no-op — when a KB or resource is being deleted,
+      the kb_fields rows are removed by ON DELETE CASCADE, so there is no need
+      to UPDATE them first (doing so would write a new MVCC row version for
+      every matching field only for it to be immediately dead-tupled away).
     """
-    pg_txn = _pg_transaction(txn)
-    if rid is None:
-        async with pg_txn.connection.cursor() as cur:
-            await cur.execute(
-                "DELETE FROM file_md5 WHERE kbid = %(kbid)s",
-                {"kbid": kbid},
-            )
-        if datamanagers_v2_write(kbid):
-            await file_md5_v2.delete(txn, kbid=kbid)
+    if field_id is None:
+        # Rows will be removed by CASCADE; nothing to do.
+        return
 
-    elif field_id is None:
-        async with pg_txn.connection.cursor() as cur:
-            await cur.execute(
-                "DELETE FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s",
-                {"kbid": kbid, "rid": rid},
-            )
-        if datamanagers_v2_write(kbid):
-            await file_md5_v2.delete(txn, kbid=kbid, rid=rid)
-
-    else:
-        async with pg_txn.connection.cursor() as cur:
-            await cur.execute(
-                "DELETE FROM file_md5 WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_id = %(field_id)s",
-                {
-                    "kbid": kbid,
-                    "rid": rid,
-                    "field_id": f"f/{field_id}",
-                },
-            )
-        if datamanagers_v2_write(kbid):
-            await file_md5_v2.delete(txn, kbid=kbid, rid=rid, field_id=field_id)
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(
+            """
+            UPDATE kb_fields SET md5 = NULL
+            WHERE kbid = %(kbid)s AND rid = %(rid)s
+              AND field_type = %(field_type)s AND field_id = %(field_id)s
+            """,
+            {"kbid": kbid, "rid": rid, "field_id": field_id, "field_type": field_type},
+        )

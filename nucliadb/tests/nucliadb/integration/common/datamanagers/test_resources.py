@@ -44,13 +44,13 @@ async def kbid(maindb_driver: Driver) -> AsyncIterator[str]:
     kbid = KnowledgeBox.new_unique_kbid()
     slug = kbid
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.kb.kb_v2.set_kbid_for_slug(txn, kbid=kbid, slug=slug)
+        await datamanagers.kb.set_kbid_for_slug(txn, kbid=kbid, slug=slug)
         await txn.commit()
     try:
         yield kbid
     finally:
         async with maindb_driver.rw_transaction() as txn:
-            await datamanagers.kb.kb_v2.delete(txn, kbid=kbid)
+            await datamanagers.kb.delete(txn, kbid=kbid)
             await txn.commit()
 
 
@@ -87,16 +87,16 @@ async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, 
     field_type_abbr = from_proto.field_type_name(field.field_type).abbreviation()
 
     async with maindb_driver.ro_transaction() as txn:
-        all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
+        all_fields = await datamanagers.fields.get_all_field_ids(txn, kbid=kbid, rid=rid)
         assert all_fields is None or len(all_fields.fields) == 0
-        assert (await datamanagers.resources.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is False
+        assert (await datamanagers.fields.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is False
 
     # set a field for a resource
 
     async with maindb_driver.rw_transaction() as txn:
         pb = resources_pb2.AllFieldIDs()
         pb.fields.append(field)
-        await datamanagers.fields.fields_v2.set(
+        await datamanagers.fields.set(
             txn,
             kbid=kbid,
             rid=rid,
@@ -104,30 +104,26 @@ async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, 
             field_id=field.field,
             value=FieldLink(uri="http://example.com"),
         )
-        await datamanagers.resources.set_all_field_ids(txn, kbid=kbid, rid=rid, allfields=pb)
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
-        all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
+        all_fields = await datamanagers.fields.get_all_field_ids(txn, kbid=kbid, rid=rid)
         assert all_fields is not None
         assert len(all_fields.fields) == 1
 
-        assert (await datamanagers.resources.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is True
+        assert (await datamanagers.fields.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is True
 
     # set no fields
 
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.resources.set_all_field_ids(
-            txn, kbid=kbid, rid=rid, allfields=resources_pb2.AllFieldIDs()
-        )
-        await datamanagers.fields.fields_v2.delete(
+        await datamanagers.fields.delete(
             txn, kbid=kbid, rid=rid, field_type=field_type_abbr, field_id=field.field
         )
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
-        all_fields = await datamanagers.resources.get_all_field_ids(txn, kbid=kbid, rid=rid)
+        all_fields = await datamanagers.fields.get_all_field_ids(txn, kbid=kbid, rid=rid)
         assert all_fields is not None
         assert len(all_fields.fields) == 0
 
-        assert (await datamanagers.resources.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is False
+        assert (await datamanagers.fields.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is False

@@ -424,7 +424,7 @@ async def test_knowledgebox_file_upload_field_sync(
 
     async with datamanagers.with_ro_transaction() as txn:
         assert (
-            await datamanagers.resources.has_field(
+            await datamanagers.fields.has_field(
                 txn,
                 kbid=kbid,
                 rid=resource,

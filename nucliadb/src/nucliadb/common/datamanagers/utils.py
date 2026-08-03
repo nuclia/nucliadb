@@ -30,8 +30,6 @@ from google.protobuf.message import Message
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGTransaction, ReadOnlyPGTransaction
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb_utils import const
-from nucliadb_utils.utilities import has_feature
 
 logger = logging.getLogger(__name__)
 
@@ -104,20 +102,6 @@ async def with_ro_transaction():
     driver = get_driver()
     async with driver.ro_transaction() as ro_txn:
         yield ro_txn
-
-
-def datamanagers_v2_write(kbid: str) -> bool:
-    """
-    Check if the knowledge box is currently being migrated to the v2 datamanagers.
-    """
-    return has_feature(const.Features.DATAMANAGERS_V2_WRITE, context={"kbid": kbid})
-
-
-def datamanagers_v2_read(kbid: str) -> bool:
-    """
-    Check if the knowledge box has already been migrated and has datamanagers v2 reads enabled.
-    """
-    return has_feature(const.Features.DATAMANAGERS_V2_READ, context={"kbid": kbid})
 
 
 def _pg(txn: Transaction) -> PGTransaction:

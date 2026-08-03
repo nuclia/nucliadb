@@ -641,7 +641,7 @@ async def get_matching_field_ids(
     if len(strategy.data_augmentation_field_prefixes) > 0:
         for resource_uuid in ordered_resources:
             all_field_ids = await datamanagers.atomic.resources.get_all_field_ids(
-                kbid=kbid, rid=resource_uuid, for_update=False
+                kbid=kbid, rid=resource_uuid
             )
             if all_field_ids is None:
                 continue

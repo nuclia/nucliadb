@@ -950,9 +950,7 @@ async def compute_resource_status(
     Compute and set the resource-level processing status on basic by inspecting
     the status of all individual fields.
     """
-    field_ids = await datamanagers.resources.get_all_field_ids(
-        txn, kbid=kbid, rid=uuid, for_update=False
-    )
+    field_ids = await datamanagers.fields.get_all_field_ids(txn, kbid=kbid, rid=uuid)
     if field_ids is None:
         # No fields, it is processed
         basic.metadata.status = resources_pb2.Metadata.Status.PROCESSED

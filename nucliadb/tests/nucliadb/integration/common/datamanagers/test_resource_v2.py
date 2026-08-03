@@ -19,7 +19,7 @@
 #
 """
 Integration tests for the `logs_foreign_key_error` decorator behaviour on
-resources_v2 write operations.
+resources write operations.
 
 These tests verify that writing to an ORM table whose parent row does not yet
 exist (simulating a resource that has not been backfilled yet) does not raise an
@@ -31,7 +31,7 @@ import logging
 
 import pytest
 
-from nucliadb.common.datamanagers import kb_v2, resources_v2
+from nucliadb.common.datamanagers import kb, resources
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -48,7 +48,7 @@ async def kbid(maindb_driver: Driver) -> str:
     """Create a new knowledge box and return its kbid."""
     kbid = KnowledgeBox.new_unique_kbid()
     async with maindb_driver.rw_transaction() as txn:
-        await kb_v2.set_kbid_for_slug(txn, slug=kbid, kbid=kbid)
+        await kb.set_kbid_for_slug(txn, slug=kbid, kbid=kbid)
         await txn.commit()
     return kbid
 
@@ -68,7 +68,7 @@ async def test_set_basic_missing_parent_logs_warning_and_does_not_raise(
     with caplog.at_level(logging.WARNING, logger="nucliadb.common.datamanagers.utils"):
         async with maindb_driver.rw_transaction() as txn:
             # No kbs row exists for kbid — FK violation expected to be swallowed
-            await resources_v2.set_basic(
+            await resources.set_basic(
                 txn,
                 kbid=kbid,
                 rid=rid,
@@ -106,7 +106,7 @@ async def test_transaction_remains_usable_after_foreign_key_violation(
     with caplog.at_level(logging.WARNING, logger="nucliadb.common.datamanagers.utils"):
         async with maindb_driver.rw_transaction() as txn:
             # Step 1: FK violation - must be swallowed, savepoint rolled back.
-            await resources_v2.set_basic(
+            await resources.set_basic(
                 txn,
                 kbid=missing_kbid,
                 rid=rid_bad,
@@ -114,7 +114,7 @@ async def test_transaction_remains_usable_after_foreign_key_violation(
             )
 
             # Step 2: Valid write on the same (still-open) transaction.
-            await resources_v2.set_slug(
+            await resources.set_slug(
                 txn,
                 kbid=kbid,
                 rid=rid_good,
@@ -126,14 +126,12 @@ async def test_transaction_remains_usable_after_foreign_key_violation(
 
     # The FK-violation write was silently dropped.
     async with maindb_driver.ro_transaction() as txn:
-        assert await resources_v2.exists(txn, kbid=missing_kbid, rid=rid_bad) is False
+        assert await resources.exists(txn, kbid=missing_kbid, rid=rid_bad) is False
 
     # The valid write was persisted.
     async with maindb_driver.ro_transaction() as txn:
-        assert await resources_v2.exists(txn, kbid=kbid, rid=rid_good) is True
-        assert (
-            await resources_v2.get_resource_uuid_from_slug(txn, kbid=kbid, slug="good-slug") == rid_good
-        )
+        assert await resources.exists(txn, kbid=kbid, rid=rid_good) is True
+        assert await resources.get_resource_uuid_from_slug(txn, kbid=kbid, slug="good-slug") == rid_good
 
     warning_records = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert any("Foreign key violation" in r.message for r in warning_records), (
@@ -153,7 +151,7 @@ async def test_set_slug_raises_conflict_error(
     rid = Resource.new_unique_rid()
 
     async with maindb_driver.rw_transaction() as txn:
-        await resources_v2.set_slug(
+        await resources.set_slug(
             txn,
             kbid=kbid,
             rid=rid,
@@ -165,7 +163,7 @@ async def test_set_slug_raises_conflict_error(
     with pytest.raises(ConflictError):
         async with maindb_driver.rw_transaction() as txn:
             rid2 = Resource.new_unique_rid()
-            await resources_v2.set_slug(
+            await resources.set_slug(
                 txn,
                 kbid=kbid,
                 rid=rid2,
@@ -175,7 +173,7 @@ async def test_set_slug_raises_conflict_error(
 
     # But setting it for the previous resource should succeed, as it is idempotent
     async with maindb_driver.rw_transaction() as txn:
-        await resources_v2.set_slug(
+        await resources.set_slug(
             txn,
             kbid=kbid,
             rid=rid,
@@ -194,7 +192,7 @@ async def test_modify_slug(
     rid = Resource.new_unique_rid()
 
     async with maindb_driver.rw_transaction() as txn:
-        await resources_v2.set_slug(
+        await resources.set_slug(
             txn,
             kbid=kbid,
             rid=rid,
@@ -204,7 +202,7 @@ async def test_modify_slug(
 
     # Now modify the slug
     async with maindb_driver.rw_transaction() as txn:
-        old_slug = await resources_v2.modify_slug(
+        old_slug = await resources.modify_slug(
             txn,
             kbid=kbid,
             rid=rid,
@@ -223,13 +221,13 @@ async def test_resource_set_get(
     Test that resource metadata can be set and retrieved correctly.
     """
     rid = Resource.new_unique_rid()
-    assert {rid async for rid in resources_v2.iterate_resource_ids(kbid=kbid)} == set()
+    assert {rid async for rid in resources.iterate_resource_ids(kbid=kbid)} == set()
 
     async with maindb_driver.rw_transaction() as txn:
-        assert await resources_v2.exists(txn, kbid=kbid, rid=rid) is False
-        assert await resources_v2.calculate_number_of_resources(txn, kbid=kbid) == 0
+        assert await resources.exists(txn, kbid=kbid, rid=rid) is False
+        assert await resources.calculate_number_of_resources(txn, kbid=kbid) == 0
 
-        await resources_v2.set_slug(
+        await resources.set_slug(
             txn,
             kbid=kbid,
             rid=rid,
@@ -238,62 +236,62 @@ async def test_resource_set_get(
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
-        assert await resources_v2.calculate_number_of_resources(txn, kbid=kbid) == 1
-        assert [rid async for rid in resources_v2.iterate_resource_ids(kbid=kbid)] == [rid]
-        assert await resources_v2.exists(txn, kbid=kbid, rid=rid) is True
-        assert await resources_v2.get_basic(txn, kbid=kbid, rid=rid) is None
-        assert await resources_v2.get_origin(txn, kbid=kbid, rid=rid) is None
-        assert await resources_v2.get_security(txn, kbid=kbid, rid=rid) is None
-        assert await resources_v2.get_extra(txn, kbid=kbid, rid=rid) is None
-        assert await resources_v2.get_resource_shard_id(txn, kbid=kbid, rid=rid) is None
-        assert await resources_v2.get_resource_uuid_from_slug(txn, kbid=kbid, slug="test-slug") == rid
+        assert await resources.calculate_number_of_resources(txn, kbid=kbid) == 1
+        assert [rid async for rid in resources.iterate_resource_ids(kbid=kbid)] == [rid]
+        assert await resources.exists(txn, kbid=kbid, rid=rid) is True
+        assert await resources.get_basic(txn, kbid=kbid, rid=rid) is None
+        assert await resources.get_origin(txn, kbid=kbid, rid=rid) is None
+        assert await resources.get_security(txn, kbid=kbid, rid=rid) is None
+        assert await resources.get_extra(txn, kbid=kbid, rid=rid) is None
+        assert await resources.get_resource_shard_id(txn, kbid=kbid, rid=rid) is None
+        assert await resources.get_resource_uuid_from_slug(txn, kbid=kbid, slug="test-slug") == rid
 
     async with maindb_driver.rw_transaction() as txn:
         extra = resources_pb2.Extra()
         extra.metadata.update({"key": "value"})
-        await resources_v2.set_extra(txn, kbid=kbid, rid=rid, extra=extra)
-        await resources_v2.set_origin(
+        await resources.set_extra(txn, kbid=kbid, rid=rid, extra=extra)
+        await resources.set_origin(
             txn, kbid=kbid, rid=rid, origin=resources_pb2.Origin(source_id="test-source")
         )
-        await resources_v2.set_security(
+        await resources.set_security(
             txn, kbid=kbid, rid=rid, security=resources_pb2.Security(access_groups=["group1", "group2"])
         )
-        await resources_v2.set_resource_shard_id(txn, kbid=kbid, rid=rid, shard="shard-1")
-        await resources_v2.set_basic(
+        await resources.set_resource_shard_id(txn, kbid=kbid, rid=rid, shard="shard-1")
+        await resources.set_basic(
             txn, kbid=kbid, rid=rid, basic=resources_pb2.Basic(slug="test-slug", title="Test Title")
         )
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
-        basic = await resources_v2.get_basic(txn, kbid=kbid, rid=rid)
+        basic = await resources.get_basic(txn, kbid=kbid, rid=rid)
         assert basic is not None
         assert basic.slug == "test-slug"
         assert basic.title == "Test Title"
 
-        origin = await resources_v2.get_origin(txn, kbid=kbid, rid=rid)
+        origin = await resources.get_origin(txn, kbid=kbid, rid=rid)
         assert origin is not None
         assert origin.source_id == "test-source"
 
-        security = await resources_v2.get_security(txn, kbid=kbid, rid=rid)
+        security = await resources.get_security(txn, kbid=kbid, rid=rid)
         assert security is not None
         assert security.access_groups == ["group1", "group2"]
 
-        extra_ = await resources_v2.get_extra(txn, kbid=kbid, rid=rid)
+        extra_ = await resources.get_extra(txn, kbid=kbid, rid=rid)
         assert extra_ is not None
         assert extra_.metadata["key"] == "value"
 
-        shard_id = await resources_v2.get_resource_shard_id(txn, kbid=kbid, rid=rid)
+        shard_id = await resources.get_resource_shard_id(txn, kbid=kbid, rid=rid)
         assert shard_id == "shard-1"
 
     async with maindb_driver.rw_transaction() as txn:
-        await resources_v2.delete(txn, kbid=kbid, rid=rid)
+        await resources.delete(txn, kbid=kbid, rid=rid)
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
-        assert await resources_v2.exists(txn, kbid=kbid, rid=rid) is False
-        assert await resources_v2.calculate_number_of_resources(txn, kbid=kbid) == 0
-        assert [rid async for rid in resources_v2.iterate_resource_ids(kbid=kbid)] == []
-        assert await resources_v2.get_basic(txn, kbid=kbid, rid=rid) is None
+        assert await resources.exists(txn, kbid=kbid, rid=rid) is False
+        assert await resources.calculate_number_of_resources(txn, kbid=kbid) == 0
+        assert [rid async for rid in resources.iterate_resource_ids(kbid=kbid)] == []
+        assert await resources.get_basic(txn, kbid=kbid, rid=rid) is None
 
 
 @pytest.mark.asyncio
@@ -301,5 +299,5 @@ async def test_exists_returns_false_for_invalid_uuid(
     maindb_driver: Driver,
 ) -> None:
     async with maindb_driver.ro_transaction() as txn:
-        result = await resources_v2.exists(txn, kbid="not-a-valid-uuid", rid="also-not-valid")
+        result = await resources.exists(txn, kbid="not-a-valid-uuid", rid="also-not-valid")
     assert result is False

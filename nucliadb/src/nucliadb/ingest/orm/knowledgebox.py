@@ -287,7 +287,7 @@ class KnowledgeBox:
                 raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
             if slug:
-                await datamanagers.kb.modify_slug(txn, kbid=kbid, old_slug=stored.slug, new_slug=slug)
+                await datamanagers.kb.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
                 stored.slug = slug
 
             if title is not None:
@@ -385,17 +385,12 @@ class KnowledgeBox:
                 return
 
             kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
-            if kb_config is not None:
-                slug = kb_config.slug
-                await datamanagers.kb.delete_kb_slug(txn, slug=slug)
-
-            await datamanagers.kb.delete_config(txn, kbid=kbid)
 
             await cls.mark_for_purge(txn, kbid=kbid)
 
             shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
 
-            await datamanagers.kb.kb_v2.soft_delete(txn, kbid=kbid)
+            await datamanagers.kb.soft_delete(txn, kbid=kbid)
 
             await txn.commit()
 
@@ -455,7 +450,7 @@ class KnowledgeBox:
     async def delete_all_kb_keys(cls, txn: Transaction, kbid: str):
         prefix = KB_KEYS.format(kbid=kbid)
         await txn.delete_by_prefix(prefix)
-        await datamanagers.kb.kb_v2.delete(txn, kbid=kbid)
+        await datamanagers.kb.delete(txn, kbid=kbid)
 
     async def get_resource_shard(self, shard_id: str) -> writer_pb2.ShardObject | None:
         async with datamanagers.with_ro_transaction() as txn:
