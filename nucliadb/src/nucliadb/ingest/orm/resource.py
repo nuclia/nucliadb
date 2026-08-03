@@ -333,8 +333,6 @@ class Resource:
 
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
-            if fieldid.field_type == FieldType.FILE:
-                await self.delete_file_field_md5(fieldid.field)
 
         for delete_splits in message.delete_splits:
             await self._apply_delete_splits(delete_splits)

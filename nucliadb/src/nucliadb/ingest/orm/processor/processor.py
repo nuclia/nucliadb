@@ -26,7 +26,7 @@ import nats.js.errors
 from nidx_protos import noderesources_pb2, nodewriter_pb2
 from nidx_protos.noderesources_pb2 import Resource as PBBrainResource
 
-from nucliadb.common import datamanagers, file_md5, locking
+from nucliadb.common import datamanagers, locking
 from nucliadb.common.catalog import catalog_delete, catalog_update
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
@@ -235,7 +235,6 @@ class Processor:
                         raise AttributeError("Shard not available")
 
                     await catalog_delete(txn, kbid, uuid)
-                    await file_md5.delete(txn, kbid=kbid, rid=uuid)
 
                     external_index_manager = await get_external_index_manager(kbid=kbid)
                     if external_index_manager is not None:

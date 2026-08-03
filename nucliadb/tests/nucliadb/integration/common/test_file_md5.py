@@ -87,12 +87,6 @@ async def test_same_md5_different_fields(driver: PGDriver, kbid: str, rid: str):
 
     assert await file_md5.exists(kbid=kbid, md5="aaa") is True
 
-    async with driver.rw_transaction() as txn:
-        await file_md5.delete(txn, kbid=kbid, rid=rid, field_id="file1")
-        await txn.commit()
-
-    assert await file_md5.exists(kbid=kbid, md5="aaa") is True
-
 
 async def test_delete_by_field(driver: PGDriver, kbid: str, rid: str):
     async with driver.rw_transaction() as txn:
@@ -101,7 +95,6 @@ async def test_delete_by_field(driver: PGDriver, kbid: str, rid: str):
         await txn.commit()
 
     async with driver.rw_transaction() as txn:
-        await file_md5.delete(txn, kbid=kbid, rid=rid, field_id="file1")
         await fields.delete(txn, kbid=kbid, rid=rid, field_id="file1", field_type="f")
         await txn.commit()
 
@@ -122,7 +115,6 @@ async def test_delete_by_resource(driver: PGDriver, kbid: str, rid: str):
         await txn.commit()
 
     async with driver.rw_transaction() as txn:
-        await file_md5.delete(txn, kbid=kbid, rid=rid)
         await resources.delete(txn, kbid=kbid, rid=rid)
         await txn.commit()
 
@@ -147,7 +139,6 @@ async def test_delete_by_kb(driver: PGDriver, kbid: str, rid: str):
         await txn.commit()
 
     async with driver.rw_transaction() as txn:
-        await file_md5.delete(txn, kbid=kbid)
         await kb.delete(txn, kbid=kbid)
         await txn.commit()
 

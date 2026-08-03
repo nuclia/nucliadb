@@ -25,7 +25,7 @@ from uuid import uuid4
 
 from nidx_protos import nidx_pb2, noderesources_pb2
 
-from nucliadb.common import datamanagers, file_md5
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
 from nucliadb.common.maindb.driver import Driver, Transaction
@@ -438,7 +438,6 @@ class KnowledgeBox:
             await txn.set(storage_to_delete, b"")
 
             await catalog_delete_kb(txn, kbid)
-            await file_md5.delete(txn, kbid=kbid)
             await txn.commit()
 
         # Delete by prefix in another transaction, as it can be slow and we don't want to block the previous one
