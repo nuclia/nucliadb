@@ -56,5 +56,5 @@ async def fix_resource(kbid: str, rid: str):
         unique_langs = set(basic.metadata.languages)
         basic.metadata.ClearField("languages")
         basic.metadata.languages.extend(list(unique_langs))
-        await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
+        await datamanagers.resources.upsert(txn, kbid=kbid, rid=rid, basic=basic)
         await txn.commit()

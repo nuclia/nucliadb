@@ -32,9 +32,15 @@ from nucliadb_protos.utils_pb2 import ExtractedText
 async def test_get_paragraph_text(storage, cache, txn, dummy_nidx_utility, processor, knowledgebox):
     kbid = knowledgebox
     rid = Resource.new_unique_rid()
-    basic = Basic(slug="slug", uuid=rid)
-    await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
-    await datamanagers.resources.set_slug(txn, kbid=kbid, rid=rid, slug="slug")
+    slug = "slug"
+    basic = Basic(slug=slug, uuid=rid)
+    await datamanagers.resources.upsert(
+        txn,
+        kbid=kbid,
+        rid=rid,
+        slug=slug,
+        basic=basic,
+    )
     kb = KnowledgeBox(txn, storage, kbid)
     orm_resource = await kb.get(rid)
     assert orm_resource

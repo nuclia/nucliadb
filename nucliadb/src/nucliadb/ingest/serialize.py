@@ -42,7 +42,7 @@ from nucliadb_models.extracted import (
     RelationNodeVector,
     VectorObject,
 )
-from nucliadb_models.metadata import Extra, Origin, Relation
+from nucliadb_models.metadata import Relation
 from nucliadb_models.resource import (
     ConversationFieldData,
     ConversationFieldExtractedData,
@@ -62,7 +62,6 @@ from nucliadb_models.resource import (
     TextFieldExtractedData,
 )
 from nucliadb_models.search import ResourceProperties
-from nucliadb_models.security import ResourceSecurity
 from nucliadb_protos import writer_pb2
 from nucliadb_protos.writer_pb2 import FieldStatus
 from nucliadb_utils.utilities import get_storage
@@ -143,59 +142,64 @@ async def serialize_resource(
 ) -> Resource:
     resource = Resource(id=orm_resource.uuid)
 
+    requested_resource_columns: list[datamanagers.resources.ResourceColumn] = []
+    if ResourceProperties.BASIC in show:
+        requested_resource_columns.append("basic")
+    if ResourceProperties.ORIGIN in show:
+        requested_resource_columns.append("origin")
+    if ResourceProperties.EXTRA in show:
+        requested_resource_columns.append("extra")
+    if ResourceProperties.SECURITY in show:
+        requested_resource_columns.append("security")
+
+    resource_data = None
+    if requested_resource_columns:
+        resource_data = await orm_resource.get_data(columns=tuple(requested_resource_columns))
+
     include_values = ResourceProperties.VALUES in show
 
     include_extracted_data = ResourceProperties.EXTRACTED in show and extracted != []
 
     if ResourceProperties.BASIC in show:
-        await orm_resource.get_basic()
+        basic = None if resource_data is None else resource_data.basic
 
-        if orm_resource.basic is not None:
-            resource.slug = orm_resource.basic.slug
-            resource.title = orm_resource.basic.title
-            resource.summary = orm_resource.basic.summary
-            resource.icon = orm_resource.basic.icon
-            resource.thumbnail = orm_resource.basic.thumbnail
-            resource.hidden = orm_resource.basic.hidden
-            resource.created = (
-                orm_resource.basic.created.ToDatetime()
-                if orm_resource.basic.HasField("created")
-                else None
-            )
-            resource.modified = (
-                orm_resource.basic.modified.ToDatetime()
-                if orm_resource.basic.HasField("modified")
-                else None
-            )
+        if basic is not None:
+            resource.slug = basic.slug
+            resource.title = basic.title
+            resource.summary = basic.summary
+            resource.icon = basic.icon
+            resource.thumbnail = basic.thumbnail
+            resource.hidden = basic.hidden
+            resource.created = basic.created.ToDatetime() if basic.HasField("created") else None
+            resource.modified = basic.modified.ToDatetime() if basic.HasField("modified") else None
 
-            resource.metadata = from_proto.metadata(orm_resource.basic.metadata)
-            resource.usermetadata = from_proto.user_metadata(orm_resource.basic.usermetadata)
-            resource.fieldmetadata = [
-                from_proto.user_field_metadata(fm) for fm in orm_resource.basic.fieldmetadata
-            ]
-            resource.computedmetadata = from_proto.computed_metadata(orm_resource.basic.computedmetadata)
+            resource.metadata = from_proto.metadata(basic.metadata)
+            resource.usermetadata = from_proto.user_metadata(basic.usermetadata)
+            resource.fieldmetadata = [from_proto.user_field_metadata(fm) for fm in basic.fieldmetadata]
+            resource.computedmetadata = from_proto.computed_metadata(basic.computedmetadata)
 
-            resource.last_seqid = orm_resource.basic.last_seqid
+            resource.last_seqid = basic.last_seqid
 
             # 0 on the proto means it was not ever set, as first valid value for this field will allways be 1
-            resource.last_account_seq = (
-                orm_resource.basic.last_account_seq if orm_resource.basic.last_account_seq != 0 else None
-            )
-            resource.queue = QueueType[orm_resource.basic.QueueType.Name(orm_resource.basic.queue)]
+            resource.last_account_seq = basic.last_account_seq if basic.last_account_seq != 0 else None
+            resource.queue = QueueType[basic.QueueType.Name(basic.queue)]
 
             if ResourceProperties.RELATIONS in show:
                 resource.usermetadata.relations = await serialize_user_relations(orm_resource)
 
     if ResourceProperties.ORIGIN in show:
-        resource.origin = await serialize_origin(orm_resource)
+        if resource_data is not None and resource_data.origin is not None:
+            resource.origin = from_proto.origin(resource_data.origin)
 
     if ResourceProperties.EXTRA in show:
-        resource.extra = await serialize_extra(orm_resource)
+        if resource_data is not None and resource_data.extra is not None:
+            resource.extra = from_proto.extra(resource_data.extra)
 
     include_errors = ResourceProperties.ERRORS in show
 
     if ResourceProperties.SECURITY in show:
-        resource.security = await serialize_security(orm_resource)
+        if resource_data is not None and resource_data.security is not None:
+            resource.security = from_proto.security(resource_data.security)
 
     if (field_type_filter and (include_values or include_extracted_data)) or include_errors:
         await orm_resource.get_fields()
@@ -315,35 +319,9 @@ async def serialize_resource(
     return resource
 
 
-async def serialize_origin(resource: ORMResource) -> Origin | None:
-    origin = await resource.get_origin()
-    if origin is None:
-        return None
-
-    return from_proto.origin(origin)
-
-
-async def serialize_extra(resource: ORMResource) -> Extra | None:
-    extra = await resource.get_extra()
-    if extra is None:
-        return None
-    return from_proto.extra(extra)
-
-
 async def serialize_user_relations(resource: ORMResource) -> list[Relation]:
     relations = await resource.get_user_relations()
     return [from_proto.relation(rel) for rel in relations.relations]
-
-
-async def serialize_security(resource: ORMResource) -> ResourceSecurity:
-    security = ResourceSecurity(access_groups=[])
-
-    security_pb = await resource.get_security()
-    if security_pb is not None:
-        for gid in security_pb.access_groups:
-            security.access_groups.append(gid)
-
-    return security
 
 
 async def serialize_field_errors(

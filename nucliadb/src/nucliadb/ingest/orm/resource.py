@@ -91,6 +91,8 @@ class Resource:
         self.fields: dict[tuple[FieldType.ValueType, str], Field] = {}
         self.conversations: dict[int, PBConversation] = {}
         self.relations: PBRelations | None = None
+        self.slug: str | None = None
+        self.shard: str | None = None
         self.origin: PBOrigin | None = None
         self.extra: PBExtra | None = None
         self.security: utils_pb2.Security | None = None
@@ -100,11 +102,14 @@ class Resource:
         self.storage = storage
         self.kbid = kbid
         self.uuid = uuid
-        self.basic = basic
+        self.basic: PBBasic | None = basic
         self.disable_vectors = disable_vectors
         self._previous_status: Metadata.Status.ValueType | None = None
         self.user_relations: PBRelations | None = None
         self.locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._loaded_resource_columns: set[datamanagers.resources.ResourceColumn] = set()
+        if basic is not None:
+            self._loaded_resource_columns.add("basic")
 
     @staticmethod
     def new_unique_rid() -> str:
@@ -112,8 +117,8 @@ class Resource:
 
     @classmethod
     async def get(cls, txn: Transaction, kbid: str, rid: str) -> Resource | None:
-        basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
-        if basic is None:
+        resource_data = await datamanagers.resources.get(txn, kbid=kbid, rid=rid, columns=("basic",))
+        if resource_data is None or resource_data.basic is None:
             return None
         storage = await get_storage()
         return cls(
@@ -121,63 +126,107 @@ class Resource:
             storage=storage,
             kbid=kbid,
             uuid=rid,
-            basic=basic,
+            basic=resource_data.basic,
             disable_vectors=False,
         )
+
+    def _cache_resource_data(self, resource_data: datamanagers.resources.ResourceData) -> None:
+        for column_name in ("slug", "shard", "basic", "origin", "security", "extra"):
+            value = getattr(resource_data, column_name)
+            if value is datamanagers.resources.UNSET:
+                continue
+            setattr(self, column_name, value)
+            self._loaded_resource_columns.add(column_name)
+
+    def _resource_data_from_cache(
+        self, columns: tuple[datamanagers.resources.ResourceColumn, ...]
+    ) -> datamanagers.resources.ResourceData:
+        resource_data = datamanagers.resources.ResourceData()
+        for column_name in columns:
+            setattr(resource_data, column_name, getattr(self, column_name))
+        return resource_data
+
+    async def get_data(
+        self, *, columns: tuple[datamanagers.resources.ResourceColumn, ...]
+    ) -> datamanagers.resources.ResourceData | None:
+        missing_columns = tuple(
+            column_name for column_name in columns if column_name not in self._loaded_resource_columns
+        )
+        if missing_columns:
+            resource_data = await datamanagers.resources.get(
+                self.txn,
+                kbid=self.kbid,
+                rid=self.uuid,
+                columns=missing_columns,
+            )
+            if resource_data is None:
+                return None
+            self._cache_resource_data(resource_data)
+
+        return self._resource_data_from_cache(columns)
 
     async def set_slug(self):
         basic = await self.get_basic()
         await datamanagers.resources.set_slug(self.txn, kbid=self.kbid, rid=self.uuid, slug=basic.slug)
 
-    # Basic
     async def get_basic(self) -> PBBasic:
-        if self.basic is None:
-            basic = await datamanagers.resources.get_basic(self.txn, kbid=self.kbid, rid=self.uuid)
+        if "basic" not in self._loaded_resource_columns:
+            resource_data = await self.get_data(columns=("basic",))
+            basic = None if resource_data is None else resource_data.basic
             self.basic = basic if basic is not None else PBBasic()
+            self._loaded_resource_columns.add("basic")
+        assert self.basic is not None
         return self.basic
 
-    async def set_basic(self, payload: PBBasic) -> None:
-        await datamanagers.resources.set_basic(self.txn, kbid=self.kbid, rid=self.uuid, basic=payload)
-        self.basic = payload
-        self.modified = True
-
-    # Origin
     async def get_origin(self) -> PBOrigin | None:
-        if self.origin is None:
-            origin = await datamanagers.resources.get_origin(self.txn, kbid=self.kbid, rid=self.uuid)
-            self.origin = origin
+        if "origin" not in self._loaded_resource_columns:
+            resource_data = await self.get_data(columns=("origin",))
+            self.origin = None if resource_data is None else resource_data.origin
         return self.origin
 
-    async def set_origin(self, payload: PBOrigin):
-        await datamanagers.resources.set_origin(self.txn, kbid=self.kbid, rid=self.uuid, origin=payload)
-        self.modified = True
-        self.origin = payload
-
-    # Extra
     async def get_extra(self) -> PBExtra | None:
-        if self.extra is None:
-            extra = await datamanagers.resources.get_extra(self.txn, kbid=self.kbid, rid=self.uuid)
-            self.extra = extra
+        if "extra" not in self._loaded_resource_columns:
+            resource_data = await self.get_data(columns=("extra",))
+            self.extra = None if resource_data is None else resource_data.extra
         return self.extra
 
-    async def set_extra(self, payload: PBExtra):
-        await datamanagers.resources.set_extra(self.txn, kbid=self.kbid, rid=self.uuid, extra=payload)
-        self.modified = True
-        self.extra = payload
-
-    # Security
     async def get_security(self) -> utils_pb2.Security | None:
-        if self.security is None:
-            security = await datamanagers.resources.get_security(self.txn, kbid=self.kbid, rid=self.uuid)
-            self.security = security
+        if "security" not in self._loaded_resource_columns:
+            resource_data = await self.get_data(columns=("security",))
+            self.security = None if resource_data is None else resource_data.security
         return self.security
 
-    async def set_security(self, payload: utils_pb2.Security) -> None:
-        await datamanagers.resources.set_security(
-            self.txn, kbid=self.kbid, rid=self.uuid, security=payload
+    async def upsert(
+        self,
+        basic: PBBasic | None = None,
+        origin: PBOrigin | None = None,
+        extra: PBExtra | None = None,
+        security: utils_pb2.Security | None = None,
+    ) -> None:
+        if not any([x is not None for x in [basic, origin, extra, security]]):
+            return
+        await datamanagers.resources.upsert(
+            self.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            basic=basic if basic is not None else datamanagers.resources.UNSET,
+            origin=origin if origin is not None else datamanagers.resources.UNSET,
+            extra=extra if extra is not None else datamanagers.resources.UNSET,
+            security=security if security is not None else datamanagers.resources.UNSET,
         )
+        if basic is not None:
+            self.basic = basic
+            self._loaded_resource_columns.add("basic")
+        if origin is not None:
+            self.origin = origin
+            self._loaded_resource_columns.add("origin")
+        if extra is not None:
+            self.extra = extra
+            self._loaded_resource_columns.add("extra")
+        if security is not None:
+            self.security = security
+            self._loaded_resource_columns.add("security")
         self.modified = True
-        self.security = payload
 
     # Relations
     async def get_user_relations(self) -> PBRelations:

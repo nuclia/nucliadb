@@ -93,12 +93,12 @@ async def test_modify_slug(
     initial_slug = "initial-slug"
     async with maindb_driver.rw_transaction() as txn:
         basic = resources_pb2.Basic(slug=initial_slug, title="Test Title")
-        await resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
-        await resources.set_slug(
+        await resources.upsert(
             txn,
             kbid=kbid,
             rid=rid,
             slug=initial_slug,
+            basic=basic,
         )
         await txn.commit()
 
@@ -151,16 +151,15 @@ async def test_resource_set_get(
     async with maindb_driver.rw_transaction() as txn:
         extra = resources_pb2.Extra()
         extra.metadata.update({"key": "value"})
-        await resources.set_extra(txn, kbid=kbid, rid=rid, extra=extra)
-        await resources.set_origin(
-            txn, kbid=kbid, rid=rid, origin=resources_pb2.Origin(source_id="test-source")
-        )
-        await resources.set_security(
-            txn, kbid=kbid, rid=rid, security=resources_pb2.Security(access_groups=["group1", "group2"])
-        )
-        await resources.set_resource_shard_id(txn, kbid=kbid, rid=rid, shard="shard-1")
-        await resources.set_basic(
-            txn, kbid=kbid, rid=rid, basic=resources_pb2.Basic(slug="test-slug", title="Test Title")
+        await resources.upsert(
+            txn,
+            kbid=kbid,
+            rid=rid,
+            shard="shard-1",
+            basic=resources_pb2.Basic(slug="test-slug", title="Test Title"),
+            extra=extra,
+            origin=resources_pb2.Origin(source_id="test-source"),
+            security=resources_pb2.Security(access_groups=["group1", "group2"]),
         )
         await txn.commit()
 
@@ -194,6 +193,93 @@ async def test_resource_set_get(
         assert await resources.calculate_number_of_resources(txn, kbid=kbid) == 0
         assert [rid async for rid in resources.iterate_resource_ids(kbid=kbid)] == []
         assert await resources.get_basic(txn, kbid=kbid, rid=rid) is None
+
+
+async def test_upsert_distinguishes_none_from_unset(
+    maindb_driver: Driver,
+    kbid: str,
+) -> None:
+    rid = Resource.new_unique_rid()
+
+    async with maindb_driver.rw_transaction() as txn:
+        extra = resources_pb2.Extra()
+        extra.metadata.update({"key": "value"})
+        await resources.upsert(
+            txn,
+            kbid=kbid,
+            rid=rid,
+            slug="test-slug",
+            shard="shard-1",
+            basic=resources_pb2.Basic(slug="test-slug", title="Test Title"),
+            origin=resources_pb2.Origin(source_id="test-source"),
+            security=resources_pb2.Security(access_groups=["group1"]),
+            extra=extra,
+        )
+        await txn.commit()
+
+    async with maindb_driver.rw_transaction() as txn:
+        await resources.upsert(
+            txn,
+            kbid=kbid,
+            rid=rid,
+            slug=None,
+            basic=None,
+            origin=resources.UNSET,
+            security=resources.UNSET,
+            extra=resources.UNSET,
+            shard=resources.UNSET,
+        )
+        await txn.commit()
+
+    async with maindb_driver.ro_transaction() as txn:
+        assert await resources.get_slug(txn, kbid=kbid, rid=rid) is None
+        assert await resources.get_basic(txn, kbid=kbid, rid=rid) is None
+
+        origin = await resources.get_origin(txn, kbid=kbid, rid=rid)
+        assert origin is not None
+        assert origin.source_id == "test-source"
+
+        security = await resources.get_security(txn, kbid=kbid, rid=rid)
+        assert security is not None
+        assert security.access_groups == ["group1"]
+
+        extra1 = await resources.get_extra(txn, kbid=kbid, rid=rid)
+        assert extra1 is not None
+        assert extra1.metadata["key"] == "value"
+
+        assert await resources.get_resource_shard_id(txn, kbid=kbid, rid=rid) == "shard-1"
+
+
+async def test_get_selected_columns(
+    maindb_driver: Driver,
+    kbid: str,
+) -> None:
+    rid = Resource.new_unique_rid()
+
+    async with maindb_driver.rw_transaction() as txn:
+        await resources.upsert(
+            txn,
+            kbid=kbid,
+            rid=rid,
+            slug=None,
+            shard="shard-1",
+            basic=resources_pb2.Basic(slug="test-slug", title="Test Title"),
+            origin=resources_pb2.Origin(source_id="test-source"),
+        )
+        await txn.commit()
+
+    async with maindb_driver.ro_transaction() as txn:
+        resource = await resources.get(txn, kbid=kbid, rid=rid, columns=("slug", "basic", "shard"))
+
+    assert resource is not None
+    assert resource.slug is None
+    assert resource.shard == "shard-1"
+    assert resource.basic is not resources.UNSET
+    assert resource.basic is not None
+    assert resource.basic.title == "Test Title"
+    assert resource.origin is resources.UNSET
+    assert resource.security is resources.UNSET
+    assert resource.extra is resources.UNSET
 
 
 @pytest.mark.asyncio

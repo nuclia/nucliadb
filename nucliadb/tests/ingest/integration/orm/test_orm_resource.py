@@ -89,10 +89,36 @@ async def test_create_resource_orm_with_basic(
     o2.source_id = "My Source"
     o2.created.FromDatetime(datetime.now())
 
-    await r.set_origin(o2)
+    await r.upsert(origin=o2)
     o2 = await r.get_origin()
     assert o2 is not None
     assert o2.source_id == "My Source"
+
+    await txn.abort()
+
+
+async def test_resource_get_data_selected_columns(
+    storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+):
+    basic = PBBasic(title="My title", summary="My summary")
+    uuid = str(uuid4())
+    kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
+    resource = await kb_obj.add_resource(uuid=uuid, slug="slug", basic=basic)
+    assert resource is not None
+
+    origin = PBOrigin(source_id="origin-id")
+    await resource.upsert(origin=origin)
+
+    data = await resource.get_data(columns=("basic", "origin", "security"))
+
+    assert data is not None
+    assert data.basic is not datamanagers.resources.UNSET
+    assert data.basic is not None
+    assert data.basic.title == "My title"
+    assert data.origin is not None
+    assert data.origin.source_id == "origin-id"
+    assert data.security is None
+    assert await resource.get_origin() is not None
 
     await txn.abort()
 

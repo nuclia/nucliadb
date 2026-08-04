@@ -60,8 +60,13 @@ async def resource_with_slug(maindb_driver: Driver, kbid: str):
     slug = "slug"
 
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=Basic(slug=slug))
-        await datamanagers.resources.set_slug(txn, kbid=kbid, rid=rid, slug=slug)
+        await datamanagers.resources.upsert(
+            txn,
+            kbid=kbid,
+            rid=rid,
+            slug=slug,
+            basic=Basic(slug=slug, uuid=rid),
+        )
         await txn.commit()
 
     await check_slug(maindb_driver, kbid, rid, slug)

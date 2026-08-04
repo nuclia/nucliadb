@@ -498,7 +498,12 @@ class KnowledgeBox:
             slug = uuid
         basic.slug = slug
         fix_paragraph_annotation_keys(uuid, basic)
-        await datamanagers.resources.set_basic(self.txn, kbid=self.kbid, rid=uuid, basic=basic)
+        await datamanagers.resources.upsert(
+            self.txn,
+            kbid=self.kbid,
+            rid=uuid,
+            basic=basic,
+        )
         return Resource(
             storage=self.storage,
             txn=self.txn,

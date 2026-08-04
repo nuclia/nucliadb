@@ -481,9 +481,7 @@ async def move_resource_to_shard(
                 # resource could have already been moved
                 return False
 
-            await datamanagers.resources.set_resource_shard_id(
-                txn, kbid=kbid, rid=resource_id, shard=to_shard.shard
-            )
+            await datamanagers.resources.upsert(txn, kbid=kbid, rid=resource_id, shard=to_shard.shard)
             await index_resource_to_shard(context, kbid, resource_id, to_shard)
             indexed_to_new = True
             await delete_resource_from_shard(context, kbid, resource_id, from_shard)

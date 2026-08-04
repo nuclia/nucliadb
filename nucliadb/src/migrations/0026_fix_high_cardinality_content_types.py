@@ -57,5 +57,5 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                 continue
             logger.info("Fixing content type for resource", extra={"kbid": kbid, "rid": rid})
             basic.icon = "multipart/form-data"
-            await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
+            await datamanagers.resources.upsert(txn, kbid=kbid, rid=rid, basic=basic)
             await txn.commit()

@@ -394,7 +394,7 @@ class Processor:
                         # After an index error, recompute and persist resource status
                         basic = await resource.get_basic()
                         await compute_resource_status(txn, kbid, uuid, basic)
-                        await resource.set_basic(basic)
+                        await resource.upsert(basic=basic)
                         # Catalog takes status from index message labels, override it to error
                         current_status = [x for x in index_message.labels if x.startswith("/n/s/")]
                         if current_status:
@@ -506,9 +506,7 @@ class Processor:
                     shard = await self.index_node_shard_manager.create_shard_by_kbid(
                         txn, kbid, prewarm_enabled=prewarm
                     )
-            await datamanagers.resources.set_resource_shard_id(
-                txn, kbid=kbid, rid=uuid, shard=shard.shard
-            )
+            await datamanagers.resources.upsert(txn, kbid=kbid, rid=uuid, shard=shard.shard)
         return shard
 
     @processor_observer.wrap({"type": "index_resource"})
@@ -641,14 +639,13 @@ class Processor:
         # computed resource status into basic before persisting.
         await compute_resource_status(resource.txn, resource.kbid, resource.uuid, current_basic)
 
-        if current_basic != previous_basic:
-            await resource.set_basic(current_basic)
-        if message.HasField("origin"):
-            await resource.set_origin(message.origin)
-        if message.HasField("extra"):
-            await resource.set_extra(message.extra)
-        if message.HasField("security"):
-            await resource.set_security(message.security)
+        await resource.upsert(
+            basic=current_basic if current_basic != previous_basic else None,
+            origin=message.origin if message.HasField("origin") else None,
+            extra=message.extra if message.HasField("extra") else None,
+            security=message.security if message.HasField("security") else None,
+        )
+
         if message.HasField("user_relations"):
             await resource.set_user_relations(message.user_relations)
 
@@ -745,7 +742,7 @@ class Processor:
             async with self.driver.rw_transaction() as txn:
                 kb.txn = resource.txn = txn
                 resource.basic.metadata.status = resources_pb2.Metadata.Status.ERROR
-                await resource.set_basic(resource.basic)
+                await resource.upsert(basic=resource.basic)
                 await txn.commit()
         except Exception:
             logger.warning("Error while marking resource as error", exc_info=True)

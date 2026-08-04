@@ -34,8 +34,11 @@ Each row represents one resource in a knowledge box and stores:
 import logging
 import uuid
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from typing import Final, Literal, TypeAlias, cast
 
 import psycopg.errors
+import psycopg.sql
 
 from nucliadb.common.datamanagers.utils import _pg_cursor, with_ro_transaction
 from nucliadb.common.maindb.driver import Transaction
@@ -45,9 +48,69 @@ from nucliadb_protos import resources_pb2
 logger = logging.getLogger(__name__)
 
 
+class _UnsetType:
+    pass
+
+
+UNSET: Final = _UnsetType()
+
+ResourceColumn: TypeAlias = Literal["slug", "shard", "basic", "origin", "security", "extra"]
+
+UNSET_STR: Final[str | None] = cast(str | None, UNSET)
+UNSET_BASIC: Final[resources_pb2.Basic | None] = cast(resources_pb2.Basic | None, UNSET)
+UNSET_ORIGIN: Final[resources_pb2.Origin | None] = cast(resources_pb2.Origin | None, UNSET)
+UNSET_SECURITY: Final[resources_pb2.Security | None] = cast(resources_pb2.Security | None, UNSET)
+UNSET_EXTRA: Final[resources_pb2.Extra | None] = cast(resources_pb2.Extra | None, UNSET)
+
+
+@dataclass(slots=True)
+class ResourceData:
+    slug: str | None = UNSET_STR
+    shard: str | None = UNSET_STR
+    basic: resources_pb2.Basic | None = UNSET_BASIC
+    origin: resources_pb2.Origin | None = UNSET_ORIGIN
+    security: resources_pb2.Security | None = UNSET_SECURITY
+    extra: resources_pb2.Extra | None = UNSET_EXTRA
+
+
 def _to_rid(value: uuid.UUID) -> str:
     """Return the 32-char hex form (no hyphens) of a UUID column value."""
     return value.hex
+
+
+def _serialize_resource_column(value):
+    if value is UNSET:
+        return UNSET
+    if value is None:
+        return None
+    if isinstance(
+        value,
+        (
+            resources_pb2.Basic,
+            resources_pb2.Origin,
+            resources_pb2.Security,
+            resources_pb2.Extra,
+        ),
+    ):
+        return value.SerializeToString()
+    return value
+
+
+def _deserialize_resource_column(column: ResourceColumn, value):
+    if value is None:
+        return None
+    if column == "slug" or column == "shard":
+        return str(value)
+
+    message_types = {
+        "basic": resources_pb2.Basic,
+        "origin": resources_pb2.Origin,
+        "security": resources_pb2.Security,
+        "extra": resources_pb2.Extra,
+    }
+    pb = message_types[column]()
+    pb.ParseFromString(bytes(value))
+    return pb
 
 
 # ---------------------------------------------------------------------------
@@ -55,80 +118,68 @@ def _to_rid(value: uuid.UUID) -> str:
 # ---------------------------------------------------------------------------
 
 
-async def set_basic(
+async def upsert(
     txn: Transaction,
     *,
     kbid: str,
     rid: str,
-    basic: resources_pb2.Basic,
+    slug: str | None | _UnsetType = UNSET,
+    shard: str | None | _UnsetType = UNSET,
+    basic: resources_pb2.Basic | None | _UnsetType = UNSET,
+    origin: resources_pb2.Origin | None | _UnsetType = UNSET,
+    security: resources_pb2.Security | None | _UnsetType = UNSET,
+    extra: resources_pb2.Extra | None | _UnsetType = UNSET,
 ) -> None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_resources (kbid, rid, basic)
-            VALUES (%(kbid)s, %(rid)s, %(basic)s)
-            ON CONFLICT (kbid, rid) DO UPDATE SET
-                basic = EXCLUDED.basic
-            """,
-            {"kbid": kbid, "rid": rid, "basic": basic.SerializeToString()},
+    """Upsert a resource row, updating only columns explicitly provided.
+
+    Use UNSET to leave a column untouched. Pass None to explicitly store SQL NULL.
+    """
+    values = {
+        "kbid": kbid,
+        "rid": rid,
+        "slug": _serialize_resource_column(slug),
+        "shard": _serialize_resource_column(shard),
+        "basic": _serialize_resource_column(basic),
+        "origin": _serialize_resource_column(origin),
+        "security": _serialize_resource_column(security),
+        "extra": _serialize_resource_column(extra),
+    }
+    columns_to_set = [
+        column_name
+        for column_name in ("slug", "shard", "basic", "origin", "security", "extra")
+        if values[column_name] is not UNSET
+    ]
+    if not columns_to_set:
+        return
+
+    insert_columns = ["kbid", "rid", *columns_to_set]
+    assignments = [
+        psycopg.sql.SQL("{} = EXCLUDED.{}").format(
+            psycopg.sql.Identifier(column_name),
+            psycopg.sql.Identifier(column_name),
         )
+        for column_name in columns_to_set
+    ]
 
+    query = psycopg.sql.SQL(
+        """
+        INSERT INTO kb_resources ({insert_columns})
+        VALUES ({insert_values})
+        ON CONFLICT (kbid, rid) DO UPDATE SET
+            {assignments}
+        """
+    ).format(
+        insert_columns=psycopg.sql.SQL(", ").join(
+            psycopg.sql.Identifier(column_name) for column_name in insert_columns
+        ),
+        insert_values=psycopg.sql.SQL(", ").join(
+            psycopg.sql.Placeholder(column_name) for column_name in insert_columns
+        ),
+        assignments=psycopg.sql.SQL(", ").join(assignments),
+    )
 
-async def set_origin(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    origin: resources_pb2.Origin,
-) -> None:
     async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_resources (kbid, rid, origin)
-            VALUES (%(kbid)s, %(rid)s, %(origin)s)
-            ON CONFLICT (kbid, rid) DO UPDATE SET
-                origin = EXCLUDED.origin
-            """,
-            {"kbid": kbid, "rid": rid, "origin": origin.SerializeToString()},
-        )
-
-
-async def set_security(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    security: resources_pb2.Security,
-) -> None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_resources (kbid, rid, security)
-            VALUES (%(kbid)s, %(rid)s, %(security)s)
-            ON CONFLICT (kbid, rid) DO UPDATE SET
-                security = EXCLUDED.security
-            """,
-            {"kbid": kbid, "rid": rid, "security": security.SerializeToString()},
-        )
-
-
-async def set_extra(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    extra: resources_pb2.Extra,
-) -> None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_resources (kbid, rid, extra)
-            VALUES (%(kbid)s, %(rid)s, %(extra)s)
-            ON CONFLICT (kbid, rid) DO UPDATE SET
-                extra = EXCLUDED.extra
-            """,
-            {"kbid": kbid, "rid": rid, "extra": extra.SerializeToString()},
-        )
+        await cur.execute(query, {column_name: values[column_name] for column_name in insert_columns})
 
 
 async def get_slug(txn: Transaction, kbid: str, rid: str) -> str | None:
@@ -141,7 +192,9 @@ async def get_slug(txn: Transaction, kbid: str, rid: str) -> str | None:
             {"kbid": kbid, "rid": rid},
         )
         row = await cur.fetchone()
-        return str(row[0]) if row is not None else None
+        if row is None or row[0] is None:
+            return None
+        return str(row[0])
 
 
 async def set_slug(
@@ -151,19 +204,15 @@ async def set_slug(
     rid: str,
     slug: str,
 ) -> None:
-    async with _pg_cursor(txn) as cur:
-        try:
-            await cur.execute(
-                """
-                INSERT INTO kb_resources (kbid, rid, slug)
-                VALUES (%(kbid)s, %(rid)s, %(slug)s)
-                ON CONFLICT (kbid, rid) DO UPDATE SET
-                    slug = EXCLUDED.slug
-                """,
-                {"kbid": kbid, "rid": rid, "slug": slug},
-            )
-        except psycopg.errors.UniqueViolation:
-            raise ConflictError(f"Slug '{slug}' already exists")
+    """Update only the slug column of an existing resource row.
+
+    Raises ConflictError if the slug already belongs to another resource in
+    the same knowledge box.
+    """
+    try:
+        await upsert(txn, kbid=kbid, rid=rid, slug=slug)
+    except psycopg.errors.UniqueViolation:
+        raise ConflictError(f"Slug '{slug}' already exists")
 
 
 async def modify_slug(
@@ -195,25 +244,6 @@ async def modify_slug(
             return old_slug
         except psycopg.errors.UniqueViolation:
             raise ConflictError(f"Slug '{new_slug}' already exists")
-
-
-async def set_resource_shard_id(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    shard: str,
-) -> None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_resources (kbid, rid, shard)
-            VALUES (%(kbid)s, %(rid)s, %(shard)s)
-            ON CONFLICT (kbid, rid) DO UPDATE SET
-                shard = EXCLUDED.shard
-            """,
-            {"kbid": kbid, "rid": rid, "shard": shard},
-        )
 
 
 async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
@@ -267,65 +297,79 @@ async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
         return await cur.fetchone() is not None
 
 
+async def get(
+    txn: Transaction,
+    *,
+    kbid: str,
+    rid: str,
+    columns: tuple[ResourceColumn, ...],
+    for_update: bool = False,
+) -> ResourceData | None:
+    """Return the selected resource columns for a row, or None if the row does not exist.
+
+    Non-requested fields are left as UNSET. Requested SQL NULL values are returned as None.
+    """
+    if not columns:
+        raise ValueError("At least one resource column must be requested")
+
+    query = psycopg.sql.SQL(
+        "SELECT {columns} FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s"
+    ).format(
+        columns=psycopg.sql.SQL(", ").join(
+            psycopg.sql.Identifier(column_name) for column_name in columns
+        )
+    )
+    if for_update:
+        query += psycopg.sql.SQL(" FOR UPDATE")
+
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(query, {"kbid": kbid, "rid": rid})
+        row = await cur.fetchone()
+        if row is None:
+            return None
+
+    resource = ResourceData()
+    for index, column_name in enumerate(columns):
+        setattr(resource, column_name, _deserialize_resource_column(column_name, row[index]))
+    return resource
+
+
 async def get_basic(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
 ) -> resources_pb2.Basic | None:
-    async with _pg_cursor(txn) as cur:
-        statement = "SELECT basic FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s"
-        if for_update:
-            statement += " FOR UPDATE"
-        await cur.execute(
-            statement,
-            {"kbid": kbid, "rid": rid},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = resources_pb2.Basic()
-        pb.ParseFromString(bytes(row[0]))
-        return pb
+    """Return the deserialised Basic for a resource, or None."""
+    resource = await get(txn, kbid=kbid, rid=rid, columns=("basic",), for_update=for_update)
+    if resource is None:
+        return None
+    assert resource.basic is not UNSET
+    return resource.basic
 
 
 async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Origin | None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            "SELECT origin FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
-            {"kbid": kbid, "rid": rid},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = resources_pb2.Origin()
-        pb.ParseFromString(bytes(row[0]))
-        return pb
+    """Return the deserialised Origin for a resource, or None."""
+    resource = await get(txn, kbid=kbid, rid=rid, columns=("origin",))
+    if resource is None:
+        return None
+    assert resource.origin is not UNSET
+    return resource.origin
 
 
 async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Security | None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            "SELECT security FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
-            {"kbid": kbid, "rid": rid},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = resources_pb2.Security()
-        pb.ParseFromString(bytes(row[0]))
-        return pb
+    """Return the deserialised Security for a resource, or None."""
+    resource = await get(txn, kbid=kbid, rid=rid, columns=("security",))
+    if resource is None:
+        return None
+    assert resource.security is not UNSET
+    return resource.security
 
 
 async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Extra | None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            "SELECT extra FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
-            {"kbid": kbid, "rid": rid},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = resources_pb2.Extra()
-        pb.ParseFromString(bytes(row[0]))
-        return pb
+    """Return the deserialised Extra for a resource, or None."""
+    resource = await get(txn, kbid=kbid, rid=rid, columns=("extra",))
+    if resource is None:
+        return None
+    assert resource.extra is not UNSET
+    return resource.extra
 
 
 async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
@@ -356,10 +400,9 @@ async def get_number_of_resources(txn: Transaction, *, kbid: str) -> int:
 async def get_resource_shard_id(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
 ) -> str | None:
-    async with _pg_cursor(txn) as cur:
-        sql = "SELECT shard FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s"
-        if for_update:
-            sql += " FOR UPDATE"
-        await cur.execute(sql, {"kbid": kbid, "rid": rid})
-        row = await cur.fetchone()
-        return row[0] if row is not None else None
+    """Return the shard ID for a resource, or None."""
+    resource = await get(txn, kbid=kbid, rid=rid, columns=("shard",), for_update=for_update)
+    if resource is None:
+        return None
+    assert resource.shard is not UNSET
+    return resource.shard
