@@ -1345,7 +1345,7 @@ async def hydrate_resource_text(
     async with get_driver().ro_transaction() as txn:
         resource.txn = txn
         runner = ConcurrentRunner(max_tasks=max_concurrent_tasks)
-        for field_type, field_key in await resource.get_fields(force=True):
+        for field_type, field_key in await resource.get_fields():
             field_id = FieldId.from_pb(rid, field_type, field_key)
             runner.schedule(hydrate_field_text(kbid, field_id))
 
