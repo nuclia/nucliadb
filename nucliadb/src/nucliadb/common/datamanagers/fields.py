@@ -41,7 +41,7 @@ from typing import Sequence
 
 from google.protobuf.message import Message
 
-from nucliadb.common.datamanagers.utils import _pg_cursor, logs_foreign_key_error
+from nucliadb.common.datamanagers.utils import _pg_cursor
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb_protos import resources_pb2 as rpb2
@@ -52,7 +52,6 @@ from nucliadb_protos import writer_pb2 as wpb2
 # ---------------------------------------------------------------------------
 
 
-@logs_foreign_key_error
 async def set_status(
     txn: Transaction,
     *,
@@ -81,7 +80,6 @@ async def set_status(
         )
 
 
-@logs_foreign_key_error
 async def set(
     txn: Transaction,
     *,
@@ -296,3 +294,35 @@ async def has_field(
             },
         )
         return await cur.fetchone() is not None
+
+
+async def exists_md5(
+    txn: Transaction,
+    *,
+    kbid: str,
+    md5: str,
+    field_type: str,
+) -> bool:
+    """Check if a file with the given MD5 hash already exists in the KB."""
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(
+            "SELECT 1 FROM kb_fields WHERE kbid = %(kbid)s AND md5 = %(md5)s AND field_type = %(field_type)s LIMIT 1",
+            {"kbid": kbid, "md5": md5, "field_type": field_type},
+        )
+        return await cur.fetchone() is not None
+
+
+async def set_md5(
+    txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str, field_type: str
+) -> None:
+    """Set the MD5 hash on the kb_fields row for the given file field."""
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(
+            """
+            INSERT INTO kb_fields (kbid, rid, field_type, field_id, md5)
+            VALUES (%(kbid)s, %(rid)s, %(field_type)s, %(field_id)s, %(md5)s)
+            ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
+                md5 = EXCLUDED.md5
+            """,
+            {"kbid": kbid, "md5": md5, "rid": rid, "field_id": field_id, "field_type": field_type},
+        )

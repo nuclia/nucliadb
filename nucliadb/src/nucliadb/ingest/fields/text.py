@@ -20,7 +20,7 @@
 
 import hashlib
 
-from nucliadb.common import file_md5
+from nucliadb.common.datamanagers import fields
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb_protos.resources_pb2 import FieldAuthor, FieldText
@@ -34,7 +34,7 @@ class Text(Field[FieldText]):
     async def set_value(self, payload: FieldText):
         if payload.md5 == "":
             payload.md5 = hashlib.md5(payload.body.encode(), usedforsecurity=False).hexdigest()
-        await file_md5.set(
+        await fields.set_md5(
             self.resource.txn,
             kbid=self.kbid,
             md5=payload.md5,
