@@ -62,7 +62,6 @@ async def set_basic(
     rid: str,
     basic: resources_pb2.Basic,
 ) -> None:
-    """Upsert the basic column of a resource row, creating the row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -82,7 +81,6 @@ async def set_origin(
     rid: str,
     origin: resources_pb2.Origin,
 ) -> None:
-    """Upsert the origin column, creating the row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -102,7 +100,6 @@ async def set_security(
     rid: str,
     security: resources_pb2.Security,
 ) -> None:
-    """Upsert the security column, creating the row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -122,7 +119,6 @@ async def set_extra(
     rid: str,
     extra: resources_pb2.Extra,
 ) -> None:
-    """Upsert the extra column, creating the row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -136,7 +132,6 @@ async def set_extra(
 
 
 async def get_slug(txn: Transaction, kbid: str, rid: str) -> str | None:
-    """Get the slug of a resource."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -156,11 +151,6 @@ async def set_slug(
     rid: str,
     slug: str,
 ) -> None:
-    """Update only the slug column of an existing resource row.
-
-    Raises ConflictError if the slug already belongs to another resource in
-    the same knowledge box.
-    """
     async with _pg_cursor(txn) as cur:
         try:
             await cur.execute(
@@ -183,13 +173,6 @@ async def modify_slug(
     rid: str,
     new_slug: str,
 ) -> str:
-    """Update the slug and basic columns of an existing resource row.
-
-    Returns the old slug value.
-    Raises NotFoundError if the resource does not exist.
-    Raises ConflictError if the slug already belongs to another resource in
-    the same knowledge box.
-    """
     basic = await get_basic(txn, kbid=kbid, rid=rid, for_update=True)
     old_slug = await get_slug(txn, kbid=kbid, rid=rid)
     if old_slug is None or basic is None:
@@ -221,7 +204,6 @@ async def set_resource_shard_id(
     rid: str,
     shard: str,
 ) -> None:
-    """Upsert the shard column, creating the row if it does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -235,7 +217,6 @@ async def set_resource_shard_id(
 
 
 async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
-    """Delete a resource row (cascades to fields)."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "DELETE FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
@@ -249,7 +230,6 @@ async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
 
 
 async def exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
-    """Return True if the resource exists."""
     async with _pg_cursor(txn) as cur:
         try:
             await cur.execute(
@@ -269,7 +249,6 @@ resource_exists = exists  # alias for backwards compatibility
 
 
 async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str) -> str | None:
-    """Return the resource UUID for the given slug within a KB, or None."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT rid FROM kb_resources WHERE kbid = %(kbid)s AND slug = %(slug)s",
@@ -280,7 +259,6 @@ async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str)
 
 
 async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
-    """Return True if a resource with the given slug exists within a KB."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT 1 FROM kb_resources WHERE kbid = %(kbid)s AND slug = %(slug)s",
@@ -292,7 +270,6 @@ async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
 async def get_basic(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
 ) -> resources_pb2.Basic | None:
-    """Return the deserialised Basic for a resource, or None."""
     async with _pg_cursor(txn) as cur:
         statement = "SELECT basic FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s"
         if for_update:
@@ -310,7 +287,6 @@ async def get_basic(
 
 
 async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Origin | None:
-    """Return the deserialised Origin for a resource, or None."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT origin FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
@@ -325,7 +301,6 @@ async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.
 
 
 async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Security | None:
-    """Return the deserialised Security for a resource, or None."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT security FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
@@ -340,7 +315,6 @@ async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb
 
 
 async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Extra | None:
-    """Return the deserialised Extra for a resource, or None."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT extra FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s",
@@ -355,7 +329,6 @@ async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.E
 
 
 async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
-    """Iterate over all resource UUIDs in a knowledge box."""
     async with with_ro_transaction() as txn:
         async with _pg_cursor(txn) as cur:
             await cur.execute(
@@ -367,7 +340,6 @@ async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
 
 
 async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
-    """Return the total number of resources in a knowledge box."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT COUNT(*) FROM kb_resources WHERE kbid = %(kbid)s",
@@ -384,7 +356,6 @@ async def get_number_of_resources(txn: Transaction, *, kbid: str) -> int:
 async def get_resource_shard_id(
     txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
 ) -> str | None:
-    """Return the shard ID for a resource, or None."""
     async with _pg_cursor(txn) as cur:
         sql = "SELECT shard FROM kb_resources WHERE kbid = %(kbid)s AND rid = %(rid)s"
         if for_update:

@@ -31,7 +31,7 @@ Each row stores one page of a conversation field, or the SplitsMetadata sentinel
 
 The FieldConversation metadata (page count, total, page size, extract/split strategy)
 is stored in kb_fields.value for the corresponding 'c'-type field row and is written
-directly here to avoid a cross-module import cycle with fields_v2.
+directly here to avoid a cross-module import cycle with fields.
 
 NOTE: deleting a kb_resources row (or its parent kbs row) automatically removes all
 related kb_conversations rows via the ON DELETE CASCADE foreign key.
@@ -60,7 +60,6 @@ async def get_metadata(
     rid: str,
     field_id: str,
 ) -> FieldConversation | None:
-    """Return the FieldConversation metadata for a conversation field, or None."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -86,7 +85,6 @@ async def set_metadata(
     field_id: str,
     metadata: FieldConversation,
 ) -> None:
-    """Upsert the FieldConversation metadata row in kb_fields."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -117,7 +115,6 @@ async def get_page(
     field_id: str,
     page: int,
 ) -> PBConversation | None:
-    """Return one page of a conversation field, or None if not found."""
     if page <= 0:
         raise ValueError("Conversation pages start at index 1")
     async with _pg_cursor(txn) as cur:
@@ -146,7 +143,6 @@ async def set_page(
     page: int,
     value: PBConversation,
 ) -> None:
-    """Upsert one page of a conversation field."""
     if page <= 0:
         raise ValueError("Conversation pages start at index 1")
     async with _pg_cursor(txn) as cur:
@@ -179,7 +175,6 @@ async def get_splits_metadata(
     rid: str,
     field_id: str,
 ) -> SplitsMetadata | None:
-    """Return the SplitsMetadata for a conversation field, or None."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -205,7 +200,6 @@ async def set_splits_metadata(
     field_id: str,
     splits_metadata: SplitsMetadata,
 ) -> None:
-    """Upsert the SplitsMetadata sentinel row (page = 0) for a conversation field."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -236,12 +230,6 @@ async def delete_field(
     rid: str,
     field_id: str,
 ) -> None:
-    """
-    Delete all kb_conversations rows for this field (all pages + the
-    SplitsMetadata sentinel).  The kb_fields row for the 'c'-type field
-    is handled by the fields datamanager; cascading from kb_resources only
-    fires when the whole resource or KB is deleted.
-    """
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """

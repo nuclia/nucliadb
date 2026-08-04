@@ -17,13 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-"""
-Integration tests for nucliadb.common.datamanagers.fields.
-
-Covers: set, set_status, get_raw, get_status, get_statuses, get_all_field_ids,
-        has_field, delete.
-"""
-
 import pytest
 
 from nucliadb.common.datamanagers import fields, kb, resources

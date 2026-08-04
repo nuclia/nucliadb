@@ -61,7 +61,6 @@ async def set_status(
     field_id: str,
     status: wpb2.FieldStatus,
 ) -> None:
-    """Update only the status column. Does nothing if the row does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -89,9 +88,6 @@ async def set(
     field_id: str,
     value: Message | bytes,
 ) -> None:
-    """
-    Set the value of a field row, creating it if it does not exist. This is an upsert operation.
-    """
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -118,7 +114,6 @@ async def delete(
     field_type: str,
     field_id: str,
 ) -> None:
-    """Delete a single field row."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -148,7 +143,6 @@ async def get_raw(
     field_type: str,
     field_id: str,
 ) -> bytes | None:
-    """Return only the serialised value bytes for a field, or None."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -177,7 +171,6 @@ async def get_status(
     field_type: str,
     field_id: str,
 ) -> wpb2.FieldStatus | None:
-    """Return the deserialised FieldStatus for a field, or None if the row does not exist."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -207,7 +200,6 @@ async def get_statuses(
     rid: str,
     fields: Sequence[rpb2.FieldID],
 ) -> list[wpb2.FieldStatus]:
-    """Return the deserialised FieldStatus for a list of fields, in the same order."""
     if not fields:
         return []
 
@@ -252,7 +244,6 @@ async def get_all_field_ids(
     kbid: str,
     rid: str,
 ) -> rpb2.AllFieldIDs:
-    """Return the AllFieldIDs protobuf for a resource, or None if not set."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -278,7 +269,6 @@ async def has_field(
     rid: str,
     field_id: rpb2.FieldID,
 ) -> bool:
-    """Return True if a field row exists, False otherwise."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
@@ -303,7 +293,6 @@ async def exists_md5(
     md5: str,
     field_type: str,
 ) -> bool:
-    """Check if a file with the given MD5 hash already exists in the KB."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT 1 FROM kb_fields WHERE kbid = %(kbid)s AND md5 = %(md5)s AND field_type = %(field_type)s LIMIT 1",
@@ -315,7 +304,6 @@ async def exists_md5(
 async def set_md5(
     txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str, field_type: str
 ) -> None:
-    """Set the MD5 hash on the kb_fields row for the given file field."""
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             """
