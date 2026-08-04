@@ -142,10 +142,16 @@ async def test_resource_set_get(
         assert [rid async for rid in resources.iterate_resource_ids(kbid=kbid)] == [rid]
         assert await resources.exists(txn, kbid=kbid, rid=rid) is True
         assert await resources.get_basic(txn, kbid=kbid, rid=rid) is None
-        assert await resources.get_origin(txn, kbid=kbid, rid=rid) is None
-        assert await resources.get_security(txn, kbid=kbid, rid=rid) is None
-        assert await resources.get_extra(txn, kbid=kbid, rid=rid) is None
-        assert await resources.get_resource_shard_id(txn, kbid=kbid, rid=rid) is None
+        data = await resources.get(
+            txn, kbid=kbid, rid=rid, columns=("slug", "basic", "origin", "security", "extra", "shard")
+        )
+        assert data is not None
+        assert data.slug == "test-slug"
+        assert data.basic is None
+        assert data.origin is None
+        assert data.security is None
+        assert data.extra is None
+        assert data.shard is None
         assert await resources.get_resource_uuid_from_slug(txn, kbid=kbid, slug="test-slug") == rid
 
     async with maindb_driver.rw_transaction() as txn:
@@ -168,20 +174,20 @@ async def test_resource_set_get(
         assert basic is not None
         assert basic.slug == "test-slug"
         assert basic.title == "Test Title"
-
-        origin = await resources.get_origin(txn, kbid=kbid, rid=rid)
+        data = await resources.get(
+            txn, kbid=kbid, rid=rid, columns=("slug", "basic", "origin", "security", "extra", "shard")
+        )
+        assert data is not None
+        origin = data.origin
         assert origin is not None
         assert origin.source_id == "test-source"
-
-        security = await resources.get_security(txn, kbid=kbid, rid=rid)
+        security = data.security
         assert security is not None
         assert security.access_groups == ["group1", "group2"]
-
-        extra_ = await resources.get_extra(txn, kbid=kbid, rid=rid)
+        extra_ = data.extra
         assert extra_ is not None
         assert extra_.metadata["key"] == "value"
-
-        shard_id = await resources.get_resource_shard_id(txn, kbid=kbid, rid=rid)
+        shard_id = data.shard
         assert shard_id == "shard-1"
 
     async with maindb_driver.rw_transaction() as txn:
@@ -235,19 +241,20 @@ async def test_upsert_distinguishes_none_from_unset(
         assert await resources.get_slug(txn, kbid=kbid, rid=rid) is None
         assert await resources.get_basic(txn, kbid=kbid, rid=rid) is None
 
-        origin = await resources.get_origin(txn, kbid=kbid, rid=rid)
-        assert origin is not None
-        assert origin.source_id == "test-source"
-
-        security = await resources.get_security(txn, kbid=kbid, rid=rid)
-        assert security is not None
-        assert security.access_groups == ["group1"]
-
-        extra1 = await resources.get_extra(txn, kbid=kbid, rid=rid)
-        assert extra1 is not None
-        assert extra1.metadata["key"] == "value"
-
-        assert await resources.get_resource_shard_id(txn, kbid=kbid, rid=rid) == "shard-1"
+        data = await resources.get(
+            txn, kbid=kbid, rid=rid, columns=("slug", "basic", "origin", "security", "extra", "shard")
+        )
+        assert data is not None
+        assert data.slug is None
+        assert data.basic is None
+        assert data.origin is not None
+        assert data.origin.source_id == "test-source"
+        assert data.security is not None
+        assert data.security.access_groups == ["group1"]
+        assert data.extra is not None
+        assert data.extra.metadata["key"] == "value"
+        assert data.shard is not None
+        assert data.shard == "shard-1"
 
 
 async def test_get_selected_columns(

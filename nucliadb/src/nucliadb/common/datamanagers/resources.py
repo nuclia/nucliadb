@@ -345,33 +345,6 @@ async def get_basic(
     return resource.basic
 
 
-async def get_origin(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Origin | None:
-    """Return the deserialised Origin for a resource, or None."""
-    resource = await get(txn, kbid=kbid, rid=rid, columns=("origin",))
-    if resource is None:
-        return None
-    assert resource.origin is not UNSET
-    return resource.origin
-
-
-async def get_security(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Security | None:
-    """Return the deserialised Security for a resource, or None."""
-    resource = await get(txn, kbid=kbid, rid=rid, columns=("security",))
-    if resource is None:
-        return None
-    assert resource.security is not UNSET
-    return resource.security
-
-
-async def get_extra(txn: Transaction, *, kbid: str, rid: str) -> resources_pb2.Extra | None:
-    """Return the deserialised Extra for a resource, or None."""
-    resource = await get(txn, kbid=kbid, rid=rid, columns=("extra",))
-    if resource is None:
-        return None
-    assert resource.extra is not UNSET
-    return resource.extra
-
-
 async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
     async with with_ro_transaction() as txn:
         async with _pg_cursor(txn) as cur:
