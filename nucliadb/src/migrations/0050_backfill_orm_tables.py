@@ -494,8 +494,8 @@ class resources_v1:
 
     KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 
-    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     @classmethod
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     async def get_resource_shard_id(
         cls, txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
     ) -> str | None:
@@ -560,15 +560,15 @@ class resources_v1:
             for rid in await cls._get_resource_ids_from_slugs(kbid=kbid, slugs=batch):
                 yield rid
 
-    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     @classmethod
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     async def _iter_resource_slugs(cls, *, kbid: str) -> AsyncGenerator[str, None]:
         async with with_ro_transaction() as txn:
             async for key in txn.keys(match=cls.KB_RESOURCE_SLUG_BASE.format(kbid=kbid)):
                 yield key.split("/")[-1]
 
-    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     @classmethod
+    @backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=3)
     async def _get_resource_ids_from_slugs(cls, kbid: str, slugs: list[str]) -> list[str]:
         async with with_ro_transaction() as txn:
             rids = await txn.batch_get(
