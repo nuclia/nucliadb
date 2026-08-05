@@ -197,7 +197,7 @@ async def create_shard_for_kb(kbid: str):
 
 
 async def get_kb_shards(kbid: str) -> writer_pb2.Shards:
-    kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid)
+    kb_shards = await datamanagers.atomic.kb.get_shards(kbid=kbid)
     assert kb_shards is not None
     return kb_shards
 

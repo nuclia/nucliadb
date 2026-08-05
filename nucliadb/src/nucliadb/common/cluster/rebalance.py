@@ -76,7 +76,7 @@ class Rebalancer:
         by querying nidx paragraph index for each shard.
         """
         result = []
-        self.kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=self.kbid)
+        self.kb_shards = await datamanagers.atomic.kb.get_shards(kbid=self.kbid)
         if self.kb_shards is not None:
             for idx, shard in enumerate(self.kb_shards.shards):
                 if estimate:
@@ -309,9 +309,7 @@ class Rebalancer:
             # If shard was emptied, delete it
             async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=self.kbid)):
                 async with datamanagers.with_rw_transaction() as txn:
-                    kb_shards = await datamanagers.cluster.get_kb_shards(
-                        txn, kbid=self.kbid, for_update=True
-                    )
+                    kb_shards = await datamanagers.kb.get_shards(txn, kbid=self.kbid, for_update=True)
                     if kb_shards is not None:
                         logger.info(
                             "Deleting empty shard",
@@ -333,9 +331,7 @@ class Rebalancer:
                             # Only decrement the actual pointer if we remove before the pointer.
                             kb_shards.actual -= 1
                         assert kb_shards.actual >= 0
-                        await datamanagers.cluster.update_kb_shards(
-                            txn, kbid=self.kbid, shards=kb_shards
-                        )
+                        await datamanagers.kb.upsert(txn, kbid=self.kbid, shards=kb_shards)
                         await txn.commit()
 
                 # Delete shard from nidx
@@ -554,7 +550,7 @@ async def run(context: ApplicationContext) -> None:
         async with locking.distributed_lock(REBALANCE_LOCK):
             # get all kb ids
             async with datamanagers.with_ro_transaction() as txn:
-                kbids = [kbid async for kbid, _ in datamanagers.kb.get_kbs(txn)]
+                kbids = [kbid async for kbid, _ in datamanagers.kb.iter(txn)]
             # go through each kb and see if shards need to be rebalanced
             for kbid in kbids:
                 async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):

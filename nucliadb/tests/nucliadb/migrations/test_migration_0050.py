@@ -76,8 +76,8 @@ async def test_migration_0050_backfill_kb_runs_smoothly(maindb_driver: Driver):
     await migration.module.migrate_kb(execution_context, kbid)
 
     async with dm.with_ro_transaction() as txn:
-        assert await dm.kb.exists_kb(txn, kbid=kbid) is True
-        assert await dm.cluster.get_kb_shards(txn, kbid=kbid) == shards
+        assert await dm.kb.exists(txn, kbid=kbid) is True
+        assert await dm.kb.get_shards(txn, kbid=kbid) == shards
         assert await dm.kb.get_config(txn, kbid=kbid) == config
         for rid, slug in resources:
             basic = resources_pb2.Basic(slug=slug)

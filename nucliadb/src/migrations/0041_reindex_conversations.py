@@ -39,7 +39,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     """
     Reindex resources that have conversation fields
     """
-    kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid, for_update=False)
+    kb_shards = await datamanagers.atomic.kb.get_shards(kbid=kbid, for_update=False)
     if kb_shards is not None:
         async for rid in iter_affected_resource_ids(context, kbid):
             await reindex_resource(context, kbid, rid, kb_shards)

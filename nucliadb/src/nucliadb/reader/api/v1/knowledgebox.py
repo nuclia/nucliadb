@@ -52,7 +52,7 @@ async def get_kbs(
     driver = get_driver()
     async with driver.ro_transaction() as txn:
         response = KnowledgeBoxList()
-        async for kbid, slug in datamanagers.kb.get_kbs(txn, slug_prefix=prefix):
+        async for kbid, slug in datamanagers.kb.iter(txn, slug_prefix=prefix):
             response.kbs.append(
                 KnowledgeBoxObjSummary(
                     slug=user_kb_slug(slug, account_id=x_nucliadb_account) or None, uuid=kbid
@@ -101,10 +101,10 @@ async def get_kb_by_slug(
     driver = get_driver()
     async with driver.ro_transaction() as txn:
         # For cloud, the account id is prepended in order to be able to reuse the same slug in different accounts.
-        kbid = await datamanagers.kb.get_kb_uuid(txn, slug=f"{x_nucliadb_account}:{slug}")
+        kbid = await datamanagers.kb.get_kbid(txn, slug=f"{x_nucliadb_account}:{slug}")
         if kbid is None:
             # For onprem, the slug is fully controlled by the user
-            kbid = await datamanagers.kb.get_kb_uuid(txn, slug=slug)
+            kbid = await datamanagers.kb.get_kbid(txn, slug=slug)
             if kbid is None:
                 raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 

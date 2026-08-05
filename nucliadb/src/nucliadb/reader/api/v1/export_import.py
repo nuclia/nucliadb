@@ -161,4 +161,4 @@ async def _get_status(
 
 async def exists_kb(kbid: str) -> bool:
     async with datamanagers.with_ro_transaction() as txn:
-        return await datamanagers.kb.exists_kb(txn, kbid=kbid)
+        return await datamanagers.kb.exists(txn, kbid=kbid)

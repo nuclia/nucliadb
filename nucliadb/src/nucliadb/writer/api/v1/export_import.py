@@ -72,7 +72,7 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def start_kb_export_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
-    if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
+    if not await datamanagers.atomic.kb.exists(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     export_id = uuid4().hex
@@ -148,7 +148,7 @@ async def kb_create_and_import_endpoint(request: Request):
 @version(1)
 async def start_kb_import_endpoint(request: Request, kbid: str):
     context = get_app_context(request.app)
-    if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
+    if not await datamanagers.atomic.kb.exists(kbid=kbid):
         return HTTPClientError(status_code=404, detail="Knowledge Box not found")
 
     await maybe_back_pressure(kbid)

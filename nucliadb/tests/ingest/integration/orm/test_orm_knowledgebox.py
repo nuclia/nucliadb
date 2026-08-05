@@ -72,7 +72,7 @@ async def test_create_knowledgebox(
     )
     assert result == (kbid, slug)
     async with maindb_driver.ro_transaction() as txn:
-        exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
+        exists = await datamanagers.kb.exists(txn, kbid=kbid)
         assert exists
 
         config = await datamanagers.kb.get_config(txn, kbid=kbid)
@@ -113,7 +113,7 @@ async def test_create_knowledgebox_with_multiple_vectorsets(
     )
     assert result == (kbid, slug)
     async with maindb_driver.ro_transaction() as txn:
-        exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
+        exists = await datamanagers.kb.exists(txn, kbid=kbid)
         assert exists
 
         assert len([vs async for vs in datamanagers.vectorsets.iter(txn, kbid=kbid)]) == 2
@@ -206,13 +206,13 @@ async def test_delete_knowledgebox(
         slug="my-kb",
         semantic_models={"vs": SemanticModelMetadata()},
     )
-    exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    exists = await datamanagers.atomic.kb.exists(kbid=kbid)
     assert exists is True
 
     deleted_kbid = await KnowledgeBox.delete(maindb_driver, kbid)
     assert deleted_kbid == kbid
 
-    exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    exists = await datamanagers.atomic.kb.exists(kbid=kbid)
     assert exists is False
 
 

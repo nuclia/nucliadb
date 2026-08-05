@@ -47,7 +47,7 @@ async def iter_kbids(context: ApplicationContext) -> AsyncGenerator[str]:
     Return a list of all KB ids.
     """
     async with context.kv_driver.ro_transaction() as txn:
-        async for kbid, _ in datamanagers.kb.get_kbs(txn):
+        async for kbid, _ in datamanagers.kb.iter(txn):
             yield kbid
 
 

@@ -133,7 +133,7 @@ async def create_rollover_shards(
                 resources_validated=False,
             )
 
-        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        kb_shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
         if kb_shards is None:
             raise UnexpectedRolloverError(f"No shards found for KB {kbid}")
 
@@ -426,16 +426,14 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
             logger.info("Shards already cut over, skipping", extra={"kbid": kbid})
             return
 
-        previously_active_shards = await datamanagers.cluster.get_kb_shards(
-            txn, kbid=kbid, for_update=True
-        )
+        previously_active_shards = await datamanagers.kb.get_shards(txn, kbid=kbid, for_update=True)
         rollover_shards = await datamanagers.rollover.get_kb_rollover_shards(
             txn, kbid=kbid, for_update=True
         )
         if previously_active_shards is None or rollover_shards is None:
             raise UnexpectedRolloverError("Shards for kb not found")
 
-        await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=rollover_shards)
+        await datamanagers.kb.upsert(txn, kbid=kbid, shards=rollover_shards)
         await datamanagers.rollover.delete_kb_rollover_shards(txn, kbid=kbid)
 
         for shard in previously_active_shards.shards:
@@ -482,7 +480,7 @@ async def validate_indexed_data(
         ):
             raise UnexpectedRolloverError(f"Preconditions not met for KB {kbid}")
 
-        rolled_over_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        rolled_over_shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
         if rolled_over_shards is None:
             raise UnexpectedRolloverError(f"No rollover shards found for KB {kbid}")
 
@@ -595,7 +593,7 @@ async def validate_indexed_data(
     async with datamanagers.with_transaction() as txn:
         state.resources_validated = True
         await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
-        await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=rolled_over_shards)
+        await datamanagers.kb.upsert(txn, kbid=kbid, shards=rolled_over_shards)
 
     return repaired_resources
 
