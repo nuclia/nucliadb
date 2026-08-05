@@ -35,7 +35,6 @@ from grpc import aio
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import KBShardManager
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
@@ -607,7 +606,6 @@ async def create_resource(
         t2.file.CopyFrom(TEST_CLOUDFILE)
 
         file_field = await test_resource.set_field(rpb.FieldType.FILE, "file1", t2)
-        await add_field_id(test_resource, file_field)
         await make_field(kb_obj, file_field, "MyText")
 
         # 2.2 LINK FIELD
@@ -629,14 +627,12 @@ async def create_resource(
         ex1.link_thumbnail.CopyFrom(THUMBNAIL)
 
         await linkfield.set_link_extracted_data(ex1)
-        await add_field_id(test_resource, linkfield)
         await make_field(kb_obj, linkfield, "MyText")
 
         # 2.3 TEXT FIELDS
 
         t23 = rpb.FieldText(body="This is my text field", format=rpb.FieldText.Format.PLAIN)
         textfield = await test_resource.set_field(rpb.FieldType.TEXT, "text1", t23)
-        await add_field_id(test_resource, textfield)
         await make_field(kb_obj, textfield, "MyText")
 
         # 2.4 CONVERSATION FIELD
@@ -663,7 +659,6 @@ async def create_resource(
             c2.messages.append(new_message)
 
         convfield = await test_resource.set_field(rpb.FieldType.CONVERSATION, "conv1", c2)
-        await add_field_id(test_resource, convfield)
         await make_field(kb_obj, convfield, extracted_text="MyText")
 
         # Q/A
@@ -687,12 +682,6 @@ async def create_resource(
 
         await txn.commit()
         return test_resource
-
-
-async def add_field_id(resource: Resource, field: Field):
-    field_type = FIELD_TYPE_STR_TO_PB[field.type]
-    field_id = rpb.FieldID(field_type=field_type, field=field.id)
-    await resource.update_all_field_ids(updated=[field_id])
 
 
 @pytest.fixture(scope="function")

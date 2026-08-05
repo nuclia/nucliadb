@@ -25,12 +25,11 @@ from httpx import AsyncClient
 from nidx_protos.nodereader_pb2 import GetShardRequest, SearchRequest
 from nidx_protos.noderesources_pb2 import ShardId
 
-from nucliadb.common.datamanagers.cluster import KB_SHARDS
+from nucliadb.common.datamanagers.cluster import get_kb_shards
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.tests.vectors import Q
-from nucliadb_protos.writer_pb2 import Shards as PBShards
 
 RUNNING_IN_GH_ACTIONS = os.environ.get("CI", "").lower() == "true"
 
@@ -84,47 +83,43 @@ async def test_search_resource_all(
 
     driver = get_driver()
     async with driver.ro_transaction() as txn:
-        key = KB_SHARDS.format(kbid=kbid)
-        async for key in txn.keys(key):
-            value = await txn.get(key)
-            assert value is not None
-            shards = PBShards()
-            shards.ParseFromString(value)
-            shard_id = shards.shards[0].nidx_shard_id
-            shard = await get_nidx_api_client().GetShard(GetShardRequest(shard_id=ShardId(id=shard_id)))
-            assert shard.shard_id == shard_id
-            assert shard.fields == 3
-            assert shard.paragraphs == 2
-            assert shard.sentences == 3
+        kb_shards = await get_kb_shards(txn, kbid=kbid)
+        assert kb_shards is not None
+        shard_id = kb_shards.shards[0].nidx_shard_id
+        shard = await get_nidx_api_client().GetShard(GetShardRequest(shard_id=ShardId(id=shard_id)))
+        assert shard.shard_id == shard_id
+        assert shard.fields == 3
+        assert shard.paragraphs == 2
+        assert shard.sentences == 3
 
-            request = SearchRequest()
-            request.vectorset = "my-semantic-model"
-            request.shard_ids[:] = [shard_id]
-            request.body = "Ramon"
-            request.result_per_page = 20
-            request.document = True
-            request.paragraph = True
-            request.vector.extend(Q)
-            request.min_score_semantic = -1.0
+        request = SearchRequest()
+        request.vectorset = "my-semantic-model"
+        request.shard_ids[:] = [shard_id]
+        request.body = "Ramon"
+        request.result_per_page = 20
+        request.document = True
+        request.paragraph = True
+        request.vector.extend(Q)
+        request.min_score_semantic = -1.0
 
-            response = await get_nidx_searcher_client().Search(request)
-            paragraphs = response.paragraph
-            documents = response.document
-            vectors = response.vector
+        response = await get_nidx_searcher_client().Search(request)
+        paragraphs = response.paragraph
+        documents = response.document
+        vectors = response.vector
 
-            assert paragraphs.total == 1
-            assert documents.total == 1
+        assert paragraphs.total == 1
+        assert documents.total == 1
 
-            # 0-19 : My own text Ramon
-            # 20-45 : This is great to be here
-            # 48-65 : Where is my beer?
+        # 0-19 : My own text Ramon
+        # 20-45 : This is great to be here
+        # 48-65 : Where is my beer?
 
-            # Q : Where is my wine?
-            results = [(x.doc_id.id, x.score) for x in vectors.documents]
-            results.sort(reverse=True, key=lambda x: x[1])
-            assert results[0][0].endswith("48-65")
-            assert results[1][0].endswith("0-19")
-            assert results[2][0].endswith("20-45")
+        # Q : Where is my wine?
+        results = [(x.doc_id.id, x.score) for x in vectors.documents]
+        results.sort(reverse=True, key=lambda x: x[1])
+        assert results[0][0].endswith("48-65")
+        assert results[1][0].endswith("0-19")
+        assert results[2][0].endswith("20-45")
 
 
 @pytest.mark.deploy_modes("cluster")

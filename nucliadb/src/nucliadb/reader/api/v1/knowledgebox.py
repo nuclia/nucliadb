@@ -52,7 +52,7 @@ async def get_kbs(
     driver = get_driver()
     async with driver.ro_transaction() as txn:
         response = KnowledgeBoxList()
-        async for kbid, slug in datamanagers.kb.get_kbs(txn, prefix=prefix):
+        async for kbid, slug in datamanagers.kb.get_kbs(txn, slug_prefix=prefix):
             response.kbs.append(
                 KnowledgeBoxObjSummary(
                     slug=user_kb_slug(slug, account_id=x_nucliadb_account) or None, uuid=kbid

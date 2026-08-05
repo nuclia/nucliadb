@@ -26,7 +26,7 @@ import nats.js.errors
 from nidx_protos import noderesources_pb2, nodewriter_pb2
 from nidx_protos.noderesources_pb2 import Resource as PBBrainResource
 
-from nucliadb.common import datamanagers, file_md5, locking
+from nucliadb.common import datamanagers, locking
 from nucliadb.common.catalog import catalog_delete, catalog_update
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.common.cluster.utils import get_shard_manager
@@ -235,7 +235,6 @@ class Processor:
                         raise AttributeError("Shard not available")
 
                     await catalog_delete(txn, kbid, uuid)
-                    await file_md5.delete(txn, kbid=kbid, rid=uuid)
 
                     external_index_manager = await get_external_index_manager(kbid=kbid)
                     if external_index_manager is not None:
@@ -950,9 +949,7 @@ async def compute_resource_status(
     Compute and set the resource-level processing status on basic by inspecting
     the status of all individual fields.
     """
-    field_ids = await datamanagers.resources.get_all_field_ids(
-        txn, kbid=kbid, rid=uuid, for_update=False
-    )
+    field_ids = await datamanagers.fields.get_all_field_ids(txn, kbid=kbid, rid=uuid)
     if field_ids is None:
         # No fields, it is processed
         basic.metadata.status = resources_pb2.Metadata.Status.PROCESSED
