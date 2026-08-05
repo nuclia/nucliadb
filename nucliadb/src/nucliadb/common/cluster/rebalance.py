@@ -552,7 +552,7 @@ async def run(context: ApplicationContext) -> None:
         async with locking.distributed_lock(REBALANCE_LOCK):
             # get all kb ids
             async with datamanagers.with_ro_transaction() as txn:
-                kbids = [kbid async for kbid, _ in datamanagers.kb.get_kbs(txn)]
+                kbids = [kbid async for kbid, _ in datamanagers.kb.iter(txn)]
             # go through each kb and see if shards need to be rebalanced
             for kbid in kbids:
                 async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):

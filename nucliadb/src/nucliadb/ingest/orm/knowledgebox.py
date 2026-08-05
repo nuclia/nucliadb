@@ -137,14 +137,17 @@ class KnowledgeBox:
 
         try:
             async with driver.rw_transaction() as txn:
-                exists = await datamanagers.kb.get_kb_uuid(
-                    txn, slug=slug
-                ) or await datamanagers.kb.exists_kb(txn, kbid=kbid)
+                exists = await datamanagers.kb.get_uuid(txn, slug=slug) or await datamanagers.kb.exists(
+                    txn, kbid=kbid
+                )
                 if exists:
                     raise KnowledgeBoxConflict()
 
                 # Create in maindb
-                await datamanagers.kb.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
+                try:
+                    await datamanagers.kb.set_slug(txn, slug=slug, kbid=kbid)
+                except datamanagers.exceptions.KnowledgeBoxConflict:
+                    raise KnowledgeBoxConflict()
 
                 # all KBs have the vectorset key initialized, although (for
                 # now), not every KB will store vectorsets there
@@ -221,8 +224,7 @@ class KnowledgeBox:
                     prewarm_enabled=prewarm_enabled,
                 )
                 config.external_index_provider.CopyFrom(stored_external_index_provider)
-                await datamanagers.kb.set_config(txn, kbid=kbid, config=config)
-                await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
+                await datamanagers.kb.upsert(txn, kbid=kbid, config=config, shards=kb_shards)
 
                 # shard creation will alter this value on maindb, make sure nobody
                 # uses this variable anymore
@@ -287,7 +289,10 @@ class KnowledgeBox:
                 raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
             if slug:
-                await datamanagers.kb.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
+                try:
+                    await datamanagers.kb.set_slug(txn, slug=slug, kbid=kbid)
+                except datamanagers.exceptions.KnowledgeBoxConflict:
+                    raise KnowledgeBoxConflict()
                 stored.slug = slug
 
             if title is not None:
@@ -320,7 +325,7 @@ class KnowledgeBox:
             if enforce_security is not None:
                 stored.enforce_security = enforce_security
 
-            await datamanagers.kb.set_config(txn, kbid=kbid, config=stored)
+            await datamanagers.kb.upsert(txn, kbid=kbid, config=stored)
 
             await txn.commit()
 
@@ -379,16 +384,15 @@ class KnowledgeBox:
         """
 
         async with driver.rw_transaction() as txn:
-            exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
-            if not exists:
+            data = await datamanagers.kb.get(txn, kbid=kbid, columns=("config", "shards"))
+            if data is None:
                 # Already deleted, or never existed.
                 return
 
-            kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
+            kb_config = data.config
+            shards_obj = data.shards
 
             await cls.mark_for_purge(txn, kbid=kbid)
-
-            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
 
             await datamanagers.kb.soft_delete(txn, kbid=kbid)
 

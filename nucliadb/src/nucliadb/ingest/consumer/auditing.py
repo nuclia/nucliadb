@@ -103,7 +103,7 @@ class IndexAuditHandler:
 
     @metrics.handler_histo.wrap({"type": "audit_counter"})
     async def process_kb(self, kbid: str) -> None:
-        if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
+        if not await datamanagers.atomic.kb.exists(kbid=kbid):
             logger.warning(f"KB does not exist, skipping counter audit", extra={"kbid": kbid})
             return
         try:

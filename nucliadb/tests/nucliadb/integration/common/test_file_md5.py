@@ -40,7 +40,7 @@ async def driver(pg_maindb_driver: PGDriver):
 async def kbid(driver: PGDriver) -> str:
     kb_id = KnowledgeBox.new_unique_kbid()
     async with driver.rw_transaction() as txn:
-        await kb.set_kbid_for_slug(txn, kbid=kb_id, slug=f"slug-{kb_id}")
+        await kb.set_slug(txn, kbid=kb_id, slug=f"slug-{kb_id}")
         await txn.commit()
     return kb_id
 
@@ -127,7 +127,7 @@ async def test_delete_by_kb(driver: PGDriver, kbid: str, rid: str):
     other_kb = KnowledgeBox.new_unique_kbid()
     r2 = Resource.new_unique_rid()
     async with driver.rw_transaction() as txn:
-        await kb.set_kbid_for_slug(txn, kbid=other_kb, slug=f"slug-{other_kb}")
+        await kb.set_slug(txn, kbid=other_kb, slug=f"slug-{other_kb}")
         await resources.set_slug(txn, kbid=kbid, rid=r2, slug=f"slug-{r2}")
         await resources.set_slug(txn, kbid=other_kb, rid=rid, slug=f"slug-{rid}")
         await txn.commit()

@@ -298,7 +298,7 @@ class Processor:
         transaction_check: bool = True,
     ) -> None:
         kbid = message.kbid
-        kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+        kb_exists = await datamanagers.atomic.kb.exists(kbid=kbid)
         uuid: str | None = None
         if not kb_exists:
             logger.info("Deleted KB: skipping txn", extra={"kbid": kbid})
@@ -752,12 +752,12 @@ class Processor:
     ) -> KnowledgeBox | None:
         uuid: str | None = kbid.uuid
         if uuid == "":
-            uuid = await datamanagers.kb.get_kb_uuid(txn, slug=kbid.slug)
+            uuid = await datamanagers.kb.get_uuid(txn, slug=kbid.slug)
 
         if uuid is None:
             return None
 
-        if not (await datamanagers.kb.exists_kb(txn, kbid=uuid)):
+        if not (await datamanagers.kb.exists(txn, kbid=uuid)):
             return None
 
         storage = await get_storage()

@@ -52,7 +52,7 @@ async def test_migration_0018_global(maindb_driver: Driver):
             fake_kb_id = KnowledgeBox.new_unique_kbid()
             key = KB_SLUGS.format(slug=fake_kb_slug)
             await txn.set(key, fake_kb_id.encode())
-            assert not await datamanagers.kb.exists_kb(txn, kbid=fake_kb_id)
+            assert not await datamanagers.kb.exists(txn, kbid=fake_kb_id)
 
             await txn.commit()
 
@@ -63,12 +63,12 @@ async def test_migration_0018_global(maindb_driver: Driver):
             slug=real_kb_slug,
             semantic_models={"my-semantic-model": knowledgebox_pb2.SemanticModelMetadata()},
         )
-        assert await datamanagers.atomic.kb.exists_kb(kbid=real_kb_id)
+        assert await datamanagers.atomic.kb.exists(kbid=real_kb_id)
 
         # tikv needs to open a second transaction to be able to read values from
         # the first one using `scan_keys`
         async with maindb_driver.ro_transaction() as txn:
-            kb_slugs = [kb_slug async for kbid, kb_slug in datamanagers.kb.get_kbs(txn, slug_prefix="")]
+            kb_slugs = [kb_slug async for kbid, kb_slug in datamanagers.kb.iter(txn, slug_prefix="")]
             assert len(kb_slugs) == 2
             assert fake_kb_slug in kb_slugs
             assert real_kb_slug in kb_slugs
@@ -77,8 +77,8 @@ async def test_migration_0018_global(maindb_driver: Driver):
     await migration.module.migrate(execution_context)
 
     async with maindb_driver.ro_transaction() as txn:
-        assert not await datamanagers.kb.exists_kb(txn, kbid=fake_kb_id)
-        assert await datamanagers.kb.exists_kb(txn, kbid=real_kb_id)
+        assert not await datamanagers.kb.exists(txn, kbid=fake_kb_id)
+        assert await datamanagers.kb.exists(txn, kbid=real_kb_id)
 
         value = await txn.get(KB_SLUGS.format(slug=fake_kb_slug))
         assert value is None
@@ -87,6 +87,6 @@ async def test_migration_0018_global(maindb_driver: Driver):
         assert value is not None
         assert value.decode() == real_kb_id
 
-        kb_slugs = [kb_slug async for kbid, kb_slug in datamanagers.kb.get_kbs(txn, slug_prefix="")]
+        kb_slugs = [kb_slug async for kbid, kb_slug in datamanagers.kb.iter(txn, slug_prefix="")]
         assert len(kb_slugs) == 1
         assert real_kb_slug in kb_slugs

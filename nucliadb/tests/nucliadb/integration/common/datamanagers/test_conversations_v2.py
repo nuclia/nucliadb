@@ -47,7 +47,7 @@ from nucliadb_protos.resources_pb2 import (
 async def kbid(maindb_driver: Driver) -> str:
     kbid = KnowledgeBox.new_unique_kbid()
     async with maindb_driver.rw_transaction() as txn:
-        await kb.set_kbid_for_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
+        await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid
 

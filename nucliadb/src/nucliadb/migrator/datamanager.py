@@ -48,7 +48,7 @@ class MigrationsDataManager:
     async def schedule_all_kbs(self, target_version: int) -> None:
         # Get all kb ids
         async with self.driver.ro_transaction() as txn:
-            kbids = [kbid async for kbid, _ in datamanagers.kb.get_kbs(txn)]
+            kbids = [kbid async for kbid, _ in datamanagers.kb.iter(txn)]
         # Schedule the migrations
         async with self.driver.rw_transaction() as txn:
             for kbid in kbids:

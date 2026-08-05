@@ -103,7 +103,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
 
 async def should_backfill_kb(kbid: str) -> bool:
     async with datamanagers.with_ro_transaction() as txn:
-        if not await kbs_v2.exists_kb(txn, kbid=kbid):
+        if not await kbs_v2.exists(txn, kbid=kbid):
             logger.warning(
                 "KB should be backfilled, as it does not exist in the new orm tables",
                 extra={"kbid": kbid},
@@ -450,14 +450,14 @@ class kbs_v1:
     async def get_kbs(cls, txn: Transaction, *, prefix: str = "") -> AsyncIterator[tuple[str, str]]:
         async for key in txn.keys(cls.KB_SLUGS.format(slug=prefix)):
             slug = key.replace(cls.KB_SLUGS_BASE, "")
-            uuid = await cls.get_kb_uuid(txn, slug=slug)
+            uuid = await cls.get_kbid(txn, slug=slug)
             if uuid is None:
                 logger.error(f"KB with slug ({slug}) but without uuid?")
                 continue
             yield (uuid, slug)
 
     @classmethod
-    async def get_kb_uuid(cls, txn: Transaction, *, slug: str) -> str | None:
+    async def get_kbid(cls, txn: Transaction, *, slug: str) -> str | None:
         uuid = await txn.get(cls.KB_SLUGS.format(slug=slug), for_update=False)
         if uuid is not None:
             return uuid.decode()

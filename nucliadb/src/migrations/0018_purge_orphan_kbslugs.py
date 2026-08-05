@@ -47,7 +47,7 @@ async def migrate(context: ExecutionContext) -> None:
                 continue
 
             kbid = value.decode()
-            if not (await datamanagers.kb.exists_kb(txn, kbid=kbid)):
+            if not (await datamanagers.kb.exists(txn, kbid=kbid)):
                 # log data too just in case
                 logger.info(
                     "Removing orphan /kbslugs key",

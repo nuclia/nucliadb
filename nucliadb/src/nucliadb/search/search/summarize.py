@@ -78,7 +78,7 @@ async def get_extracted_texts(kbid: str, resource_uuids_or_slugs: list[str]) -> 
 
     # Schedule getting extracted text for each field of each resource
     async with driver.ro_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise datamanagers.exceptions.KnowledgeBoxNotFound(kbid)
 
         kb_orm = KnowledgeBox(txn, storage, kbid)

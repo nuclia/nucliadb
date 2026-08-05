@@ -184,6 +184,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             )
         except KnowledgeBoxNotFound:
             return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.NOTFOUND)
+        except KnowledgeBoxConflict:
+            return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.CONFLICT)
         except Exception:
             logger.exception("Could not update KB", exc_info=True)
             return UpdateKnowledgeBoxResponse(status=KnowledgeBoxResponseStatus.ERROR)
@@ -377,4 +379,4 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
 
 async def exists_kb(kbid: str) -> bool:
-    return await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    return await datamanagers.atomic.kb.exists(kbid=kbid)

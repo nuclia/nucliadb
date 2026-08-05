@@ -42,7 +42,7 @@ async def txn(maindb_driver: Driver):
 async def kbid(maindb_driver: Driver):
     kbid = KnowledgeBox.new_unique_kbid()
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.kb.set_kbid_for_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
+        await datamanagers.kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid
 

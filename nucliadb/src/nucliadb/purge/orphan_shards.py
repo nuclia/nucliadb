@@ -100,7 +100,7 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardKb]:
     stored_shards: dict[str, ShardKb] = {}
 
     async with driver.ro_transaction() as txn:
-        async for kbid, _ in datamanagers.kb.get_kbs(txn):
+        async for kbid, _ in datamanagers.kb.iter(txn):
             kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
             if kb_shards is None:
                 logger.warning("KB not found while looking for orphan shards", extra={"kbid": kbid})
@@ -139,7 +139,7 @@ async def report_orphan_shards(driver: Driver):
             if kbid == UNKNOWN_KB:
                 msg = "Found orphan shard but could not get KB info"
             else:
-                kb_exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
+                kb_exists = await datamanagers.kb.exists(txn, kbid=kbid)
                 if kb_exists:
                     msg = "Found orphan shard for existing KB"
                 else:

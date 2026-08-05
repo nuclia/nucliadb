@@ -65,7 +65,7 @@ class TrainShardManager(manager.KBShardManager):
         if kbid is None:
             return None
 
-        if not (await datamanagers.kb.exists_kb(txn, kbid=kbid)):
+        if not (await datamanagers.kb.exists(txn, kbid=kbid)):
             return None
 
         kbobj = KnowledgeBox(txn, self.storage, kbid)

@@ -81,7 +81,7 @@ class cluster:
 
 
 class kb:
-    exists_kb = ro_txn_wrap(kb_dm.exists_kb)
+    exists = ro_txn_wrap(kb_dm.exists)
     get_config = ro_txn_wrap(kb_dm.get_config)
     get_external_index_provider_metadata = ro_txn_wrap(kb_dm.get_external_index_provider_metadata)
 

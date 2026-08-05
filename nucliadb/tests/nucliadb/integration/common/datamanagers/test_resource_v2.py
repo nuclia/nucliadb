@@ -38,7 +38,7 @@ async def kbid(maindb_driver: Driver) -> str:
     """Create a new knowledge box and return its kbid."""
     kbid = KnowledgeBox.new_unique_kbid()
     async with maindb_driver.rw_transaction() as txn:
-        await kb.set_kbid_for_slug(txn, slug=kbid, kbid=kbid)
+        await kb.set_slug(txn, slug=kbid, kbid=kbid)
         await txn.commit()
     return kbid
 

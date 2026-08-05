@@ -260,7 +260,7 @@ async def get_kbs(request: Request, prefix: str = "") -> KnowledgeBoxList:
     driver = get_driver()
     async with driver.transaction() as txn:
         response = KnowledgeBoxList()
-        async for kbid, slug in KnowledgeBox.get_kbs(txn, prefix):
+        async for kbid, slug in KnowledgeBox.iter(txn, prefix):
             response.kbs.append(KnowledgeBoxObjSummary(slug=slug or None, uuid=kbid))
         return response
 ```

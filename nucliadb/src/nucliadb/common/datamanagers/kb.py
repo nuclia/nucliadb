@@ -30,20 +30,161 @@ Each row represents one knowledge box and stores:
 
 import logging
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Final, Literal, TypeAlias, cast
 
 import psycopg.errors
+import psycopg.sql
 
-from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb.common.datamanagers.utils import _pg_cursor
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb_protos import knowledgebox_pb2
-
-from . import cluster
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
 logger = logging.getLogger(__name__)
 
 
-async def get_kbs(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tuple[str, str]]:
+class _UnsetType:
+    pass
+
+
+UNSET: Final = _UnsetType()
+KBColumn: TypeAlias = Literal["slug", "config", "shards", "deleted_at"]
+UNSET_STR: Final[str | None] = cast(str | None, UNSET)
+UNSET_CONFIG: Final[knowledgebox_pb2.KnowledgeBoxConfig | None] = cast(
+    knowledgebox_pb2.KnowledgeBoxConfig | None, UNSET
+)
+UNSET_SHARDS: Final[writer_pb2.Shards | None] = cast(writer_pb2.Shards | None, UNSET)
+UNSET_DELETED_AT: Final[datetime | None] = cast(datetime | None, UNSET)
+
+
+@dataclass(slots=True)
+class KBData:
+    slug: str | None = UNSET_STR
+    config: knowledgebox_pb2.KnowledgeBoxConfig | None = UNSET_CONFIG
+    shards: writer_pb2.Shards | None = UNSET_SHARDS
+    deleted_at: datetime | None = UNSET_DELETED_AT
+
+
+def _serialize_kb_column(value):
+    if value is UNSET:
+        return UNSET
+    if value is None:
+        return None
+    if isinstance(value, (knowledgebox_pb2.KnowledgeBoxConfig, writer_pb2.Shards)):
+        return value.SerializeToString()
+    else:  # pragma: no cover
+        raise ValueError(f"Cannot serialize value of type {type(value)}: {value}")
+
+
+def _deserialize_kb_column(column: KBColumn, value):
+    if value is None:
+        return None
+    if column == "slug" or column == "deleted_at":
+        return value
+    if column == "config":
+        kb_config = knowledgebox_pb2.KnowledgeBoxConfig()
+        kb_config.ParseFromString(bytes(value))
+        return kb_config
+    if column == "shards":
+        shards = writer_pb2.Shards()
+        shards.ParseFromString(bytes(value))
+        return shards
+    raise ValueError(f"Unknown KB column: {column}")  # pragma: no cover
+
+
+async def upsert(
+    txn: Transaction,
+    *,
+    kbid: str,
+    config: knowledgebox_pb2.KnowledgeBoxConfig | None | _UnsetType = UNSET,
+    shards: writer_pb2.Shards | None | _UnsetType = UNSET,
+    deleted_at: datetime | None | _UnsetType = UNSET,
+) -> None:
+    """Upsert a KB row, updating only columns explicitly provided.
+
+    Use UNSET to leave a column untouched. Pass None to explicitly store SQL NULL.
+    """
+    values = {
+        "kbid": kbid,
+        "config": _serialize_kb_column(config),
+        "shards": _serialize_kb_column(shards),
+        "deleted_at": _serialize_kb_column(deleted_at),
+    }
+    columns_to_set = [
+        column_name
+        for column_name in ("config", "shards", "deleted_at")
+        if values[column_name] is not UNSET
+    ]
+    if not columns_to_set:
+        return
+
+    insert_columns = ["kbid", *columns_to_set]
+    assignments = [
+        psycopg.sql.SQL("{} = EXCLUDED.{}").format(
+            psycopg.sql.Identifier(column_name),
+            psycopg.sql.Identifier(column_name),
+        )
+        for column_name in columns_to_set
+    ]
+
+    query = psycopg.sql.SQL(
+        """
+        INSERT INTO kbs ({insert_columns})
+        VALUES ({insert_values})
+        ON CONFLICT (kbid) DO UPDATE SET
+            {assignments}
+        """
+    ).format(
+        insert_columns=psycopg.sql.SQL(", ").join(
+            psycopg.sql.Identifier(column_name) for column_name in insert_columns
+        ),
+        insert_values=psycopg.sql.SQL(", ").join(
+            psycopg.sql.Placeholder(column_name) for column_name in insert_columns
+        ),
+        assignments=psycopg.sql.SQL(", ").join(assignments),
+    )
+
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(query, {column_name: values[column_name] for column_name in insert_columns})
+
+
+async def get(
+    txn: Transaction,
+    *,
+    kbid: str,
+    columns: tuple[KBColumn, ...],
+    for_update: bool = False,
+) -> KBData | None:
+    """Return selected KB columns for a row, or None if the row does not exist.
+
+    Non-requested fields are left as UNSET. Requested SQL NULL values are returned as None.
+    """
+    if not columns:
+        raise ValueError("At least one KB column must be requested")
+
+    query = psycopg.sql.SQL("SELECT {columns} FROM kbs WHERE kbid = %(kbid)s").format(
+        columns=psycopg.sql.SQL(", ").join(
+            psycopg.sql.Identifier(column_name) for column_name in columns
+        )
+    )
+    if for_update:
+        query += psycopg.sql.SQL(" FOR UPDATE")
+
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(query, {"kbid": kbid})
+        row = await cur.fetchone()
+        if row is None:
+            return None
+
+    kb_data = KBData()
+    for index, column_name in enumerate(columns):
+        setattr(kb_data, column_name, _deserialize_kb_column(column_name, row[index]))
+    return kb_data
+
+
+async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tuple[str, str]]:
     async with _pg_cursor(txn) as cur:
         if slug_prefix:
             await cur.execute(
@@ -59,7 +200,7 @@ async def get_kbs(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[t
                 yield (str(row[0]), row[1])
 
 
-async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
+async def exists(txn: Transaction, *, kbid: str) -> bool:
     async with _pg_cursor(txn) as cur:
         try:
             await cur.execute(
@@ -73,14 +214,14 @@ async def exists_kb(txn: Transaction, *, kbid: str) -> bool:
             )
         except psycopg.errors.InvalidTextRepresentation:
             logger.warning(
-                "Invalid UUID format in exists_kb() check, returning False",
+                "Invalid UUID format in exists() check, returning False",
                 extra={"kbid": kbid},
             )
             return False
         return await cur.fetchone() is not None
 
 
-async def get_kb_uuid(txn: Transaction, *, slug: str) -> str | None:
+async def get_uuid(txn: Transaction, *, slug: str) -> str | None:
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT kbid FROM kbs WHERE slug = %(slug)s",
@@ -90,17 +231,20 @@ async def get_kb_uuid(txn: Transaction, *, slug: str) -> str | None:
         return str(row[0]) if row is not None else None
 
 
-async def set_kbid_for_slug(txn: Transaction, *, slug: str, kbid: str):
+async def set_slug(txn: Transaction, *, slug: str, kbid: str):
     async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kbs (kbid, slug)
-            VALUES (%(kbid)s, %(slug)s)
-            ON CONFLICT (kbid) DO UPDATE SET
-                slug = EXCLUDED.slug
-            """,
-            {"kbid": kbid, "slug": slug},
-        )
+        try:
+            await cur.execute(
+                """
+                INSERT INTO kbs (kbid, slug)
+                VALUES (%(kbid)s, %(slug)s)
+                ON CONFLICT (kbid) DO UPDATE SET
+                    slug = EXCLUDED.slug
+                """,
+                {"kbid": kbid, "slug": slug},
+            )
+        except psycopg.errors.UniqueViolation as exc:
+            raise KnowledgeBoxConflict() from exc
 
 
 async def delete(txn: Transaction, *, kbid: str) -> None:
@@ -127,34 +271,27 @@ async def soft_delete(txn: Transaction, *, kbid: str) -> None:
 async def get_config(
     txn: Transaction, *, kbid: str, for_update: bool = False
 ) -> knowledgebox_pb2.KnowledgeBoxConfig | None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            "SELECT config FROM kbs WHERE kbid = %(kbid)s",
-            {"kbid": kbid},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = knowledgebox_pb2.KnowledgeBoxConfig()
-        pb.ParseFromString(row[0])
-        return pb
+    kb_data = await get(txn, kbid=kbid, columns=("config",), for_update=for_update)
+    if kb_data is None:
+        return None
+    return kb_data.config
+
+
+async def get_shards(
+    txn: Transaction, *, kbid: str, for_update: bool = False
+) -> writer_pb2.Shards | None:
+    kb_data = await get(txn, kbid=kbid, columns=("shards",), for_update=for_update)
+    if kb_data is None:
+        return None
+    return kb_data.shards
 
 
 async def set_config(txn: Transaction, *, kbid: str, config: knowledgebox_pb2.KnowledgeBoxConfig):
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kbs (kbid, config)
-            VALUES (%(kbid)s, %(config)s)
-            ON CONFLICT (kbid) DO UPDATE SET
-                config = EXCLUDED.config
-            """,
-            {"kbid": kbid, "config": config.SerializeToString()},
-        )
+    await upsert(txn, kbid=kbid, config=config)
 
 
 async def get_model_metadata(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.SemanticModelMetadata:
-    shards_obj = await cluster.get_kb_shards(txn, kbid=kbid, for_update=False)
+    shards_obj = await get_shards(txn, kbid=kbid, for_update=False)
     if shards_obj is None:
         raise KnowledgeBoxNotFound(kbid)
     if shards_obj.HasField("model"):
@@ -221,8 +358,8 @@ async def get_external_index_provider_metadata(
 async def set_external_index_provider_metadata(
     txn: Transaction, *, kbid: str, metadata: knowledgebox_pb2.StoredExternalIndexProviderMetadata
 ):
-    kb_config = await get_config(txn, kbid=kbid)
+    kb_config = await get_config(txn, kbid=kbid, for_update=True)
     if kb_config is None:
         raise KnowledgeBoxNotFound(kbid)
     kb_config.external_index_provider.CopyFrom(metadata)
-    await set_config(txn, kbid=kbid, config=kb_config)
+    await upsert(txn, kbid=kbid, config=kb_config)
