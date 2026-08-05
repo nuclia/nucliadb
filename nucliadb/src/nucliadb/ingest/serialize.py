@@ -74,6 +74,7 @@ async def serialize(
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
+    vectorset: str | None = None,
     service_name: str | None = None,
     slug: str | None = None,
 ) -> Resource | None:
@@ -86,6 +87,7 @@ async def serialize(
             show,
             field_type_filter,
             extracted,
+            vectorset=vectorset,
             service_name=service_name,
             slug=slug,
         )
@@ -98,6 +100,7 @@ async def managed_serialize(
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
+    vectorset: str | None = None,
     service_name: str | None = None,
     slug: str | None = None,
 ) -> Resource | None:
@@ -105,7 +108,9 @@ async def managed_serialize(
     if orm_resource is None:
         return None
 
-    return await serialize_resource(orm_resource, show, field_type_filter, extracted)
+    return await serialize_resource(
+        orm_resource, show, field_type_filter, extracted, vectorset=vectorset
+    )
 
 
 async def get_orm_resource(
@@ -140,6 +145,7 @@ async def serialize_resource(
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
+    vectorset: str | None = None,
 ) -> Resource:
     resource = Resource(id=orm_resource.uuid)
 
@@ -227,6 +233,7 @@ async def serialize_resource(
                         resource.data.texts[field.id].extracted,
                         field_type_name,
                         extracted,
+                        vectorset=vectorset,
                     )
             elif field_type_name is FieldTypeName.FILE:
                 if resource.data.files is None:
@@ -249,6 +256,7 @@ async def serialize_resource(
                         resource.data.files[field.id].extracted,
                         field_type_name,
                         extracted,
+                        vectorset=vectorset,
                     )
             elif field_type_name is FieldTypeName.LINK:
                 if resource.data.links is None:
@@ -268,6 +276,7 @@ async def serialize_resource(
                         resource.data.links[field.id].extracted,
                         field_type_name,
                         extracted,
+                        vectorset=vectorset,
                     )
             elif field_type_name is FieldTypeName.CONVERSATION:
                 if resource.data.conversations is None:
@@ -289,6 +298,7 @@ async def serialize_resource(
                         resource.data.conversations[field.id].extracted,
                         field_type_name,
                         extracted,
+                        vectorset=vectorset,
                     )
             elif field_type_name is FieldTypeName.GENERIC:
                 if resource.data.generics is None:
@@ -381,6 +391,7 @@ async def set_resource_field_extracted_data(
     field_data: ExtractedDataType,
     field_type_name: FieldTypeName,
     wanted_extracted_data: list[ExtractedDataTypeName],
+    vectorset: str | None = None,
 ) -> None:
     if field_data is None:
         return
@@ -399,7 +410,7 @@ async def set_resource_field_extracted_data(
         field_data.large_metadata = await serialize_extracted_large_metadata(field)
 
     if ExtractedDataTypeName.VECTOR in wanted_extracted_data:
-        field_data.vectors = await serialize_extracted_vectors(field)
+        field_data.vectors = await serialize_extracted_vectors(field, vectorset=vectorset)
 
     if ExtractedDataTypeName.QA in wanted_extracted_data:
         field_data.question_answers = await serialize_extracted_question_answers(field)
@@ -444,15 +455,19 @@ async def serialize_extracted_large_metadata(field: Field) -> LargeComputedMetad
     return from_proto.large_computed_metadata(data_lcm)
 
 
-async def serialize_extracted_vectors(field: Field) -> VectorObject | None:
-    # XXX: our extracted API is not vectorset-compatible, so we'll get the
-    # first vectorset and return the values. Ideally, we should provide a
-    # way to select a vectorset
+async def serialize_extracted_vectors(field: Field, vectorset: str | None = None) -> VectorObject | None:
     vectorset_id = None
+    vs = None
     async with datamanagers.with_ro_transaction() as txn:
-        async for vectorset_id, vs in datamanagers.vectorsets.iter(txn=txn, kbid=field.kbid):
-            break
-    assert vectorset_id is not None, "All KBs must have at least a vectorset"
+        if vectorset is None:
+            # Get the first vectorset for this field's KB, if any
+            async for vectorset_id, vs in datamanagers.vectorsets.iter(txn=txn, kbid=field.kbid):
+                break
+        else:
+            vectorset_id = vectorset
+            vs = await datamanagers.vectorsets.get(txn, kbid=field.kbid, vectorset_id=vectorset)
+    if vs is None or vectorset_id is None:
+        return None
     data_vec = await field.get_vectors(vectorset_id, vs.storage_key_kind)
     if data_vec is None:
         return None
