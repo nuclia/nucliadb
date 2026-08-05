@@ -19,13 +19,6 @@
 #
 from nucliadb.common.datamanagers import kb
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb_protos import writer_pb2
-
-
-async def get_kb_shards(
-    txn: Transaction, *, kbid: str, for_update: bool = False
-) -> writer_pb2.Shards | None:
-    return await kb.get_shards(txn, kbid=kbid, for_update=for_update)
 
 
 async def is_kb_shard(txn: Transaction, *, kbid: str, shard_id: str) -> bool:
@@ -36,7 +29,3 @@ async def is_kb_shard(txn: Transaction, *, kbid: str, shard_id: str) -> bool:
         if shard.shard == shard_id:
             return True
     return False
-
-
-async def update_kb_shards(txn: Transaction, *, kbid: str, shards: writer_pb2.Shards) -> None:
-    await kb.upsert(txn, kbid=kbid, shards=shards)

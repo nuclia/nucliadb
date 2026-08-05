@@ -101,7 +101,7 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardKb]:
 
     async with driver.ro_transaction() as txn:
         async for kbid, _ in datamanagers.kb.iter(txn):
-            kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+            kb_shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
             if kb_shards is None:
                 logger.warning("KB not found while looking for orphan shards", extra={"kbid": kbid})
                 continue

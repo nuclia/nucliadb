@@ -82,7 +82,7 @@ async def _build_requests(
     nidx_requests: dict[str, ExtractedTextsRequest] = {}
 
     async with datamanagers.with_ro_transaction() as txn:
-        kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        kb_shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
         if kb_shards is None:
             return None
 

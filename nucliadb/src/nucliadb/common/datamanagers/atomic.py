@@ -43,7 +43,6 @@ from typing_extensions import ParamSpec
 
 from nucliadb.common.maindb.driver import Transaction
 
-from . import cluster as cluster_dm
 from . import fields as fields_dm
 from . import kb as kb_dm
 from . import labels as labels_dm
@@ -76,14 +75,11 @@ def rw_txn_wrap(fun: Callable[Concatenate[Transaction, P], Awaitable[T]]) -> Cal
     return wrapper
 
 
-class cluster:
-    get_kb_shards = ro_txn_wrap(cluster_dm.get_kb_shards)
-
-
 class kb:
     exists = ro_txn_wrap(kb_dm.exists)
     get_config = ro_txn_wrap(kb_dm.get_config)
     get_external_index_provider_metadata = ro_txn_wrap(kb_dm.get_external_index_provider_metadata)
+    get_shards = ro_txn_wrap(kb_dm.get_shards)
 
 
 class resources:

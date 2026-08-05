@@ -27,7 +27,7 @@ Covers every public function in the module:
 
 import pytest
 
-from nucliadb.common.datamanagers import cluster, kb
+from nucliadb.common.datamanagers import kb
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
@@ -323,11 +323,11 @@ async def test_update_and_get_kb_shards(maindb_driver: Driver, kbid: str) -> Non
     shards = make_shards(kbid)
 
     async with maindb_driver.rw_transaction() as txn:
-        await cluster.update_kb_shards(txn, kbid=kbid, shards=shards)
+        await kb.upsert(txn, kbid=kbid, shards=shards)
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
-        result = await cluster.get_kb_shards(txn, kbid=kbid)
+        result = await kb.get_shards(txn, kbid=kbid)
 
     assert result is not None
     assert result.kbid == kbid
@@ -336,7 +336,7 @@ async def test_update_and_get_kb_shards(maindb_driver: Driver, kbid: str) -> Non
 @pytest.mark.asyncio
 async def test_get_kb_shards_returns_none_for_missing_kb(maindb_driver: Driver) -> None:
     async with maindb_driver.ro_transaction() as txn:
-        result = await cluster.get_kb_shards(txn, kbid=new_kbid())
+        result = await kb.get_shards(txn, kbid=new_kbid())
     assert result is None
 
 
@@ -345,12 +345,12 @@ async def test_get_kb_shards_for_update(maindb_driver: Driver, kbid: str) -> Non
     shards = make_shards(kbid)
 
     async with maindb_driver.rw_transaction() as txn:
-        await cluster.update_kb_shards(txn, kbid=kbid, shards=shards)
+        await kb.upsert(txn, kbid=kbid, shards=shards)
         await txn.commit()
 
     # for_update=True is a SELECT … FOR UPDATE; verify it returns the same data
     async with maindb_driver.rw_transaction() as txn:
-        result = await cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
+        result = await kb.get_shards(txn, kbid=kbid, for_update=True)
 
     assert result is not None
     assert result.kbid == kbid

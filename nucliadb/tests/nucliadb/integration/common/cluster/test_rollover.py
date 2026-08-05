@@ -97,7 +97,7 @@ async def test_rollover_kb_index_with_prewarm(
     nidx_utility = app_context.nidx
 
     async def nidx_shard_ids(kbid: str) -> set[str]:
-        kb_shards = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid)
+        kb_shards = await datamanagers.atomic.kb.get_shards(kbid=kbid)
         assert kb_shards is not None
         shard_ids = [shard.nidx_shard_id for shard in kb_shards.shards]
         assert len(shard_ids) == len(set(shard_ids))
@@ -174,7 +174,7 @@ async def test_rollover_kb_index_does_a_clean_cutover(
 ):
     async def get_kb_shards(kbid: str):
         async with app_context.kv_driver.ro_transaction() as txn:
-            return await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+            return await datamanagers.kb.get_shards(txn, kbid=kbid)
 
     shards1 = await get_kb_shards(knowledgebox)
     assert shards1.extra == {}

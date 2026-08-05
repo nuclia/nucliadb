@@ -45,7 +45,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     # No longer relevant with nidx
 
     # async with context.kv_driver.rw_transaction() as txn:
-    #     shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid, for_update=True)
+    #     shards = await datamanagers.kb.get_shards(txn, kbid=kbid, for_update=True)
     #     if shards is None:
     #         logger.error("KB without shards", extra={"kbid": kbid})
     #         return

@@ -38,8 +38,8 @@ async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
     sm = manager.KBShardManager()
 
     # Fake KB shards instead of creating a KB to generate it
-    shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
-    await datamanagers.cluster.update_kb_shards(
+    shards = await datamanagers.kb.get_shards(txn, kbid=kbid, for_update=True)
+    await datamanagers.kb.upsert(
         txn,
         kbid=kbid,
         shards=writer_pb2.Shards(
@@ -50,7 +50,7 @@ async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
     # create first shard
     await sm.create_shard_by_kbid(txn, kbid, prewarm_enabled=False)
 
-    shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+    shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
     assert shards is not None
     assert len(shards.shards) == 1
     assert shards.shards[0].read_only is False
@@ -60,7 +60,7 @@ async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
     # adding a second shard will mark the first as read only
     await sm.create_shard_by_kbid(txn, kbid, prewarm_enabled=False)
 
-    shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+    shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
     assert shards is not None
     assert len(shards.shards) == 2
     assert shards.shards[0].read_only is True
@@ -71,7 +71,7 @@ async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
     # adding a third one will be equivalent
     await sm.create_shard_by_kbid(txn, kbid, prewarm_enabled=False)
 
-    shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+    shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
     assert shards is not None
     assert len(shards.shards) == 3
     assert shards.shards[0].read_only is True
