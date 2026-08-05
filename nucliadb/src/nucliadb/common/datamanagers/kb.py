@@ -233,7 +233,7 @@ async def get_kbid(txn: Transaction, *, slug: str) -> str | None:
         return str(row[0]) if row is not None else None
 
 
-@observer.wrap({"type": "kb", "op": "get_slug"})
+@observer.wrap({"type": "kb", "op": "set_slug"})
 async def set_slug(txn: Transaction, *, slug: str, kbid: str):
     async with _pg_cursor(txn) as cur:
         try:
