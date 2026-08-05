@@ -26,11 +26,23 @@ import psycopg
 import psycopg.sql
 from google.protobuf.message import Message
 
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxConflict
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGTransaction, ReadOnlyPGTransaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb_telemetry.metrics import Observer
 
 logger = logging.getLogger(__name__)
+
+
+observer = Observer(
+    "nucliadb_datamanagers",
+    error_mappings={
+        "conflict": KnowledgeBoxConflict,
+    },
+    labels={"type": "unknown", "op": "unknown"},
+)
+
 
 PB_TYPE = TypeVar("PB_TYPE", bound=Message)
 

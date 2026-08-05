@@ -38,21 +38,11 @@ import psycopg.errors
 import psycopg.sql
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
-from nucliadb.common.datamanagers.utils import _pg_cursor
+from nucliadb.common.datamanagers.utils import _pg_cursor, observer
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
-from nucliadb_telemetry.metrics import Observer
 
 logger = logging.getLogger(__name__)
-
-
-observer = Observer(
-    "datamanagers.kb",
-    error_mappings={
-        "conflict": KnowledgeBoxConflict,
-    },
-    labels={"op": "unknown"},
-)
 
 
 KBColumn: TypeAlias = Literal["slug", "config", "shards", "deleted_at"]
@@ -106,14 +96,13 @@ def _deserialize_kb_column(column: KBColumn, value):
     raise ValueError(f"Unknown KB column: {column}")  # pragma: no cover
 
 
-@observer.wrap({"op": "upsert"})
+@observer.wrap({"type": "kb", "op": "upsert"})
 async def upsert(
     txn: Transaction,
     *,
     kbid: str,
     config: knowledgebox_pb2.KnowledgeBoxConfig | None | _UnsetType = UNSET,
     shards: writer_pb2.Shards | None | _UnsetType = UNSET,
-    deleted_at: datetime | None | _UnsetType = UNSET,
 ) -> None:
     """Upsert a KB row, updating only columns explicitly provided.
 
@@ -123,12 +112,9 @@ async def upsert(
         "kbid": kbid,
         "config": _serialize_kb_column(config),
         "shards": _serialize_kb_column(shards),
-        "deleted_at": _serialize_kb_column(deleted_at),
     }
     columns_to_set = [
-        column_name
-        for column_name in ("config", "shards", "deleted_at")
-        if values[column_name] is not UNSET
+        column_name for column_name in ("config", "shards") if values[column_name] is not UNSET
     ]
     if not columns_to_set:
         return
@@ -163,7 +149,7 @@ async def upsert(
         await cur.execute(query, {column_name: values[column_name] for column_name in insert_columns})
 
 
-@observer.wrap({"op": "get"})
+@observer.wrap({"type": "kb", "op": "get"})
 async def get(
     txn: Transaction,
     *,
@@ -214,7 +200,7 @@ async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tupl
                 yield (str(row[0]), row[1])
 
 
-@observer.wrap({"op": "exists"})
+@observer.wrap({"type": "kb", "op": "exists"})
 async def exists(txn: Transaction, *, kbid: str) -> bool:
     async with _pg_cursor(txn) as cur:
         try:
@@ -236,7 +222,7 @@ async def exists(txn: Transaction, *, kbid: str) -> bool:
         return await cur.fetchone() is not None
 
 
-@observer.wrap({"op": "get_kbid"})
+@observer.wrap({"type": "kb", "op": "get_kbid"})
 async def get_kbid(txn: Transaction, *, slug: str) -> str | None:
     async with _pg_cursor(txn) as cur:
         await cur.execute(
@@ -247,7 +233,7 @@ async def get_kbid(txn: Transaction, *, slug: str) -> str | None:
         return str(row[0]) if row is not None else None
 
 
-@observer.wrap({"op": "get_slug"})
+@observer.wrap({"type": "kb", "op": "get_slug"})
 async def set_slug(txn: Transaction, *, slug: str, kbid: str):
     async with _pg_cursor(txn) as cur:
         try:
@@ -264,7 +250,7 @@ async def set_slug(txn: Transaction, *, slug: str, kbid: str):
             raise KnowledgeBoxConflict() from exc
 
 
-@observer.wrap({"op": "delete"})
+@observer.wrap({"type": "kb", "op": "delete"})
 async def delete(txn: Transaction, *, kbid: str) -> None:
     """Fully delete a KB row and all its associated resources, fields, and conversations."""
     async with _pg_cursor(txn) as cur:
@@ -274,7 +260,7 @@ async def delete(txn: Transaction, *, kbid: str) -> None:
         )
 
 
-@observer.wrap({"op": "soft_delete"})
+@observer.wrap({"type": "kb", "op": "soft_delete"})
 async def soft_delete(txn: Transaction, *, kbid: str) -> None:
     """Soft delete a KB row by clearing its slug and stamping deleted_at with the current time.
 
@@ -287,7 +273,7 @@ async def soft_delete(txn: Transaction, *, kbid: str) -> None:
         )
 
 
-@observer.wrap({"op": "get_config"})
+@observer.wrap({"type": "kb", "op": "get_config"})
 async def get_config(
     txn: Transaction, *, kbid: str, for_update: bool = False
 ) -> knowledgebox_pb2.KnowledgeBoxConfig | None:
@@ -304,7 +290,7 @@ async def get_config(
         return pb
 
 
-@observer.wrap({"op": "get_shards"})
+@observer.wrap({"type": "kb", "op": "get_shards"})
 async def get_shards(
     txn: Transaction, *, kbid: str, for_update: bool = False
 ) -> writer_pb2.Shards | None:
