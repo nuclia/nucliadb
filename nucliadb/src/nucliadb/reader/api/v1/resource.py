@@ -57,6 +57,12 @@ from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 from nucliadb_utils.utilities import get_audit, get_storage
 
+VectorSetQueryParam = Query(
+    default=None,
+    title="Vectorset",
+    description="Vectors index to return embeddings from. If not provided, the first vectorset configured will be used.",
+)
+
 
 @api.head(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}",
@@ -213,6 +219,7 @@ async def get_resource_by_uuid(
             ExtractedDataTypeName.FILE,
         ]
     ),
+    vectorset: str | None = VectorSetQueryParam,
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ):
@@ -222,6 +229,7 @@ async def get_resource_by_uuid(
         show=show,
         field_type_filter=field_type_filter,
         extracted=extracted,
+        vectorset=vectorset,
         x_nucliadb_user=x_nucliadb_user,
         x_forwarded_for=x_forwarded_for,
     )
@@ -251,6 +259,7 @@ async def get_resource_by_slug(
             ExtractedDataTypeName.FILE,
         ]
     ),
+    vectorset: str | None = VectorSetQueryParam,
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> Resource:
@@ -260,6 +269,7 @@ async def get_resource_by_slug(
         show=show,
         field_type_filter=field_type_filter,
         extracted=extracted,
+        vectorset=vectorset,
         x_nucliadb_user=x_nucliadb_user,
         x_forwarded_for=x_forwarded_for,
     )
@@ -273,6 +283,7 @@ async def _get_resource(
     show: list[ResourceProperties],
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
+    vectorset: str | None = None,
     x_nucliadb_user: str,
     x_forwarded_for: str,
 ) -> Resource:
@@ -290,6 +301,7 @@ async def _get_resource(
         show,
         field_type_filter,
         extracted,
+        vectorset=vectorset,
         service_name=SERVICE_NAME,
         slug=rslug,
     )
@@ -323,6 +335,7 @@ async def get_resource_field_rslug_prefix(
             ExtractedDataTypeName.FILE,
         ]
     ),
+    vectorset: str | None = VectorSetQueryParam,
     # not working with latest pydantic/fastapi
     # page: Union[Literal["last", "first"], int] = Query("last"),
     page: str | int = Query("last"),
@@ -335,6 +348,7 @@ async def get_resource_field_rslug_prefix(
         show=show,
         extracted=extracted,
         page=page,
+        vectorset=vectorset,
     )
 
 
@@ -363,6 +377,7 @@ async def get_resource_field_rid_prefix(
             ExtractedDataTypeName.FILE,
         ]
     ),
+    vectorset: str | None = VectorSetQueryParam,
     # not working with latest pydantic/fastapi
     # page: Union[Literal["last", "first"], int] = Query("last"),
     page: str | int = Query("last"),
@@ -375,6 +390,7 @@ async def get_resource_field_rid_prefix(
         show=show,
         extracted=extracted,
         page=page,
+        vectorset=vectorset,
     )
 
 
@@ -385,6 +401,7 @@ async def _get_resource_field(
     show: list[ResourceFieldProperties],
     extracted: list[ExtractedDataTypeName],
     page: str | int,
+    vectorset: str | None = None,
     rid: str | None = None,
     rslug: str | None = None,
 ) -> Response:
@@ -459,10 +476,7 @@ async def _get_resource_field(
         ):
             resource_field.extracted = FIELD_NAME_TO_EXTRACTED_DATA_FIELD_MAP[field_type]()
             await set_resource_field_extracted_data(
-                field,
-                resource_field.extracted,
-                field_type,
-                extracted,
+                field, resource_field.extracted, field_type, extracted, vectorset=vectorset
             )
 
         if ResourceFieldProperties.ERROR in show:
