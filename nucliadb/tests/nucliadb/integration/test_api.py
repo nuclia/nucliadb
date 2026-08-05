@@ -29,6 +29,7 @@ import pydantic
 import pytest
 from httpx import AsyncClient, Response
 
+from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.processing import DummyProcessingEngine, PushPayload
 from nucliadb.learning_proxy import (
@@ -71,6 +72,7 @@ from nucliadb_utils.storages.storage import Storage
 from tests.utils import broker_resource, inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
 from tests.utils.dirty_index import mark_dirty, wait_for_sync
+from tests.utils.vectorsets import add_vectorset
 from tests.writer.test_fields import (
     TEST_CONVERSATION_PAYLOAD,
     TEST_FILE_PAYLOAD,
@@ -484,6 +486,106 @@ async def test_extracted_shortened_metadata(
         for meta in (metadata, split_metadata):
             for cropped_field in cropped_fields:
                 assert len(meta[cropped_field]) > 0
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_get_extracted_vectors_can_select_vectorset(
+    nucliadb_writer: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    resp = await nucliadb_writer.post(
+        f"/kb/{standalone_knowledgebox}/resources",
+        json={
+            "title": "My title",
+            "slug": "myresource",
+            "texts": {"text1": {"body": "My text"}},
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    async with datamanagers.with_ro_transaction() as txn:
+        async for default_vectorset_id, default_vectorset in datamanagers.vectorsets.iter(
+            txn, kbid=standalone_knowledgebox
+        ):
+            break
+
+    vectorset_dimension = default_vectorset.vectorset_index_config.vector_dimension
+    extra_vectorset_id = "en-2024-08-05"
+    resp = await add_vectorset(
+        nucliadb_writer,
+        standalone_knowledgebox,
+        extra_vectorset_id,
+        vector_dimension=vectorset_dimension,
+    )
+    assert resp.status_code == 201, resp.text
+
+    default_vector = [0.0 for _ in range(vectorset_dimension)]
+    default_vector[0] = 1.0
+    selected_vector = [0.0 for _ in range(vectorset_dimension)]
+    selected_vector[1] = 1.0
+
+    bmb = BrokerMessageBuilder(
+        kbid=standalone_knowledgebox,
+        rid=rid,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+    text_field = bmb.field_builder("text1", field_type=FieldType.TEXT)
+    text_field.with_extracted_text("My text")
+    text_field.with_extracted_vectors(
+        vectors=[Vector(start=0, end=7, vector=default_vector)],
+        vectorset=default_vectorset_id,
+    )
+    text_field.with_extracted_vectors(
+        vectors=[Vector(start=0, end=7, vector=selected_vector)],
+        vectorset=extra_vectorset_id,
+    )
+
+    await inject_message(nucliadb_ingest_grpc, bmb.build())
+
+    # Test the resource endpoint
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
+        params={"show": ["extracted"], "extracted": ["vectors"], "vectorset": extra_vectorset_id},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    returned_vector = body["data"]["texts"]["text1"]["extracted"]["vectors"]["vectors"]["vectors"][0][
+        "vector"
+    ]
+    assert returned_vector[:2] == [0.0, 1.0]
+
+    # Test the field endpoint
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}/text/text1",
+        params={"show": ["extracted"], "extracted": ["vectors"], "vectorset": extra_vectorset_id},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    returned_vector = body["extracted"]["vectors"]["vectors"]["vectors"][0]["vector"]
+    assert returned_vector[:2] == [0.0, 1.0]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}",
+        params={"show": ["extracted"], "extracted": ["vectors"]},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    returned_vector = body["data"]["texts"]["text1"]["extracted"]["vectors"]["vectors"]["vectors"][0][
+        "vector"
+    ]
+    assert returned_vector[:2] == [1.0, 0.0]
+
+    resp = await nucliadb_reader.get(
+        f"/kb/{standalone_knowledgebox}/resource/{rid}/text/text1",
+        params={"show": ["extracted"], "extracted": ["vectors"]},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    returned_vector = body["extracted"]["vectors"]["vectors"]["vectors"][0]["vector"]
+    assert returned_vector[:2] == [1.0, 0.0]
 
 
 @pytest.mark.parametrize(
