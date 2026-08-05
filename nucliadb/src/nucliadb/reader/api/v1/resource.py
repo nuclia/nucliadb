@@ -102,10 +102,10 @@ async def head_resource(
         raise ValueError("Either rid or rslug must be provided, but not both")
     if rid is None:
         rslug = cast(str, rslug)
-        rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(kbid=kbid, slug=rslug)
+        rid = await datamanagers.atomic.resources.get_uuid(kbid=kbid, slug=rslug)
         if rid is None:
             raise HTTPException(status_code=404, detail="Resource does not exist")
-    if not await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid):
+    if not await datamanagers.atomic.resources.exists(kbid=kbid, rid=rid):
         raise HTTPException(status_code=404, detail="Resource does not exist")
 
 
@@ -143,7 +143,7 @@ async def list_resources(
             # ask for one item more than we need, in order to know if it's the last page
             async def _rids_generator(count: int):
                 iterated = 0
-                async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+                async for rid in datamanagers.resources.iterate_ids(kbid=kbid):
                     if iterated >= count:
                         break
                     yield rid

@@ -45,7 +45,7 @@ async def migrate(context: ExecutionContext) -> None: ...
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     if kbid not in AFFECTED_KBS:
         return
-    async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+    async for rid in datamanagers.resources.iterate_ids(kbid=kbid):
         async with datamanagers.with_rw_transaction() as txn:
             basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
             if not basic or not basic.icon:

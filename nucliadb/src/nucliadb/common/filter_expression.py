@@ -99,9 +99,7 @@ async def parse_expression(
         if expr.id:
             f.resource.resource_id = expr.id
         elif expr.slug:
-            rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
-                kbid=kbid, slug=expr.slug
-            )
+            rid = await datamanagers.atomic.resources.get_uuid(kbid=kbid, slug=expr.slug)
             if rid is None:
                 raise InvalidQueryError("slug", f"Cannot find slug {expr.slug}")
             f.resource.resource_id = rid
@@ -116,9 +114,7 @@ async def parse_expression(
         if expr.resource_id:
             f.resource_field_prefix.resource_id = expr.resource_id
         elif expr.resource_slug:
-            rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
-                kbid=kbid, slug=expr.resource_slug
-            )
+            rid = await datamanagers.atomic.resources.get_uuid(kbid=kbid, slug=expr.resource_slug)
             if rid is None:
                 raise InvalidQueryError("slug", f"Cannot find slug {expr.resource_slug}")
             f.resource_field_prefix.resource_id = rid

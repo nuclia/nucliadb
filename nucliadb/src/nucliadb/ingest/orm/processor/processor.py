@@ -202,9 +202,7 @@ class Processor:
         uuid = (
             message.uuid
             if message.uuid
-            else await datamanagers.atomic.resources.get_resource_uuid_from_slug(
-                kbid=kbid, slug=message.slug
-            )
+            else await datamanagers.atomic.resources.get_uuid(kbid=kbid, slug=message.slug)
         )
         if uuid is None:
             logger.info(
@@ -224,7 +222,7 @@ class Processor:
             try:
                 logger.info("Deleting resource", extra={"kbid": kbid, "rid": uuid})
                 kb = KnowledgeBox(txn, self.storage, kbid)
-                shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
+                shard_id = await datamanagers.resources.get_shard_id(txn, kbid=kbid, rid=uuid)
                 if shard_id is None:
                     logger.warning(
                         "Resource shard not found: Skipping delete", extra={"kbid": kbid, "rid": uuid}
@@ -305,7 +303,7 @@ class Processor:
         if not kb_exists:
             logger.info("Deleted KB: skipping txn", extra={"kbid": kbid})
         else:
-            uuid = message.uuid or await datamanagers.atomic.resources.get_resource_uuid_from_slug(
+            uuid = message.uuid or await datamanagers.atomic.resources.get_uuid(
                 kbid=kbid, slug=message.slug
             )
             if not uuid:
@@ -488,7 +486,7 @@ class Processor:
         self, txn: Transaction, kb: KnowledgeBox, uuid: str
     ) -> writer_pb2.ShardObject:
         kbid = kb.kbid
-        shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
+        shard_id = await datamanagers.resources.get_shard_id(txn, kbid=kbid, rid=uuid)
         shard = None
         if shard_id is not None:
             # Resource already has a shard assigned

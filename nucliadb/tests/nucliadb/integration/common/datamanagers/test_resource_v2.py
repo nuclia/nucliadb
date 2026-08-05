@@ -82,7 +82,7 @@ async def test_set_slug_raises_conflict_error(
         await txn.commit()
 
 
-async def test_modify_slug(
+async def test_update_slug(
     maindb_driver: Driver,
     kbid: str,
 ) -> None:
@@ -104,7 +104,7 @@ async def test_modify_slug(
 
     # Now modify the slug
     async with maindb_driver.rw_transaction() as txn:
-        old_slug = await resources.modify_slug(
+        old_slug = await resources.update_slug(
             txn,
             kbid=kbid,
             rid=rid,
@@ -123,11 +123,11 @@ async def test_resource_set_get(
     Test that resource metadata can be set and retrieved correctly.
     """
     rid = Resource.new_unique_rid()
-    assert {rid async for rid in resources.iterate_resource_ids(kbid=kbid)} == set()
+    assert {rid async for rid in resources.iterate_ids(kbid=kbid)} == set()
 
     async with maindb_driver.rw_transaction() as txn:
         assert await resources.exists(txn, kbid=kbid, rid=rid) is False
-        assert await resources.calculate_number_of_resources(txn, kbid=kbid) == 0
+        assert await resources.count(txn, kbid=kbid) == 0
 
         await resources.set_slug(
             txn,
@@ -138,8 +138,8 @@ async def test_resource_set_get(
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
-        assert await resources.calculate_number_of_resources(txn, kbid=kbid) == 1
-        assert [rid async for rid in resources.iterate_resource_ids(kbid=kbid)] == [rid]
+        assert await resources.count(txn, kbid=kbid) == 1
+        assert [rid async for rid in resources.iterate_ids(kbid=kbid)] == [rid]
         assert await resources.exists(txn, kbid=kbid, rid=rid) is True
         assert await resources.get_basic(txn, kbid=kbid, rid=rid) is None
         data = await resources.get(
@@ -152,7 +152,7 @@ async def test_resource_set_get(
         assert data.security is None
         assert data.extra is None
         assert data.shard is None
-        assert await resources.get_resource_uuid_from_slug(txn, kbid=kbid, slug="test-slug") == rid
+        assert await resources.get_uuid(txn, kbid=kbid, slug="test-slug") == rid
 
     async with maindb_driver.rw_transaction() as txn:
         extra = resources_pb2.Extra()
@@ -196,8 +196,8 @@ async def test_resource_set_get(
 
     async with maindb_driver.ro_transaction() as txn:
         assert await resources.exists(txn, kbid=kbid, rid=rid) is False
-        assert await resources.calculate_number_of_resources(txn, kbid=kbid) == 0
-        assert [rid async for rid in resources.iterate_resource_ids(kbid=kbid)] == []
+        assert await resources.count(txn, kbid=kbid) == 0
+        assert [rid async for rid in resources.iterate_ids(kbid=kbid)] == []
         assert await resources.get_basic(txn, kbid=kbid, rid=rid) is None
 
 
@@ -238,9 +238,6 @@ async def test_upsert_distinguishes_none_from_unset(
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
-        assert await resources.get_slug(txn, kbid=kbid, rid=rid) is None
-        assert await resources.get_basic(txn, kbid=kbid, rid=rid) is None
-
         data = await resources.get(
             txn, kbid=kbid, rid=rid, columns=("slug", "basic", "origin", "security", "extra", "shard")
         )

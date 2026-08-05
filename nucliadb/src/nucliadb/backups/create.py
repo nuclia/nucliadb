@@ -90,7 +90,7 @@ async def backup_resources(context: ApplicationContext, kbid: str, backup_id: st
             kb_id=kbid,
             requested_at=datetime.now(tz=timezone.utc),
         )
-        async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+        async for rid in datamanagers.resources.iterate_ids(kbid=kbid):
             metadata.total_resources += 1
             metadata.missing_resources.append(rid)
         metadata.missing_resources.sort()

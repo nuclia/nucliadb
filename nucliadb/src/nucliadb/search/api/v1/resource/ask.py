@@ -105,7 +105,7 @@ async def resource_ask_endpoint_by_slug(
         "This is slower and requires waiting for entire answer to be ready.",
     ),
 ) -> StreamingResponse | HTTPClientError | Response:
-    resource_id = await datamanagers.atomic.resources.get_resource_uuid_from_slug(kbid=kbid, slug=slug)
+    resource_id = await datamanagers.atomic.resources.get_uuid(kbid=kbid, slug=slug)
     if resource_id is None:
         return HTTPClientError(status_code=404, detail="Resource not found")
 

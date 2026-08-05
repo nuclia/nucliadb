@@ -471,7 +471,7 @@ async def move_resource_to_shard(
             locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=resource_id)),
             datamanagers.with_transaction() as txn,
         ):
-            found_shard_id = await datamanagers.resources.get_resource_shard_id(
+            found_shard_id = await datamanagers.resources.get_shard_id(
                 txn, kbid=kbid, rid=resource_id, for_update=True
             )
             if found_shard_id is None:  # pragma: no cover

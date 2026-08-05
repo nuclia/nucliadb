@@ -185,9 +185,7 @@ async def parse_filter_expression(expr: ResourceFilterExpressionType, kbid: str)
         if expr.id:
             cat.resource_id = expr.id
         elif expr.slug:
-            rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
-                kbid=kbid, slug=expr.slug
-            )
+            rid = await datamanagers.atomic.resources.get_uuid(kbid=kbid, slug=expr.slug)
             if rid is None:
                 raise InvalidQueryError("slug", f"Cannot find slug {expr.slug}")
             cat.resource_id = rid

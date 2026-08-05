@@ -60,9 +60,7 @@ async def test_materialize_kb_data(
     await mz.initialize()
 
     async with datamanagers.with_transaction() as txn:
-        assert (
-            await datamanagers.resources.calculate_number_of_resources(txn, kbid=knowledgebox) == count
-        )
+        assert await datamanagers.resources.count(txn, kbid=knowledgebox) == count
 
     await pubsub.publish(
         const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox),
@@ -75,7 +73,7 @@ async def test_materialize_kb_data(
     await asyncio.sleep(0.2)
 
     async with datamanagers.with_transaction() as txn:
-        assert await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox) == count
+        assert await datamanagers.resources.count(txn, kbid=knowledgebox) == count
 
     await mz.finalize()
     assert audit_storage.js.publish.call_count == 1  # type: ignore[ty:unresolved-attribute]

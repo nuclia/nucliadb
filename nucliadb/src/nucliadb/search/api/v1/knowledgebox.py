@@ -143,14 +143,12 @@ async def get_resources_count(kbid: str, force_calculate: bool = False) -> int:
     async with datamanagers.with_ro_transaction() as txn:
         if force_calculate:
             # For small kbs, this is faster and more up to date
-            resource_count = await datamanagers.resources.calculate_number_of_resources(txn, kbid=kbid)
+            resource_count = await datamanagers.resources.count(txn, kbid=kbid)
         else:
-            resource_count = await datamanagers.resources.get_number_of_resources(txn, kbid=kbid)
+            resource_count = await datamanagers.resources.count(txn, kbid=kbid)
             if resource_count == -1:
                 # WARNING: standalone, this value will never be cached
-                resource_count = await datamanagers.resources.calculate_number_of_resources(
-                    txn, kbid=kbid
-                )
+                resource_count = await datamanagers.resources.count(txn, kbid=kbid)
     return resource_count
 
 

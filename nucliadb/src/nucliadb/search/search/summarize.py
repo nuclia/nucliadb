@@ -129,7 +129,7 @@ async def get_resource_uuid(kbobj: KnowledgeBox, uuid_or_slug: str) -> str | Non
     # Try with uuid first
     try:
         ruuid = UUID(uuid_or_slug).hex
-        if await datamanagers.resources.resource_exists(kbobj.txn, kbid=kbobj.kbid, rid=ruuid):
+        if await datamanagers.resources.exists(kbobj.txn, kbid=kbobj.kbid, rid=ruuid):
             return ruuid
     except ValueError:
         # Not a valid uuid, try with slug

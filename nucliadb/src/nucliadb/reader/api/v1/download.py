@@ -320,7 +320,7 @@ async def _get_resource_uuid_from_params(kbid, rid: str | None, rslug: str | Non
     if not rid:
         # Attempt to get it from slug
         assert rslug
-        rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(
+        rid = await datamanagers.atomic.resources.get_uuid(
             kbid=kbid,
             slug=rslug,
         )

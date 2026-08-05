@@ -487,9 +487,7 @@ class KnowledgeBox:
             await self.storage_delete_resource(uuid)
 
     async def get_resource_uuid_by_slug(self, slug: str) -> str | None:
-        return await datamanagers.resources.get_resource_uuid_from_slug(
-            self.txn, kbid=self.kbid, slug=slug
-        )
+        return await datamanagers.resources.get_uuid(self.txn, kbid=self.kbid, slug=slug)
 
     async def add_resource(self, uuid: str, slug: str, basic: Basic | None = None) -> Resource:
         if basic is None:
@@ -515,7 +513,7 @@ class KnowledgeBox:
 
     async def iterate_resources(self) -> AsyncGenerator[Resource, None]:
         # This uses a separate transaction for iterating resource ids
-        async for uuid in datamanagers.resources.iterate_resource_ids(kbid=self.kbid):
+        async for uuid in datamanagers.resources.iterate_ids(kbid=self.kbid):
             yield Resource(
                 self.txn,
                 self.storage,

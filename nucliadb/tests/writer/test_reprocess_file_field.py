@@ -66,7 +66,7 @@ async def file_field(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is True
+    assert (await datamanagers.atomic.resources.exists(kbid=kbid, rid=rid)) is True
 
     yield kbid, rid, field_id
 

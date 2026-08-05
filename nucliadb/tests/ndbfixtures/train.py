@@ -287,7 +287,7 @@ async def test_pagination_resources(processor: Processor, knowledgebox: str):
 
     while time() - t0 < 30:  # wait max 30 seconds for it
         async with driver.ro_transaction() as txn:
-            count = await datamanagers.resources.calculate_number_of_resources(txn, kbid=knowledgebox)
+            count = await datamanagers.resources.count(txn, kbid=knowledgebox)
             if count == amount:
                 break
         print(f"got {count}, retrying")

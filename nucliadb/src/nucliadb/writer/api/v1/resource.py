@@ -373,7 +373,7 @@ async def update_resource_slug(
     new_slug: str,
 ):
     async with driver.rw_transaction() as txn:
-        old_slug = await datamanagers.resources.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
+        old_slug = await datamanagers.resources.update_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
         await txn.commit()
         return old_slug
 
@@ -590,14 +590,14 @@ async def _reindex_resource(
 
 
 async def get_rid_from_slug_or_raise_error(kbid: str, rslug: str) -> str:
-    rid = await datamanagers.atomic.resources.get_resource_uuid_from_slug(kbid=kbid, slug=rslug)
+    rid = await datamanagers.atomic.resources.get_uuid(kbid=kbid, slug=rslug)
     if not rid:
         raise HTTPException(status_code=404, detail="Resource does not exist")
     return rid
 
 
 async def validate_rid_exists_or_raise_error(kbid: str, rid: str):
-    if not (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)):
+    if not (await datamanagers.atomic.resources.exists(kbid=kbid, rid=rid)):
         raise HTTPException(status_code=404, detail="Resource does not exist")
 
 

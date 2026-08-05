@@ -35,7 +35,7 @@ async def check_slug(driver: Driver, kbid, rid, slug):
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
         assert basic is not None
         assert basic.slug == slug
-        uuid = await datamanagers.resources.get_resource_uuid_from_slug(txn, kbid=kbid, slug=slug)
+        uuid = await datamanagers.resources.get_uuid(txn, kbid=kbid, slug=slug)
         assert uuid == rid
 
 
@@ -74,12 +74,12 @@ async def resource_with_slug(maindb_driver: Driver, kbid: str):
     return kbid, rid, slug
 
 
-async def test_modify_slug(resource_with_slug, maindb_driver: Driver):
+async def test_update_slug(resource_with_slug, maindb_driver: Driver):
     kbid, rid, _ = resource_with_slug
     new_slug = "new_slug"
 
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.resources.modify_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
+        await datamanagers.resources.update_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
         await txn.commit()
 
     await check_slug(maindb_driver, kbid, rid, new_slug)

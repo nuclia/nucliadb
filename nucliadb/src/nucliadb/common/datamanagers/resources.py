@@ -182,21 +182,6 @@ async def upsert(
         await cur.execute(query, {column_name: values[column_name] for column_name in insert_columns})
 
 
-async def get_slug(txn: Transaction, kbid: str, rid: str) -> str | None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            SELECT slug FROM kb_resources
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-            """,
-            {"kbid": kbid, "rid": rid},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        return str(row[0])
-
-
 async def set_slug(
     txn: Transaction,
     *,
@@ -204,7 +189,7 @@ async def set_slug(
     rid: str,
     slug: str,
 ) -> None:
-    """Update only the slug column of an existing resource row.
+    """Set only the slug column of an existing resource row.
 
     Raises ConflictError if the slug already belongs to another resource in
     the same knowledge box.
@@ -215,17 +200,29 @@ async def set_slug(
         raise ConflictError(f"Slug '{slug}' already exists")
 
 
-async def modify_slug(
+async def update_slug(
     txn: Transaction,
     *,
     kbid: str,
     rid: str,
     new_slug: str,
 ) -> str:
-    basic = await get_basic(txn, kbid=kbid, rid=rid, for_update=True)
-    old_slug = await get_slug(txn, kbid=kbid, rid=rid)
-    if old_slug is None or basic is None:
+    """
+    NOTE: Slug is stored twice (in the slug column and in the basic column).
+    This function makes sure to update both in a single transaction.
+    Ideally we should only store it in the slug column.
+    """
+    data = await get(txn, kbid=kbid, rid=rid, columns=("basic", "slug"), for_update=True)
+    if (
+        data is None
+        or data.basic is None
+        or data.basic is UNSET
+        or data.slug is None
+        or data.slug is UNSET
+    ):
         raise NotFoundError()
+    old_slug = data.slug
+    basic = data.basic
     basic.slug = new_slug
     async with _pg_cursor(txn) as cur:
         try:
@@ -275,10 +272,7 @@ async def exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
         return await cur.fetchone() is not None
 
 
-resource_exists = exists  # alias for backwards compatibility
-
-
-async def get_resource_uuid_from_slug(txn: Transaction, *, kbid: str, slug: str) -> str | None:
+async def get_uuid(txn: Transaction, *, kbid: str, slug: str) -> str | None:
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT rid FROM kb_resources WHERE kbid = %(kbid)s AND slug = %(slug)s",
@@ -345,7 +339,7 @@ async def get_basic(
     return resource.basic
 
 
-async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
+async def iterate_ids(*, kbid: str) -> AsyncIterator[str]:
     async with with_ro_transaction() as txn:
         async with _pg_cursor(txn) as cur:
             await cur.execute(
@@ -356,7 +350,7 @@ async def iterate_resource_ids(*, kbid: str) -> AsyncIterator[str]:
                 yield _to_rid(rid)
 
 
-async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
+async def count(txn: Transaction, *, kbid: str) -> int:
     async with _pg_cursor(txn) as cur:
         await cur.execute(
             "SELECT COUNT(*) FROM kb_resources WHERE kbid = %(kbid)s",
@@ -366,13 +360,7 @@ async def calculate_number_of_resources(txn: Transaction, *, kbid: str) -> int:
         return row[0] if row else 0
 
 
-async def get_number_of_resources(txn: Transaction, *, kbid: str) -> int:
-    return await calculate_number_of_resources(txn, kbid=kbid)
-
-
-async def get_resource_shard_id(
-    txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
-) -> str | None:
+async def get_shard_id(txn: Transaction, *, kbid: str, rid: str, for_update: bool = False) -> str | None:
     """Return the shard ID for a resource, or None."""
     resource = await get(txn, kbid=kbid, rid=rid, columns=("shard",), for_update=for_update)
     if resource is None:
