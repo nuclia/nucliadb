@@ -94,8 +94,6 @@ async def db_augment_resource(
     basic = None if resource_data is None else resource_data.basic
     for prop in select:
         if isinstance(prop, ResourceTitle):
-            if basic is None:
-                basic = await resource.get_basic()
             if basic is not None:
                 title = basic.title
 
