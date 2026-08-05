@@ -35,8 +35,6 @@ directly here to avoid a cross-module import cycle with fields.
 
 NOTE: deleting a kb_resources row (or its parent kbs row) automatically removes all
 related kb_conversations rows via the ON DELETE CASCADE foreign key.
-Deleting a single conversation field requires an explicit DELETE by (kbid, rid, field_id)
-because there is no FK from kb_conversations to kb_fields.
 """
 
 from nucliadb.common.datamanagers.utils import _pg_cursor
