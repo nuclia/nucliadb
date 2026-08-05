@@ -21,7 +21,6 @@ import uuid
 from unittest.mock import Mock, patch
 
 from nucliadb.common import datamanagers
-from nucliadb.common.datamanagers.conversations import KB_CONVERSATION_SPLITS_METADATA
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -29,6 +28,8 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb.migrator.models import Migration
 from nucliadb_protos import resources_pb2
 from tests.nucliadb.migrations import get_migration
+
+KB_CONVERSATION_SPLITS_METADATA = "/kbs/{kbid}/r/{uuid}/f/{type}/{field}/splits_metadata"
 
 migration: Migration = get_migration(39)
 
@@ -46,10 +47,10 @@ async def test_migration_0039(maindb_driver: Driver):
     with patch("nucliadb.ingest.orm.resource.get_storage"):
         # Create a fake conversation field with only one message
         async with maindb_driver.rw_transaction() as txn:
-            await datamanagers.kb.kb_v2.set_kbid_for_slug(txn, kbid=kbid, slug="slug")
+            await datamanagers.kb.set_kbid_for_slug(txn, kbid=kbid, slug="slug")
 
             kb_obj = KnowledgeBox(txn, storage, kbid)
-            await datamanagers.resources.resources_v2.set_slug(txn, kbid=kbid, rid=rid, slug="slug")
+            await datamanagers.resources.set_slug(txn, kbid=kbid, rid=rid, slug="slug")
             r_obj = await kb_obj.add_resource(rid, "slug")
             conv_pb = resources_pb2.Conversation()
             conv_pb.messages.append(resources_pb2.Message(ident="foo"))

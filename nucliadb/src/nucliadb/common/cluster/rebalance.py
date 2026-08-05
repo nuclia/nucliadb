@@ -351,12 +351,15 @@ async def get_resources_from_shard(driver: Driver, kbid: str, shard_id: str, n: 
         cur = conn.cursor("")
         await cur.execute(
             """
-            SELECT split_part(key, '/', 5) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND value = %s LIMIT %s;
+            SELECT rid
+            FROM kb_resources
+            WHERE kbid = %s AND shard = %s
+            LIMIT %s;
             """,
-            (f"/kbs/{kbid}/r/[^/]*/shard$", shard_id, n),
+            (kbid, shard_id, n),
         )
         records = await cur.fetchall()
-        rids: list[str] = [r[0] for r in records]
+        rids: list[str] = [datamanagers.resources._to_rid(r[0]) for r in records]
         return rids
 
 
@@ -413,9 +416,9 @@ async def count_resources_in_shard(driver: Driver, kbid: str, shard_id: str) -> 
         cur = conn.cursor("")
         await cur.execute(
             """
-            SELECT COUNT(*) FROM resources WHERE key ~ '/kbs/[^/]*/r/[^/]*/shard$' AND key ~ %s AND value = %s;
+            SELECT COUNT(*) FROM kb_resources WHERE kbid = %s AND shard = %s;
             """,
-            (f"/kbs/{kbid}/r/[^/]*/shard$", shard_id),
+            (kbid, shard_id),
         )
         record = await cur.fetchone()
         if record is None:  # pragma: no cover

@@ -60,7 +60,6 @@ async def test_materialize_kb_data(
     await mz.initialize()
 
     async with datamanagers.with_transaction() as txn:
-        assert await datamanagers.resources.get_number_of_resources(txn, kbid=knowledgebox) == -1
         assert (
             await datamanagers.resources.calculate_number_of_resources(txn, kbid=knowledgebox) == count
         )

@@ -23,7 +23,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from nucliadb.common.datamanagers import kb_v2
+from nucliadb.common.datamanagers import kb
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import DummyPredictEngine
@@ -47,7 +47,7 @@ def disable_hidden_resources_check():
 async def kbid(maindb_driver: Driver):
     kbid = KnowledgeBox.new_unique_kbid()
     async with maindb_driver.rw_transaction() as txn:
-        await kb_v2.set_kbid_for_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
+        await kb.set_kbid_for_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid
 

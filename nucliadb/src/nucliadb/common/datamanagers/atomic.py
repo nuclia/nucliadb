@@ -44,6 +44,7 @@ from typing_extensions import ParamSpec
 from nucliadb.common.maindb.driver import Transaction
 
 from . import cluster as cluster_dm
+from . import fields as fields_dm
 from . import kb as kb_dm
 from . import labels as labels_dm
 from . import resources as resources_dm
@@ -89,7 +90,7 @@ class resources:
     get_resource_uuid_from_slug = ro_txn_wrap(resources_dm.get_resource_uuid_from_slug)
     resource_exists = ro_txn_wrap(resources_dm.resource_exists)
     slug_exists = ro_txn_wrap(resources_dm.slug_exists)
-    get_all_field_ids = ro_txn_wrap(resources_dm.get_all_field_ids)
+    get_all_field_ids = ro_txn_wrap(fields_dm.get_all_field_ids)
 
 
 class labelset:

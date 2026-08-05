@@ -43,7 +43,7 @@ async def iterate_sentences(
     resource: Resource,
     enabled_metadata: EnabledMetadata,
 ) -> AsyncIterator[TrainSentence]:  # pragma: no cover
-    fields = await resource.get_fields(force=True)
+    fields = await resource.get_fields()
     metadata = TrainMetadata()
     userdefinedparagraphclass: dict[str, ParagraphAnnotation] = {}
     if enabled_metadata.labels:
@@ -161,7 +161,7 @@ async def iterate_sentences(
 async def iterate_paragraphs(
     resource: Resource, enabled_metadata: EnabledMetadata
 ) -> AsyncIterator[TrainParagraph]:
-    fields = await resource.get_fields(force=True)
+    fields = await resource.get_fields()
     metadata = TrainMetadata()
     userdefinedparagraphclass: dict[str, ParagraphAnnotation] = {}
     if enabled_metadata.labels:
@@ -243,7 +243,7 @@ async def iterate_paragraphs(
 async def iterate_fields(
     resource: Resource, enabled_metadata: EnabledMetadata
 ) -> AsyncIterator[TrainField]:
-    fields = await resource.get_fields(force=True)
+    fields = await resource.get_fields()
     metadata = TrainMetadata()
     if enabled_metadata.labels:
         if resource.basic is None:
@@ -291,7 +291,7 @@ async def iterate_fields(
 async def generate_train_resource(
     resource: Resource, enabled_metadata: EnabledMetadata
 ) -> TrainResource:
-    fields = await resource.get_fields(force=True)
+    fields = await resource.get_fields()
     metadata = TrainMetadata()
     if enabled_metadata.labels:
         if resource.basic is None:

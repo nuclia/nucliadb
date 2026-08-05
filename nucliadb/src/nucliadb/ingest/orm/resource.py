@@ -91,7 +91,6 @@ class Resource:
         self.fields: dict[tuple[FieldType.ValueType, str], Field] = {}
         self.conversations: dict[int, PBConversation] = {}
         self.relations: PBRelations | None = None
-        self.all_fields_keys: list[tuple[FieldType.ValueType, str]] | None = None
         self.origin: PBOrigin | None = None
         self.extra: PBExtra | None = None
         self.security: utils_pb2.Security | None = None
@@ -200,7 +199,7 @@ class Resource:
 
     # Fields
     async def get_fields(
-        self, force: bool = False, load_values: bool = False
+        self, load_values: bool = False
     ) -> dict[tuple[FieldType.ValueType, str], Field]:
         """
         Get all fields of the resource.
@@ -208,15 +207,15 @@ class Resource:
             force: If True, forces a refresh of the fields from the database, ignoring any cached values.
             load_values: If True, loads the values of the fields from the database. If False, only the field orm objects are created and cached.
         """
-        for type, field in await self.get_fields_ids(force=force):
+        for type, field in await self.get_fields_ids():
             if (type, field) not in self.fields:
                 self.fields[(type, field)] = await self.get_field(field, type, load=load_values)
         return self.fields
 
-    async def _inner_get_fields_ids(self) -> list[tuple[FieldType.ValueType, str]]:
+    async def get_fields_ids(self) -> list[tuple[FieldType.ValueType, str]]:
         # Use a set to make sure we don't have duplicate field ids
         result = set()
-        all_fields = await self.get_all_field_ids(for_update=False)
+        all_fields = await self.get_all_field_ids()
         if all_fields is not None:
             for f in all_fields.fields:
                 result.add((f.field_type, f.field))
@@ -232,15 +231,6 @@ class Resource:
                 if append:
                     result.add((FieldType.GENERIC, generic))
         return list(result)
-
-    async def get_fields_ids(self, force: bool = False) -> list[tuple[FieldType.ValueType, str]]:
-        """
-        Get all ids of the fields of the resource and cache them.
-        """
-        # Get all fields
-        if self.all_fields_keys is None or force is True:
-            self.all_fields_keys = await self._inner_get_fields_ids()
-        return self.all_fields_keys
 
     async def get_field(self, key: str, type: FieldType.ValueType, load: bool = True):
         field = (type, key)
@@ -264,10 +254,6 @@ class Resource:
         else:
             field_obj = self.fields[field]
         await field_obj.set_value(payload)
-        if self.all_fields_keys is None:
-            self.all_fields_keys = []
-        self.all_fields_keys.append(field)
-
         self.modified = True
         return field_obj
 
@@ -278,10 +264,6 @@ class Resource:
             del self.fields[field]
         else:
             field_obj = KB_FIELDS[type](id=key, resource=self)
-
-        if self.all_fields_keys is not None:
-            if field in self.all_fields_keys:
-                self.all_fields_keys.remove(field)
         await field_obj.delete()
 
     async def _apply_delete_splits(self, payload: writer_pb2.DeleteSplits) -> None:
@@ -294,53 +276,14 @@ class Resource:
 
     async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
         """Return whether this resource has this field or not."""
-        all_fields_ids = await self.get_fields_ids(force=True)
+        all_fields_ids = await self.get_fields_ids()
         for field_type, field_id in all_fields_ids:
             if field_type == type and field_id == field:
                 return True
         return False
 
-    async def get_all_field_ids(self, *, for_update: bool) -> PBAllFieldIDs | None:
-        return await datamanagers.resources.get_all_field_ids(
-            self.txn, kbid=self.kbid, rid=self.uuid, for_update=for_update
-        )
-
-    async def set_all_field_ids(self, all_fields: PBAllFieldIDs):
-        return await datamanagers.resources.set_all_field_ids(
-            self.txn, kbid=self.kbid, rid=self.uuid, allfields=all_fields
-        )
-
-    async def update_all_field_ids(
-        self,
-        *,
-        updated: list[FieldID] | None = None,
-        deleted: list[FieldID] | None = None,
-        errors: list[writer_pb2.Error] | None = None,
-    ):
-        needs_update = False
-        all_fields = await self.get_all_field_ids(for_update=True)
-        if all_fields is None:
-            needs_update = True
-            all_fields = PBAllFieldIDs()
-
-        for field in updated or []:
-            if field not in all_fields.fields:
-                all_fields.fields.append(field)
-                needs_update = True
-
-        for error in errors or []:
-            field_id = FieldID(field_type=error.field_type, field=error.field)
-            if field_id not in all_fields.fields:
-                all_fields.fields.append(field_id)
-                needs_update = True
-
-        for field in deleted or []:
-            if field in all_fields.fields:
-                all_fields.fields.remove(field)
-                needs_update = True
-
-        if needs_update:
-            await self.set_all_field_ids(all_fields)
+    async def get_all_field_ids(self) -> PBAllFieldIDs | None:
+        return await datamanagers.fields.get_all_field_ids(self.txn, kbid=self.kbid, rid=self.uuid)
 
     async def apply_field_values(self, message: BrokerMessage):
         message_updated_fields = []
@@ -372,18 +315,11 @@ class Resource:
 
         for fieldid in message.delete_fields:
             await self.delete_field(fieldid.field_type, fieldid.field)
-            if fieldid.field_type == FieldType.FILE:
-                await self.delete_file_field_md5(fieldid.field)
 
         for delete_splits in message.delete_splits:
             await self._apply_delete_splits(delete_splits)
 
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
-            await self.update_all_field_ids(
-                updated=message_updated_fields,
-                deleted=message.delete_fields,  # type: ignore
-                errors=message.errors,  # type: ignore
-            )
             self.modified = True
 
         await self.apply_fields_status(message)
@@ -392,18 +328,7 @@ class Resource:
         """
         Record file MD5 hashes for deduplication checks.
         """
-        if not file.md5:
-            # To be safe, delete any existing MD5 record for this field if the new file doesn't have an MD5.
-            # This is for PUT operations where the file is being replaced but the new md5 is not provided.
-            await self.delete_file_field_md5(field_id)
-        else:
-            await file_md5.set(self.txn, kbid=self.kbid, md5=file.md5, rid=self.uuid, field_id=field_id)
-
-    async def delete_file_field_md5(self, field_id: str):
-        """
-        Delete file MD5 hash records for a given field.
-        """
-        await file_md5.delete(self.txn, kbid=self.kbid, rid=self.uuid, field_id=field_id)
+        await file_md5.set(self.txn, kbid=self.kbid, md5=file.md5, rid=self.uuid, field_id=field_id)
 
     def _trim_field_status_errors(
         self,
@@ -748,7 +673,7 @@ class Resource:
         """
         Get all filenames from the resource file fields.
         """
-        fields = await self.get_fields(force=True, load_values=False)
+        fields = await self.get_fields(load_values=False)
         filenames = set()
         for (field_type, _), field_obj in fields.items():
             if field_type == FieldType.FILE:

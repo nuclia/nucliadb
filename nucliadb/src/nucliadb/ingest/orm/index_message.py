@@ -230,7 +230,7 @@ class IndexMessageBuilder:
             # in the texts index (as it is the one used for prefiltering).
             fields_to_index = [
                 FieldID(field=field_id, field_type=field_type)
-                for field_type, field_id in await self.resource.get_fields(force=True)
+                for field_type, field_id in await self.resource.get_fields()
             ]
         else:
             # Simply process the fields that are in the message
@@ -313,7 +313,7 @@ class IndexMessageBuilder:
         basic = await self.get_basic()
         fields_to_index = [
             FieldID(field=field_id, field_type=field_type)
-            for field_type, field_id in await self.resource.get_fields(force=True)
+            for field_type, field_id in await self.resource.get_fields()
         ]
         vectorsets_configs = await self.get_vectorsets_configs()
         for fieldid in fields_to_index:
