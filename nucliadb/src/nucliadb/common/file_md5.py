@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 """
-V2 implementation of file MD5 tracking using the kb_fields.md5 column
+Implementation of file MD5 tracking using the kb_fields.md5 column
 (migration 0016).
 
 Instead of the dedicated `file_md5` table, the MD5 hash is stored directly

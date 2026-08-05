@@ -20,6 +20,7 @@
 import uuid
 from unittest.mock import Mock
 
+from nucliadb.common import datamanagers as dm
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.migrator.models import Migration
 from nucliadb_protos import knowledgebox_pb2, resources_pb2, writer_pb2
@@ -73,3 +74,13 @@ async def test_migration_0050_backfill_kb_runs_smoothly(maindb_driver: Driver):
 
     # The test goal is coverage: this should complete without raising exceptions.
     await migration.module.migrate_kb(execution_context, kbid)
+
+    async with dm.with_ro_transaction() as txn:
+        assert await dm.kb.exists_kb(txn, kbid=kbid) is True
+        assert await dm.cluster.get_kb_shards(txn, kbid=kbid) == shards
+        assert await dm.kb.get_config(txn, kbid=kbid) == config
+        for rid, slug in resources:
+            basic = resources_pb2.Basic(slug=slug)
+            assert await dm.resources.get_basic(txn, kbid=kbid, rid=rid) == basic
+            assert await dm.resources.get_resource_shard_id(txn, kbid=kbid, rid=rid) == shard_id
+            assert await dm.resources.get_resource_uuid_from_slug(txn, kbid=kbid, slug=slug) == rid
