@@ -109,14 +109,14 @@ async def should_backfill_kb(kbid: str) -> bool:
             return True
 
         all_resources_v1: set[str] = set()
-        async for rid in resources_v1.iterate_resource_ids(kbid=kbid):
+        async for rid in resources_v1.iter(kbid=kbid):
             if "-" in rid:
                 logger.warning(f"Resource {kbid}/{rid} has a non-hex ID")
                 all_resources_v1.add(uuid.UUID(rid).hex)
             else:
                 all_resources_v1.add(rid)
 
-        all_resources_v2 = {rid async for rid in resources_v2.iterate_resource_ids(kbid=kbid)}
+        all_resources_v2 = {rid async for rid in resources_v2.iter(kbid=kbid)}
         if all_resources_v1 != all_resources_v2:
             missing_v1 = all_resources_v2 - all_resources_v1
             missing_v2 = all_resources_v1 - all_resources_v2
@@ -152,7 +152,7 @@ async def backfill_kb(*, kbid: str) -> None:
 
     # Snapshot v1 resource IDs before starting the migration
     v1_rids: set[str] = set()
-    async for rid in resources_v1.iterate_resource_ids(kbid=kbid):
+    async for rid in resources_v1.iter(kbid=kbid):
         v1_rids.add(rid)
 
     await _backfill_resources(
@@ -173,11 +173,11 @@ async def backfill_kb(*, kbid: str) -> None:
         # These are resources that were created after our initial v1 snapshot was
         # taken and would have been missed by the main loop above.
         v2_rids: set[str] = set()
-        async for rid in resources_v2.iterate_resource_ids(kbid=kbid):
+        async for rid in resources_v2.iter(kbid=kbid):
             v2_rids.add(rid)
 
         v1_rids_now: set[str] = set()
-        async for rid in resources_v1.iterate_resource_ids(kbid=kbid):
+        async for rid in resources_v1.iter(kbid=kbid):
             if "-" in rid:
                 logger.warning(f"Resource {kbid}/{rid} has a non-hex ID")
                 v1_rids_now.add(uuid.UUID(rid).hex)
@@ -287,7 +287,7 @@ async def _backfill_resource_in_txn(txn: Transaction, *, kbid: str, rid: str) ->
     if basic is None:
         raise ValueError(f"Resource {kbid}/{rid} has no basic metadata, skipping backfill")
 
-    shard = await resources_v1.get_resource_shard_id(txn, kbid=kbid, rid=rid)
+    shard = await resources_v1.get_shard_id(txn, kbid=kbid, rid=rid)
     if shard is None:
         raise ValueError(f"Resource {kbid}/{rid} has no shard, skipping backfill")
 
@@ -493,7 +493,7 @@ class resources_v1:
     KB_RESOURCE_SHARD = "/kbs/{kbid}/r/{uuid}/shard"
 
     @classmethod
-    async def get_resource_shard_id(
+    async def get_shard_id(
         cls, txn: Transaction, *, kbid: str, rid: str, for_update: bool = False
     ) -> str | None:
         key = cls.KB_RESOURCE_SHARD.format(kbid=kbid, uuid=rid)
@@ -538,7 +538,7 @@ class resources_v1:
         return await get_kv_pb(txn, key, resources_pb2.Security, for_update=False)
 
     @classmethod
-    async def iterate_resource_ids(cls, *, kbid: str) -> AsyncGenerator[str, None]:
+    async def iter(cls, *, kbid: str) -> AsyncGenerator[str, None]:
         """
         Currently, the implementation of this is optimizing for reducing
         how long a transaction will be open since the caller controls

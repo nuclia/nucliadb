@@ -95,9 +95,7 @@ async def _build_requests(
         for field_id in fields:
             rid = field_id.rid
             if rid not in resource_nidx_shard:
-                resource_shard_id = await datamanagers.resources.get_resource_shard_id(
-                    txn, kbid=kbid, rid=rid
-                )
+                resource_shard_id = await datamanagers.resources.get_shard(txn, kbid=kbid, rid=rid)
                 if resource_shard_id is None:
                     # Resource not in DB, either a dirty read (reading a delete)
                     # or a user requesting a deleted or wrong resource. Skip
@@ -127,9 +125,7 @@ async def _build_requests(
         for paragraph_id in paragraphs:
             rid = paragraph_id.rid
             if rid not in resource_nidx_shard:
-                resource_shard_id = await datamanagers.resources.get_resource_shard_id(
-                    txn, kbid=kbid, rid=rid
-                )
+                resource_shard_id = await datamanagers.resources.get_shard(txn, kbid=kbid, rid=rid)
                 if resource_shard_id is None:
                     # Resource not in DB, either a dirty read (reading a delete)
                     # or a user requesting a deleted or wrong resource. Skip

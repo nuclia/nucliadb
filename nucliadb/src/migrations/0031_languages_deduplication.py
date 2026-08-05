@@ -38,7 +38,7 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     async with datamanagers.with_ro_transaction() as rs_txn:
-        async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+        async for rid in datamanagers.resources.iter(kbid=kbid):
             basic = await datamanagers.resources.get_basic(rs_txn, kbid=kbid, rid=rid)
             if basic is None:
                 continue
@@ -56,5 +56,5 @@ async def fix_resource(kbid: str, rid: str):
         unique_langs = set(basic.metadata.languages)
         basic.metadata.ClearField("languages")
         basic.metadata.languages.extend(list(unique_langs))
-        await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
+        await datamanagers.resources.upsert(txn, kbid=kbid, rid=rid, basic=basic)
         await txn.commit()

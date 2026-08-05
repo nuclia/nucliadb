@@ -20,7 +20,7 @@
 import contextlib
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, TypeVar, cast
+from typing import AsyncGenerator, Final, TypeVar, cast
 
 import psycopg
 import psycopg.sql
@@ -45,6 +45,13 @@ observer = Observer(
 
 
 PB_TYPE = TypeVar("PB_TYPE", bound=Message)
+
+
+class _UnsetType:
+    pass
+
+
+UNSET: Final = _UnsetType()
 
 
 async def get_kv_pb(

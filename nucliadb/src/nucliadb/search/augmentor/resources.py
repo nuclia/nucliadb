@@ -23,12 +23,10 @@ from typing_extensions import assert_never
 
 import nucliadb_models.resource
 from nucliadb.common import datamanagers
+from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.serialize import (
-    serialize_extra,
-    serialize_origin,
     serialize_resource,
-    serialize_security,
 )
 from nucliadb.models.internal.augment import (
     AugmentedResource,
@@ -71,14 +69,29 @@ async def db_augment_resource(
 ) -> AugmentedResource:
     select = dedup_resource_select(select)
 
+    requested_resource_columns: set[datamanagers.resources.ResourceColumn] = set()
+    for prop in select:
+        if isinstance(prop, (ResourceTitle, ResourceSummary, ResourceClassificationLabels)):
+            requested_resource_columns.add("basic")
+        elif isinstance(prop, ResourceOrigin):
+            requested_resource_columns.add("origin")
+        elif isinstance(prop, ResourceExtra):
+            requested_resource_columns.add("extra")
+        elif isinstance(prop, ResourceSecurity):
+            requested_resource_columns.add("security")
+
+    resource_data = None
+    if requested_resource_columns:
+        resource_data = await resource.get_data(columns=tuple(requested_resource_columns))
+
     title = None
     summary = None
     origin = None
     extra = None
     security = None
-    labels = None
+    labels: dict[str, set[str]] | None = None
 
-    basic = None
+    basic = None if resource_data is None else resource_data.basic
     for prop in select:
         if isinstance(prop, ResourceTitle):
             if basic is None:
@@ -87,22 +100,26 @@ async def db_augment_resource(
                 title = basic.title
 
         elif isinstance(prop, ResourceSummary):
-            if basic is None:
-                basic = await resource.get_basic()
             if basic is not None:
                 summary = basic.summary
 
         elif isinstance(prop, ResourceOrigin):
-            origin = await serialize_origin(resource)
+            if resource_data is not None and resource_data.origin is not None:
+                origin = from_proto.origin(resource_data.origin)
 
         elif isinstance(prop, ResourceExtra):
-            extra = await serialize_extra(resource)
+            if resource_data is not None and resource_data.extra is not None:
+                extra = from_proto.extra(resource_data.extra)
 
         elif isinstance(prop, ResourceSecurity):
-            security = await serialize_security(resource)
+            if resource_data is not None and resource_data.security is not None:
+                security = from_proto.security(resource_data.security)
 
         elif isinstance(prop, ResourceClassificationLabels):
-            labels = await classification_labels(resource)
+            if basic is not None:
+                labels = {}
+                for classification in basic.usermetadata.classifications:
+                    labels.setdefault(classification.labelset, set()).add(classification.label)
 
         else:  # pragma: no cover
             assert_never(prop)
@@ -133,17 +150,6 @@ async def get_basic(resource: Resource) -> resources_pb2.Basic | None:
     # DB. Here we really want to know if there's basic or not
     basic = await datamanagers.resources.get_basic(resource.txn, kbid=resource.kbid, rid=resource.uuid)
     return basic
-
-
-async def classification_labels(resource: Resource) -> dict[str, set[str]] | None:
-    basic = await get_basic(resource)
-    if basic is None:
-        return None
-
-    labels: dict[str, set[str]] = {}
-    for classification in basic.usermetadata.classifications:
-        labels.setdefault(classification.labelset, set()).add(classification.label)
-    return labels
 
 
 async def augment_resources_deep(

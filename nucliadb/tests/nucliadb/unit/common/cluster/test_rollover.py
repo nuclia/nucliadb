@@ -54,13 +54,13 @@ def resource_ids():
 def resources_datamanager(resource_ids):
     mock = MagicMock()
 
-    async def iterate_resource_ids(kbid):
+    async def iter(kbid):
         for id in resource_ids:
             yield id
 
-    mock.iterate_resource_ids = iterate_resource_ids
-    mock.get_resource_shard_id = AsyncMock()
-    mock.get_resource_shard_id.return_value = "1"
+    mock.iter = iter
+    mock.get_shard_id = AsyncMock()
+    mock.get_shard_id.return_value = "1"
 
     with (
         patch("nucliadb.common.cluster.rollover.datamanagers.resources", mock),
@@ -241,7 +241,7 @@ async def test_index_to_rollover_index_handles_missing_shard_id(
         rollover_shards_created=True,
         resources_scheduled=True,
     )
-    resources_datamanager.get_resource_shard_id.return_value = None
+    resources_datamanager.get_shard_id.return_value = None
     await rollover.index_to_rollover_index(app_context, "kbid")
 
 
