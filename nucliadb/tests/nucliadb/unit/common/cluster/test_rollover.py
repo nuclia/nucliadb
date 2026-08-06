@@ -269,7 +269,7 @@ async def test_cutover_index(app_context, rollover_datamanager, kb_datamanager, 
     )
     await rollover.cutover_index(app_context, "kbid")
 
-    kb_datamanager.upsert.assert_called_with(ANY, kbid="kbid", shards=ANY)
+    kb_datamanager.set.assert_called_with(ANY, kbid="kbid", shards=ANY)
     [app_context.shard_manager.rollback_shard.assert_any_call(shard) for shard in shards.shards]
 
 
