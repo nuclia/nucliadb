@@ -61,3 +61,19 @@ async def test_augment_resource():
     ):
         augmented = await augment_resource_deep("kbid", "rid", opts=ResourceHydrationOptions())
         assert augmented == Resource(id="rid", slug="my-resource")
+
+
+async def test_augment_resource_extracted_vectors():
+    with (
+        patch(f"{MODULE}.resources.cache.get_resource"),
+        patch(
+            f"{MODULE}.resources.serialize_resource", return_value=Resource(id="rid", slug="my-resource")
+        ) as serialize_resource,
+    ):
+        _ = await augment_resource_deep("kbid", "rid", opts=ResourceHydrationOptions())
+        serialize_resource.call_args.kwargs["vectorset"] is None
+
+        _ = await augment_resource_deep(
+            "kbid", "rid", opts=ResourceHydrationOptions(vectorset="my-vectorset")
+        )
+        serialize_resource.call_args.kwargs["vectorset"] == "my-vectorset"

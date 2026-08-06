@@ -32,6 +32,9 @@ class ResourceHydrationOptions(BaseModel):
     show: list[ResourceProperties] = []
     extracted: list[ExtractedDataTypeName] = []
     field_type_filter: list[FieldTypeName] = []
+    # When extracted vectors are requested, the vectorset to return. This has no
+    # effect if extracted vectors are not requested
+    vectorset: str | None = None
 
 
 class TextBlockHydrationOptions(BaseModel):

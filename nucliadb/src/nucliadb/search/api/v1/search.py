@@ -34,6 +34,7 @@ from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
+from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.merge import merge_results
 from nucliadb.search.search.query_parser.parsers.search import parse_search
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
@@ -265,11 +266,18 @@ async def search(
         results,
         parsed.retrieval,
         kbid=kbid,
-        show=item.show,
-        field_type_filter=item.field_type_filter,
-        extracted=item.extracted,
         highlight=item.highlight,
         offset=item.offset,
+        resource_hydration_options=ResourceHydrationOptions(
+            show=item.show,
+            field_type_filter=item.field_type_filter,
+            extracted=item.extracted,
+            # Although we may have the true "default" vectorset (as /query may
+            # have returned it), we want to maintain the same behavior as in
+            # resource serialization. Thus, we pass the user vectorset and let
+            # the serializer decide the meaning of None
+            vectorset=item.vectorset,
+        ),
     )
 
     if audit is not None:
