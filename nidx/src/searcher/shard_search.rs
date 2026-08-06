@@ -27,7 +27,7 @@ use tracing::{Span, instrument};
 use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
-use crate::searcher::query_planner::{GraphIndexQueries, IndexQueries};
+use crate::searcher::query_planner::{GraphIndexQueries, IndexQueries, PrefilterRequest};
 
 use super::index_cache::IndexCache;
 use super::query_planner;
@@ -72,7 +72,7 @@ async fn shard_search(
         None
     };
 
-    let json_search = if query_plan.index_queries.json_request.is_some() {
+    let json_search = if query_plan.prefilter.json.is_some() {
         if let Some(json_index) = indexes.json_index() {
             Some(index_cache.get(&json_index).await?)
         } else {
@@ -82,7 +82,7 @@ async fn shard_search(
         None
     };
 
-    let text_search = if query_plan.prefilter.is_some() || query_plan.index_queries.texts_request.is_some() {
+    let text_search = if query_plan.prefilter.texts.is_some() || query_plan.index_queries.texts_request.is_some() {
         let Some(text_index) = indexes.text_index() else {
             return Err(NidxError::NotFound);
         };
@@ -173,22 +173,20 @@ fn apply_shard_id_to_response(response: &mut SearchResponse, shard_id: Uuid) {
 }
 
 fn compute_prefilter(
-    index_queries: &mut IndexQueries,
-    plan_prefilter: Option<PreFilterRequest>,
+    mut plan_prefilter: PrefilterRequest,
     json_searcher: Option<&JsonSearcher>,
     text_searcher: Option<&TextSearcher>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<PrefilterResult> {
     let mut text_prefilter_result: Option<anyhow::Result<PrefilterResult>> = None;
     let mut json_prefilter_result: Option<anyhow::Result<HashSet<Uuid>>> = None;
-    let json_request = index_queries.json_request.take();
 
     std::thread::scope(|scope| {
-        if let Some(prefilter) = plan_prefilter {
+        if let Some(prefilter) = plan_prefilter.texts.take() {
             let current = Span::current();
             let result = &mut text_prefilter_result;
             scope.spawn(move || *result = Some(current.in_scope(|| text_searcher.unwrap().prefilter(&prefilter))));
         }
-        if let Some(request) = json_request
+        if let Some(request) = plan_prefilter.json.take()
             && let Some(searcher) = json_searcher
         {
             let current = Span::current();
@@ -199,12 +197,11 @@ fn compute_prefilter(
 
     let text_prefilter = text_prefilter_result.transpose()?.unwrap_or(PrefilterResult::All);
     let combined = if let Some(uuids) = json_prefilter_result.transpose()? {
-        text_prefilter.combine(uuids, index_queries.filter_operator)
+        text_prefilter.combine(uuids, plan_prefilter.filter_operator)
     } else {
         text_prefilter
     };
-    index_queries.apply_prefilter(combined);
-    Ok(())
+    Ok(combined)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -295,7 +292,8 @@ fn blocking_search(
 ) -> anyhow::Result<SearchResponse> {
     let mut index_queries = query_plan.index_queries;
 
-    compute_prefilter(&mut index_queries, query_plan.prefilter, json_searcher, text_searcher)?;
+    let prefilter = compute_prefilter(query_plan.prefilter, json_searcher, text_searcher)?;
+    index_queries.apply_prefilter(prefilter);
 
     run_index_searches(
         index_queries,

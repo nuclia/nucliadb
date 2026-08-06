@@ -143,8 +143,6 @@ impl GraphIndexQueries {
 #[derive(Default, Clone)]
 pub struct IndexQueries {
     pub prefilter_results: PrefilterResult,
-    pub filter_operator: FilterOperator,
-    pub json_request: Option<JsonSearchRequest>,
     pub vectors_request: Option<VectorSearchRequest>,
     pub paragraphs_request: Option<ParagraphSearchRequest>,
     pub texts_request: Option<DocumentSearchRequest>,
@@ -169,8 +167,15 @@ impl IndexQueries {
 /// possible.
 #[derive(Clone)]
 pub struct QueryPlan {
-    pub prefilter: Option<PreFilterRequest>,
+    pub prefilter: PrefilterRequest,
     pub index_queries: IndexQueries,
+}
+
+#[derive(Clone)]
+pub struct PrefilterRequest {
+    pub texts: Option<PreFilterRequest>,
+    pub json: Option<JsonSearchRequest>,
+    pub filter_operator: FilterOperator,
 }
 
 pub(crate) fn proto_filter_operator(value: i32) -> anyhow::Result<FilterOperator> {
@@ -186,18 +191,19 @@ pub fn build_query_plan(search_request: SearchRequest, shard_id: &Uuid) -> anyho
     let texts_request = compute_texts_request(&search_request);
     let vectors_request = compute_vectors_request(&search_request)?;
     let paragraphs_request = compute_paragraphs_request(&search_request, shard_id)?;
+
     let json_request = compute_json_request(&search_request)?;
-
     let prefilter = compute_prefilters(&search_request);
-
     let filter_operator = proto_filter_operator(search_request.filter_operator)?;
 
     Ok(QueryPlan {
-        prefilter,
+        prefilter: PrefilterRequest {
+            texts: prefilter,
+            json: json_request,
+            filter_operator,
+        },
         index_queries: IndexQueries {
             prefilter_results: PrefilterResult::All,
-            filter_operator,
-            json_request,
             vectors_request,
             paragraphs_request,
             texts_request,
@@ -457,7 +463,7 @@ mod tests {
             ..Default::default()
         };
         let query_plan = build_query_plan(request, &Uuid::nil()).unwrap();
-        let Some(prefilter) = query_plan.prefilter else {
+        let Some(prefilter) = query_plan.prefilter.texts else {
             panic!("There should be a prefilter");
         };
         let Some(formula) = prefilter.filter_expression else {
