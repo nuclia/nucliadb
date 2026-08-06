@@ -187,7 +187,7 @@ class _SearchParser:
             with_duplicates=self.item.with_duplicates,
             filter_expression=self.item.filter_expression,
             label_filters=self.item.filters,
-            keyword_filters=[],
+            keyword_filters=None,
             resource_filters=self.item.resource_filters,
             fields=self.item.fields,
             range_creation_start=self.item.range_creation_start,

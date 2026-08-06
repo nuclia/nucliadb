@@ -183,17 +183,6 @@ class ParsedQuery(BaseModel):
     generation: Generation | None = None
 
 
-### Suggest
-
-
-class SuggestRetrieval(BaseModel):
-    query: str
-    use_keyword: bool
-    use_relations: bool
-    top_k: int
-    filters: Filters
-
-
 ### Graph
 
 

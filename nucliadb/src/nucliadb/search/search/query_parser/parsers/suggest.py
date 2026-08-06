@@ -82,8 +82,8 @@ async def parse_suggest(
         with_duplicates=False,  # unused
         filter_expression=filter_expression,
         label_filters=label_filters,
-        keyword_filters=[],
-        resource_filters=[],
+        keyword_filters=None,
+        resource_filters=None,
         fields=fields,
         range_creation_start=range_creation_start,
         range_creation_end=range_creation_end,
