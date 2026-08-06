@@ -26,6 +26,7 @@ from nidx_protos import nodereader_pb2
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.filter_expression import parse_expression, parse_kv_expression
 from nucliadb.search import logger
+from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
@@ -229,6 +230,7 @@ async def query_with_synonyms(
     return None
 
 
+@query_parser_observer.wrap({"type": "parse_filters"})
 async def parse_filters(
     kbid: str,
     fetcher: Fetcher,
