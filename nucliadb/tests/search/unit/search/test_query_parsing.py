@@ -38,7 +38,7 @@ from nucliadb_models.search import FindRequest
 @pytest.fixture(scope="function", autouse=True)
 def disable_hidden_resources_check():
     with patch(
-        "nucliadb.search.search.query_parser.parsers.find.filter_hidden_resources", return_value=False
+        "nucliadb.search.search.query_parser.parsers.common.filter_hidden_resources", return_value=False
     ):
         yield
 

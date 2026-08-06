@@ -22,7 +22,6 @@ from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
-    Filters,
     ParsedQuery,
     Query,
     RelationQuery,
@@ -111,7 +110,23 @@ class _SearchParser:
         if search_models.SearchOptions.RELATIONS in self.item.features:
             self._query.relation = await self._parse_relation_query()
 
-        filters = await self._parse_filters()
+        filters = await parse_filters(
+            self.kbid,
+            self.fetcher,
+            show_hidden=self.item.show_hidden,
+            security=self.item.security,
+            with_duplicates=self.item.with_duplicates,
+            facets=self.item.faceted,
+            filter_expression=self.item.filter_expression,
+            label_filters=self.item.filters,
+            keyword_filters=None,
+            resource_filters=self.item.resource_filters,
+            fields=self.item.fields,
+            range_creation_start=self.item.range_creation_start,
+            range_creation_end=self.item.range_creation_end,
+            range_modification_start=self.item.range_modification_start,
+            range_modification_end=self.item.range_modification_end,
+        )
 
         retrieval = UnitRetrieval(
             query=self._query,
@@ -175,23 +190,3 @@ class _SearchParser:
                 )
 
         return (sort.order, sort.field)
-
-    async def _parse_filters(self) -> Filters:
-        assert self._query is not None, "query must be parsed before filters"
-
-        return await parse_filters(
-            self.kbid,
-            self.fetcher,
-            show_hidden=self.item.show_hidden,
-            security=self.item.security,
-            with_duplicates=self.item.with_duplicates,
-            filter_expression=self.item.filter_expression,
-            label_filters=self.item.filters,
-            keyword_filters=None,
-            resource_filters=self.item.resource_filters,
-            fields=self.item.fields,
-            range_creation_start=self.item.range_creation_start,
-            range_creation_end=self.item.range_creation_end,
-            range_modification_start=self.item.range_modification_start,
-            range_modification_end=self.item.range_modification_end,
-        )

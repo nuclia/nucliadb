@@ -26,7 +26,6 @@ from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
-    Filters,
     GraphQuery,
     ParsedQuery,
     PredictReranker,
@@ -107,7 +106,22 @@ class _FindParser:
         if search_models.FindOptions.GRAPH in self.item.features:
             self._query.graph = await self._parse_graph_query()
 
-        filters = await self._parse_filters()
+        filters = await parse_filters(
+            self.kbid,
+            self.fetcher,
+            show_hidden=self.item.show_hidden,
+            security=self.item.security,
+            with_duplicates=self.item.with_duplicates,
+            filter_expression=self.item.filter_expression,
+            label_filters=self.item.filters,
+            keyword_filters=self.item.keyword_filters,
+            resource_filters=self.item.resource_filters,
+            fields=self.item.fields,
+            range_creation_start=self.item.range_creation_start,
+            range_creation_end=self.item.range_creation_end,
+            range_modification_start=self.item.range_modification_start,
+            range_modification_end=self.item.range_modification_end,
+        )
 
         try:
             rank_fusion = parse_rank_fusion(self.item.rank_fusion, self.item.top_k)
@@ -190,23 +204,3 @@ class _FindParser:
             detected_entities = await self.fetcher.get_detected_entities()
 
         return detected_entities
-
-    async def _parse_filters(self) -> Filters:
-        assert self._query is not None, "query must be parsed before filters"
-
-        return await parse_filters(
-            self.kbid,
-            self.fetcher,
-            show_hidden=self.item.show_hidden,
-            security=self.item.security,
-            with_duplicates=self.item.with_duplicates,
-            filter_expression=self.item.filter_expression,
-            label_filters=self.item.filters,
-            keyword_filters=self.item.keyword_filters,
-            resource_filters=self.item.resource_filters,
-            fields=self.item.fields,
-            range_creation_start=self.item.range_creation_start,
-            range_creation_end=self.item.range_creation_end,
-            range_modification_start=self.item.range_modification_start,
-            range_modification_end=self.item.range_modification_end,
-        )

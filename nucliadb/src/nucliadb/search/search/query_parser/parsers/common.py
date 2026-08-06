@@ -235,11 +235,12 @@ async def parse_filters(
     kbid: str,
     fetcher: Fetcher,
     *,
-    show_hidden: bool,
-    security: RequestSecurity | None,
-    with_duplicates: bool,
+    show_hidden: bool = False,
+    security: RequestSecurity | None = None,
+    with_duplicates: bool = False,
+    facets: list[str] | None = None,
     # new-style filter expression
-    filter_expression: FilterExpression | None,
+    filter_expression: FilterExpression | None = None,
     # old-style filters (superseded by filter expressions)
     label_filters: list[str] | list[Filter] | None = None,
     keyword_filters: list[str] | list[Filter] | None = None,
@@ -250,6 +251,7 @@ async def parse_filters(
     range_modification_start: datetime | None = None,
     range_modification_end: datetime | None = None,
 ) -> Filters:
+    facets = facets or []
     label_filters = label_filters or []
     keyword_filters = keyword_filters or []
     resource_filters = resource_filters or []
@@ -302,7 +304,7 @@ async def parse_filters(
     security = await kb_security_enforced(kbid, security)
 
     return Filters(
-        facets=[],
+        facets=facets,
         field_expression=field_expr,
         paragraph_expression=paragraph_expr,
         filter_expression_operator=filter_operator,
