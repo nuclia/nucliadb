@@ -98,7 +98,7 @@ def kb_datamanager(resource_ids, shards):
     mock = MagicMock()
     mock.get_shards = AsyncMock()
     mock.get_shards.return_value = shards
-    mock.upsert = AsyncMock()
+    mock.set = AsyncMock()
 
     with patch("nucliadb.common.cluster.rollover.datamanagers.kb", mock):
         yield mock
