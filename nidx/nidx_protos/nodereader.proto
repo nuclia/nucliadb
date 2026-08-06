@@ -422,6 +422,7 @@ message SearchRequest {
 
     optional FilterExpression field_filter = 26;
     optional FilterExpression paragraph_filter = 27;
+    optional JsonFilterExpression json_filter = 32;
     FilterOperator filter_operator = 28;
 
     // Reduced graph search for specific use case of text block search. It only
@@ -431,8 +432,6 @@ message SearchRequest {
         GraphQuery query = 1;
     }
     GraphSearch graph_search = 29;
-
-    optional JsonFilterExpression json_filter = 32;
 
     optional SearchAfter search_after = 35;
 }
@@ -451,6 +450,7 @@ message SuggestRequest {
 
     optional FilterExpression field_filter = 7;
     optional FilterExpression paragraph_filter = 8;
+    optional JsonFilterExpression json_filter = 12;
     FilterOperator filter_operator = 9;
 
     optional utils.Security security = 10;
