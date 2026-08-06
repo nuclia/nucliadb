@@ -50,9 +50,7 @@ from nucliadb.search.search.fetch import get_labels_resource
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.paragraphs import highlight_paragraph
 from nucliadb.search.search.query_parser.models import FulltextQuery, UnitRetrieval
-from nucliadb_models.common import FieldTypeName
 from nucliadb_models.labels import translate_system_to_alias_label
-from nucliadb_models.resource import ExtractedDataTypeName
 from nucliadb_models.search import (
     DirectionalRelation,
     EntitySubgraph,
@@ -65,7 +63,6 @@ from nucliadb_models.search import (
     RelatedEntity,
     RelationDirection,
     Relations,
-    ResourceProperties,
     ResourceResult,
     Resources,
     ResourceSearchResults,
@@ -482,11 +479,10 @@ async def merge_results(
     search_response: SearchResponse,
     retrieval: UnitRetrieval,
     kbid: str,
-    show: list[ResourceProperties],
-    field_type_filter: list[FieldTypeName],
-    extracted: list[ExtractedDataTypeName],
     offset: int,
     highlight: bool = False,
+    *,
+    resource_hydration_options: ResourceHydrationOptions,
 ) -> KnowledgeboxSearchResults:
     concurrency_control = asyncio.Semaphore(50)
 
@@ -539,11 +535,7 @@ async def merge_results(
     api_results.resources = await augment_resources_deep(
         kbid,
         given=list(resources),
-        opts=ResourceHydrationOptions(
-            show=show,
-            field_type_filter=field_type_filter,
-            extracted=extracted,
-        ),
+        opts=resource_hydration_options,
     )
     return api_results
 

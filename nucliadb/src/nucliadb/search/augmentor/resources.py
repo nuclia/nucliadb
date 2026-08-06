@@ -209,5 +209,6 @@ async def augment_resource_deep(
         show=opts.show,
         field_type_filter=opts.field_type_filter,
         extracted=opts.extracted,
+        vectorset=opts.vectorset,
     )
     return serialized
