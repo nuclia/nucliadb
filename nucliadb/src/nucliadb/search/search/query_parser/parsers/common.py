@@ -239,15 +239,20 @@ async def parse_filters(
     # new-style filter expression
     filter_expression: FilterExpression | None,
     # old-style filters (superseded by filter expressions)
-    label_filters: list[str] | list[Filter],
-    keyword_filters: list[str] | list[Filter],
-    resource_filters: list[str],
-    fields: list[str],
-    range_creation_start: datetime | None,
-    range_creation_end: datetime | None,
-    range_modification_start: datetime | None,
-    range_modification_end: datetime | None,
+    label_filters: list[str] | list[Filter] | None = None,
+    keyword_filters: list[str] | list[Filter] | None = None,
+    resource_filters: list[str] | None = None,
+    fields: list[str] | None = None,
+    range_creation_start: datetime | None = None,
+    range_creation_end: datetime | None = None,
+    range_modification_start: datetime | None = None,
+    range_modification_end: datetime | None = None,
 ) -> Filters:
+    label_filters = label_filters or []
+    keyword_filters = keyword_filters or []
+    resource_filters = resource_filters or []
+    fields = fields or []
+
     has_old_filters = (
         len(label_filters) > 0
         or len(keyword_filters) > 0
