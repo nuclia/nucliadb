@@ -229,6 +229,11 @@ async def _external_index_find(
             show=item.show,
             extracted=item.extracted,
             field_type_filter=item.field_type_filter,
+            # Although we may have the true "default" vectorset (as /query may
+            # have returned it), we want to maintain the same behavior as in
+            # resource serialization. Thus, we pass the user vectorset and let
+            # the serializer decide the meaning of None
+            vectorset=item.vectorset,
         ),
         text_block_hydration_options=TextBlockHydrationOptions(),
         reranker=reranker,
