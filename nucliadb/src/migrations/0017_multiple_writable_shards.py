@@ -57,5 +57,5 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     #     # just ensure we're writing it correctly
     #     assert [shard_object.read_only for shard_object in shards.shards].count(False) == 1
 
-    #     await datamanagers.kb.upsert(txn, kbid=kbid, shards=shards)
+    #     await datamanagers.kb.set(txn, kbid=kbid, shards=shards)
     #     await txn.commit()

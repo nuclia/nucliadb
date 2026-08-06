@@ -79,7 +79,7 @@ async def test_set_config_creates_row_and_is_readable(maindb_driver: Driver) -> 
     cfg = make_config("My KB")
 
     async with maindb_driver.rw_transaction() as txn:
-        await kb.upsert(txn, kbid=kbid, config=cfg)
+        await kb.set(txn, kbid=kbid, config=cfg)
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
@@ -94,11 +94,11 @@ async def test_set_config_overwrites_existing(maindb_driver: Driver) -> None:
     kbid = new_kbid()
 
     async with maindb_driver.rw_transaction() as txn:
-        await kb.upsert(txn, kbid=kbid, config=make_config("First"))
+        await kb.set(txn, kbid=kbid, config=make_config("First"))
         await txn.commit()
 
     async with maindb_driver.rw_transaction() as txn:
-        await kb.upsert(txn, kbid=kbid, config=make_config("Second"))
+        await kb.set(txn, kbid=kbid, config=make_config("Second"))
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
@@ -254,7 +254,7 @@ async def test_update_and_get_kb_shards(maindb_driver: Driver, kbid: str) -> Non
     shards = make_shards(kbid)
 
     async with maindb_driver.rw_transaction() as txn:
-        await kb.upsert(txn, kbid=kbid, shards=shards)
+        await kb.set(txn, kbid=kbid, shards=shards)
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
@@ -276,7 +276,7 @@ async def test_get_kb_shards_for_update(maindb_driver: Driver, kbid: str) -> Non
     shards = make_shards(kbid)
 
     async with maindb_driver.rw_transaction() as txn:
-        await kb.upsert(txn, kbid=kbid, shards=shards)
+        await kb.set(txn, kbid=kbid, shards=shards)
         await txn.commit()
 
     # for_update=True is a SELECT … FOR UPDATE; verify it returns the same data

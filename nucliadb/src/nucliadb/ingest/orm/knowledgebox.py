@@ -221,7 +221,7 @@ class KnowledgeBox:
                     prewarm_enabled=prewarm_enabled,
                 )
                 config.external_index_provider.CopyFrom(stored_external_index_provider)
-                await datamanagers.kb.upsert(txn, kbid=kbid, shards=kb_shards, config=config)
+                await datamanagers.kb.set(txn, kbid=kbid, shards=kb_shards, config=config)
 
                 # shard creation will alter this value on maindb, make sure nobody
                 # uses this variable anymore
@@ -322,7 +322,7 @@ class KnowledgeBox:
             if enforce_security is not None:
                 stored.enforce_security = enforce_security
 
-            await datamanagers.kb.upsert(txn, kbid=kbid, config=stored)
+            await datamanagers.kb.set(txn, kbid=kbid, config=stored)
 
             await txn.commit()
 

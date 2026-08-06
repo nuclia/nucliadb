@@ -39,7 +39,7 @@ async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
 
     # Fake KB shards instead of creating a KB to generate it
     shards = await datamanagers.kb.get_shards(txn, kbid=kbid, for_update=True)
-    await datamanagers.kb.upsert(
+    await datamanagers.kb.set(
         txn,
         kbid=kbid,
         shards=writer_pb2.Shards(

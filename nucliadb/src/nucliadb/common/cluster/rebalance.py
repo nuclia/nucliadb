@@ -331,7 +331,7 @@ class Rebalancer:
                             # Only decrement the actual pointer if we remove before the pointer.
                             kb_shards.actual -= 1
                         assert kb_shards.actual >= 0
-                        await datamanagers.kb.upsert(txn, kbid=self.kbid, shards=kb_shards)
+                        await datamanagers.kb.set(txn, kbid=self.kbid, shards=kb_shards)
                         await txn.commit()
 
                 # Delete shard from nidx

@@ -96,15 +96,15 @@ def _deserialize_kb_column(column: KBColumn, value):
     raise ValueError(f"Unknown KB column: {column}")  # pragma: no cover
 
 
-@observer.wrap({"type": "kb", "op": "upsert"})
-async def upsert(
+@observer.wrap({"type": "kb", "op": "set"})
+async def set(
     txn: Transaction,
     *,
     kbid: str,
     config: knowledgebox_pb2.KnowledgeBoxConfig | None | _UnsetType = UNSET,
     shards: writer_pb2.Shards | None | _UnsetType = UNSET,
 ) -> None:
-    """Upsert a KB row, updating only columns explicitly provided.
+    """Set a KB row, updating only columns explicitly provided.
 
     Use UNSET to leave a column untouched. Pass None to explicitly store SQL NULL.
     """
@@ -372,4 +372,4 @@ async def set_external_index_provider_metadata(
     if kb_config is None:
         raise KnowledgeBoxNotFound(kbid)
     kb_config.external_index_provider.CopyFrom(metadata)
-    await upsert(txn, kbid=kbid, config=kb_config)
+    await set(txn, kbid=kbid, config=kb_config)

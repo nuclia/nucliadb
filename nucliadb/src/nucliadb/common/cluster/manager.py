@@ -167,7 +167,7 @@ class KBShardManager:
         # B/c with Shards.actual - we only use last created shard
         kb_shards.actual = len(kb_shards.shards) - 1
 
-        await datamanagers.kb.upsert(txn, kbid=kbid, shards=kb_shards)
+        await datamanagers.kb.set(txn, kbid=kbid, shards=kb_shards)
 
         return shard
 
