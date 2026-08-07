@@ -55,6 +55,7 @@ async def test_suggest_resource_all(nucliadb_search: AsyncClient, test_search_re
 
         prequest = SuggestRequest(
             features=[SuggestFeatures.ENTITIES, SuggestFeatures.PARAGRAPHS],
+            top_k=10,
         )
         prequest.shard_ids[:] = [shard_id]
         prequest.body = "Ramon"
