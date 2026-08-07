@@ -19,11 +19,18 @@
 #
 import re
 import string
+from datetime import datetime
 
+from nidx_protos import nodereader_pb2
+
+from nucliadb.common.exceptions import InvalidQueryError
+from nucliadb.common.filter_expression import parse_expression, parse_kv_expression
 from nucliadb.search import logger
+from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
+    Filters,
     KeywordQuery,
     NoopReranker,
     PredictReranker,
@@ -32,8 +39,12 @@ from nucliadb.search.search.query_parser.models import (
     Reranker,
     SemanticQuery,
 )
+from nucliadb.search.search.query_parser.old_filters import OldFilterParams, parse_old_filters
+from nucliadb.search.search.utils import filter_hidden_resources, kb_security_enforced
+from nucliadb_models import RequestSecurity
 from nucliadb_models import search as search_models
-from nucliadb_models.search import MAX_RANK_FUSION_WINDOW
+from nucliadb_models.filters import FilterExpression
+from nucliadb_models.search import MAX_RANK_FUSION_WINDOW, Filter
 
 DEFAULT_GENERIC_SEMANTIC_THRESHOLD = 0.7
 
@@ -217,6 +228,91 @@ async def query_with_synonyms(
         return advanced_query
 
     return None
+
+
+@query_parser_observer.wrap({"type": "parse_filters"})
+async def parse_filters(
+    kbid: str,
+    fetcher: Fetcher,
+    *,
+    show_hidden: bool = False,
+    security: RequestSecurity | None = None,
+    with_duplicates: bool = False,
+    facets: list[str] | None = None,
+    # new-style filter expression
+    filter_expression: FilterExpression | None = None,
+    # old-style filters (superseded by filter expressions)
+    label_filters: list[str] | list[Filter] | None = None,
+    keyword_filters: list[str] | list[Filter] | None = None,
+    resource_filters: list[str] | None = None,
+    fields: list[str] | None = None,
+    range_creation_start: datetime | None = None,
+    range_creation_end: datetime | None = None,
+    range_modification_start: datetime | None = None,
+    range_modification_end: datetime | None = None,
+) -> Filters:
+    facets = facets or []
+    label_filters = label_filters or []
+    keyword_filters = keyword_filters or []
+    resource_filters = resource_filters or []
+    fields = fields or []
+
+    has_old_filters = (
+        len(label_filters) > 0
+        or len(keyword_filters) > 0
+        or len(resource_filters) > 0
+        or len(fields) > 0
+        or range_creation_start is not None
+        or range_creation_end is not None
+        or range_modification_start is not None
+        or range_modification_end is not None
+    )
+    if filter_expression is not None and has_old_filters:
+        raise InvalidQueryError("filter_expression", "Cannot mix old filters with filter_expression")
+
+    field_expr = None
+    paragraph_expr = None
+    filter_operator = nodereader_pb2.FilterOperator.AND
+
+    if has_old_filters:
+        old_filters = OldFilterParams(
+            label_filters=label_filters,
+            keyword_filters=keyword_filters,
+            key_filters=resource_filters,
+            fields=fields,
+            range_creation_start=range_creation_start,
+            range_creation_end=range_creation_end,
+            range_modification_start=range_modification_start,
+            range_modification_end=range_modification_end,
+        )
+        field_expr, paragraph_expr = await parse_old_filters(old_filters, fetcher)
+
+    json_expr = None
+    if filter_expression is not None:
+        if filter_expression.field:
+            field_expr = await parse_expression(filter_expression.field, kbid)
+        if filter_expression.key_value:
+            json_expr = await parse_kv_expression(filter_expression.key_value, kbid)
+        if filter_expression.paragraph:
+            paragraph_expr = await parse_expression(filter_expression.paragraph, kbid)
+        if filter_expression.operator == FilterExpression.Operator.OR:
+            filter_operator = nodereader_pb2.FilterOperator.OR
+        else:
+            filter_operator = nodereader_pb2.FilterOperator.AND
+
+    hidden = await filter_hidden_resources(kbid, show_hidden)
+    security = await kb_security_enforced(kbid, security)
+
+    return Filters(
+        facets=facets,
+        field_expression=field_expr,
+        paragraph_expression=paragraph_expr,
+        filter_expression_operator=filter_operator,
+        json_expression=json_expr,
+        security=security,
+        hidden=hidden,
+        with_duplicates=with_duplicates,
+    )
 
 
 def parse_rank_fusion(

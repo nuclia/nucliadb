@@ -286,11 +286,11 @@ async def test_retrieve_query_parsing() -> None:
         patch("nucliadb.search.search.query_parser.parsers.retrieve.ParsedQuery", new=MockedParsedQuery),
         patch("nucliadb.search.search.query_parser.parsers.retrieve.Fetcher", new=Fetcher),
         patch(
-            "nucliadb.search.search.query_parser.parsers.retrieve.filter_hidden_resources",
+            "nucliadb.search.search.query_parser.parsers.common.filter_hidden_resources",
             return_value=False,
         ),
         patch(
-            "nucliadb.search.search.query_parser.parsers.retrieve.kb_security_enforced",
+            "nucliadb.search.search.query_parser.parsers.common.kb_security_enforced",
             return_value=None,
         ),
     ):

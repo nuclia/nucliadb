@@ -132,7 +132,7 @@ async def suggest_post_knowledgebox(
             # all these fields are superseeded by filter expression. In the POST
             # endpoint we don't support any of these fields
             fields=[],
-            filters=[],
+            label_filters=[],
             range_creation_start=None,
             range_creation_end=None,
             range_modification_start=None,
@@ -151,7 +151,7 @@ async def suggest(
     query: str,
     filter_expression: FilterExpression | None,
     fields: list[str],
-    filters: list[str],
+    label_filters: list[str],
     range_creation_start: datetime | None,
     range_creation_end: datetime | None,
     range_modification_start: datetime | None,
@@ -169,7 +169,7 @@ async def suggest(
             features,
             filter_expression,
             fields,
-            filters,
+            label_filters,
             show_hidden,
             range_creation_start,
             range_creation_end,

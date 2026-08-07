@@ -103,7 +103,9 @@ class Filters(BaseModel):
     )
     json_expression: nodereader_pb2.JsonFilterExpression | None = None
 
+    # TODO: facets trigger a faceted search, not a filter. This should be in another place
     facets: list[str] = Field(default_factory=list)
+
     hidden: bool | None = None
     security: search_models.RequestSecurity | None = None
     with_duplicates: bool = False
