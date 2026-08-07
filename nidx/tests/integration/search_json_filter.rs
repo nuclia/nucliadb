@@ -174,6 +174,10 @@ fn uuids_from_paragraph_results(results: &nodereader::SearchResponse) -> Vec<Str
         .unwrap_or_default()
 }
 
+fn uuids_from_suggest_results(results: &nodereader::SuggestResponse) -> Vec<String> {
+    results.results.iter().map(|p| p.uuid.clone()).collect()
+}
+
 #[sqlx::test]
 async fn test_json_exact_match(pool: PgPool) -> Result<(), Box<dyn std::error::Error>> {
     let (mut fixture, shard_id, apple_uuid, banana_uuid, _hammer_uuid) = setup_fixture(pool).await?;
@@ -197,6 +201,36 @@ async fn test_json_exact_match(pool: PgPool) -> Result<(), Box<dyn std::error::E
         .into_inner();
 
     let uuids = uuids_from_paragraph_results(&results);
+    assert!(uuids.contains(&apple_uuid), "apple should match category=fruit");
+    assert!(uuids.contains(&banana_uuid), "banana should match category=fruit");
+    assert_eq!(uuids.len(), 2);
+
+    Ok(())
+}
+
+#[sqlx::test]
+async fn test_suggest_json_exact_match(pool: PgPool) -> Result<(), Box<dyn std::error::Error>> {
+    let (mut fixture, shard_id, apple_uuid, banana_uuid, _hammer_uuid) = setup_fixture(pool).await?;
+
+    // "fruit" matches apple and banana
+    let results = fixture
+        .searcher_client
+        .suggest(Request::new(nodereader::SuggestRequest {
+            shard_ids: vec![shard_id.clone()],
+            body: "item".to_string(),
+            top_k: 10,
+            features: vec![nodereader::SuggestFeatures::Paragraphs.into()],
+            json_filter: Some(json_path_filter(
+                "t/product",
+                "category",
+                json_field_path_filter::Predicate::Text("fruit".to_string()),
+            )),
+            ..Default::default()
+        }))
+        .await?
+        .into_inner();
+
+    let uuids = uuids_from_suggest_results(&results);
     assert!(uuids.contains(&apple_uuid), "apple should match category=fruit");
     assert!(uuids.contains(&banana_uuid), "banana should match category=fruit");
     assert_eq!(uuids.len(), 2);
