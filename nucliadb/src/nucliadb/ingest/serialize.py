@@ -34,7 +34,6 @@ from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
-from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.extracted import (
     ExtractedText,
@@ -444,6 +443,7 @@ async def fetch_field_values(
     include_value: bool,
     include_errors: bool,
 ) -> tuple[Any | None, FieldStatus | None]:
+
     value_task = None
     status_task = None
 
@@ -480,6 +480,8 @@ async def serialize_fields_data(
     include_errors: bool,
     concurrency_control: asyncio.Semaphore,
 ) -> None:
+    from nucliadb.search.augmentor.utils import limited_concurrency
+
     await asyncio.gather(
         *[
             limited_concurrency(
@@ -515,6 +517,8 @@ async def serialize_fields_extracted_data(
     vectorset: str | None,
     concurrency_control: asyncio.Semaphore,
 ) -> None:
+    from nucliadb.search.augmentor.utils import limited_concurrency
+
     await asyncio.gather(
         *[
             limited_concurrency(
