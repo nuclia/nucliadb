@@ -206,7 +206,7 @@ async def serialize_resource(
             field_data = ensure_serialized_field_data(resource.data, field_type_name, field.id)
             selected_fields.append((field, field_type_name, field_data))
 
-        await serialize_fields_pg_data(
+        await serialize_fields_data(
             selected_fields,
             include_values=include_values,
             include_errors=include_errors,
@@ -393,7 +393,7 @@ def ensure_serialized_field_data(
     raise ValueError(f"Unsupported field type for serialization: {field_type_name}")
 
 
-async def serialize_field_pg_data(
+async def serialize_field_data(
     field: Field,
     field_type_name: FieldTypeName,
     serialized: (
@@ -408,7 +408,7 @@ async def serialize_field_pg_data(
     include_value: bool,
     include_errors: bool,
 ) -> None:
-    value, status = await fetch_field_pg_data(
+    value, status = await fetch_field_values(
         field,
         field_type_name,
         include_value=include_value,
@@ -438,7 +438,7 @@ async def serialize_field_pg_data(
         set_serialized_field_errors_from_status(serialized, status)
 
 
-async def fetch_field_pg_data(
+async def fetch_field_values(
     field: Field,
     field_type_name: FieldTypeName,
     *,
@@ -463,7 +463,7 @@ async def fetch_field_pg_data(
     return value, status
 
 
-async def serialize_fields_pg_data(
+async def serialize_fields_data(
     selected_fields: list[
         tuple[
             Field,
@@ -494,7 +494,7 @@ async def serialize_fields_pg_data(
         ),
     ) -> None:
         if semaphore is None:
-            await serialize_field_pg_data(
+            await serialize_field_data(
                 field,
                 field_type_name,
                 field_data,
@@ -504,7 +504,7 @@ async def serialize_fields_pg_data(
             return
 
         async with semaphore:
-            await serialize_field_pg_data(
+            await serialize_field_data(
                 field,
                 field_type_name,
                 field_data,
