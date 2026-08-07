@@ -50,5 +50,5 @@ async def test_create_cleansup_on_error(
 
     # Get current shards object
     async with datamanagers.with_transaction() as txn:
-        shards_object = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        shards_object = await datamanagers.kb.get_shards(txn, kbid=kbid)
         assert shards_object

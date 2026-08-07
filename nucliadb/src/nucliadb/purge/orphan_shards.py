@@ -26,7 +26,7 @@ from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
-from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
 from nucliadb.common.nidx import (
     get_nidx_api_client,
@@ -79,7 +79,7 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardKb]:
             async with datamanagers.with_ro_transaction() as txn:
                 skip = await datamanagers.rollover.is_rollover_shard(
                     txn, kbid=kbid, shard_id=shard_id
-                ) or await datamanagers.cluster.is_kb_shard(txn, kbid=kbid, shard_id=shard_id)
+                ) or await is_kb_shard(txn, kbid=kbid, shard_id=shard_id)
                 if skip:
                     continue
         orphan_shards[shard_id] = kbid
@@ -88,6 +88,16 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardKb]:
         kbid = await _get_kbid(shard_id) or UNKNOWN_KB
         orphan_shards[shard_id] = kbid
     return orphan_shards
+
+
+async def is_kb_shard(txn: Transaction, *, kbid: str, shard_id: str) -> bool:
+    shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
+    if shards is None:
+        return False
+    for shard in shards.shards:
+        if shard.shard == shard_id:
+            return True
+    return False
 
 
 async def _get_indexed_shards() -> dict[str, ShardKb]:
@@ -100,8 +110,8 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardKb]:
     stored_shards: dict[str, ShardKb] = {}
 
     async with driver.ro_transaction() as txn:
-        async for kbid, _ in datamanagers.kb.get_kbs(txn):
-            kb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        async for kbid, _ in datamanagers.kb.iter(txn):
+            kb_shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
             if kb_shards is None:
                 logger.warning("KB not found while looking for orphan shards", extra={"kbid": kbid})
                 continue
@@ -139,7 +149,7 @@ async def report_orphan_shards(driver: Driver):
             if kbid == UNKNOWN_KB:
                 msg = "Found orphan shard but could not get KB info"
             else:
-                kb_exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
+                kb_exists = await datamanagers.kb.exists(txn, kbid=kbid)
                 if kb_exists:
                     msg = "Found orphan shard for existing KB"
                 else:

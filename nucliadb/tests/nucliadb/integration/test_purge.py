@@ -159,7 +159,7 @@ async def test_purge_orphan_shards(
     # We have removed the shards in maindb but left them orphan in the index
     # nodes
     async with maindb_driver.ro_transaction() as txn:
-        maindb_shards = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+        maindb_shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
         assert maindb_shards is None
 
     shards = await list_shards()

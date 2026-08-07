@@ -137,14 +137,14 @@ class KnowledgeBox:
 
         try:
             async with driver.rw_transaction() as txn:
-                exists = await datamanagers.kb.get_kb_uuid(
-                    txn, slug=slug
-                ) or await datamanagers.kb.exists_kb(txn, kbid=kbid)
-                if exists:
-                    raise KnowledgeBoxConflict()
+                if await datamanagers.kb.exists(txn, kbid=kbid):
+                    raise KnowledgeBoxConflict("KB with this kbid already exists")
 
                 # Create in maindb
-                await datamanagers.kb.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
+                try:
+                    await datamanagers.kb.set_slug(txn, slug=slug, kbid=kbid)
+                except datamanagers.exceptions.KnowledgeBoxConflict as e:
+                    raise KnowledgeBoxConflict("Slug already exists") from e
 
                 # all KBs have the vectorset key initialized, although (for
                 # now), not every KB will store vectorsets there
@@ -221,8 +221,7 @@ class KnowledgeBox:
                     prewarm_enabled=prewarm_enabled,
                 )
                 config.external_index_provider.CopyFrom(stored_external_index_provider)
-                await datamanagers.kb.set_config(txn, kbid=kbid, config=config)
-                await datamanagers.cluster.update_kb_shards(txn, kbid=kbid, shards=kb_shards)
+                await datamanagers.kb.set(txn, kbid=kbid, shards=kb_shards, config=config)
 
                 # shard creation will alter this value on maindb, make sure nobody
                 # uses this variable anymore
@@ -287,7 +286,10 @@ class KnowledgeBox:
                 raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
             if slug:
-                await datamanagers.kb.set_kbid_for_slug(txn, slug=slug, kbid=kbid)
+                try:
+                    await datamanagers.kb.set_slug(txn, slug=slug, kbid=kbid)
+                except datamanagers.exceptions.KnowledgeBoxConflict as e:
+                    raise KnowledgeBoxConflict("Slug already exists") from e
                 stored.slug = slug
 
             if title is not None:
@@ -320,7 +322,7 @@ class KnowledgeBox:
             if enforce_security is not None:
                 stored.enforce_security = enforce_security
 
-            await datamanagers.kb.set_config(txn, kbid=kbid, config=stored)
+            await datamanagers.kb.set(txn, kbid=kbid, config=stored)
 
             await txn.commit()
 
@@ -331,7 +333,7 @@ class KnowledgeBox:
 
     @classmethod
     async def configure_shards(cls, driver: Driver, kbid: str, *, prewarm: bool):
-        shards_obj = await datamanagers.atomic.cluster.get_kb_shards(kbid=kbid)
+        shards_obj = await datamanagers.atomic.kb.get_shards(kbid=kbid)
         if shards_obj is None:
             logger.warning(f"Shards not found for KB while updating pre-warm flag", extra={"kbid": kbid})
             return
@@ -379,7 +381,7 @@ class KnowledgeBox:
         """
 
         async with driver.rw_transaction() as txn:
-            exists = await datamanagers.kb.exists_kb(txn, kbid=kbid)
+            exists = await datamanagers.kb.exists(txn, kbid=kbid)
             if not exists:
                 # Already deleted, or never existed.
                 return
@@ -388,7 +390,7 @@ class KnowledgeBox:
 
             await cls.mark_for_purge(txn, kbid=kbid)
 
-            shards_obj = await datamanagers.cluster.get_kb_shards(txn, kbid=kbid)
+            shards_obj = await datamanagers.kb.get_shards(txn, kbid=kbid)
 
             await datamanagers.kb.soft_delete(txn, kbid=kbid)
 
@@ -453,7 +455,7 @@ class KnowledgeBox:
 
     async def get_resource_shard(self, shard_id: str) -> writer_pb2.ShardObject | None:
         async with datamanagers.with_ro_transaction() as txn:
-            pb = await datamanagers.cluster.get_kb_shards(txn, kbid=self.kbid)
+            pb = await datamanagers.kb.get_shards(txn, kbid=self.kbid)
             if pb is None:
                 logger.warning("Shards not found for kbid", extra={"kbid": self.kbid})
                 return None

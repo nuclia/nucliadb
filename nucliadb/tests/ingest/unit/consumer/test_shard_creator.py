@@ -42,7 +42,7 @@ def pubsub():
 def kbdm():
     mock = MagicMock()
     mock.get_model_metadata = AsyncMock(return_value="model")
-    mock.exists_kb = AsyncMock(return_value=True)
+    mock.exists = AsyncMock(return_value=True)
     with (
         patch("nucliadb.common.cluster.manager.datamanagers.kb", new=mock),
         patch("nucliadb.ingest.consumer.shard_creator.datamanagers.kb", new=mock),
@@ -128,7 +128,7 @@ async def test_handle_message_do_not_create_on_kb_not_found(
     dummy_nidx_utility: NidxUtility,
     shard_manager,
 ):
-    kbdm.exists_kb.return_value = False
+    kbdm.exists.return_value = False
 
     notif = Notification(
         kbid="kbid",

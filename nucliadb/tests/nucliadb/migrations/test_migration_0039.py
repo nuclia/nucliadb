@@ -47,7 +47,7 @@ async def test_migration_0039(maindb_driver: Driver):
     with patch("nucliadb.ingest.orm.resource.get_storage"):
         # Create a fake conversation field with only one message
         async with maindb_driver.rw_transaction() as txn:
-            await datamanagers.kb.set_kbid_for_slug(txn, kbid=kbid, slug="slug")
+            await datamanagers.kb.set_slug(txn, kbid=kbid, slug="slug")
 
             kb_obj = KnowledgeBox(txn, storage, kbid)
             await datamanagers.resources.set_slug(txn, kbid=kbid, rid=rid, slug="slug")

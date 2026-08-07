@@ -94,18 +94,18 @@ def get_resource_index_message():
 
 
 @pytest.fixture()
-def cluster_datamanager(resource_ids, shards):
+def kb_datamanager(resource_ids, shards):
     mock = MagicMock()
-    mock.get_kb_shards = AsyncMock()
-    mock.get_kb_shards.return_value = shards
-    mock.update_kb_shards = AsyncMock()
+    mock.get_shards = AsyncMock()
+    mock.get_shards.return_value = shards
+    mock.set = AsyncMock()
 
-    with patch("nucliadb.common.cluster.rollover.datamanagers.cluster", mock):
+    with patch("nucliadb.common.cluster.rollover.datamanagers.kb", mock):
         yield mock
 
 
 @pytest.fixture()
-def rollover_datamanager(resource_ids, cluster_datamanager):
+def rollover_datamanager(resource_ids, kb_datamanager):
     mock = MagicMock()
     mock.get_kb_rollover_shards = AsyncMock()
     mock.get_kb_rollover_shards.return_value = None
@@ -260,7 +260,7 @@ async def test_index_to_rollover_index_handles_missing_res(
     rollover_datamanager.remove_to_index.assert_called_with(ANY, kbid="kbid", resource="1")
 
 
-async def test_cutover_index(app_context, rollover_datamanager, cluster_datamanager, shards):
+async def test_cutover_index(app_context, rollover_datamanager, kb_datamanager, shards):
     rollover_datamanager.get_kb_rollover_shards.return_value = shards
     rollover_datamanager.get_rollover_state.return_value = RolloverState(
         rollover_shards_created=True,
@@ -269,7 +269,7 @@ async def test_cutover_index(app_context, rollover_datamanager, cluster_datamana
     )
     await rollover.cutover_index(app_context, "kbid")
 
-    cluster_datamanager.update_kb_shards.assert_called_with(ANY, kbid="kbid", shards=ANY)
+    kb_datamanager.set.assert_called_with(ANY, kbid="kbid", shards=ANY)
     [app_context.shard_manager.rollback_shard.assert_any_call(shard) for shard in shards.shards]
 
 
