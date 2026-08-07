@@ -19,12 +19,13 @@ use nidx_json::JsonSearcher;
 use nidx_json::search::{JsonFilterExpression, JsonPathFilter, JsonPredicate, JsonSearchRequest};
 use nidx_protos::SuggestRequest;
 use nidx_protos::json_field_path_filter::Predicate;
+use nidx_protos::json_filter_expression::Expr as JsonExpr;
 use nidx_protos::{GraphSearchRequest, SearchRequest};
 use nidx_text::TextSearcher;
 use nidx_text::prefilter::*;
 use nidx_types::prefilter::{FilterOperator, PrefilterResult};
 
-use crate::errors::NidxResult;
+use crate::errors::{NidxError, NidxResult};
 use crate::searcher::query_planner::proto_filter_operator;
 
 /// A filter step using the text and/or json indexes. Prefiltering generates a
@@ -89,7 +90,7 @@ impl Prefilter {
         Ok(combined)
     }
 
-    pub fn parse_search(request: &SearchRequest) -> anyhow::Result<Self> {
+    pub fn parse_search(request: &SearchRequest) -> NidxResult<Self> {
         let text_prefilter = parse_text_prefilter(request);
         let json_prefilter = parse_json_prefilter(request)?;
         let filter_operator = proto_filter_operator(request.filter_operator)?;
@@ -101,7 +102,7 @@ impl Prefilter {
         })
     }
 
-    pub fn parse_suggest(request: &SuggestRequest) -> anyhow::Result<Option<Self>> {
+    pub fn parse_suggest(request: &SuggestRequest) -> NidxResult<Option<Self>> {
         let text_prefilter = if request.field_filter.is_some() || request.security.is_some() {
             Some(PreFilterRequest {
                 security: request.security.clone(),
@@ -131,7 +132,7 @@ impl Prefilter {
         }))
     }
 
-    pub fn parse_graph(request: &GraphSearchRequest) -> anyhow::Result<Option<Self>> {
+    pub fn parse_graph(request: &GraphSearchRequest) -> NidxResult<Option<Self>> {
         let text_prefilter = if request.field_filter.is_some() || request.security.is_some() {
             Some(PreFilterRequest {
                 security: request.security.clone(),
@@ -162,7 +163,7 @@ fn parse_text_prefilter(request: &SearchRequest) -> Option<PreFilterRequest> {
     }
 }
 
-fn parse_json_prefilter(request: &SearchRequest) -> anyhow::Result<Option<JsonSearchRequest>> {
+fn parse_json_prefilter(request: &SearchRequest) -> NidxResult<Option<JsonSearchRequest>> {
     let Some(json_filter) = &request.json_filter else {
         return Ok(None);
     };
@@ -171,20 +172,18 @@ fn parse_json_prefilter(request: &SearchRequest) -> anyhow::Result<Option<JsonSe
     }))
 }
 
-fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> anyhow::Result<JsonFilterExpression> {
-    use nidx_protos::json_filter_expression::Expr as JsonExpr;
-
+fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> NidxResult<JsonFilterExpression> {
     match expr
         .expr
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("Empty JsonFilterExpression"))?
+        .ok_or_else(|| NidxError::InvalidRequest("Empty JsonFilterExpression".to_string()))?
     {
         JsonExpr::BoolAnd(list) => {
             let operands = list
                 .operands
                 .iter()
                 .map(proto_to_json_filter)
-                .collect::<anyhow::Result<Vec<_>>>()?;
+                .collect::<NidxResult<Vec<_>>>()?;
             Ok(JsonFilterExpression::And(operands))
         }
         JsonExpr::BoolOr(list) => {
@@ -192,7 +191,7 @@ fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> anyhow::Res
                 .operands
                 .iter()
                 .map(proto_to_json_filter)
-                .collect::<anyhow::Result<Vec<_>>>()?;
+                .collect::<NidxResult<Vec<_>>>()?;
             Ok(JsonFilterExpression::Or(operands))
         }
         JsonExpr::BoolNot(inner) => Ok(JsonFilterExpression::Not(Box::new(proto_to_json_filter(inner)?))),
@@ -200,7 +199,7 @@ fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> anyhow::Res
             let predicate = match path_filter
                 .predicate
                 .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("Missing predicate"))?
+                .ok_or_else(|| NidxError::InvalidRequest("Missing predicate".to_string()))?
             {
                 Predicate::Text(s) => JsonPredicate::Text(s.clone()),
                 Predicate::Int(i) => JsonPredicate::Int(*i),
