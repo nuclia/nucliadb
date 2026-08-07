@@ -30,6 +30,7 @@ import nucliadb_models as models
 from nucliadb.common import datamanagers
 from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.models_utils import to_proto
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.knowledgebox import Resource as ORMResource
@@ -703,7 +704,7 @@ async def _reprocess_resource_field(
     x_file_password: str | None,
     reset_title: bool,
 ) -> ResourceUpdated:
-    field_type_pb = FIELD_TYPE_NAME_TO_FIELD_TYPE_MAP[field_type]
+    field_type_pb = to_proto.field_type_name(field_type)
     if field_type_pb not in REPROCESSABLE_FIELD_TYPES:
         raise HTTPException(
             status_code=422,
