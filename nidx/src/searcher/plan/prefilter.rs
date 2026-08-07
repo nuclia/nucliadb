@@ -90,8 +90,8 @@ impl Prefilter {
     }
 
     pub fn parse_search(request: &SearchRequest) -> anyhow::Result<Self> {
-        let text_prefilter = compute_prefilters(request);
-        let json_prefilter = compute_json_request(request)?;
+        let text_prefilter = parse_text_prefilter(request);
+        let json_prefilter = parse_json_prefilter(request)?;
         let filter_operator = proto_filter_operator(request.filter_operator)?;
 
         Ok(Self {
@@ -149,7 +149,7 @@ impl Prefilter {
     }
 }
 
-fn compute_prefilters(request: &SearchRequest) -> Option<PreFilterRequest> {
+fn parse_text_prefilter(request: &SearchRequest) -> Option<PreFilterRequest> {
     let prefilter_request = PreFilterRequest {
         security: request.security.clone(),
         filter_expression: request.field_filter.clone(),
@@ -162,7 +162,7 @@ fn compute_prefilters(request: &SearchRequest) -> Option<PreFilterRequest> {
     }
 }
 
-fn compute_json_request(request: &SearchRequest) -> anyhow::Result<Option<JsonSearchRequest>> {
+fn parse_json_prefilter(request: &SearchRequest) -> anyhow::Result<Option<JsonSearchRequest>> {
     let Some(json_filter) = &request.json_filter else {
         return Ok(None);
     };
