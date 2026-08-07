@@ -14,15 +14,12 @@
 //
 
 use anyhow::anyhow;
-use nidx_json::search::{JsonFilterExpression, JsonPathFilter, JsonPredicate, JsonSearchRequest};
 use nidx_paragraph::{ParagraphSearchRequest, SearchAfterTieBreak};
 use nidx_protos::filter_expression::Expr;
 use nidx_protos::graph_query::{PathQuery, node, path_query, relation};
 use nidx_protos::graph_search_request::QueryKind;
-use nidx_protos::json_field_path_filter::Predicate;
 use nidx_protos::{FilterExpression, FilterOperator as ProtoFilterOperator, GraphSearchRequest, SearchRequest};
 use nidx_text::DocumentSearchRequest;
-use nidx_text::prefilter::*;
 use nidx_types::prefilter::{FilterOperator, PrefilterResult};
 use nidx_types::query_language::*;
 use nidx_vector::SEGMENT_TAGS;
@@ -30,6 +27,8 @@ use nidx_vector::VectorSearchRequest;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use uuid::Uuid;
+
+use crate::searcher::plan::prefilter::Prefilter;
 
 use super::query_language::extract_label_filters;
 
@@ -167,15 +166,8 @@ impl IndexQueries {
 /// possible.
 #[derive(Clone)]
 pub struct QueryPlan {
-    pub prefilter: PrefilterRequest,
+    pub prefilter: Prefilter,
     pub index_queries: IndexQueries,
-}
-
-#[derive(Clone)]
-pub struct PrefilterRequest {
-    pub texts: Option<PreFilterRequest>,
-    pub json: Option<JsonSearchRequest>,
-    pub filter_operator: FilterOperator,
 }
 
 pub(crate) fn proto_filter_operator(value: i32) -> anyhow::Result<FilterOperator> {
@@ -187,21 +179,15 @@ pub(crate) fn proto_filter_operator(value: i32) -> anyhow::Result<FilterOperator
 }
 
 pub fn build_query_plan(search_request: SearchRequest, shard_id: &Uuid) -> anyhow::Result<QueryPlan> {
+    let prefilter = Prefilter::parse_search(&search_request)?;
+
     let graph_request = compute_graph_request(&search_request)?;
     let texts_request = compute_texts_request(&search_request);
     let vectors_request = compute_vectors_request(&search_request)?;
     let paragraphs_request = compute_paragraphs_request(&search_request, shard_id)?;
 
-    let json_request = compute_json_request(&search_request)?;
-    let prefilter = compute_prefilters(&search_request);
-    let filter_operator = proto_filter_operator(search_request.filter_operator)?;
-
     Ok(QueryPlan {
-        prefilter: PrefilterRequest {
-            texts: prefilter,
-            json: json_request,
-            filter_operator,
-        },
+        prefilter,
         index_queries: IndexQueries {
             prefilter_results: PrefilterResult::All,
             vectors_request,
@@ -210,90 +196,6 @@ pub fn build_query_plan(search_request: SearchRequest, shard_id: &Uuid) -> anyho
             relations_request: graph_request.map(GraphIndexQueries::build),
         },
     })
-}
-
-fn compute_json_request(search_request: &SearchRequest) -> anyhow::Result<Option<JsonSearchRequest>> {
-    let Some(json_filter) = &search_request.json_filter else {
-        return Ok(None);
-    };
-    Ok(Some(JsonSearchRequest {
-        filter: proto_to_json_filter(json_filter)?,
-    }))
-}
-
-fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> anyhow::Result<JsonFilterExpression> {
-    use nidx_protos::json_filter_expression::Expr as JsonExpr;
-
-    match expr
-        .expr
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("Empty JsonFilterExpression"))?
-    {
-        JsonExpr::BoolAnd(list) => {
-            let operands = list
-                .operands
-                .iter()
-                .map(proto_to_json_filter)
-                .collect::<anyhow::Result<Vec<_>>>()?;
-            Ok(JsonFilterExpression::And(operands))
-        }
-        JsonExpr::BoolOr(list) => {
-            let operands = list
-                .operands
-                .iter()
-                .map(proto_to_json_filter)
-                .collect::<anyhow::Result<Vec<_>>>()?;
-            Ok(JsonFilterExpression::Or(operands))
-        }
-        JsonExpr::BoolNot(inner) => Ok(JsonFilterExpression::Not(Box::new(proto_to_json_filter(inner)?))),
-        JsonExpr::Path(path_filter) => {
-            let predicate = match path_filter
-                .predicate
-                .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("Missing predicate"))?
-            {
-                Predicate::Text(s) => JsonPredicate::Text(s.clone()),
-                Predicate::Int(i) => JsonPredicate::Int(*i),
-                Predicate::IntRange(r) => JsonPredicate::IntRange {
-                    lower: r.lower,
-                    upper: r.upper,
-                },
-                Predicate::Float(f) => JsonPredicate::Float(*f),
-                Predicate::FloatRange(r) => JsonPredicate::FloatRange {
-                    lower: r.lower,
-                    upper: r.upper,
-                },
-                Predicate::Boolean(b) => JsonPredicate::Boolean(*b),
-                Predicate::Date(ts) => JsonPredicate::Date(nidx_json::DateTime::from_timestamp_secs(ts.seconds)),
-                Predicate::DateRange(r) => {
-                    let ts_to_dt =
-                        |ts: &nidx_protos::prost_types::Timestamp| nidx_json::DateTime::from_timestamp_secs(ts.seconds);
-                    JsonPredicate::DateRange {
-                        lower: r.lower.as_ref().map(ts_to_dt),
-                        upper: r.upper.as_ref().map(ts_to_dt),
-                    }
-                }
-            };
-            Ok(JsonFilterExpression::Path(JsonPathFilter {
-                field_id: path_filter.field_id.clone(),
-                json_path: path_filter.json_path.clone(),
-                predicate,
-            }))
-        }
-    }
-}
-
-fn compute_prefilters(search_request: &SearchRequest) -> Option<PreFilterRequest> {
-    let prefilter_request = PreFilterRequest {
-        security: search_request.security.clone(),
-        filter_expression: search_request.field_filter.clone(),
-    };
-
-    if prefilter_request.security.is_some() || prefilter_request.filter_expression.is_some() {
-        Some(prefilter_request)
-    } else {
-        None
-    }
 }
 
 fn compute_paragraphs_request(
@@ -463,7 +365,7 @@ mod tests {
             ..Default::default()
         };
         let query_plan = build_query_plan(request, &Uuid::nil()).unwrap();
-        let Some(prefilter) = query_plan.prefilter.texts else {
+        let Some(prefilter) = query_plan.prefilter.text else {
             panic!("There should be a prefilter");
         };
         let Some(formula) = prefilter.filter_expression else {
