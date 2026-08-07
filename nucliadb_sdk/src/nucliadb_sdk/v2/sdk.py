@@ -254,6 +254,16 @@ SDK_DEFINITION = {
         method="POST",
         path_params=("kbid", "slug"),
     ),
+    "reprocess_field_by_id": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}/reprocess",
+        method="POST",
+        path_params=("kbid", "rid", "field_type", "field_id"),
+    ),
+    "reprocess_field_by_slug": SdkEndpointDefinition(
+        path_template="/v1/kb/{kbid}/slug/{slug}/{field_type}/{field_id}/reprocess",
+        method="POST",
+        path_params=("kbid", "slug", "field_type", "field_id"),
+    ),
     # Field endpoints
     "delete_field_by_id": SdkEndpointDefinition(
         path_template="/v1/kb/{kbid}/resource/{rid}/{field_type}/{field_id}",
@@ -1202,6 +1212,8 @@ class NucliaDB(_NucliaDBBase):
         "reprocess_resource_by_slug", type(None), type(None)
     )
     # Field endpoints
+    reprocess_field_by_id = _request_sync_builder("reprocess_field_by_id", type(None), type(None))
+    reprocess_field_by_slug = _request_sync_builder("reprocess_field_by_slug", type(None), type(None))
     delete_field_by_id = _request_sync_builder("delete_field_by_id", type(None), type(None))
     delete_field_by_slug = _request_sync_builder("delete_field_by_slug", type(None), type(None))
     # Conversation endpoints
@@ -1427,6 +1439,8 @@ class NucliaDBAsync(_NucliaDBBase):
         "reprocess_resource_by_slug", type(None), type(None)
     )
     # Field endpoints
+    reprocess_field_by_id = _request_async_builder("reprocess_field_by_id", type(None), type(None))
+    reprocess_field_by_slug = _request_async_builder("reprocess_field_by_slug", type(None), type(None))
     delete_field_by_id = _request_async_builder("delete_field_by_id", type(None), type(None))
     delete_field_by_slug = _request_async_builder("delete_field_by_slug", type(None), type(None))
     # Conversation endpoints
