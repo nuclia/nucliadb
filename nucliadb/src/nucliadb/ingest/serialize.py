@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
+from typing import Any
 
 import nucliadb_models as models
 from nucliadb.common import datamanagers
@@ -77,6 +79,7 @@ async def serialize(
     vectorset: str | None = None,
     service_name: str | None = None,
     slug: str | None = None,
+    max_parallel_field_serializations: int = 16,
 ) -> Resource | None:
     driver = get_driver()
     async with driver.ro_transaction() as txn:
@@ -90,6 +93,7 @@ async def serialize(
             vectorset=vectorset,
             service_name=service_name,
             slug=slug,
+            max_parallel_field_serializations=max_parallel_field_serializations,
         )
 
 
@@ -103,13 +107,19 @@ async def managed_serialize(
     vectorset: str | None = None,
     service_name: str | None = None,
     slug: str | None = None,
+    max_parallel_field_serializations: int = 16,
 ) -> Resource | None:
     orm_resource = await get_orm_resource(txn, kbid, rid=rid, slug=slug, service_name=service_name)
     if orm_resource is None:
         return None
 
     return await serialize_resource(
-        orm_resource, show, field_type_filter, extracted, vectorset=vectorset
+        orm_resource,
+        show,
+        field_type_filter,
+        extracted,
+        vectorset=vectorset,
+        max_parallel_field_serializations=max_parallel_field_serializations,
     )
 
 
@@ -146,183 +156,153 @@ async def serialize_resource(
     field_type_filter: list[FieldTypeName],
     extracted: list[ExtractedDataTypeName],
     vectorset: str | None = None,
+    max_parallel_field_serializations: int = 16,
 ) -> Resource:
     resource = Resource(id=orm_resource.uuid)
 
     include_values = ResourceProperties.VALUES in show
-
     include_extracted_data = ResourceProperties.EXTRACTED in show and extracted != []
-
-    if ResourceProperties.BASIC in show:
-        await orm_resource.get_basic()
-
-        if orm_resource.basic is not None:
-            resource.slug = orm_resource.basic.slug
-            resource.title = orm_resource.basic.title
-            resource.summary = orm_resource.basic.summary
-            resource.icon = orm_resource.basic.icon
-            resource.thumbnail = orm_resource.basic.thumbnail
-            resource.hidden = orm_resource.basic.hidden
-            resource.created = (
-                orm_resource.basic.created.ToDatetime()
-                if orm_resource.basic.HasField("created")
-                else None
-            )
-            resource.modified = (
-                orm_resource.basic.modified.ToDatetime()
-                if orm_resource.basic.HasField("modified")
-                else None
-            )
-
-            resource.metadata = from_proto.metadata(orm_resource.basic.metadata)
-            resource.usermetadata = from_proto.user_metadata(orm_resource.basic.usermetadata)
-            resource.fieldmetadata = [
-                from_proto.user_field_metadata(fm) for fm in orm_resource.basic.fieldmetadata
-            ]
-            resource.computedmetadata = from_proto.computed_metadata(orm_resource.basic.computedmetadata)
-
-            resource.last_seqid = orm_resource.basic.last_seqid
-
-            # 0 on the proto means it was not ever set, as first valid value for this field will allways be 1
-            resource.last_account_seq = (
-                orm_resource.basic.last_account_seq if orm_resource.basic.last_account_seq != 0 else None
-            )
-            resource.queue = QueueType[orm_resource.basic.QueueType.Name(orm_resource.basic.queue)]
-
-            if ResourceProperties.RELATIONS in show:
-                resource.usermetadata.relations = await serialize_user_relations(orm_resource)
-
-    if ResourceProperties.ORIGIN in show:
-        resource.origin = await serialize_origin(orm_resource)
-
-    if ResourceProperties.EXTRA in show:
-        resource.extra = await serialize_extra(orm_resource)
-
     include_errors = ResourceProperties.ERRORS in show
 
-    if ResourceProperties.SECURITY in show:
-        resource.security = await serialize_security(orm_resource)
+    should_serialize_fields = (
+        field_type_filter and (include_values or include_extracted_data)
+    ) or include_errors
 
-    if (field_type_filter and (include_values or include_extracted_data)) or include_errors:
-        await orm_resource.get_fields()
+    fields_task = None
+    if should_serialize_fields:
+        fields_task = asyncio.create_task(orm_resource.get_fields())
+
+    await serialize_resource_metadata(orm_resource, resource, show)
+
+    if fields_task is not None:
+        await fields_task
+
+    if should_serialize_fields:
         resource.data = ResourceData()
+        field_serialization_semaphore = (
+            asyncio.Semaphore(max_parallel_field_serializations)
+            if max_parallel_field_serializations > 0
+            else None
+        )
+
+        selected_fields: list[
+            tuple[
+                Field,
+                FieldTypeName,
+                TextFieldData
+                | FileFieldData
+                | LinkFieldData
+                | ConversationFieldData
+                | GenericFieldData
+                | KeyValueFieldData,
+            ]
+        ] = []
+
         for (field_type, _), field in orm_resource.fields.items():
             field_type_name = from_proto.field_type_name(field_type)
             if field_type_name not in field_type_filter:
                 continue
 
-            include_value = ResourceProperties.VALUES in show
-            value = None
-            if include_value:
-                value = await field.get_value()
+            field_data = ensure_serialized_field_data(resource.data, field_type_name, field.id)
+            selected_fields.append((field, field_type_name, field_data))
 
-            if field_type_name is FieldTypeName.TEXT:
-                if resource.data.texts is None:
-                    resource.data.texts = {}
-                if field.id not in resource.data.texts:
-                    resource.data.texts[field.id] = TextFieldData()
-                if include_value:
-                    serialized_value = from_proto.field_text(value) if value is not None else None
-                    resource.data.texts[field.id].value = serialized_value
-                if include_errors:
-                    await serialize_field_errors(field, resource.data.texts[field.id])
-                if include_extracted_data:
-                    resource.data.texts[field.id].extracted = TextFieldExtractedData()
-                    await set_resource_field_extracted_data(
-                        field,
-                        resource.data.texts[field.id].extracted,
-                        field_type_name,
-                        extracted,
-                        vectorset=vectorset,
-                    )
-            elif field_type_name is FieldTypeName.FILE:
-                if resource.data.files is None:
-                    resource.data.files = {}
-                if field.id not in resource.data.files:
-                    resource.data.files[field.id] = FileFieldData()
-                if include_value:
-                    if value is not None:
-                        resource.data.files[field.id].value = from_proto.field_file(value)
-                    else:
-                        resource.data.files[field.id].value = None
+        await serialize_fields_pg_data(
+            selected_fields,
+            include_values=include_values,
+            include_errors=include_errors,
+            semaphore=field_serialization_semaphore,
+        )
 
-                if include_errors:
-                    await serialize_field_errors(field, resource.data.files[field.id])
-
-                if include_extracted_data:
-                    resource.data.files[field.id].extracted = FileFieldExtractedData()
-                    await set_resource_field_extracted_data(
-                        field,
-                        resource.data.files[field.id].extracted,
-                        field_type_name,
-                        extracted,
-                        vectorset=vectorset,
-                    )
-            elif field_type_name is FieldTypeName.LINK:
-                if resource.data.links is None:
-                    resource.data.links = {}
-                if field.id not in resource.data.links:
-                    resource.data.links[field.id] = LinkFieldData()
-                if include_value and value is not None:
-                    resource.data.links[field.id].value = from_proto.field_link(value)
-
-                if include_errors:
-                    await serialize_field_errors(field, resource.data.links[field.id])
-
-                if include_extracted_data:
-                    resource.data.links[field.id].extracted = LinkFieldExtractedData()
-                    await set_resource_field_extracted_data(
-                        field,
-                        resource.data.links[field.id].extracted,
-                        field_type_name,
-                        extracted,
-                        vectorset=vectorset,
-                    )
-            elif field_type_name is FieldTypeName.CONVERSATION:
-                if resource.data.conversations is None:
-                    resource.data.conversations = {}
-                if field.id not in resource.data.conversations:
-                    resource.data.conversations[field.id] = ConversationFieldData()
-                if include_errors:
-                    await serialize_field_errors(field, resource.data.conversations[field.id])
-                if include_value and isinstance(field, Conversation):
-                    value = await field.get_metadata()
-                    if value is not None:
-                        resource.data.conversations[field.id].value = from_proto.field_conversation(
-                            value
-                        )
-                if include_extracted_data:
-                    resource.data.conversations[field.id].extracted = ConversationFieldExtractedData()
-                    await set_resource_field_extracted_data(
-                        field,
-                        resource.data.conversations[field.id].extracted,
-                        field_type_name,
-                        extracted,
-                        vectorset=vectorset,
-                    )
-            elif field_type_name is FieldTypeName.GENERIC:
-                if resource.data.generics is None:
-                    resource.data.generics = {}
-                if field.id not in resource.data.generics:
-                    resource.data.generics[field.id] = GenericFieldData()
-                if include_value:
-                    resource.data.generics[field.id].value = value
-                if include_errors:
-                    await serialize_field_errors(field, resource.data.generics[field.id])
-                if include_extracted_data:
-                    resource.data.generics[field.id].extracted = TextFieldExtractedData(
-                        text=models.ExtractedText(text=resource.data.generics[field.id].value)
-                    )
-            elif field_type_name is FieldTypeName.KEY_VALUE:
-                if resource.data.key_values is None:
-                    resource.data.key_values = {}
-                if field.id not in resource.data.key_values:
-                    resource.data.key_values[field.id] = KeyValueFieldData()
-                if include_value and value is not None:
-                    resource.data.key_values[field.id].value = from_proto.field_key_value(value)
-                if include_errors:
-                    await serialize_field_errors(field, resource.data.key_values[field.id])
+        if include_extracted_data:
+            await serialize_fields_extracted_data(
+                selected_fields,
+                extracted,
+                vectorset=vectorset,
+                semaphore=field_serialization_semaphore,
+            )
     return resource
+
+
+async def serialize_resource_metadata(
+    orm_resource: ORMResource,
+    resource: Resource,
+    show: list[ResourceProperties],
+) -> None:
+    basic_task = None
+    origin_task = None
+    extra_task = None
+    security_task = None
+    relations_task = None
+
+    if ResourceProperties.BASIC in show:
+        basic_task = asyncio.create_task(orm_resource.get_basic())
+        if ResourceProperties.RELATIONS in show:
+            relations_task = asyncio.create_task(orm_resource.get_user_relations())
+    if ResourceProperties.ORIGIN in show:
+        origin_task = asyncio.create_task(orm_resource.get_origin())
+    if ResourceProperties.EXTRA in show:
+        extra_task = asyncio.create_task(orm_resource.get_extra())
+    if ResourceProperties.SECURITY in show:
+        security_task = asyncio.create_task(orm_resource.get_security())
+
+    await asyncio.gather(
+        *[
+            task
+            for task in [basic_task, origin_task, extra_task, security_task, relations_task]
+            if task is not None
+        ]
+    )
+
+    if ResourceProperties.BASIC in show and orm_resource.basic is not None:
+        resource.slug = orm_resource.basic.slug
+        resource.title = orm_resource.basic.title
+        resource.summary = orm_resource.basic.summary
+        resource.icon = orm_resource.basic.icon
+        resource.thumbnail = orm_resource.basic.thumbnail
+        resource.hidden = orm_resource.basic.hidden
+        resource.created = (
+            orm_resource.basic.created.ToDatetime() if orm_resource.basic.HasField("created") else None
+        )
+        resource.modified = (
+            orm_resource.basic.modified.ToDatetime() if orm_resource.basic.HasField("modified") else None
+        )
+
+        resource.metadata = from_proto.metadata(orm_resource.basic.metadata)
+        resource.usermetadata = from_proto.user_metadata(orm_resource.basic.usermetadata)
+        resource.fieldmetadata = [
+            from_proto.user_field_metadata(fm) for fm in orm_resource.basic.fieldmetadata
+        ]
+        resource.computedmetadata = from_proto.computed_metadata(orm_resource.basic.computedmetadata)
+
+        resource.last_seqid = orm_resource.basic.last_seqid
+
+        # 0 on the proto means it was not ever set, as first valid value for this field will allways be 1
+        resource.last_account_seq = (
+            orm_resource.basic.last_account_seq if orm_resource.basic.last_account_seq != 0 else None
+        )
+        resource.queue = QueueType[orm_resource.basic.QueueType.Name(orm_resource.basic.queue)]
+
+        if ResourceProperties.RELATIONS in show and relations_task is not None:
+            relations = relations_task.result()
+            resource.usermetadata.relations = [from_proto.relation(rel) for rel in relations.relations]
+
+    if origin_task is not None:
+        origin = origin_task.result()
+        if origin is not None:
+            resource.origin = from_proto.origin(origin)
+
+    if extra_task is not None:
+        extra_data = extra_task.result()
+        if extra_data is not None:
+            resource.extra = from_proto.extra(extra_data)
+
+    if security_task is not None:
+        security_pb = security_task.result()
+        security = ResourceSecurity(access_groups=[])
+        if security_pb is not None:
+            for gid in security_pb.access_groups:
+                security.access_groups.append(gid)
+        resource.security = security
 
 
 async def serialize_origin(resource: ORMResource) -> Origin | None:
@@ -356,6 +336,302 @@ async def serialize_security(resource: ORMResource) -> ResourceSecurity:
     return security
 
 
+def ensure_serialized_field_data(
+    resource_data: ResourceData,
+    field_type_name: FieldTypeName,
+    field_id: str,
+) -> (
+    TextFieldData
+    | FileFieldData
+    | LinkFieldData
+    | ConversationFieldData
+    | GenericFieldData
+    | KeyValueFieldData
+):
+    if field_type_name is FieldTypeName.TEXT:
+        if resource_data.texts is None:
+            resource_data.texts = {}
+        if field_id not in resource_data.texts:
+            resource_data.texts[field_id] = TextFieldData()
+        return resource_data.texts[field_id]
+
+    if field_type_name is FieldTypeName.FILE:
+        if resource_data.files is None:
+            resource_data.files = {}
+        if field_id not in resource_data.files:
+            resource_data.files[field_id] = FileFieldData()
+        return resource_data.files[field_id]
+
+    if field_type_name is FieldTypeName.LINK:
+        if resource_data.links is None:
+            resource_data.links = {}
+        if field_id not in resource_data.links:
+            resource_data.links[field_id] = LinkFieldData()
+        return resource_data.links[field_id]
+
+    if field_type_name is FieldTypeName.CONVERSATION:
+        if resource_data.conversations is None:
+            resource_data.conversations = {}
+        if field_id not in resource_data.conversations:
+            resource_data.conversations[field_id] = ConversationFieldData()
+        return resource_data.conversations[field_id]
+
+    if field_type_name is FieldTypeName.GENERIC:
+        if resource_data.generics is None:
+            resource_data.generics = {}
+        if field_id not in resource_data.generics:
+            resource_data.generics[field_id] = GenericFieldData()
+        return resource_data.generics[field_id]
+
+    if field_type_name is FieldTypeName.KEY_VALUE:
+        if resource_data.key_values is None:
+            resource_data.key_values = {}
+        if field_id not in resource_data.key_values:
+            resource_data.key_values[field_id] = KeyValueFieldData()
+        return resource_data.key_values[field_id]
+
+    raise ValueError(f"Unsupported field type for serialization: {field_type_name}")
+
+
+async def serialize_field_pg_data(
+    field: Field,
+    field_type_name: FieldTypeName,
+    serialized: (
+        TextFieldData
+        | FileFieldData
+        | LinkFieldData
+        | ConversationFieldData
+        | GenericFieldData
+        | KeyValueFieldData
+    ),
+    *,
+    include_value: bool,
+    include_errors: bool,
+) -> None:
+    value, status = await fetch_field_pg_data(
+        field,
+        field_type_name,
+        include_value=include_value,
+        include_errors=include_errors,
+    )
+
+    if field_type_name is FieldTypeName.TEXT and isinstance(serialized, TextFieldData):
+        if include_value:
+            serialized.value = from_proto.field_text(value) if value is not None else None
+    elif field_type_name is FieldTypeName.FILE and isinstance(serialized, FileFieldData):
+        if include_value:
+            serialized.value = from_proto.field_file(value) if value is not None else None
+    elif field_type_name is FieldTypeName.LINK and isinstance(serialized, LinkFieldData):
+        if include_value and value is not None:
+            serialized.value = from_proto.field_link(value)
+    elif field_type_name is FieldTypeName.CONVERSATION and isinstance(serialized, ConversationFieldData):
+        if include_value and value is not None:
+            serialized.value = from_proto.field_conversation(value)
+    elif field_type_name is FieldTypeName.GENERIC and isinstance(serialized, GenericFieldData):
+        if include_value:
+            serialized.value = value
+    elif field_type_name is FieldTypeName.KEY_VALUE and isinstance(serialized, KeyValueFieldData):
+        if include_value and value is not None:
+            serialized.value = from_proto.field_key_value(value)
+
+    if include_errors:
+        set_serialized_field_errors_from_status(serialized, status)
+
+
+async def fetch_field_pg_data(
+    field: Field,
+    field_type_name: FieldTypeName,
+    *,
+    include_value: bool,
+    include_errors: bool,
+) -> tuple[Any | None, FieldStatus | None]:
+    value_task = None
+    status_task = None
+
+    if include_value:
+        if field_type_name is FieldTypeName.CONVERSATION and isinstance(field, Conversation):
+            value_task = asyncio.create_task(field.get_metadata())
+        else:
+            value_task = asyncio.create_task(field.get_value())
+
+    if include_errors:
+        status_task = asyncio.create_task(field.get_status())
+
+    await asyncio.gather(*[task for task in [value_task, status_task] if task is not None])
+    value = value_task.result() if value_task is not None else None
+    status = status_task.result() if status_task is not None else None
+    return value, status
+
+
+async def serialize_fields_pg_data(
+    selected_fields: list[
+        tuple[
+            Field,
+            FieldTypeName,
+            TextFieldData
+            | FileFieldData
+            | LinkFieldData
+            | ConversationFieldData
+            | GenericFieldData
+            | KeyValueFieldData,
+        ]
+    ],
+    *,
+    include_values: bool,
+    include_errors: bool,
+    semaphore: asyncio.Semaphore | None,
+) -> None:
+    async def _serialize_one(
+        field: Field,
+        field_type_name: FieldTypeName,
+        field_data: (
+            TextFieldData
+            | FileFieldData
+            | LinkFieldData
+            | ConversationFieldData
+            | GenericFieldData
+            | KeyValueFieldData
+        ),
+    ) -> None:
+        if semaphore is None:
+            await serialize_field_pg_data(
+                field,
+                field_type_name,
+                field_data,
+                include_value=include_values,
+                include_errors=include_errors,
+            )
+            return
+
+        async with semaphore:
+            await serialize_field_pg_data(
+                field,
+                field_type_name,
+                field_data,
+                include_value=include_values,
+                include_errors=include_errors,
+            )
+
+    await asyncio.gather(
+        *[
+            _serialize_one(field, field_type_name, field_data)
+            for field, field_type_name, field_data in selected_fields
+        ]
+    )
+
+
+async def serialize_fields_extracted_data(
+    selected_fields: list[
+        tuple[
+            Field,
+            FieldTypeName,
+            TextFieldData
+            | FileFieldData
+            | LinkFieldData
+            | ConversationFieldData
+            | GenericFieldData
+            | KeyValueFieldData,
+        ]
+    ],
+    extracted: list[ExtractedDataTypeName],
+    *,
+    vectorset: str | None,
+    semaphore: asyncio.Semaphore | None,
+) -> None:
+    async def _serialize_one(
+        field: Field,
+        field_type_name: FieldTypeName,
+        field_data: (
+            TextFieldData
+            | FileFieldData
+            | LinkFieldData
+            | ConversationFieldData
+            | GenericFieldData
+            | KeyValueFieldData
+        ),
+    ) -> None:
+        if semaphore is None:
+            await serialize_field_extracted_data(
+                field,
+                field_type_name,
+                field_data,
+                extracted,
+                vectorset=vectorset,
+            )
+            return
+
+        async with semaphore:
+            await serialize_field_extracted_data(
+                field,
+                field_type_name,
+                field_data,
+                extracted,
+                vectorset=vectorset,
+            )
+
+    await asyncio.gather(
+        *[
+            _serialize_one(field, field_type_name, field_data)
+            for field, field_type_name, field_data in selected_fields
+        ]
+    )
+
+
+async def serialize_field_extracted_data(
+    field: Field,
+    field_type_name: FieldTypeName,
+    serialized: (
+        TextFieldData
+        | FileFieldData
+        | LinkFieldData
+        | ConversationFieldData
+        | GenericFieldData
+        | KeyValueFieldData
+    ),
+    extracted: list[ExtractedDataTypeName],
+    *,
+    vectorset: str | None = None,
+) -> None:
+    if field_type_name is FieldTypeName.TEXT and isinstance(serialized, TextFieldData):
+        serialized.extracted = TextFieldExtractedData()
+        await set_resource_field_extracted_data(
+            field,
+            serialized.extracted,
+            field_type_name,
+            extracted,
+            vectorset=vectorset,
+        )
+    elif field_type_name is FieldTypeName.FILE and isinstance(serialized, FileFieldData):
+        serialized.extracted = FileFieldExtractedData()
+        await set_resource_field_extracted_data(
+            field,
+            serialized.extracted,
+            field_type_name,
+            extracted,
+            vectorset=vectorset,
+        )
+    elif field_type_name is FieldTypeName.LINK and isinstance(serialized, LinkFieldData):
+        serialized.extracted = LinkFieldExtractedData()
+        await set_resource_field_extracted_data(
+            field,
+            serialized.extracted,
+            field_type_name,
+            extracted,
+            vectorset=vectorset,
+        )
+    elif field_type_name is FieldTypeName.CONVERSATION and isinstance(serialized, ConversationFieldData):
+        serialized.extracted = ConversationFieldExtractedData()
+        await set_resource_field_extracted_data(
+            field,
+            serialized.extracted,
+            field_type_name,
+            extracted,
+            vectorset=vectorset,
+        )
+    elif field_type_name is FieldTypeName.GENERIC and isinstance(serialized, GenericFieldData):
+        serialized.extracted = TextFieldExtractedData(text=models.ExtractedText(text=serialized.value))
+
+
 async def serialize_field_errors(
     field: Field,
     serialized: (
@@ -368,6 +644,20 @@ async def serialize_field_errors(
     ),
 ):
     status = await field.get_status()
+    set_serialized_field_errors_from_status(serialized, status)
+
+
+def set_serialized_field_errors_from_status(
+    serialized: (
+        TextFieldData
+        | FileFieldData
+        | LinkFieldData
+        | ConversationFieldData
+        | GenericFieldData
+        | KeyValueFieldData
+    ),
+    status: FieldStatus | None,
+) -> None:
     if status is None:
         status = FieldStatus()
     serialized.status = status.Status.Name(status.status)
@@ -396,42 +686,91 @@ async def set_resource_field_extracted_data(
     if field_data is None:
         return
 
+    text_task = None
+    metadata_task = None
+    large_metadata_task = None
+    vector_task = None
+    qa_task = None
+    file_task = None
+    link_task = None
+    relation_node_vectors_task = None
+    relation_edge_vectors_task = None
+
     if ExtractedDataTypeName.TEXT in wanted_extracted_data:
-        field_data.text = await serialize_extracted_text(field)
+        text_task = asyncio.create_task(serialize_extracted_text(field))
 
     metadata_wanted = ExtractedDataTypeName.METADATA in wanted_extracted_data
     shortened_metadata_wanted = ExtractedDataTypeName.SHORTENED_METADATA in wanted_extracted_data
     if metadata_wanted or shortened_metadata_wanted:
-        field_data.metadata = await serialize_extracted_metadata(
-            field, shortened=shortened_metadata_wanted and not metadata_wanted
+        metadata_task = asyncio.create_task(
+            serialize_extracted_metadata(
+                field, shortened=shortened_metadata_wanted and not metadata_wanted
+            )
         )
 
     if ExtractedDataTypeName.LARGE_METADATA in wanted_extracted_data:
-        field_data.large_metadata = await serialize_extracted_large_metadata(field)
+        large_metadata_task = asyncio.create_task(serialize_extracted_large_metadata(field))
 
     if ExtractedDataTypeName.VECTOR in wanted_extracted_data:
-        field_data.vectors = await serialize_extracted_vectors(field, vectorset=vectorset)
+        vector_task = asyncio.create_task(serialize_extracted_vectors(field, vectorset=vectorset))
 
     if ExtractedDataTypeName.QA in wanted_extracted_data:
-        field_data.question_answers = await serialize_extracted_question_answers(field)
+        qa_task = asyncio.create_task(serialize_extracted_question_answers(field))
 
     if (
         isinstance(field, File)
         and isinstance(field_data, FileFieldExtractedData)
         and ExtractedDataTypeName.FILE in wanted_extracted_data
     ):
-        field_data.file = await serialize_file_extracted_data(field)
+        file_task = asyncio.create_task(serialize_file_extracted_data(field))
 
     if (
         isinstance(field, Link)
         and isinstance(field_data, LinkFieldExtractedData)
         and ExtractedDataTypeName.LINK in wanted_extracted_data
     ):
-        field_data.link = await serialize_link_extracted_data(field)
+        link_task = asyncio.create_task(serialize_link_extracted_data(field))
 
     if ExtractedDataTypeName.RELATION_VECTORS in wanted_extracted_data:
-        field_data.relation_node_vectors = await serialize_relation_node_vectors(field)
-        field_data.relation_edge_vectors = await serialize_relation_edge_vectors(field)
+        relation_node_vectors_task = asyncio.create_task(serialize_relation_node_vectors(field))
+        relation_edge_vectors_task = asyncio.create_task(serialize_relation_edge_vectors(field))
+
+    await asyncio.gather(
+        *[
+            task
+            for task in [
+                text_task,
+                metadata_task,
+                large_metadata_task,
+                vector_task,
+                qa_task,
+                file_task,
+                link_task,
+                relation_node_vectors_task,
+                relation_edge_vectors_task,
+            ]
+            if task is not None
+        ]
+    )
+
+    if text_task is not None:
+        field_data.text = text_task.result()
+    if metadata_task is not None:
+        field_data.metadata = metadata_task.result()
+    if large_metadata_task is not None:
+        field_data.large_metadata = large_metadata_task.result()
+    if vector_task is not None:
+        field_data.vectors = vector_task.result()
+    if qa_task is not None:
+        field_data.question_answers = qa_task.result()
+    if file_task is not None and isinstance(field_data, FileFieldExtractedData):
+        field_data.file = file_task.result()
+    if link_task is not None and isinstance(field_data, LinkFieldExtractedData):
+        field_data.link = link_task.result()
+    if relation_node_vectors_task is not None:
+        field_data.relation_node_vectors = relation_node_vectors_task.result()
+    if relation_edge_vectors_task is not None:
+        field_data.relation_edge_vectors = relation_edge_vectors_task.result()
 
 
 async def serialize_extracted_text(field: Field) -> ExtractedText | None:
