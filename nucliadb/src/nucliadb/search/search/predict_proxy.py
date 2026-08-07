@@ -185,7 +185,7 @@ async def predict_proxy(
 
 async def exists_kb(kbid: str) -> bool:
     async with datamanagers.with_ro_transaction() as txn:
-        return await datamanagers.kb.exists_kb(txn, kbid=kbid)
+        return await datamanagers.kb.exists(txn, kbid=kbid)
 
 
 async def chat_streaming_generator(

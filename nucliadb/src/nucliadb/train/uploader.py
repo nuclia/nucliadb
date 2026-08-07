@@ -86,7 +86,7 @@ class UploadServicer:
     async def GetOntology(self, request: GetLabelsRequest, context=None) -> GetLabelsResponse:
         kbid = request.kb.uuid
         response = GetLabelsResponse()
-        kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+        kb_exists = await datamanagers.atomic.kb.exists(kbid=kbid)
         if not kb_exists:
             response.status = GetLabelsResponse.Status.NOTFOUND
             return response

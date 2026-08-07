@@ -18,24 +18,18 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nidx_protos import nodereader_pb2
-
 from nucliadb.common.exceptions import InvalidQueryError
-from nucliadb.common.filter_expression import parse_expression
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
-    Filters,
     ParsedQuery,
     Query,
     RelationQuery,
     UnitRetrieval,
     _TextQuery,
 )
-from nucliadb.search.search.query_parser.old_filters import OldFilterParams, parse_old_filters
-from nucliadb.search.search.utils import filter_hidden_resources, kb_security_enforced
+from nucliadb.search.search.query_parser.parsers.common import parse_filters
 from nucliadb_models import search as search_models
-from nucliadb_models.filters import FilterExpression
 from nucliadb_models.search import (
     SearchRequest,
     SortField,
@@ -116,7 +110,23 @@ class _SearchParser:
         if search_models.SearchOptions.RELATIONS in self.item.features:
             self._query.relation = await self._parse_relation_query()
 
-        filters = await self._parse_filters()
+        filters = await parse_filters(
+            self.kbid,
+            self.fetcher,
+            show_hidden=self.item.show_hidden,
+            security=self.item.security,
+            with_duplicates=self.item.with_duplicates,
+            facets=self.item.faceted,
+            filter_expression=self.item.filter_expression,
+            label_filters=self.item.filters,
+            keyword_filters=None,
+            resource_filters=self.item.resource_filters,
+            fields=self.item.fields,
+            range_creation_start=self.item.range_creation_start,
+            range_creation_end=self.item.range_creation_end,
+            range_modification_start=self.item.range_modification_start,
+            range_modification_end=self.item.range_modification_end,
+        )
 
         retrieval = UnitRetrieval(
             query=self._query,
@@ -180,56 +190,3 @@ class _SearchParser:
                 )
 
         return (sort.order, sort.field)
-
-    async def _parse_filters(self) -> Filters:
-        assert self._query is not None, "query must be parsed before filters"
-
-        has_old_filters = (
-            len(self.item.filters) > 0
-            or len(self.item.fields) > 0
-            or self.item.range_creation_start is not None
-            or self.item.range_creation_end is not None
-            or self.item.range_modification_start is not None
-            or self.item.range_modification_end is not None
-        )
-        if self.item.filter_expression is not None and has_old_filters:
-            raise InvalidQueryError("filter_expression", "Cannot mix old filters with filter_expression")
-
-        field_expr = None
-        paragraph_expr = None
-        filter_operator = nodereader_pb2.FilterOperator.AND
-
-        if has_old_filters:
-            old_filters = OldFilterParams(
-                label_filters=self.item.filters,
-                keyword_filters=[],
-                range_creation_start=self.item.range_creation_start,
-                range_creation_end=self.item.range_creation_end,
-                range_modification_start=self.item.range_modification_start,
-                range_modification_end=self.item.range_modification_end,
-                fields=self.item.fields,
-            )
-            field_expr, paragraph_expr = await parse_old_filters(old_filters, self.fetcher)
-
-        if self.item.filter_expression is not None:
-            if self.item.filter_expression.field:
-                field_expr = await parse_expression(self.item.filter_expression.field, self.kbid)
-            if self.item.filter_expression.paragraph:
-                paragraph_expr = await parse_expression(self.item.filter_expression.paragraph, self.kbid)
-            if self.item.filter_expression.operator == FilterExpression.Operator.OR:
-                filter_operator = nodereader_pb2.FilterOperator.OR
-            else:
-                filter_operator = nodereader_pb2.FilterOperator.AND
-
-        hidden = await filter_hidden_resources(self.kbid, self.item.show_hidden)
-        security = await kb_security_enforced(self.kbid, self.item.security)
-
-        return Filters(
-            facets=self.item.faceted,
-            field_expression=field_expr,
-            paragraph_expression=paragraph_expr,
-            filter_expression_operator=filter_operator,
-            security=security,
-            hidden=hidden,
-            with_duplicates=self.item.with_duplicates,
-        )

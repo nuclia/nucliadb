@@ -75,7 +75,7 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
     """
     Downloads the backup files from the cloud storage and imports them into the KB.
     """
-    kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    kb_exists = await datamanagers.atomic.kb.exists(kbid=kbid)
     if not kb_exists:
         logger.warning(
             "Trying to restore on a KB that doesn't exist",

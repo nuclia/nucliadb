@@ -75,7 +75,7 @@ async def set_labelset_endpoint(
 
 
 async def set_labelset(kbid: str, labelset_id: str, item: LabelSet):
-    kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    kb_exists = await datamanagers.atomic.kb.exists(kbid=kbid)
     if not kb_exists:
         raise KnowledgeBoxNotFound()
     labelset = writer_pb2.LabelSet()
@@ -117,7 +117,7 @@ async def delete_labelset_endpoint(request: Request, kbid: str, labelset: str):
 
 
 async def delete_labelset(kbid: str, labelset_id: str):
-    kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    kb_exists = await datamanagers.atomic.kb.exists(kbid=kbid)
     if not kb_exists:
         raise KnowledgeBoxNotFound()
     await datamanagers.atomic.labelset.delete(kbid=kbid, labelset_id=labelset_id)
@@ -133,7 +133,7 @@ async def delete_labelset(kbid: str, labelset_id: str):
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSynonyms):
-    if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
+    if not await datamanagers.atomic.kb.exists(kbid=kbid):
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     synonyms = to_proto.kb_synonyms(item)
     await datamanagers.atomic.synonyms.set(kbid=kbid, synonyms=synonyms)
@@ -151,7 +151,7 @@ async def set_custom_synonyms(request: Request, kbid: str, item: KnowledgeBoxSyn
 @version(1)
 async def delete_custom_synonyms(request: Request, kbid: str):
     async with datamanagers.with_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         await datamanagers.synonyms.delete(txn, kbid=kbid)
@@ -172,7 +172,7 @@ async def create_search_configuration(
     request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
 ):
     async with datamanagers.with_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         if await datamanagers.search_configurations.get(txn, kbid=kbid, name=config_name) is not None:
@@ -198,7 +198,7 @@ async def update_search_configuration(
     request: Request, kbid: str, config_name: str, search_configuration: SearchConfiguration
 ):
     async with datamanagers.with_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         if await datamanagers.search_configurations.get(txn, kbid=kbid, name=config_name) is None:
@@ -222,7 +222,7 @@ async def update_search_configuration(
 @version(1)
 async def delete_search_configuration(request: Request, kbid: str, config_name: str):
     async with datamanagers.with_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         if await datamanagers.search_configurations.get(txn, kbid=kbid, name=config_name) is None:
@@ -245,7 +245,7 @@ async def delete_search_configuration(request: Request, kbid: str, config_name: 
 @version(1)
 async def create_kv_schema(request: Request, kbid: str, item: KVSchema) -> KVSchema:
     async with datamanagers.with_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         existing = await datamanagers.kv_schemas.get_all(txn, kbid=kbid)
@@ -277,7 +277,7 @@ async def update_kv_schema(
     request: Request, kbid: str, schema_id: str, item: UpdateKVSchema
 ) -> KVSchema:
     async with datamanagers.with_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         schema = await datamanagers.kv_schemas.get(txn, kbid=kbid, id=schema_id)
@@ -311,7 +311,7 @@ async def update_kv_schema(
 @version(1)
 async def delete_kv_schema(request: Request, kbid: str, schema_id: str) -> Response:
     async with datamanagers.with_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         deleted = await datamanagers.kv_schemas.delete(txn, kbid=kbid, id=schema_id)

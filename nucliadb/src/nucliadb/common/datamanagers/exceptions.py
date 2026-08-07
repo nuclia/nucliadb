@@ -19,3 +19,7 @@
 #
 class KnowledgeBoxNotFound(Exception):
     pass
+
+
+class KnowledgeBoxConflict(Exception):
+    pass

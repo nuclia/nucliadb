@@ -23,7 +23,7 @@ from httpx import AsyncClient
 from nidx_protos.nodereader_pb2 import GetShardRequest, SuggestFeatures, SuggestRequest
 from nidx_protos.noderesources_pb2 import ShardId
 
-from nucliadb.common.datamanagers.cluster import get_kb_shards
+from nucliadb.common.datamanagers.kb import get_shards as get_kb_shards
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 from nucliadb.search.api.v1.router import KB_PREFIX
@@ -55,6 +55,7 @@ async def test_suggest_resource_all(nucliadb_search: AsyncClient, test_search_re
 
         prequest = SuggestRequest(
             features=[SuggestFeatures.ENTITIES, SuggestFeatures.PARAGRAPHS],
+            top_k=10,
         )
         prequest.shard_ids[:] = [shard_id]
         prequest.body = "Ramon"

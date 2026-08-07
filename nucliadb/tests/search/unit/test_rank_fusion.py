@@ -52,7 +52,7 @@ from nucliadb_protos.utils_pb2 import RelationMetadata
 @pytest.fixture(scope="function", autouse=True)
 def disable_hidden_resources_check():
     with patch(
-        "nucliadb.search.search.query_parser.parsers.find.filter_hidden_resources", return_value=False
+        "nucliadb.search.search.query_parser.parsers.common.filter_hidden_resources", return_value=False
     ):
         yield
 
@@ -61,7 +61,7 @@ def disable_hidden_resources_check():
 async def kbid(maindb_driver: Driver) -> str:
     kbid = KnowledgeBox.new_unique_kbid()
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.kb.set_kbid_for_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
+        await datamanagers.kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid
 

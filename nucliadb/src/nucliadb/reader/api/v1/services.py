@@ -142,7 +142,7 @@ async def get_labelsets_endoint(request: Request, kbid: str) -> KnowledgeBoxLabe
 
 
 async def get_labelsets(kbid: str) -> KnowledgeBoxLabels:
-    kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    kb_exists = await datamanagers.atomic.kb.exists(kbid=kbid)
     if not kb_exists:
         raise KnowledgeBoxNotFound()
     labelsets: writer_pb2.Labels = await datamanagers.atomic.labelset.get_all(kbid=kbid)
@@ -190,7 +190,7 @@ class LabelSetNotFound(Exception):
 
 
 async def get_labelset(kbid: str, labelset_id: str) -> LabelSet:
-    kb_exists = await datamanagers.atomic.kb.exists_kb(kbid=kbid)
+    kb_exists = await datamanagers.atomic.kb.exists(kbid=kbid)
     if not kb_exists:
         raise KnowledgeBoxNotFound()
     labelset: writer_pb2.LabelSet | None = await datamanagers.atomic.labelset.get(
@@ -219,7 +219,7 @@ async def get_labelset(kbid: str, labelset_id: str) -> LabelSet:
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def get_custom_synonyms(request: Request, kbid: str):
-    if not await datamanagers.atomic.kb.exists_kb(kbid=kbid):
+    if not await datamanagers.atomic.kb.exists(kbid=kbid):
         raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
     synonyms = await datamanagers.atomic.synonyms.get(kbid=kbid) or Synonyms()
     return from_proto.kb_synonyms(synonyms)
@@ -260,7 +260,7 @@ async def notifications_endpoint(request: Request, kbid: str) -> StreamingRespon
 
 async def exists_kb(kbid: str) -> bool:
     async with datamanagers.with_ro_transaction() as txn:
-        return await datamanagers.kb.exists_kb(txn, kbid=kbid)
+        return await datamanagers.kb.exists(txn, kbid=kbid)
 
 
 @api.get(
@@ -334,7 +334,7 @@ async def processing_status(
 @version(1)
 async def get_search_configuration(request: Request, kbid: str, config_name: str) -> SearchConfiguration:
     async with datamanagers.with_ro_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         config = await datamanagers.search_configurations.get(txn, kbid=kbid, name=config_name)
@@ -355,7 +355,7 @@ async def get_search_configuration(request: Request, kbid: str, config_name: str
 @version(1)
 async def list_search_configurations(request: Request, kbid: str) -> dict[str, SearchConfiguration]:
     async with datamanagers.with_ro_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         return await datamanagers.search_configurations.list(txn, kbid=kbid)
@@ -372,7 +372,7 @@ async def list_search_configurations(request: Request, kbid: str) -> dict[str, S
 @version(1)
 async def list_kv_schemas(request: Request, kbid: str) -> KBKVSchemas:
     async with datamanagers.with_ro_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         return await datamanagers.kv_schemas.get_all(txn, kbid=kbid)
@@ -389,7 +389,7 @@ async def list_kv_schemas(request: Request, kbid: str) -> KBKVSchemas:
 @version(1)
 async def get_kv_schema(request: Request, kbid: str, schema_id: str) -> KVSchema:
     async with datamanagers.with_ro_transaction() as txn:
-        if not await datamanagers.kb.exists_kb(txn, kbid=kbid):
+        if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
         schema = await datamanagers.kv_schemas.get(txn, kbid=kbid, id=schema_id)

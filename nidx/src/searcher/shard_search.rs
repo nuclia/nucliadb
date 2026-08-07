@@ -13,20 +13,20 @@
 // limitations under the License.
 //
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use nidx_json::JsonSearcher;
 use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{GraphSearchRequest, GraphSearchResponse, SearchRequest, SearchResponse};
 use nidx_relation::{RelationSearcher, graph_query_parser::VectorQueryResults};
-use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
+use nidx_text::TextSearcher;
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::VectorSearcher;
 use tracing::{Span, instrument};
 use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
+use crate::searcher::query_planner::prefilter::Prefilter;
 use crate::searcher::query_planner::{GraphIndexQueries, IndexQueries};
 
 use super::index_cache::IndexCache;
@@ -72,7 +72,7 @@ async fn shard_search(
         None
     };
 
-    let json_search = if query_plan.index_queries.json_request.is_some() {
+    let json_search = if query_plan.prefilter.json.is_some() {
         if let Some(json_index) = indexes.json_index() {
             Some(index_cache.get(&json_index).await?)
         } else {
@@ -82,7 +82,7 @@ async fn shard_search(
         None
     };
 
-    let text_search = if query_plan.prefilter.is_some() || query_plan.index_queries.texts_request.is_some() {
+    let text_search = if query_plan.prefilter.text.is_some() || query_plan.index_queries.texts_request.is_some() {
         let Some(text_index) = indexes.text_index() else {
             return Err(NidxError::NotFound);
         };
@@ -170,41 +170,6 @@ fn apply_shard_id_to_response(response: &mut SearchResponse, shard_id: Uuid) {
             result.shard_id = shard_id_bytes.clone();
         }
     }
-}
-
-fn compute_prefilter(
-    index_queries: &mut IndexQueries,
-    plan_prefilter: Option<PreFilterRequest>,
-    json_searcher: Option<&JsonSearcher>,
-    text_searcher: Option<&TextSearcher>,
-) -> anyhow::Result<()> {
-    let mut text_prefilter_result: Option<anyhow::Result<PrefilterResult>> = None;
-    let mut json_prefilter_result: Option<anyhow::Result<HashSet<Uuid>>> = None;
-    let json_request = index_queries.json_request.take();
-
-    std::thread::scope(|scope| {
-        if let Some(prefilter) = plan_prefilter {
-            let current = Span::current();
-            let result = &mut text_prefilter_result;
-            scope.spawn(move || *result = Some(current.in_scope(|| text_searcher.unwrap().prefilter(&prefilter))));
-        }
-        if let Some(request) = json_request
-            && let Some(searcher) = json_searcher
-        {
-            let current = Span::current();
-            let result = &mut json_prefilter_result;
-            scope.spawn(move || *result = Some(current.in_scope(|| searcher.search(&request))));
-        }
-    });
-
-    let text_prefilter = text_prefilter_result.transpose()?.unwrap_or(PrefilterResult::All);
-    let combined = if let Some(uuids) = json_prefilter_result.transpose()? {
-        text_prefilter.combine(uuids, index_queries.filter_operator)
-    } else {
-        text_prefilter
-    };
-    index_queries.apply_prefilter(combined);
-    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -295,7 +260,8 @@ fn blocking_search(
 ) -> anyhow::Result<SearchResponse> {
     let mut index_queries = query_plan.index_queries;
 
-    compute_prefilter(&mut index_queries, query_plan.prefilter, json_searcher, text_searcher)?;
+    let prefilter = query_plan.prefilter.run(text_searcher, json_searcher)?;
+    index_queries.apply_prefilter(prefilter);
 
     run_index_searches(
         index_queries,
@@ -330,28 +296,16 @@ pub async fn shard_graph_search(
         return Err(NidxError::NotFound);
     };
 
-    // If we got prefilter params, apply prefilter
-    let prefilter = if graph_request.security.is_some() || graph_request.field_filter.is_some() {
-        let prefilter_request = PreFilterRequest {
-            security: graph_request.security.clone(),
-            filter_expression: graph_request.field_filter.clone(),
-        };
+    let prefilter = if let Some(prefilter) = Prefilter::parse_graph(&graph_request)? {
         let Some(text_index_id) = indexes.text_index() else {
             return Err(NidxError::NotFound);
         };
         let text_searcher = index_cache.get(&text_index_id).await?;
-        let current = Span::current();
-        tokio::task::spawn_blocking(move || {
-            current.in_scope(|| {
-                let searcher: &TextSearcher = text_searcher.as_ref().into();
-                searcher.prefilter(&prefilter_request)
-            })
-        })
-        .await??
+        let text_searcher: &TextSearcher = text_searcher.as_ref().into();
+        prefilter.run(Some(text_searcher), None)?
     } else {
         PrefilterResult::All
     };
-
     if matches!(prefilter, PrefilterResult::None) {
         return Ok(GraphSearchResponse {
             shard_ids: vec![shard_id.to_string()],

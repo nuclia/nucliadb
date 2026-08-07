@@ -174,6 +174,8 @@ async def update_kb(request: Request, kbid: str, item: KnowledgeBoxConfig) -> Kn
             )
         except datamanagers.exceptions.KnowledgeBoxNotFound:
             raise HTTPException(status_code=404, detail="Knowledge box does not exist")
+        except KnowledgeBoxConflict:
+            raise HTTPException(status_code=419, detail="Slug already exists")
         except Exception as exc:
             logger.exception("Could not update KB", exc_info=exc, extra={"kbid": kbid})
             raise HTTPException(status_code=500, detail="Error updating knowledge box")

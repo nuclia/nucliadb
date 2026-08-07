@@ -17,21 +17,15 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from nidx_protos import nodereader_pb2
 from pydantic import ValidationError
 from typing_extensions import assert_never
 
 import nucliadb_models.retrieval
 from nucliadb.common.exceptions import InvalidQueryError
-from nucliadb.common.filter_expression import (
-    parse_expression,
-    parse_kv_expression,
-)
 from nucliadb.search.search.metrics import query_parser_observer
 from nucliadb.search.search.query_parser.exceptions import InternalParserError
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.models import (
-    Filters,
     GraphQuery,
     KeywordQuery,
     ParsedQuery,
@@ -40,10 +34,12 @@ from nucliadb.search.search.query_parser.models import (
     SemanticQuery,
     UnitRetrieval,
 )
-from nucliadb.search.search.query_parser.parsers.common import query_with_synonyms, validate_query_syntax
+from nucliadb.search.search.query_parser.parsers.common import (
+    parse_filters,
+    query_with_synonyms,
+    validate_query_syntax,
+)
 from nucliadb.search.search.query_parser.parsers.graph import _calculate_graph_vectors
-from nucliadb.search.search.utils import filter_hidden_resources, kb_security_enforced
-from nucliadb_models.filters import FilterExpression
 from nucliadb_models.retrieval import RetrievalRequest
 
 from .common import parse_rank_fusion, parse_reranker
@@ -121,7 +117,15 @@ class _RetrievalParser:
     async def parse(self) -> UnitRetrieval:
         top_k = self.item.top_k
         query = await self._parse_query()
-        filters = await self._parse_filters()
+        filters = await parse_filters(
+            self.kbid,
+            self.fetcher,
+            show_hidden=self.item.filters.show_hidden,
+            security=self.item.filters.security,
+            with_duplicates=self.item.filters.with_duplicates,
+            filter_expression=self.item.filters.filter_expression,
+        )
+
         try:
             rank_fusion = parse_rank_fusion(self.item.rank_fusion, self.item.top_k)
         except ValidationError as exc:
@@ -310,34 +314,3 @@ class _RetrievalParser:
             query_vector = user_vector[:matryoshka_dimension]
 
         return vectorset, query_vector
-
-    @query_parser_observer.wrap({"type": "retrieve_parse_filters"})
-    async def _parse_filters(self) -> Filters:
-        filters = Filters()
-
-        if self.item.filters.filter_expression is not None:
-            if self.item.filters.filter_expression.field is not None:
-                filters.field_expression = await parse_expression(
-                    self.item.filters.filter_expression.field,
-                    self.kbid,
-                )
-            if self.item.filters.filter_expression.paragraph is not None:
-                filters.paragraph_expression = await parse_expression(
-                    self.item.filters.filter_expression.paragraph,
-                    self.kbid,
-                )
-            if self.item.filters.filter_expression.key_value is not None:
-                filters.json_expression = await parse_kv_expression(
-                    self.item.filters.filter_expression.key_value, self.kbid
-                )
-            if self.item.filters.filter_expression.operator == FilterExpression.Operator.OR:
-                filter_operator = nodereader_pb2.FilterOperator.OR
-            else:
-                filter_operator = nodereader_pb2.FilterOperator.AND
-            filters.filter_expression_operator = filter_operator
-
-        filters.hidden = await filter_hidden_resources(self.kbid, self.item.filters.show_hidden)
-        filters.security = await kb_security_enforced(self.kbid, self.item.filters.security)
-        filters.with_duplicates = self.item.filters.with_duplicates
-
-        return filters

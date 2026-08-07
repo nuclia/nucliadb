@@ -44,7 +44,7 @@ async def kbid(maindb_driver: Driver) -> AsyncIterator[str]:
     kbid = KnowledgeBox.new_unique_kbid()
     slug = kbid
     async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.kb.set_kbid_for_slug(txn, kbid=kbid, slug=slug)
+        await datamanagers.kb.set_slug(txn, kbid=kbid, slug=slug)
         await txn.commit()
     try:
         yield kbid
