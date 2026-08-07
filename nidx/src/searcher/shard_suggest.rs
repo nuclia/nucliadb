@@ -15,15 +15,17 @@
 
 use std::sync::Arc;
 
+use nidx_json::JsonSearcher;
 use nidx_paragraph::{ParagraphSearcher, ParagraphSuggestRequest};
 use nidx_protos::{RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
 use nidx_relation::RelationSearcher;
-use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
+use nidx_text::TextSearcher;
 use nidx_types::prefilter::PrefilterResult;
 use tracing::{Span, instrument};
 use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
+use crate::searcher::plan::prefilter::Prefilter;
 use crate::searcher::shards_query::shards_query;
 
 use super::{
@@ -65,6 +67,11 @@ pub async fn shard_suggest(
     };
     let text_searcher_arc = index_cache.get(&text_index).await?;
 
+    let Some(json_index) = indexes.json_index() else {
+        return Err(NidxError::NotFound);
+    };
+    let json_searcher_arc = index_cache.get(&json_index).await?;
+
     let Some(relation_index) = indexes.relation_index() else {
         return Err(NidxError::NotFound);
     };
@@ -81,6 +88,7 @@ pub async fn shard_suggest(
             blocking_suggest(
                 request,
                 text_searcher_arc.as_ref().into(),
+                json_searcher_arc.as_ref().into(),
                 paragraph_searcher_arc.as_ref().into(),
                 relation_searcher_arc.as_ref().into(),
             )
@@ -95,55 +103,28 @@ pub async fn shard_suggest(
 fn blocking_suggest(
     request: SuggestRequest,
     text_searcher: &TextSearcher,
+    json_searcher: &JsonSearcher,
     paragraph_searcher: &ParagraphSearcher,
     relation_searcher: &RelationSearcher,
 ) -> anyhow::Result<SuggestResponse> {
-    // TODO: assign to top_k once we deploy, i.e., all suggest requests send the
-    // top_k. 10 was the legacy number of results used by Python
-    let top_k = if request.top_k == 0 { 10 } else { request.top_k };
-
-    let suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
-    let suggest_entities = request.features.contains(&(SuggestFeatures::Entities as i32));
-
-    if !suggest_paragraphs && !suggest_entities {
-        // all features disabled, we won't search
+    let top_k = request.top_k;
+    let Some(query_plan) = SuggestPlan::build(request)? else {
+        // nothing to search, we can return
         return Ok(SuggestResponse::default());
-    }
-
-    let relation_request = if suggest_entities {
-        let prefixes = split_suggest_query(&request.body, MAX_SUGGEST_COMPOUND_WORDS);
-        Some(prefixes)
-    } else {
-        None
-    };
-    let paragraph_request = if suggest_paragraphs {
-        Some(ParagraphSuggestRequest {
-            body: request.body,
-            top_k,
-            filtering_formula: request
-                .paragraph_filter
-                .clone()
-                .map(filter_to_boolean_expression)
-                .transpose()?,
-            filter_operator: proto_filter_operator(request.filter_operator)?,
-        })
-    } else {
-        None
     };
 
-    let mut prefilter = PrefilterResult::All;
-    if request.field_filter.is_some() || request.security.is_some() {
-        let request = PreFilterRequest {
-            security: request.security.clone(),
-            filter_expression: request.field_filter.clone(),
-        };
-        prefilter = text_searcher.prefilter(&request)?;
-    }
-
+    let prefilter = if let Some(prefilter) = query_plan.prefilter {
+        prefilter.run(Some(text_searcher), Some(json_searcher))?
+    } else {
+        PrefilterResult::All
+    };
     if matches!(prefilter, PrefilterResult::None) {
         // Nothing matches the prefilter, searching won't yield any result
         return Ok(SuggestResponse::default());
     }
+
+    let paragraph_request = query_plan.paragraphs;
+    let relation_request = query_plan.relations;
 
     let paragraph_task = {
         let prefilter = prefilter.clone();
@@ -186,6 +167,58 @@ fn blocking_suggest(
     }
 
     Ok(response)
+}
+
+struct SuggestPlan {
+    prefilter: Option<Prefilter>,
+    paragraphs: Option<ParagraphSuggestRequest>,
+    relations: Option<Vec<String>>,
+}
+
+impl SuggestPlan {
+    pub fn build(request: SuggestRequest) -> NidxResult<Option<Self>> {
+        if request.top_k == 0 {
+            // nothing requested
+            return Ok(None);
+        }
+
+        let suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
+        let suggest_entities = request.features.contains(&(SuggestFeatures::Entities as i32));
+        if !suggest_paragraphs && !suggest_entities {
+            // all features disabled, we won't search
+            return Ok(None);
+        }
+
+        let prefilter = Prefilter::parse_suggest(&request)?;
+
+        let relations = if suggest_entities {
+            let prefixes = split_suggest_query(&request.body, MAX_SUGGEST_COMPOUND_WORDS);
+            Some(prefixes)
+        } else {
+            None
+        };
+
+        let paragraphs = if suggest_paragraphs {
+            Some(ParagraphSuggestRequest {
+                body: request.body,
+                top_k: request.top_k,
+                filtering_formula: request
+                    .paragraph_filter
+                    .clone()
+                    .map(filter_to_boolean_expression)
+                    .transpose()?,
+                filter_operator: proto_filter_operator(request.filter_operator)?,
+            })
+        } else {
+            None
+        };
+
+        Ok(Some(Self {
+            prefilter,
+            paragraphs,
+            relations,
+        }))
+    }
 }
 
 /// Given a query, return a list of derived queries using word(s) from the end

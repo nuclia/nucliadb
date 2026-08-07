@@ -18,6 +18,7 @@ use tracing::Span;
 use nidx_json::JsonSearcher;
 use nidx_json::search::{JsonFilterExpression, JsonPathFilter, JsonPredicate, JsonSearchRequest};
 use nidx_protos::SearchRequest;
+use nidx_protos::SuggestRequest;
 use nidx_protos::json_field_path_filter::Predicate;
 use nidx_text::TextSearcher;
 use nidx_text::prefilter::*;
@@ -98,6 +99,36 @@ impl Prefilter {
             json: json_prefilter,
             filter_operator,
         })
+    }
+
+    pub fn parse_suggest(request: &SuggestRequest) -> anyhow::Result<Option<Self>> {
+        let text_prefilter = if request.field_filter.is_some() || request.security.is_some() {
+            Some(PreFilterRequest {
+                security: request.security.clone(),
+                filter_expression: request.field_filter.clone(),
+            })
+        } else {
+            None
+        };
+        let json_prefilter = if let Some(json_prefilter) = &request.json_filter {
+            Some(JsonSearchRequest {
+                filter: proto_to_json_filter(json_prefilter)?,
+            })
+        } else {
+            None
+        };
+
+        if text_prefilter.is_none() && json_prefilter.is_none() {
+            return Ok(None);
+        }
+
+        let filter_operator = proto_filter_operator(request.filter_operator)?;
+
+        Ok(Some(Self {
+            text: text_prefilter,
+            json: json_prefilter,
+            filter_operator,
+        }))
     }
 }
 
