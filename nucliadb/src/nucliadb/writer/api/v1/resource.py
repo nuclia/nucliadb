@@ -54,6 +54,7 @@ from nucliadb.writer.resource.basic import (
     set_status_modify,
 )
 from nucliadb.writer.resource.field import (
+    REPROCESSABLE_FIELD_TYPES,
     ResourceClassifications,
     atomic_get_stored_resource_classifications,
     extract_fields,
@@ -468,6 +469,8 @@ async def _reprocess_resource(
 
         await extract_fields(resource=resource, toprocess=toprocess)
         for field_type, field_id in resource.fields.keys():
+            if field_type not in REPROCESSABLE_FIELD_TYPES:
+                continue
             writer.field_statuses.append(
                 FieldIDStatus(
                     id=FieldID(field_type=field_type, field=field_id),
