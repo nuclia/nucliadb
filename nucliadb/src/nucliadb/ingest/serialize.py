@@ -21,6 +21,8 @@
 import asyncio
 from typing import Any
 
+from typing_extensions import assert_never
+
 import nucliadb_models as models
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Transaction
@@ -32,6 +34,7 @@ from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource as ORMResource
+from nucliadb.search.augmentor.utils import limited_concurrency
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.extracted import (
     ExtractedText,
@@ -179,11 +182,7 @@ async def serialize_resource(
 
     if should_serialize_fields:
         resource.data = ResourceData()
-        field_serialization_semaphore = (
-            asyncio.Semaphore(max_parallel_field_serializations)
-            if max_parallel_field_serializations > 0
-            else None
-        )
+        concurrency_control = asyncio.Semaphore(max(max_parallel_field_serializations, 1))
 
         selected_fields: list[
             tuple[
@@ -210,7 +209,7 @@ async def serialize_resource(
             selected_fields,
             include_values=include_values,
             include_errors=include_errors,
-            semaphore=field_serialization_semaphore,
+            concurrency_control=concurrency_control,
         )
 
         if include_extracted_data:
@@ -218,7 +217,7 @@ async def serialize_resource(
                 selected_fields,
                 extracted,
                 vectorset=vectorset,
-                semaphore=field_serialization_semaphore,
+                concurrency_control=concurrency_control,
             )
     return resource
 
@@ -389,8 +388,8 @@ def ensure_serialized_field_data(
         if field_id not in resource_data.key_values:
             resource_data.key_values[field_id] = KeyValueFieldData()
         return resource_data.key_values[field_id]
-
-    raise ValueError(f"Unsupported field type for serialization: {field_type_name}")
+    else:
+        assert_never(field_type_name)
 
 
 async def serialize_field_data(
@@ -479,42 +478,20 @@ async def serialize_fields_data(
     *,
     include_values: bool,
     include_errors: bool,
-    semaphore: asyncio.Semaphore | None,
+    concurrency_control: asyncio.Semaphore,
 ) -> None:
-    async def _serialize_one(
-        field: Field,
-        field_type_name: FieldTypeName,
-        field_data: (
-            TextFieldData
-            | FileFieldData
-            | LinkFieldData
-            | ConversationFieldData
-            | GenericFieldData
-            | KeyValueFieldData
-        ),
-    ) -> None:
-        if semaphore is None:
-            await serialize_field_data(
-                field,
-                field_type_name,
-                field_data,
-                include_value=include_values,
-                include_errors=include_errors,
-            )
-            return
-
-        async with semaphore:
-            await serialize_field_data(
-                field,
-                field_type_name,
-                field_data,
-                include_value=include_values,
-                include_errors=include_errors,
-            )
-
     await asyncio.gather(
         *[
-            _serialize_one(field, field_type_name, field_data)
+            limited_concurrency(
+                serialize_field_data(
+                    field,
+                    field_type_name,
+                    field_data,
+                    include_value=include_values,
+                    include_errors=include_errors,
+                ),
+                max_ops=concurrency_control,
+            )
             for field, field_type_name, field_data in selected_fields
         ]
     )
@@ -536,42 +513,20 @@ async def serialize_fields_extracted_data(
     extracted: list[ExtractedDataTypeName],
     *,
     vectorset: str | None,
-    semaphore: asyncio.Semaphore | None,
+    concurrency_control: asyncio.Semaphore,
 ) -> None:
-    async def _serialize_one(
-        field: Field,
-        field_type_name: FieldTypeName,
-        field_data: (
-            TextFieldData
-            | FileFieldData
-            | LinkFieldData
-            | ConversationFieldData
-            | GenericFieldData
-            | KeyValueFieldData
-        ),
-    ) -> None:
-        if semaphore is None:
-            await serialize_field_extracted_data(
-                field,
-                field_type_name,
-                field_data,
-                extracted,
-                vectorset=vectorset,
-            )
-            return
-
-        async with semaphore:
-            await serialize_field_extracted_data(
-                field,
-                field_type_name,
-                field_data,
-                extracted,
-                vectorset=vectorset,
-            )
-
     await asyncio.gather(
         *[
-            _serialize_one(field, field_type_name, field_data)
+            limited_concurrency(
+                serialize_field_extracted_data(
+                    field,
+                    field_type_name,
+                    field_data,
+                    extracted,
+                    vectorset=vectorset,
+                ),
+                max_ops=concurrency_control,
+            )
             for field, field_type_name, field_data in selected_fields
         ]
     )
