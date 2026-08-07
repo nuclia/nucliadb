@@ -13,6 +13,9 @@
 // limitations under the License.
 //
 
+pub mod prefilter;
+pub mod suggest;
+
 use anyhow::anyhow;
 use nidx_paragraph::{ParagraphSearchRequest, SearchAfterTieBreak};
 use nidx_protos::filter_expression::Expr;
@@ -28,7 +31,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::searcher::plan::prefilter::Prefilter;
+use prefilter::Prefilter;
 
 use super::query_language::extract_label_filters;
 

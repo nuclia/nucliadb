@@ -26,7 +26,7 @@ use tracing::{Span, instrument};
 use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
-use crate::searcher::plan::prefilter::Prefilter;
+use crate::searcher::query_planner::prefilter::Prefilter;
 use crate::searcher::query_planner::{GraphIndexQueries, IndexQueries};
 
 use super::index_cache::IndexCache;

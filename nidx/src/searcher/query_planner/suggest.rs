@@ -17,7 +17,7 @@ use nidx_paragraph::ParagraphSuggestRequest;
 use nidx_protos::{SuggestFeatures, SuggestRequest};
 
 use crate::errors::NidxResult;
-use crate::searcher::plan::prefilter::Prefilter;
+use crate::searcher::query_planner::prefilter::Prefilter;
 use crate::searcher::query_planner::{filter_to_boolean_expression, proto_filter_operator};
 
 /// Max number of words accepted as a suggest query. This is useful for

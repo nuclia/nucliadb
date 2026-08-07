@@ -26,7 +26,7 @@ use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
 use crate::searcher::index_cache::IndexCache;
-use crate::searcher::plan::suggest::SuggestPlan;
+use crate::searcher::query_planner::suggest::SuggestPlan;
 use crate::searcher::shards_query::shards_query;
 
 /// Suggest gives possible strings to autocomplete a partial query that's been
