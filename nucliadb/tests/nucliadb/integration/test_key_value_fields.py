@@ -17,8 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+from typing import Literal
+
 import pytest
 from httpx import AsyncClient
+from typing_extensions import assert_never
 
 PRODUCT_SCHEMA = {
     "id": "product",
@@ -231,11 +234,13 @@ async def test_kv_field_validation(
     assert resp.status_code == 422, resp.text
 
 
+@pytest.mark.parametrize("endpoint", ["find", "search", "suggest"])
 @pytest.mark.deploy_modes("standalone")
 async def test_kv_field_filter(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox: str,
+    endpoint: Literal["find", "search", "suggest"],
 ):
     """
     Covers: search/filtering via filter_expression using KeyValueFilter.
@@ -297,19 +302,37 @@ async def test_kv_field_filter(
     assert resp.status_code == 201, resp.text
     rid2 = resp.json()["uuid"]
 
-    async def find_with_filter(filter_expression: dict) -> set:
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
-            json={
-                "query": "product item",
-                "features": ["keyword"],
-                "filter_expression": {
-                    "key_value": filter_expression,
+    async def call_with_filter(
+        endpoint: Literal["find", "search", "suggest"], filter_expression: dict
+    ) -> set[str]:
+        if endpoint == "find" or endpoint == "search":
+            resp = await nucliadb_reader.post(
+                f"/kb/{kbid}/{endpoint}",
+                json={
+                    "query": "product item",
+                    "features": ["keyword"],
+                    "filter_expression": {
+                        "key_value": filter_expression,
+                    },
                 },
-            },
-        )
-        assert resp.status_code == 200, resp.text
-        return set(resp.json()["resources"].keys())
+            )
+            assert resp.status_code == 200, resp.text
+            return set(resp.json()["resources"].keys())
+        elif endpoint == "suggest":
+            resp = await nucliadb_reader.post(
+                f"/kb/{kbid}/{endpoint}",
+                json={
+                    "query": "product item",
+                    "features": ["paragraph"],
+                    "filter_expression": {
+                        "key_value": filter_expression,
+                    },
+                },
+            )
+            assert resp.status_code == 200, resp.text
+            return set(r["rid"] for r in resp.json()["paragraphs"]["results"])
+        else:  # pragma: no cover
+            assert_never(endpoint)
 
     filters = [
         # BOOLEAN fields
@@ -349,19 +372,21 @@ async def test_kv_field_filter(
         ("labels", "contains", "B", {rid2}),
     ]
     for key, op, value, expected in filters:
-        resources = await find_with_filter(
+        resources = await call_with_filter(
+            endpoint,
             {
                 "schema_id": "product",
                 "key": key,
                 op: value,
-            }
+            },
         )
         assert resources == expected, (
             f"Unexpected match for `{key} {op} {value}`: matched {resources} instead of {expected}"
         )
 
     # --- AND: color=red AND in_stock=True → finds resource 1 only ---
-    rids = await find_with_filter(
+    rids = await call_with_filter(
+        endpoint,
         {
             "and": [
                 {
@@ -375,7 +400,7 @@ async def test_kv_field_filter(
                     "eq": True,
                 },
             ]
-        }
+        },
     )
     assert rid1 in rids, f"Expected rid1 in results for color=red AND in_stock=True, got {rids}"
     assert rid2 not in rids, f"Expected rid2 NOT in results for color=red AND in_stock=True, got {rids}"
