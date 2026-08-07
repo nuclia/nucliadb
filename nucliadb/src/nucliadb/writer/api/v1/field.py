@@ -30,6 +30,7 @@ import nucliadb_models as models
 from nucliadb.common import datamanagers
 from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.models_utils import to_proto
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.knowledgebox import Resource as ORMResource
@@ -48,10 +49,10 @@ from nucliadb.writer.api.v1.resource import (
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.writer.resource.audit import parse_audit
 from nucliadb.writer.resource.field import (
+    REPROCESSABLE_FIELD_TYPES,
     ResourceClassifications,
     atomic_get_stored_resource_classifications,
-    extract_file_field,
-    get_stored_resource_classifications,
+    extract_fields,
     parse_conversation_field,
     parse_file_field,
     parse_key_value_field,
@@ -596,6 +597,73 @@ async def delete_resource_field_rid_prefix(
 
 
 @api.post(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}/reprocess",
+    status_code=202,
+    summary="Reprocess resource field (by slug)",
+    response_model=models.writer.ResourceUpdated,
+    tags=["Resource fields"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def reprocess_resource_field_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_type: models.FieldTypeName,
+    field_id: FieldIdString,
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
+    x_file_password: Annotated[str | None, X_FILE_PASSWORD] = None,
+    reset_title: bool = Query(
+        default=False,
+        description="Reset the title of the resource so that the file or link computed titles are set after processing.",
+    ),
+) -> ResourceUpdated:
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
+    return await _reprocess_resource_field(
+        kbid=kbid,
+        rid=rid,
+        field_type=field_type,
+        field_id=field_id,
+        x_nucliadb_user=x_nucliadb_user,
+        x_file_password=x_file_password,
+        reset_title=reset_title,
+    )
+
+
+@api.post(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/{{field_type}}/{{field_id}}/reprocess",
+    status_code=202,
+    summary="Reprocess resource field (by id)",
+    response_model=models.writer.ResourceUpdated,
+    tags=["Resource fields"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def reprocess_resource_field_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_type: models.FieldTypeName,
+    field_id: FieldIdString,
+    x_nucliadb_user: Annotated[str, X_NUCLIADB_USER] = "",
+    x_file_password: Annotated[str | None, X_FILE_PASSWORD] = None,
+    reset_title: bool = Query(
+        default=False,
+        description="Reset the title of the resource so that the file or link computed titles are set after processing.",
+    ),
+) -> ResourceUpdated:
+    return await _reprocess_resource_field(
+        kbid=kbid,
+        rid=rid,
+        field_type=field_type,
+        field_id=field_id,
+        x_nucliadb_user=x_nucliadb_user,
+        x_file_password=x_file_password,
+        reset_title=reset_title,
+    )
+
+
+@api.post(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field_id}}/reprocess",
     status_code=202,
     summary="Reprocess file field (by id)",
@@ -616,6 +684,41 @@ async def reprocess_file_field(
         description="Reset the title of the resource so that the file or link computed titles are set after processing.",
     ),
 ) -> ResourceUpdated:
+    return await _reprocess_resource_field(
+        kbid=kbid,
+        rid=rid,
+        field_type=models.FieldTypeName.FILE,
+        field_id=field_id,
+        x_nucliadb_user=x_nucliadb_user,
+        x_file_password=x_file_password,
+        reset_title=reset_title,
+    )
+
+
+async def _reprocess_resource_field(
+    kbid: str,
+    rid: str,
+    field_type: models.FieldTypeName,
+    field_id: str,
+    x_nucliadb_user: str,
+    x_file_password: str | None,
+    reset_title: bool,
+) -> ResourceUpdated:
+    field_type_pb = to_proto.field_type_name(field_type)
+    if field_type_pb not in REPROCESSABLE_FIELD_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail="Only file, link, text and conversation fields can be reprocessed",
+        )
+
+    if field_type is not models.FieldTypeName.FILE and x_file_password is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="X-FILE-PASSWORD header is only supported for file fields",
+        )
+
+    await validate_rid_exists_or_raise_error(kbid, rid)
+    await validate_field_exists_or_raise_error(kbid, rid, field_id, field_type_pb)
     await maybe_back_pressure(kbid, resource_uuid=rid)
 
     processing = get_processing()
@@ -647,18 +750,21 @@ async def reprocess_file_field(
         if resource.basic is not None:
             toprocess.title = resource.basic.title
 
-        rclassif = await get_stored_resource_classifications(txn, kbid=kbid, rid=rid)
-
-        try:
-            await extract_file_field(
-                field_id,
-                resource=resource,
-                toprocess=toprocess,
-                password=x_file_password,
-                resource_classifications=rclassif,
-            )
-        except KeyError:
-            raise HTTPException(status_code=404, detail="Field does not exist")
+        file_password_overrides = None
+        if x_file_password is not None:
+            file_password_overrides = {field_id: x_file_password}
+        include_generated_conversations_for_source_fields = None
+        if field_type_pb == resources_pb2.FieldType.CONVERSATION:
+            include_generated_conversations_for_source_fields = {field_id}
+        await extract_fields(
+            resource=resource,
+            toprocess=toprocess,
+            selected_fields={(field_type_pb, field_id)},
+            file_password_overrides=file_password_overrides,
+            include_generated_conversations_for_source_fields=(
+                include_generated_conversations_for_source_fields
+            ),
+        )
 
     writer = BrokerMessage()
     writer.kbid = kbid
@@ -670,7 +776,7 @@ async def reprocess_file_field(
     writer.basic.metadata.status = Metadata.Status.PENDING
     writer.field_statuses.append(
         FieldIDStatus(
-            id=FieldID(field_type=resources_pb2.FieldType.FILE, field=field_id),
+            id=FieldID(field_type=field_type_pb, field=field_id),
             status=FieldStatus.Status.PENDING,
         )
     )
@@ -748,7 +854,7 @@ async def validate_field_exists_or_raise_error(
     ):
         # Field was found, return early
         return
-    raise HTTPException(status_code=404, detail="Conversation field does not exist")
+    raise HTTPException(status_code=404, detail="Field does not exist")
 
 
 async def validate_message_idents(kbid: str, rid: str, field_id: str, idents: list[str]) -> list[str]:

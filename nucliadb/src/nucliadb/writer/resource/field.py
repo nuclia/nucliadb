@@ -73,6 +73,14 @@ class ResourceClassifications:
         return list(resource_level.union(field_level))
 
 
+REPROCESSABLE_FIELD_TYPES = {
+    resources_pb2.FieldType.TEXT,
+    resources_pb2.FieldType.FILE,
+    resources_pb2.FieldType.CONVERSATION,
+    resources_pb2.FieldType.LINK,
+}
+
+
 async def _to_push_filefield(
     processing: ProcessingEngine,
     storage: Storage,
@@ -115,7 +123,13 @@ async def extract_file_field(
     )
 
 
-async def extract_fields(resource: ORMResource, toprocess: PushPayload):
+async def extract_fields(
+    resource: ORMResource,
+    toprocess: PushPayload,
+    selected_fields: set[tuple[int, str]] | None = None,
+    file_password_overrides: dict[str, str] | None = None,
+    include_generated_conversations_for_source_fields: set[str] | None = None,
+) -> list[tuple[int, str]]:
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
     await resource.get_fields()
@@ -124,15 +138,14 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
         kbid=toprocess.kbid,
         rid=toprocess.uuid,
     )
+    extracted_fields: list[tuple[int, str]] = []
     for (field_type, field_id), field in resource.fields.items():
+        if selected_fields is not None and (field_type, field_id) not in selected_fields:
+            continue
+
         field_type_name = from_proto.field_type_name(field_type)
 
-        if field_type_name not in {
-            FieldTypeName.TEXT,
-            FieldTypeName.FILE,
-            FieldTypeName.CONVERSATION,
-            FieldTypeName.LINK,
-        }:
+        if field_type not in REPROCESSABLE_FIELD_TYPES:
             continue
 
         field_pb = await field.get_value()
@@ -149,15 +162,20 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             continue
         classif_labels = resource_classifications.for_field(field_id, field_type)
         if field_type_name is FieldTypeName.FILE:
+            if file_password_overrides and field_id in file_password_overrides:
+                field_pb.password = file_password_overrides[field_id]
             toprocess.filefield[field_id] = await _to_push_filefield(
                 processing, storage, field_pb, classif_labels
             )
+            extracted_fields.append((field_type, field_id))
 
         if field_type_name is FieldTypeName.LINK:
             toprocess.linkfield[field_id] = _to_push_linkfield(field_pb, classif_labels)
+            extracted_fields.append((field_type, field_id))
 
         if field_type_name is FieldTypeName.TEXT:
             toprocess.textfield[field_id] = _to_push_textfield(field_pb, classif_labels)
+            extracted_fields.append((field_type, field_id))
 
         if field_type_name is FieldTypeName.CONVERSATION and isinstance(field, Conversation):
             full_conversation = await _to_push_conversationfield(
@@ -166,6 +184,21 @@ async def extract_fields(resource: ORMResource, toprocess: PushPayload):
             if full_conversation is None:
                 continue
             toprocess.conversationfield[field_id] = full_conversation
+            if (
+                include_generated_conversations_for_source_fields is not None
+                and field_id in include_generated_conversations_for_source_fields
+            ):
+                await add_generated_conversations_to_pushpayload(
+                    processing,
+                    storage,
+                    toprocess.kbid,
+                    toprocess.uuid,
+                    field_id,
+                    toprocess,
+                )
+            extracted_fields.append((field_type, field_id))
+
+    return extracted_fields
 
 
 def _to_push_linkfield(
