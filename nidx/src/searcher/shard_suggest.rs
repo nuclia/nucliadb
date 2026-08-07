@@ -16,8 +16,8 @@
 use std::sync::Arc;
 
 use nidx_json::JsonSearcher;
-use nidx_paragraph::{ParagraphSearcher, ParagraphSuggestRequest};
-use nidx_protos::{RelationPrefixSearchResponse, SuggestFeatures, SuggestRequest, SuggestResponse};
+use nidx_paragraph::ParagraphSearcher;
+use nidx_protos::{RelationPrefixSearchResponse, SuggestRequest, SuggestResponse};
 use nidx_relation::RelationSearcher;
 use nidx_text::TextSearcher;
 use nidx_types::prefilter::PrefilterResult;
@@ -25,18 +25,9 @@ use tracing::{Span, instrument};
 use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
-use crate::searcher::plan::prefilter::Prefilter;
+use crate::searcher::index_cache::IndexCache;
+use crate::searcher::plan::suggest::SuggestPlan;
 use crate::searcher::shards_query::shards_query;
-
-use super::{
-    index_cache::IndexCache,
-    query_planner::{filter_to_boolean_expression, proto_filter_operator},
-};
-
-/// Max number of words accepted as a suggest query. This is useful for
-/// compounds with semantic meaning (like a name and a surname) but can add
-/// irrelevant words to queries
-const MAX_SUGGEST_COMPOUND_WORDS: usize = 3;
 
 /// Suggest gives possible strings to autocomplete a partial query that's been
 /// written. To do so, it searches keyword and relation indexes to find good
@@ -167,98 +158,4 @@ fn blocking_suggest(
     }
 
     Ok(response)
-}
-
-struct SuggestPlan {
-    prefilter: Option<Prefilter>,
-    paragraphs: Option<ParagraphSuggestRequest>,
-    relations: Option<Vec<String>>,
-}
-
-impl SuggestPlan {
-    pub fn build(request: SuggestRequest) -> NidxResult<Option<Self>> {
-        if request.top_k == 0 {
-            // nothing requested
-            return Ok(None);
-        }
-
-        let suggest_paragraphs = request.features.contains(&(SuggestFeatures::Paragraphs as i32));
-        let suggest_entities = request.features.contains(&(SuggestFeatures::Entities as i32));
-        if !suggest_paragraphs && !suggest_entities {
-            // all features disabled, we won't search
-            return Ok(None);
-        }
-
-        let prefilter = Prefilter::parse_suggest(&request)?;
-
-        let relations = if suggest_entities {
-            let prefixes = split_suggest_query(&request.body, MAX_SUGGEST_COMPOUND_WORDS);
-            Some(prefixes)
-        } else {
-            None
-        };
-
-        let paragraphs = if suggest_paragraphs {
-            Some(ParagraphSuggestRequest {
-                body: request.body,
-                top_k: request.top_k,
-                filtering_formula: request
-                    .paragraph_filter
-                    .clone()
-                    .map(filter_to_boolean_expression)
-                    .transpose()?,
-                filter_operator: proto_filter_operator(request.filter_operator)?,
-            })
-        } else {
-            None
-        };
-
-        Ok(Some(Self {
-            prefilter,
-            paragraphs,
-            relations,
-        }))
-    }
-}
-
-/// Given a query, return a list of derived queries using word(s) from the end
-/// of the original query.
-///
-/// The longer query, i.e., the one with more words, will come first. That's the
-/// one with more probability to get a meaningful suggestion.
-///
-/// `max_group` defines the limit of words a query can have.
-fn split_suggest_query(query: &str, max_group: usize) -> Vec<String> {
-    // Paying the price of allocating the vector to not have to
-    // prepend to the partial strings.
-    let relevant_words: Vec<_> = query.split(' ').rev().take(max_group).collect();
-    let mut prefixes = vec![String::new(); max_group];
-    for (index, word) in relevant_words.into_iter().rev().enumerate() {
-        // The inner loop is upper-bounded by max_group
-        for prefix in prefixes.iter_mut().take(index + 1) {
-            if !prefix.is_empty() {
-                prefix.push(' ');
-            }
-            prefix.push_str(word);
-        }
-    }
-    prefixes
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_suggest_split() {
-        let query = "what are the best use cases for Apache Cassandra".to_string();
-
-        let expected = vec!["for Apache Cassandra", "Apache Cassandra", "Cassandra"];
-        let got = split_suggest_query(&query, 3);
-        assert_eq!(expected, got);
-
-        let expected = vec!["Apache Cassandra", "Cassandra"];
-        let got = split_suggest_query(&query, 2);
-        assert_eq!(expected, got);
-    }
 }
