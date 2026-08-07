@@ -19,13 +19,14 @@ use nidx_json::JsonSearcher;
 use nidx_paragraph::ParagraphSearcher;
 use nidx_protos::{GraphSearchRequest, GraphSearchResponse, SearchRequest, SearchResponse};
 use nidx_relation::{RelationSearcher, graph_query_parser::VectorQueryResults};
-use nidx_text::{TextSearcher, prefilter::PreFilterRequest};
+use nidx_text::TextSearcher;
 use nidx_types::prefilter::PrefilterResult;
 use nidx_vector::VectorSearcher;
 use tracing::{Span, instrument};
 use uuid::Uuid;
 
 use crate::errors::{NidxError, NidxResult};
+use crate::searcher::plan::prefilter::Prefilter;
 use crate::searcher::query_planner::{GraphIndexQueries, IndexQueries};
 
 use super::index_cache::IndexCache;
@@ -295,28 +296,16 @@ pub async fn shard_graph_search(
         return Err(NidxError::NotFound);
     };
 
-    // If we got prefilter params, apply prefilter
-    let prefilter = if graph_request.security.is_some() || graph_request.field_filter.is_some() {
-        let prefilter_request = PreFilterRequest {
-            security: graph_request.security.clone(),
-            filter_expression: graph_request.field_filter.clone(),
-        };
+    let prefilter = if let Some(prefilter) = Prefilter::parse_graph(&graph_request)? {
         let Some(text_index_id) = indexes.text_index() else {
             return Err(NidxError::NotFound);
         };
         let text_searcher = index_cache.get(&text_index_id).await?;
-        let current = Span::current();
-        tokio::task::spawn_blocking(move || {
-            current.in_scope(|| {
-                let searcher: &TextSearcher = text_searcher.as_ref().into();
-                searcher.prefilter(&prefilter_request)
-            })
-        })
-        .await??
+        let text_searcher: &TextSearcher = text_searcher.as_ref().into();
+        prefilter.run(Some(text_searcher), None)?
     } else {
         PrefilterResult::All
     };
-
     if matches!(prefilter, PrefilterResult::None) {
         return Ok(GraphSearchResponse {
             shard_ids: vec![shard_id.to_string()],

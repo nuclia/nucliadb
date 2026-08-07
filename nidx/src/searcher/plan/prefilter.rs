@@ -17,9 +17,9 @@ use tracing::Span;
 
 use nidx_json::JsonSearcher;
 use nidx_json::search::{JsonFilterExpression, JsonPathFilter, JsonPredicate, JsonSearchRequest};
-use nidx_protos::SearchRequest;
 use nidx_protos::SuggestRequest;
 use nidx_protos::json_field_path_filter::Predicate;
+use nidx_protos::{GraphSearchRequest, SearchRequest};
 use nidx_text::TextSearcher;
 use nidx_text::prefilter::*;
 use nidx_types::prefilter::{FilterOperator, PrefilterResult};
@@ -128,6 +128,23 @@ impl Prefilter {
             text: text_prefilter,
             json: json_prefilter,
             filter_operator,
+        }))
+    }
+
+    pub fn parse_graph(request: &GraphSearchRequest) -> anyhow::Result<Option<Self>> {
+        let text_prefilter = if request.field_filter.is_some() || request.security.is_some() {
+            Some(PreFilterRequest {
+                security: request.security.clone(),
+                filter_expression: request.field_filter.clone(),
+            })
+        } else {
+            return Ok(None);
+        };
+
+        Ok(Some(Self {
+            text: text_prefilter,
+            json: None,
+            filter_operator: FilterOperator::default(), // not needed as we don't combine
         }))
     }
 }
