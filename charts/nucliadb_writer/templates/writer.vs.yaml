@@ -68,7 +68,7 @@ spec:
           method:
             regex: "POST|OPTIONS"
         - uri:
-            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/file/[^/]+/reprocess'
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/(file|text|conversation|link)/[^/]+/reprocess'
           method:
             regex: "POST|OPTIONS"
 
