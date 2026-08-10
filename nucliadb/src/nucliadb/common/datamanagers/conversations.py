@@ -229,9 +229,18 @@ async def delete_field(
     field_id: str,
 ) -> None:
     async with _pg_cursor(txn) as cur:
+        # Delete all conversation pages for this field (including the sentinel page = 0)
         await cur.execute(
             """
             DELETE FROM kb_conversations
+            WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_type = 'c' AND field_id = %(field_id)s
+            """,
+            {"kbid": kbid, "rid": rid, "field_id": field_id},
+        )
+        # Delete the FieldConversation metadata for this field (if it exists)
+        await cur.execute(
+            """
+            DELETE FROM kb_fields
             WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_type = 'c' AND field_id = %(field_id)s
             """,
             {"kbid": kbid, "rid": rid, "field_id": field_id},
