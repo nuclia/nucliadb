@@ -35,7 +35,7 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.models.internal.processing import ProcessingInfo, PushPayload, Source
 from nucliadb.writer import SERVICE_NAME, logger
-from nucliadb.writer.api.constants import X_NUCLIADB_USER, X_SKIP_STORE
+from nucliadb.writer.api.constants import X_NUCLIADB_USER, X_REPROCESS_BATCH_SIZE, X_SKIP_STORE
 from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
@@ -69,7 +69,7 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
-from nucliadb_protos.resources_pb2 import FieldID, Metadata
+from nucliadb_protos.resources_pb2 import FieldID, FieldType, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus, IndexResource
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
@@ -397,10 +397,16 @@ async def reprocess_resource_rslug_prefix(
         default=False,
         description="Reset the title of the resource so that the file or link computed titles are set after processing.",
     ),
+    x_reprocess_batch_size: Annotated[int, X_REPROCESS_BATCH_SIZE] = 20,
 ):
     rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
     return await _reprocess_resource(
-        request, kbid, rid, x_nucliadb_user=x_nucliadb_user, reset_title=reset_title
+        request,
+        kbid,
+        rid,
+        x_nucliadb_user=x_nucliadb_user,
+        reset_title=reset_title,
+        field_batch_size=x_reprocess_batch_size,
     )
 
 
@@ -422,9 +428,15 @@ async def reprocess_resource_rid_prefix(
         default=False,
         description="Reset the title of the resource so that the file or link computed titles are set after processing.",
     ),
+    x_reprocess_batch_size: Annotated[int, X_REPROCESS_BATCH_SIZE] = 20,
 ):
     return await _reprocess_resource(
-        request, kbid, rid, x_nucliadb_user=x_nucliadb_user, reset_title=reset_title
+        request,
+        kbid,
+        rid,
+        x_nucliadb_user=x_nucliadb_user,
+        reset_title=reset_title,
+        field_batch_size=x_reprocess_batch_size,
     )
 
 
@@ -437,40 +449,39 @@ async def _reprocess_resource(
         default=False,
         description="Reset the title of the resource so that the file or link computed titles are set after processing.",
     ),
+    field_batch_size: int = 20,
 ):
     await validate_rid_exists_or_raise_error(kbid, rid)
     await maybe_back_pressure(kbid, resource_uuid=rid)
 
     partitioning = get_partitioning()
-
     partition = partitioning.generate_partition(kbid, rid)
-
-    toprocess = PushPayload(
-        uuid=rid,
-        kbid=kbid,
-        partition=partition,
-        userid=x_nucliadb_user,
-    )
-
-    toprocess.kbid = kbid
-    toprocess.uuid = rid
-    toprocess.source = Source.HTTP
 
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
 
-    writer = BrokerMessage()
+    writer = BrokerMessage(
+        kbid=kbid,
+        uuid=rid,
+        source=BrokerMessage.MessageSource.WRITER,
+    )
+    writer.basic.reset_title = reset_title
+    writer.basic.metadata.useful = True
+    writer.basic.metadata.status = Metadata.Status.PENDING
+
+    # First pass: collect all reprocessable fields and prepare writer message
+    all_reprocessable_fields: list[tuple[int, str]] = []
     async with driver.ro_transaction() as txn:
         kb = KnowledgeBox(txn, storage, kbid)
-
         resource = await kb.get(rid)
         if resource is None:
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
-        await extract_fields(resource=resource, toprocess=toprocess)
-        for field_type, field_id in resource.fields.keys():
+        resource_fields = await resource.get_fields()
+        for field_type, field_id in resource_fields.keys():
             if field_type not in REPROCESSABLE_FIELD_TYPES:
                 continue
+            all_reprocessable_fields.append((field_type, field_id))
             writer.field_statuses.append(
                 FieldIDStatus(
                     id=FieldID(field_type=field_type, field=field_id),
@@ -478,17 +489,42 @@ async def _reprocess_resource(
                 )
             )
 
-    writer.kbid = kbid
-    writer.uuid = rid
-    writer.source = BrokerMessage.MessageSource.WRITER
-    if reset_title:
-        writer.basic.reset_title = True
-    writer.basic.metadata.useful = True
-    writer.basic.metadata.status = Metadata.Status.PENDING
-    await transaction.commit(writer, partition, wait=False)
-    processing_info = await send_to_process(toprocess, partition)
+    # Second pass: batch and send processing requests
+    # Process fields in batches to reduce memory usage and improve resilience
+    processing_info = None
 
-    return ResourceUpdated(seqid=processing_info.seqid)
+    for i in range(0, len(all_reprocessable_fields), field_batch_size):
+        batch_fields = set(all_reprocessable_fields[i : i + field_batch_size])
+
+        # Identify conversation fields in this batch to include generated conversations
+        conversation_fields_in_batch = {
+            field_id for field_type, field_id in batch_fields if field_type == FieldType.CONVERSATION
+        }
+
+        toprocess = PushPayload(
+            uuid=rid,
+            kbid=kbid,
+            partition=partition,
+            userid=x_nucliadb_user,
+            source=Source.HTTP,
+        )
+
+        async with driver.ro_transaction() as txn:
+            resource.txn = txn
+            await extract_fields(
+                resource=resource,
+                toprocess=toprocess,
+                selected_fields=batch_fields,
+                include_generated_conversations_for_source_fields=conversation_fields_in_batch or None,
+            )
+
+        processing_info = await send_to_process(toprocess, partition)
+
+    # Commit writer message only if there were fields to process
+    if all_reprocessable_fields:
+        await transaction.commit(writer, partition, wait=False)
+
+    return ResourceUpdated(seqid=processing_info.seqid if processing_info else None)
 
 
 @api.delete(

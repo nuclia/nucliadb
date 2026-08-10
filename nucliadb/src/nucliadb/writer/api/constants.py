@@ -38,6 +38,10 @@ X_MD5 = Header(
     max_length=32,
     description="MD5 hash of the file being uploaded. This is used to check if the file has been uploaded before.",
 )
+X_REPROCESS_BATCH_SIZE = Header(
+    default=50,
+    description="Number of fields to process per batch during resource reprocessing.",
+)
 X_PASSWORD = Header(
     min_length=1, description="If the file is password protected, the password must be provided here."
 )
