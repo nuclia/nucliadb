@@ -123,12 +123,11 @@ async def extract_file_field(
     )
 
 
-async def extract_fields(
+async def collect_fields_for_reprocessing(
     resource: ORMResource,
     toprocess: PushPayload,
     selected_fields: set[tuple[int, str]] | None = None,
     file_password_overrides: dict[str, str] | None = None,
-    include_generated_conversations_for_source_fields: set[str] | None = None,
 ) -> list[tuple[int, str]]:
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -184,18 +183,6 @@ async def extract_fields(
             if full_conversation is None:
                 continue
             toprocess.conversationfield[field_id] = full_conversation
-            if (
-                include_generated_conversations_for_source_fields is not None
-                and field_id in include_generated_conversations_for_source_fields
-            ):
-                await add_generated_conversations_to_pushpayload(
-                    processing,
-                    storage,
-                    toprocess.kbid,
-                    toprocess.uuid,
-                    field_id,
-                    toprocess,
-                )
             extracted_fields.append((field_type, field_id))
 
     return extracted_fields
@@ -676,9 +663,8 @@ async def add_generated_conversations_to_pushpayload(
     generated_fields = [
         field_id.field
         for field_id in all_field_ids.fields
-        if field_id.field_type == resources_pb2.FieldType.CONVERSATION
+        if is_generated_conversation_field(field_id.field_type, field_id.field)
         and field_id.field != source_field_id
-        and field_id.field.startswith("da-")
         and source_field_id in field_id.field
     ]
     if len(generated_fields) == 0:
@@ -699,6 +685,12 @@ async def add_generated_conversations_to_pushpayload(
             source_field_id=source_field_id,
             conversationfield=gconversation,
         )
+
+
+def is_generated_conversation_field(
+    field_type: resources_pb2.FieldType.ValueType, field_id: str
+) -> bool:
+    return field_type == resources_pb2.FieldType.CONVERSATION and field_id.startswith("da-")
 
 
 async def _get_resource(kbid: str, rid: str, storage: Storage) -> ORMResource | None:

@@ -1377,7 +1377,7 @@ async def test_append_messages_sends_generated_conversation_to_processing(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_reprocess_conversation_field_sends_generated_conversation_to_processing(
+async def test_reprocess_conversation_field_does_not_send_generated_conversation_to_processing(
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox: str,
@@ -1457,21 +1457,7 @@ async def test_reprocess_conversation_field_sends_generated_conversation_to_proc
     assert len(processing.values["send_to_process"]) == 1
     push_payload = cast(PushPayload, processing.values["send_to_process"][0][0])
 
+    # Only source conversations are sent to processing
+    assert len(push_payload.conversationfield) == 1
     assert source_conv_id in push_payload.conversationfield
-    assert generated_conv_id in push_payload.generated_conversationfield
-    assert push_payload.generated_conversationfield[generated_conv_id].source_field_id == source_conv_id
-    assert (
-        len(push_payload.generated_conversationfield[generated_conv_id].conversationfield.messages) == 2
-    )
-    assert (
-        push_payload.generated_conversationfield[generated_conv_id]
-        .conversationfield.messages[0]
-        .content.text
-        == "It's interesting to think about how far we've come in such a short time."
-    )
-    assert (
-        push_payload.generated_conversationfield[generated_conv_id]
-        .conversationfield.messages[1]
-        .content.text
-        == "Indeed! The evolution of technology has been rapid and transformative, shaping the way we live and work in profound ways."
-    )
+    assert len(push_payload.generated_conversationfield) == 0
