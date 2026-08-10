@@ -52,7 +52,7 @@ from nucliadb.writer.resource.field import (
     REPROCESSABLE_FIELD_TYPES,
     ResourceClassifications,
     atomic_get_stored_resource_classifications,
-    extract_fields,
+    collect_fields_for_reprocessing,
     parse_conversation_field,
     parse_file_field,
     parse_key_value_field,
@@ -753,17 +753,11 @@ async def _reprocess_resource_field(
         file_password_overrides = None
         if x_file_password is not None:
             file_password_overrides = {field_id: x_file_password}
-        include_generated_conversations_for_source_fields = None
-        if field_type_pb == resources_pb2.FieldType.CONVERSATION:
-            include_generated_conversations_for_source_fields = {field_id}
-        await extract_fields(
+        await collect_fields_for_reprocessing(
             resource=resource,
             toprocess=toprocess,
             selected_fields={(field_type_pb, field_id)},
             file_password_overrides=file_password_overrides,
-            include_generated_conversations_for_source_fields=(
-                include_generated_conversations_for_source_fields
-            ),
         )
 
     writer = BrokerMessage()

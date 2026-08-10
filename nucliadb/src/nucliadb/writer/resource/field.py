@@ -123,12 +123,11 @@ async def extract_file_field(
     )
 
 
-async def extract_fields(
+async def collect_fields_for_reprocessing(
     resource: ORMResource,
     toprocess: PushPayload,
     selected_fields: set[tuple[int, str]] | None = None,
     file_password_overrides: dict[str, str] | None = None,
-    include_generated_conversations_for_source_fields: set[str] | None = None,
 ) -> list[tuple[int, str]]:
     processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
@@ -184,18 +183,6 @@ async def extract_fields(
             if full_conversation is None:
                 continue
             toprocess.conversationfield[field_id] = full_conversation
-            if (
-                include_generated_conversations_for_source_fields is not None
-                and field_id in include_generated_conversations_for_source_fields
-            ):
-                await add_generated_conversations_to_pushpayload(
-                    processing,
-                    storage,
-                    toprocess.kbid,
-                    toprocess.uuid,
-                    field_id,
-                    toprocess,
-                )
             extracted_fields.append((field_type, field_id))
 
     return extracted_fields

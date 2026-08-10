@@ -57,7 +57,7 @@ from nucliadb.writer.resource.field import (
     REPROCESSABLE_FIELD_TYPES,
     ResourceClassifications,
     atomic_get_stored_resource_classifications,
-    extract_fields,
+    collect_fields_for_reprocessing,
     parse_fields,
 )
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
@@ -69,7 +69,7 @@ from nucliadb_models.writer import (
     ResourceUpdated,
     UpdateResourcePayload,
 )
-from nucliadb_protos.resources_pb2 import FieldID, FieldType, Metadata
+from nucliadb_protos.resources_pb2 import FieldID, Metadata
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus, IndexResource
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
@@ -495,12 +495,6 @@ async def _reprocess_resource(
 
     for i in range(0, len(all_reprocessable_fields), field_batch_size):
         batch_fields = set(all_reprocessable_fields[i : i + field_batch_size])
-
-        # Identify conversation fields in this batch to include generated conversations
-        conversation_fields_in_batch = {
-            field_id for field_type, field_id in batch_fields if field_type == FieldType.CONVERSATION
-        }
-
         toprocess = PushPayload(
             uuid=rid,
             kbid=kbid,
@@ -508,16 +502,13 @@ async def _reprocess_resource(
             userid=x_nucliadb_user,
             source=Source.HTTP,
         )
-
         async with driver.ro_transaction() as txn:
             resource.txn = txn
-            await extract_fields(
+            await collect_fields_for_reprocessing(
                 resource=resource,
                 toprocess=toprocess,
                 selected_fields=batch_fields,
-                include_generated_conversations_for_source_fields=conversation_fields_in_batch or None,
             )
-
         processing_info = await send_to_process(toprocess, partition)
 
     # Commit writer message only if there were fields to process
