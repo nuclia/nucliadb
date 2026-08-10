@@ -1326,7 +1326,7 @@ async def test_link_computed_titles_are_automatically_set_to_resource_title(
     resp = await nucliadb_writer.post(
         f"/kb/{kbid}/resources",
         json={
-            "link": {
+            "links": {
                 "mylink": {
                     "uri": "https://wikipedia.org/Lionel_Messi",
                 }
@@ -1357,7 +1357,7 @@ async def test_link_computed_titles_are_automatically_set_to_resource_title(
         f"/kb/{kbid}/resources",
         json={
             "title": "Luis Suarez - Wikipedia",
-            "link": {
+            "links": {
                 "mylink": {
                     "uri": "https://wikipedia.org/Luis_Suarez",
                 }
