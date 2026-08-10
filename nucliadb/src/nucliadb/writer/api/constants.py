@@ -40,6 +40,7 @@ X_MD5 = Header(
 )
 X_REPROCESS_BATCH_SIZE = Header(
     description="Number of fields to process per batch during resource reprocessing.",
+    include_in_schema=False,
 )
 X_PASSWORD = Header(
     min_length=1, description="If the file is password protected, the password must be provided here."
