@@ -229,8 +229,6 @@ async def _to_push_conversationfield(
     full_conversation = PushConversation(
         messages=[],
         classification_labels=classification_labels,
-        # When reprocessing a conversation field, we always want to replace all other possible generated conversation fields.
-        replace_generated_fields=True,
     )
     for page in range(0, metadata.pages):
         conversation_pb = await field.get_value(page + 1)
@@ -562,10 +560,7 @@ async def parse_conversation_field(
     storage = await get_storage(service_name=SERVICE_NAME)
     processing = get_processing()
     field_value = resources_pb2.Conversation(replace_field=replace_field)
-    convs = processing_models.PushConversation(
-        # If we are replacing the conversation, we also want to replace all other possible generated conversation fields.
-        replace_generated_fields=replace_field,
-    )
+    convs = processing_models.PushConversation()
     for message in conversation_field.messages:
         # Message content
         processing_message = processing_models.PushMessage(

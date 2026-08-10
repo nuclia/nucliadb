@@ -123,10 +123,6 @@ class PushConversation(BaseModel):
     extract_strategy: str | None = None
     split_strategy: str | None = None
     classification_labels: list[ClassificationLabel] = []
-    replace_generated_fields: bool = Field(
-        default=False,
-        description="If true, the generated conversation from this field will be fully replaced by the new messages generated from this conversation. If false, the new messages will be appended to the existing generated conversation.",
-    )
 
 
 class PushGeneratedConversation(BaseModel):
