@@ -100,23 +100,6 @@ async def set_metadata(
         )
 
 
-async def delete_metadata(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    field_id: str,
-) -> None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            DELETE FROM kb_fields
-            WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_type = 'c' AND field_id = %(field_id)s
-            """,
-            {"kbid": kbid, "rid": rid, "field_id": field_id},
-        )
-
-
 # ---------------------------------------------------------------------------
 # Conversation pages  (stored in kb_conversations, page >= 1)
 # ---------------------------------------------------------------------------
