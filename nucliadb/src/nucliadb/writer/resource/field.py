@@ -663,9 +663,8 @@ async def add_generated_conversations_to_pushpayload(
     generated_fields = [
         field_id.field
         for field_id in all_field_ids.fields
-        if field_id.field_type == resources_pb2.FieldType.CONVERSATION
+        if is_generated_conversation_field(field_id.field_type, field_id.field)
         and field_id.field != source_field_id
-        and field_id.field.startswith("da-")
         and source_field_id in field_id.field
     ]
     if len(generated_fields) == 0:
@@ -686,6 +685,12 @@ async def add_generated_conversations_to_pushpayload(
             source_field_id=source_field_id,
             conversationfield=gconversation,
         )
+
+
+def is_generated_conversation_field(
+    field_type: resources_pb2.FieldType.ValueType, field_id: str
+) -> bool:
+    return field_type == resources_pb2.FieldType.CONVERSATION and field_id.startswith("da-")
 
 
 async def _get_resource(kbid: str, rid: str, storage: Storage) -> ORMResource | None:

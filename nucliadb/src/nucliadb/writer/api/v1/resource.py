@@ -58,6 +58,7 @@ from nucliadb.writer.resource.field import (
     ResourceClassifications,
     atomic_get_stored_resource_classifications,
     collect_fields_for_reprocessing,
+    is_generated_conversation_field,
     parse_fields,
 )
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
@@ -469,7 +470,7 @@ async def _reprocess_resource(
     writer.basic.metadata.useful = True
     writer.basic.metadata.status = Metadata.Status.PENDING
 
-    # First pass: collect all reprocessable fields and prepare writer message
+    # First pass: collect all reprocessable field ids and prepare writer message
     all_reprocessable_fields: list[tuple[int, str]] = []
     async with driver.ro_transaction() as txn:
         kb = KnowledgeBox(txn, storage, kbid)
@@ -481,6 +482,12 @@ async def _reprocess_resource(
         for field_type, field_id in resource_fields.keys():
             if field_type not in REPROCESSABLE_FIELD_TYPES:
                 continue
+
+            if is_generated_conversation_field(field_type, field_id):
+                # On reprocessing the full resource, we don't want to send the generated conversation
+                # fields, as they will be regenerated from the source conversation field. So we skip them.
+                continue
+
             all_reprocessable_fields.append((field_type, field_id))
             writer.field_statuses.append(
                 FieldIDStatus(
