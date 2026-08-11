@@ -10,7 +10,7 @@ build-backend = "pdm.backend"
 
 [project]
 name = "nidx_protos"
-version = "7.0.0"
+version = "7.1.0"
 license = "Apache-2.0"
 description = "Protobuf definitions for nucliadb/nidx"
 authors = [{ name = "Nuclia", email = "nucliadb@nuclia.com" }]
