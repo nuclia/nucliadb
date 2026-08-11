@@ -170,3 +170,56 @@ async def test_get_value(resource):
         assert page2
         assert len(page2.messages) == 102
         assert [m.ident for m in page2.messages] == [str(i) for i in range(198, 300)]
+
+
+async def test_replace_field_starts_at_page_1(resource):
+    """Regression: replace_field=True must not leave page 1 missing.
+
+    Before the fix, delete_value() cleared kb_conversations but left the stale
+    FieldConversation row (pages=N) in kb_fields.  A subsequent set_value then
+    fetched that stale metadata, hit PageNotFound for the last page, and
+    incremented pages to N+1, so new messages landed on page 2 with page 1
+    never written.
+    """
+    conv = Conversation("faq", resource)
+
+    # Initial write: 1 page, 2 messages.
+    initial = PBConversation()
+    initial.messages.extend(
+        [
+            get_message("m1", "user", "bot", "hello"),
+            get_message("m2", "bot", "user", "hi"),
+        ]
+    )
+    await conv.set_value(initial)
+
+    metadata = await conv.get_metadata()
+    assert metadata is not None
+    assert metadata.pages == 1
+
+    # Simulate reprocessing: replace_field=True replaces all previous content.
+    replacement = PBConversation()
+    replacement.replace_field = True
+    replacement.messages.extend(
+        [
+            get_message("r1", "user", "bot", "new hello"),
+            get_message("r2", "bot", "user", "new hi"),
+        ]
+    )
+    # Reset in-memory cache so set_value re-fetches metadata from DB.
+    conv.metadata = None
+    conv.value = {}
+    conv._splits_metadata = None
+    await conv.set_value(replacement)
+
+    metadata = await conv.get_metadata()
+    assert metadata is not None
+    assert metadata.pages == 1, f"expected pages=1 after replace_field, got {metadata.pages}"
+    assert metadata.total == 2
+
+    page1 = await conv.get_value(page=1)
+    assert page1 is not None, "page 1 is missing after replace_field"
+    assert [m.ident for m in page1.messages] == ["r1", "r2"]
+
+    page2 = await conv.get_value(page=2)
+    assert page2 is None, "unexpected page 2 after replace_field with only 2 messages"
