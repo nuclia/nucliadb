@@ -51,6 +51,9 @@ class Conversation(Field[PBConversation]):
         self.metadata = None
 
     async def delete_value(self):
+        """
+        Delete all pages of the conversation, its metadata and the splits metadata.
+        """
         await datamanagers.conversations.delete_field(
             self.resource.txn,
             kbid=self.kbid,
