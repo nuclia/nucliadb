@@ -80,7 +80,7 @@ async def run_agents_by_slug(
     item: ResourceAgentsRequest,
     x_nucliadb_user: str = Header(""),
 ) -> ResourceAgentsResponse | HTTPClientError:
-    resource_id = await datamanagers.atomic.resources.get_resource_uuid_from_slug(kbid=kbid, slug=slug)
+    resource_id = await datamanagers.atomic.resources.get_rid(kbid=kbid, slug=slug)
     if resource_id is None:
         return HTTPClientError(status_code=404, detail="Resource not found")
     return await _run_agents_endpoint(kbid, resource_id, x_nucliadb_user, item)

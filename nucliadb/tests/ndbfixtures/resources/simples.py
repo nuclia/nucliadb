@@ -69,9 +69,7 @@ async def simple_resources(
     start = time.time()
     created_count = 0
     while created_count < total or (time.time() - start) < timeout:
-        created_count = len(
-            [rid async for rid in datamanagers.resources.iterate_resource_ids(kbid=knowledgebox)]
-        )
+        created_count = len([rid async for rid in datamanagers.resources.iter(kbid=knowledgebox)])
         await asyncio.sleep(0.1)
 
     yield knowledgebox, resource_ids

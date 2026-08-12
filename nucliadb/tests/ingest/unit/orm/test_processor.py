@@ -56,7 +56,7 @@ def resource():
 @pytest.fixture()
 def kb():
     mock = MagicMock(kbid="kbid")
-    mock.get_resource_shard_id = AsyncMock()
+    mock.get_shard = AsyncMock()
     mock.get_resource_shard = AsyncMock()
     yield mock
 

@@ -95,7 +95,7 @@ class MaterializerHandler:
     async def process(self, kbid: str) -> None:
         logger.info(f"Materializing knowledgebox", extra={"kbid": kbid})
         async with datamanagers.with_ro_transaction() as txn:
-            value = await datamanagers.resources.calculate_number_of_resources(txn, kbid=kbid)
+            value = await datamanagers.resources.count(txn, kbid=kbid)
         audit = get_audit()
         if audit:
             audit.report_resources(kbid=kbid, resources=value)

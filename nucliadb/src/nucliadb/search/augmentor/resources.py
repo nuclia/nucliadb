@@ -23,12 +23,10 @@ from typing_extensions import assert_never
 
 import nucliadb_models.resource
 from nucliadb.common import datamanagers
+from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.serialize import (
-    serialize_extra,
-    serialize_origin,
     serialize_resource,
-    serialize_security,
 )
 from nucliadb.models.internal.augment import (
     AugmentedResource,
@@ -71,35 +69,49 @@ async def db_augment_resource(
 ) -> AugmentedResource:
     select = dedup_resource_select(select)
 
+    requested_resource_columns: set[datamanagers.resources.ResourceColumn] = set()
+    for prop in select:
+        if isinstance(prop, (ResourceTitle, ResourceSummary, ResourceClassificationLabels)):
+            requested_resource_columns.add("basic")
+        elif isinstance(prop, ResourceOrigin):
+            requested_resource_columns.add("origin")
+        elif isinstance(prop, ResourceExtra):
+            requested_resource_columns.add("extra")
+        elif isinstance(prop, ResourceSecurity):
+            requested_resource_columns.add("security")
+
+    resource_data = None
+    if requested_resource_columns:
+        resource_data = await resource.get_data(columns=tuple(requested_resource_columns))
+
     title = None
     summary = None
+    labels = None
     origin = None
     extra = None
     security = None
-    labels = None
 
-    basic = None
+    basic = resource_data.basic if resource_data is not None else None
     for prop in select:
         if isinstance(prop, ResourceTitle):
-            if basic is None:
-                basic = await resource.get_basic()
             if basic is not None:
                 title = basic.title
 
         elif isinstance(prop, ResourceSummary):
-            if basic is None:
-                basic = await resource.get_basic()
             if basic is not None:
                 summary = basic.summary
 
         elif isinstance(prop, ResourceOrigin):
-            origin = await serialize_origin(resource)
+            if resource_data is not None and resource_data.origin is not None:
+                origin = from_proto.origin(resource_data.origin)
 
         elif isinstance(prop, ResourceExtra):
-            extra = await serialize_extra(resource)
+            if resource_data is not None and resource_data.extra is not None:
+                extra = from_proto.extra(resource_data.extra)
 
         elif isinstance(prop, ResourceSecurity):
-            security = await serialize_security(resource)
+            if resource_data is not None and resource_data.security is not None:
+                security = from_proto.security(resource_data.security)
 
         elif isinstance(prop, ResourceClassificationLabels):
             labels = await classification_labels(resource)

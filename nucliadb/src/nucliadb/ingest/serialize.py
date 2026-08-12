@@ -226,81 +226,59 @@ async def serialize_resource_metadata(
     resource: Resource,
     show: list[ResourceProperties],
 ) -> None:
-    basic_task = None
-    origin_task = None
-    extra_task = None
-    security_task = None
     relations_task = None
-
+    requested_resource_columns: list[datamanagers.resources.ResourceColumn] = []
     if ResourceProperties.BASIC in show:
-        basic_task = asyncio.create_task(orm_resource.get_basic())
+        requested_resource_columns.append("basic")
         if ResourceProperties.RELATIONS in show:
             relations_task = asyncio.create_task(orm_resource.get_user_relations())
     if ResourceProperties.ORIGIN in show:
-        origin_task = asyncio.create_task(orm_resource.get_origin())
+        requested_resource_columns.append("origin")
     if ResourceProperties.EXTRA in show:
-        extra_task = asyncio.create_task(orm_resource.get_extra())
+        requested_resource_columns.append("extra")
     if ResourceProperties.SECURITY in show:
-        security_task = asyncio.create_task(orm_resource.get_security())
+        requested_resource_columns.append("security")
 
-    await asyncio.gather(
-        *[
-            task
-            for task in [basic_task, origin_task, extra_task, security_task, relations_task]
-            if task is not None
-        ]
-    )
+    resource_data = None
+    if requested_resource_columns:
+        resource_data = await orm_resource.get_data(columns=tuple(requested_resource_columns))
 
-    if ResourceProperties.BASIC in show and orm_resource.basic is not None:
-        resource.slug = orm_resource.basic.slug
-        resource.title = orm_resource.basic.title
-        resource.summary = orm_resource.basic.summary
-        resource.icon = orm_resource.basic.icon
-        resource.thumbnail = orm_resource.basic.thumbnail
-        resource.hidden = orm_resource.basic.hidden
-        resource.created = (
-            orm_resource.basic.created.ToDatetime() if orm_resource.basic.HasField("created") else None
-        )
-        resource.modified = (
-            orm_resource.basic.modified.ToDatetime() if orm_resource.basic.HasField("modified") else None
-        )
+    basic = resource_data.basic if resource_data is not None else None
+    origin = resource_data.origin if resource_data is not None else None
+    extra = resource_data.extra if resource_data is not None else None
+    security = resource_data.security if resource_data is not None else None
 
-        resource.metadata = from_proto.metadata(orm_resource.basic.metadata)
-        resource.usermetadata = from_proto.user_metadata(orm_resource.basic.usermetadata)
-        resource.fieldmetadata = [
-            from_proto.user_field_metadata(fm) for fm in orm_resource.basic.fieldmetadata
-        ]
-        resource.computedmetadata = from_proto.computed_metadata(orm_resource.basic.computedmetadata)
+    if ResourceProperties.BASIC in show and basic is not None:
+        resource.slug = basic.slug
+        resource.title = basic.title
+        resource.summary = basic.summary
+        resource.icon = basic.icon
+        resource.thumbnail = basic.thumbnail
+        resource.hidden = basic.hidden
+        resource.created = basic.created.ToDatetime() if basic.HasField("created") else None
+        resource.modified = basic.modified.ToDatetime() if basic.HasField("modified") else None
 
-        resource.last_seqid = orm_resource.basic.last_seqid
+        resource.metadata = from_proto.metadata(basic.metadata)
+        resource.usermetadata = from_proto.user_metadata(basic.usermetadata)
+        resource.fieldmetadata = [from_proto.user_field_metadata(fm) for fm in basic.fieldmetadata]
+        resource.computedmetadata = from_proto.computed_metadata(basic.computedmetadata)
+
+        resource.last_seqid = basic.last_seqid
 
         # 0 on the proto means it was not ever set, as first valid value for this field will allways be 1
-        resource.last_account_seq = (
-            orm_resource.basic.last_account_seq if orm_resource.basic.last_account_seq != 0 else None
-        )
-        resource.queue = QueueType[orm_resource.basic.QueueType.Name(orm_resource.basic.queue)]
+        resource.last_account_seq = basic.last_account_seq if basic.last_account_seq != 0 else None
+        resource.queue = QueueType[basic.QueueType.Name(basic.queue)]
 
         if ResourceProperties.RELATIONS in show and relations_task is not None:
             relations = relations_task.result()
             resource.usermetadata.relations = [from_proto.relation(rel) for rel in relations.relations]
 
-    if origin_task is not None:
-        origin = origin_task.result()
-        if origin is not None:
-            resource.origin = from_proto.origin(origin)
-
-    if extra_task is not None:
-        extra_data = extra_task.result()
-        if extra_data is not None:
-            resource.extra = from_proto.extra(extra_data)
-
-    if security_task is not None:
-        security_pb = security_task.result()
-        security = ResourceSecurity(access_groups=[])
-        if security_pb is not None:
-            for gid in security_pb.access_groups:
-                security.access_groups.append(gid)
-        resource.security = security
+    if ResourceProperties.ORIGIN in show and origin is not None:
+        resource.origin = from_proto.origin(origin)
+    if ResourceProperties.EXTRA in show and extra is not None:
+        resource.extra = from_proto.extra(extra)
+    if ResourceProperties.SECURITY in show and security is not None:
+        resource.security = from_proto.security(security)
 
 
 async def serialize_origin(resource: ORMResource) -> Origin | None:

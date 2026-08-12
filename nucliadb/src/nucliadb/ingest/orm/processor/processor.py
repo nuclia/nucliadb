@@ -202,9 +202,7 @@ class Processor:
         uuid = (
             message.uuid
             if message.uuid
-            else await datamanagers.atomic.resources.get_resource_uuid_from_slug(
-                kbid=kbid, slug=message.slug
-            )
+            else await datamanagers.atomic.resources.get_rid(kbid=kbid, slug=message.slug)
         )
         if uuid is None:
             logger.info(
@@ -224,7 +222,7 @@ class Processor:
             try:
                 logger.info("Deleting resource", extra={"kbid": kbid, "rid": uuid})
                 kb = KnowledgeBox(txn, self.storage, kbid)
-                shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
+                shard_id = await datamanagers.resources.get_shard(txn, kbid=kbid, rid=uuid)
                 if shard_id is None:
                     logger.warning(
                         "Resource shard not found: Skipping delete", extra={"kbid": kbid, "rid": uuid}
@@ -305,7 +303,7 @@ class Processor:
         if not kb_exists:
             logger.info("Deleted KB: skipping txn", extra={"kbid": kbid})
         else:
-            uuid = message.uuid or await datamanagers.atomic.resources.get_resource_uuid_from_slug(
+            uuid = message.uuid or await datamanagers.atomic.resources.get_rid(
                 kbid=kbid, slug=message.slug
             )
             if not uuid:
@@ -394,7 +392,7 @@ class Processor:
                         # After an index error, recompute and persist resource status
                         basic = await resource.get_basic()
                         await compute_resource_status(txn, kbid, uuid, basic)
-                        await resource.set_basic(basic)
+                        await resource.set_data(basic=basic)
                         # Catalog takes status from index message labels, override it to error
                         current_status = [x for x in index_message.labels if x.startswith("/n/s/")]
                         if current_status:
@@ -488,7 +486,7 @@ class Processor:
         self, txn: Transaction, kb: KnowledgeBox, uuid: str
     ) -> writer_pb2.ShardObject:
         kbid = kb.kbid
-        shard_id = await datamanagers.resources.get_resource_shard_id(txn, kbid=kbid, rid=uuid)
+        shard_id = await datamanagers.resources.get_shard(txn, kbid=kbid, rid=uuid, for_update=True)
         shard = None
         if shard_id is not None:
             # Resource already has a shard assigned
@@ -506,9 +504,7 @@ class Processor:
                     shard = await self.index_node_shard_manager.create_shard_by_kbid(
                         txn, kbid, prewarm_enabled=prewarm
                     )
-            await datamanagers.resources.set_resource_shard_id(
-                txn, kbid=kbid, rid=uuid, shard=shard.shard
-            )
+            await datamanagers.resources.set(txn, kbid=kbid, rid=uuid, shard=shard.shard)
         return shard
 
     @processor_observer.wrap({"type": "index_resource"})
@@ -642,13 +638,13 @@ class Processor:
         await compute_resource_status(resource.txn, resource.kbid, resource.uuid, current_basic)
 
         if current_basic != previous_basic:
-            await resource.set_basic(current_basic)
+            await resource.set_data(basic=current_basic)
         if message.HasField("origin"):
-            await resource.set_origin(message.origin)
+            await resource.set_data(origin=message.origin)
         if message.HasField("extra"):
-            await resource.set_extra(message.extra)
+            await resource.set_data(extra=message.extra)
         if message.HasField("security"):
-            await resource.set_security(message.security)
+            await resource.set_data(security=message.security)
         if message.HasField("user_relations"):
             await resource.set_user_relations(message.user_relations)
 
@@ -745,7 +741,7 @@ class Processor:
             async with self.driver.rw_transaction() as txn:
                 kb.txn = resource.txn = txn
                 resource.basic.metadata.status = resources_pb2.Metadata.Status.ERROR
-                await resource.set_basic(resource.basic)
+                await resource.set_data(basic=resource.basic)
                 await txn.commit()
         except Exception:
             logger.warning("Error while marking resource as error", exc_info=True)

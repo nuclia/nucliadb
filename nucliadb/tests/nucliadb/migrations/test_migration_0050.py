@@ -82,5 +82,5 @@ async def test_migration_0050_backfill_kb_runs_smoothly(maindb_driver: Driver):
         for rid, slug in resources:
             basic = resources_pb2.Basic(slug=slug)
             assert await dm.resources.get_basic(txn, kbid=kbid, rid=rid) == basic
-            assert await dm.resources.get_resource_shard_id(txn, kbid=kbid, rid=rid) == shard_id
-            assert await dm.resources.get_resource_uuid_from_slug(txn, kbid=kbid, slug=slug) == rid
+            assert await dm.resources.get_shard(txn, kbid=kbid, rid=rid) == shard_id
+            assert await dm.resources.get_rid(txn, kbid=kbid, slug=slug) == rid

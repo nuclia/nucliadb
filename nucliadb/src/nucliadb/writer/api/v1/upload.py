@@ -871,7 +871,7 @@ async def validate_field_upload(
         rid = Resource.new_unique_rid()
     else:
         # Adding a field to an existing resource, the resource must exist.
-        if not await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid):
+        if not await datamanagers.atomic.resources.exists(kbid=kbid, rid=rid):
             raise HTTPNotFound("Resource is not found or not yet available")
 
     if field is None:

@@ -38,7 +38,7 @@ import psycopg.errors
 import psycopg.sql
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
-from nucliadb.common.datamanagers.utils import _pg_cursor, observer
+from nucliadb.common.datamanagers.utils import UNSET, _pg_cursor, _UnsetType, observer
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
@@ -48,11 +48,6 @@ logger = logging.getLogger(__name__)
 KBColumn: TypeAlias = Literal["slug", "config", "shards", "deleted_at"]
 
 
-class _UnsetType:
-    pass
-
-
-UNSET: Final = _UnsetType()
 UNSET_STR: Final[str | None] = cast(str | None, UNSET)
 UNSET_CONFIG: Final[knowledgebox_pb2.KnowledgeBoxConfig | None] = cast(
     knowledgebox_pb2.KnowledgeBoxConfig | None, UNSET

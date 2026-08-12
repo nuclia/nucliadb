@@ -187,7 +187,7 @@ async def _purge_resources_storage_batch(driver: Driver, storage: Storage, batch
         kbid, resource_id = key.split("/")[-2:]
         # Check if resource exists in maindb. This can happen if a file is deleted (marked for purge) and immediately
         # reuploaded. Without this check, we will delete the data of the newly uploaded copy of the resource.
-        if not await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=resource_id):
+        if not await datamanagers.atomic.resources.exists(kbid=kbid, rid=resource_id):
             tasks.append(asyncio.create_task(storage.delete_resource(kbid, resource_id)))
 
     await asyncio.gather(*tasks)
