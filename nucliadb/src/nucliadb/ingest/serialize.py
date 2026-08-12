@@ -46,7 +46,6 @@ from nucliadb_models.extracted import (
     RelationNodeVector,
     VectorObject,
 )
-from nucliadb_models.metadata import Relation
 from nucliadb_models.resource import (
     ConversationFieldData,
     ConversationFieldExtractedData,
@@ -278,11 +277,6 @@ async def serialize_resource_metadata(
         resource.extra = from_proto.extra(extra)
     if ResourceProperties.SECURITY in show and security is not None:
         resource.security = from_proto.security(security)
-
-
-async def serialize_user_relations(resource: ORMResource) -> list[Relation]:
-    relations = await resource.get_user_relations()
-    return [from_proto.relation(rel) for rel in relations.relations]
 
 
 def ensure_serialized_field_data(
