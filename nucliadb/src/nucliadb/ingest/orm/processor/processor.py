@@ -477,7 +477,7 @@ class Processor:
                     raise handled_exception
                 else:
                     if resource is not None:
-                        await self._mark_resource_error(kb, resource, partition, seqid)
+                        await self._mark_resource_error(kb, resource)
                     raise DeadletteredError() from handled_exception
 
             return None
@@ -727,9 +727,7 @@ class Processor:
         if self.pubsub is not None:
             await self.pubsub.publish(channel, payload)
 
-    async def _mark_resource_error(
-        self, kb: KnowledgeBox, resource: Resource | None, partition: str, seqid: int
-    ) -> None:
+    async def _mark_resource_error(self, kb: KnowledgeBox, resource: Resource | None) -> None:
         """
         Unhandled error processing, try to mark resource as error
         """

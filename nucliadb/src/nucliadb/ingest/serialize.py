@@ -268,7 +268,7 @@ async def serialize_resource_metadata(
         resource.queue = QueueType[basic.QueueType.Name(basic.queue)]
 
         if ResourceProperties.RELATIONS in show and relations_task is not None:
-            relations = relations_task.result()
+            relations = await relations_task
             resource.usermetadata.relations = [from_proto.relation(rel) for rel in relations.relations]
 
     if ResourceProperties.ORIGIN in show and origin is not None:

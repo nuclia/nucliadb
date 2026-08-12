@@ -175,7 +175,7 @@ async def test_resource_set_get(
         assert basic.slug == "test-slug"
         assert basic.title == "Test Title"
         data = await resources.get(
-            txn, kbid=kbid, rid=rid, columns=("basic", "origin", "security", "extra")
+            txn, kbid=kbid, rid=rid, columns=("basic", "origin", "security", "extra", "shard", "slug")
         )
         assert data is not None
         assert data.basic is not None
