@@ -98,7 +98,7 @@ class Resource:
 
         self.kbid = kbid
         self.uuid = uuid
-        self.shard: str | None = None
+
         self.basic: PBBasic | None = basic
         self.origin: PBOrigin | None = None
         self.extra: PBExtra | None = None
