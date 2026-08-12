@@ -46,7 +46,7 @@ from nucliadb_models.extracted import (
     RelationNodeVector,
     VectorObject,
 )
-from nucliadb_models.metadata import Extra, Origin, Relation
+from nucliadb_models.metadata import Relation
 from nucliadb_models.resource import (
     ConversationFieldData,
     ConversationFieldExtractedData,
@@ -66,7 +66,6 @@ from nucliadb_models.resource import (
     TextFieldExtractedData,
 )
 from nucliadb_models.search import ResourceProperties
-from nucliadb_models.security import ResourceSecurity
 from nucliadb_protos import writer_pb2
 from nucliadb_protos.writer_pb2 import FieldStatus
 from nucliadb_utils.utilities import get_storage
@@ -281,35 +280,9 @@ async def serialize_resource_metadata(
         resource.security = from_proto.security(security)
 
 
-async def serialize_origin(resource: ORMResource) -> Origin | None:
-    origin = await resource.get_origin()
-    if origin is None:
-        return None
-
-    return from_proto.origin(origin)
-
-
-async def serialize_extra(resource: ORMResource) -> Extra | None:
-    extra = await resource.get_extra()
-    if extra is None:
-        return None
-    return from_proto.extra(extra)
-
-
 async def serialize_user_relations(resource: ORMResource) -> list[Relation]:
     relations = await resource.get_user_relations()
     return [from_proto.relation(rel) for rel in relations.relations]
-
-
-async def serialize_security(resource: ORMResource) -> ResourceSecurity:
-    security = ResourceSecurity(access_groups=[])
-
-    security_pb = await resource.get_security()
-    if security_pb is not None:
-        for gid in security_pb.access_groups:
-            security.access_groups.append(gid)
-
-    return security
 
 
 def ensure_serialized_field_data(
