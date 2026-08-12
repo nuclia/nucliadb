@@ -637,14 +637,13 @@ class Processor:
         # computed resource status into basic before persisting.
         await compute_resource_status(resource.txn, resource.kbid, resource.uuid, current_basic)
 
-        if current_basic != previous_basic:
-            await resource.set_data(basic=current_basic)
-        if message.HasField("origin"):
-            await resource.set_data(origin=message.origin)
-        if message.HasField("extra"):
-            await resource.set_data(extra=message.extra)
-        if message.HasField("security"):
-            await resource.set_data(security=message.security)
+        await resource.set_data(
+            basic=current_basic if current_basic != previous_basic else None,
+            origin=message.origin if message.HasField("origin") else None,
+            extra=message.extra if message.HasField("extra") else None,
+            security=message.security if message.HasField("security") else None,
+        )
+
         if message.HasField("user_relations"):
             await resource.set_user_relations(message.user_relations)
 
