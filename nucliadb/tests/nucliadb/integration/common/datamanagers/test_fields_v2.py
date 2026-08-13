@@ -221,14 +221,14 @@ async def test_has_field_true_after_set(maindb_driver: Driver, kbid: str, rid: s
 
     fid = rpb2.FieldID(field_type=rpb2.FieldType.TEXT, field="body")
     async with maindb_driver.ro_transaction() as txn:
-        assert await fields.has_field(txn, kbid=kbid, rid=rid, field_id=fid) is True
+        assert await fields.exists(txn, kbid=kbid, rid=rid, field_id=fid) is True
 
 
 @pytest.mark.asyncio
 async def test_has_field_false_for_missing(maindb_driver: Driver, kbid: str, rid: str) -> None:
     fid = rpb2.FieldID(field_type=rpb2.FieldType.TEXT, field="ghost")
     async with maindb_driver.ro_transaction() as txn:
-        assert await fields.has_field(txn, kbid=kbid, rid=rid, field_id=fid) is False
+        assert await fields.exists(txn, kbid=kbid, rid=rid, field_id=fid) is False
 
 
 # ---------------------------------------------------------------------------
@@ -282,7 +282,7 @@ async def test_delete_removes_field(maindb_driver: Driver, kbid: str, rid: str) 
     async with maindb_driver.ro_transaction() as txn:
         assert await fields.get_raw(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body") is None
         fid = rpb2.FieldID(field_type=rpb2.FieldType.TEXT, field="body")
-        assert await fields.has_field(txn, kbid=kbid, rid=rid, field_id=fid) is False
+        assert await fields.exists(txn, kbid=kbid, rid=rid, field_id=fid) is False
 
 
 @pytest.mark.asyncio

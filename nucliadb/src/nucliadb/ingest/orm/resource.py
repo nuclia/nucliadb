@@ -419,13 +419,26 @@ class Resource:
         # TODO: When generated_by is populated with DA tasks by processor, remove only related errors
         from_processor = any(x.WhichOneof("generator") == "processor" for x in message.generated_by)
 
-        for (field_type, field), errors in errors_by_field.items():
-            field_obj = await self.get_field(field, field_type, load=False)
-            if from_processor:
-                # Create a new field status to clear all errors
-                status = writer_pb2.FieldStatus()
-            else:
-                status = await field_obj.get_status() or writer_pb2.FieldStatus()
+        field_keys = list(errors_by_field.keys())
+        field_ids = [FieldID(field_type=field_type, field=field) for field_type, field in field_keys]
+
+        if from_processor:
+            existing_statuses = [writer_pb2.FieldStatus() for _ in field_keys]
+        else:
+            existing_statuses = await datamanagers.fields.get_statuses(
+                self.txn,
+                kbid=self.kbid,
+                rid=self.uuid,
+                fields=field_ids,
+            )
+
+        statuses_to_persist: list[tuple[str, str, writer_pb2.FieldStatus]] = []
+        for idx, ((field_type, field), errors) in enumerate(errors_by_field.items()):
+            status = (
+                existing_statuses[idx]
+                if existing_statuses[idx] is not None
+                else writer_pb2.FieldStatus()
+            )
 
             for error in errors:
                 field_error = writer_pb2.FieldError(
@@ -458,7 +471,15 @@ class Resource:
                 # If the field was not found and the message comes from the writer, this implicitly sets the
                 # status to the default value, which is PROCESSING. This covers the case of new field creation.
 
-            await field_obj.set_status(status)
+            statuses_to_persist.append((FIELD_TYPE_PB_TO_STR[field_type], field, status))
+
+        await datamanagers.fields.set_statuses(
+            self.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            statuses=statuses_to_persist,
+        )
+        if statuses_to_persist:
             self.modified = True
 
     async def add_field_error(
