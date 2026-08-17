@@ -144,7 +144,10 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         tasks = []
         async for object_info in self.iterate_objects(bucket, resource_storage_base_path):
             tasks.append(asyncio.create_task(_delete_object(object_info)))
-        await asyncio.gather(*tasks)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        failures = [r for r in results if isinstance(r, Exception)]
+        for exc in failures:
+            logger.warning(f"Failed to delete object in resource {uuid}: {exc}")
 
     async def deadletter(self, message: BrokerMessage, seq: int, seqid: int, partition: str):
         if self.deadletter_bucket is None:
@@ -358,8 +361,7 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         cf.source = self.source  # type: ignore
 
         if md5 is None:
-            md5hash = hashlib.md5(decoded_payload, usedforsecurity=False).digest()
-            cf.md5 = md5hash.decode()
+            cf.md5 = hashlib.md5(decoded_payload, usedforsecurity=False).hexdigest()
         else:
             cf.md5 = md5
 

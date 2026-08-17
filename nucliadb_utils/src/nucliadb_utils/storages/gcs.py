@@ -308,13 +308,12 @@ class GCSStorageField(StorageField):
             "Content-Length": str(len(data)),
             "Content-Type": cf.content_type,
         }
-        if len(data) != size:
-            content_range = "bytes {init}-{chunk}/{total}".format(
-                init=self.field.offset,
-                chunk=self.field.offset + len(data) - 1,
-                total=size,
-            )
-            headers["Content-Range"] = content_range
+        content_range = "bytes {init}-{chunk}/{total}".format(
+            init=self.field.offset,
+            chunk=self.field.offset + len(data) - 1,
+            total=size,
+        )
+        headers["Content-Range"] = content_range
 
         async with self.storage.session.put(
             self.field.resumable_uri, headers=headers, data=data
