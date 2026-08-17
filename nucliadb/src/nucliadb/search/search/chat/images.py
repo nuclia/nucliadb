@@ -20,52 +20,11 @@
 import base64
 from io import BytesIO
 
-from nucliadb.common.ids import ParagraphId
 from nucliadb.ingest.fields.file import File
 from nucliadb.search import SERVICE_NAME
 from nucliadb_models.search import Image
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
-
-
-# DEPRECATED(decoupled-ask): remove once old_prompt.py is removed
-async def get_page_image(kbid: str, paragraph_id: ParagraphId, page_number: int) -> Image | None:
-    storage = await get_storage(service_name=SERVICE_NAME)
-    sf = storage.file_extracted(
-        kbid=kbid,
-        uuid=paragraph_id.rid,
-        field_type=paragraph_id.field_id.type,
-        field=paragraph_id.field_id.key,
-        key=f"generated/extracted_images_{page_number}.png",
-    )
-    image_bytes = (await sf.storage.downloadbytes(sf.bucket, sf.key)).read()
-    if not image_bytes:
-        return None
-    image = Image(
-        b64encoded=base64.b64encode(image_bytes).decode(),
-        content_type="image/png",
-    )
-    return image
-
-
-# DEPRECATED(decoupled-ask): remove once old_prompt.py is removed
-async def get_paragraph_image(kbid: str, paragraph_id: ParagraphId, reference: str) -> Image | None:
-    storage = await get_storage(service_name=SERVICE_NAME)
-    sf = storage.file_extracted(
-        kbid=kbid,
-        uuid=paragraph_id.rid,
-        field_type=paragraph_id.field_id.type,
-        field=paragraph_id.field_id.key,
-        key=f"generated/{reference}",
-    )
-    image_bytes = (await sf.storage.downloadbytes(sf.bucket, sf.key)).read()
-    if not image_bytes:
-        return None
-    image = Image(
-        b64encoded=base64.b64encode(image_bytes).decode(),
-        content_type="image/png",
-    )
-    return image
 
 
 # DEPRECATED(decoupled-ask): remove once old_prompt.py is removed

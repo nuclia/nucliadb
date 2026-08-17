@@ -40,8 +40,6 @@ from nucliadb.search.augmentor.fields import get_field_extracted_text
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.images import (
     get_file_thumbnail_image,
-    get_page_image,
-    get_paragraph_image,
 )
 from nucliadb.search.search.metrics import Metrics
 from nucliadb.search.search.paragraphs import get_paragraph_text
@@ -58,18 +56,14 @@ from nucliadb_models.search import (
     HierarchyResourceStrategy,
     Image,
     ImageRagStrategy,
-    ImageRagStrategyName,
     MetadataExtensionStrategy,
     MetadataExtensionType,
     NeighbouringParagraphsStrategy,
-    PageImageStrategy,
-    ParagraphImageStrategy,
     PromptContext,
     PromptContextImages,
     PromptContextOrder,
     RagStrategy,
     RagStrategyName,
-    TableImageStrategy,
     TextBlockAugmentationType,
     TextPosition,
 )
@@ -1116,85 +1110,10 @@ class PromptContextBuilder:
         ccontext = CappedPromptContext(max_size=self.max_context_characters)
         self.prepend_user_context(ccontext)
         await self._build_context(ccontext)
-        if self.visual_llm and not self.query_image:
-            await self._build_context_images(ccontext)
         context = ccontext.cap()
         context_images = ccontext.images
         context_order = {text_block_id: order for order, text_block_id in enumerate(context.keys())}
         return context, context_order, context_images, self.augmented_context
-
-    async def _build_context_images(self, context: CappedPromptContext) -> None:
-        ops = 0
-        if self.image_strategies is None or len(self.image_strategies) == 0:
-            # Nothing to do
-            return
-        page_image_strategy: PageImageStrategy | None = None
-        max_page_images = 5
-        table_image_strategy: TableImageStrategy | None = None
-        paragraph_image_strategy: ParagraphImageStrategy | None = None
-        for strategy in self.image_strategies:
-            if strategy.name == ImageRagStrategyName.PAGE_IMAGE:
-                if page_image_strategy is None:
-                    page_image_strategy = cast(PageImageStrategy, strategy)
-                    if page_image_strategy.count is not None:
-                        max_page_images = page_image_strategy.count
-            elif strategy.name == ImageRagStrategyName.TABLES:
-                if table_image_strategy is None:
-                    table_image_strategy = cast(TableImageStrategy, strategy)
-            elif strategy.name == ImageRagStrategyName.PARAGRAPH_IMAGE:
-                if paragraph_image_strategy is None:
-                    paragraph_image_strategy = cast(ParagraphImageStrategy, strategy)
-            else:  # pragma: no cover
-                logger.warning(
-                    "Unknown image strategy",
-                    extra={"strategy": strategy.name, "kbid": self.kbid},
-                )
-        page_images_added = 0
-        for paragraph in self.ordered_paragraphs:
-            pid = ParagraphId.from_string(paragraph.id)
-            paragraph_page_number = get_paragraph_page_number(paragraph)
-            if (
-                page_image_strategy is not None
-                and page_images_added < max_page_images
-                and paragraph_page_number is not None
-            ):
-                # page_image_id: rid/f/myfield/0
-                page_image_id = "/".join([pid.field_id.full(), str(paragraph_page_number)])
-                if page_image_id not in context.images:
-                    image = await get_page_image(self.kbid, pid, paragraph_page_number)
-                    if image is not None:
-                        ops += 1
-                        context.images[page_image_id] = image
-                        page_images_added += 1
-                    else:
-                        logger.warning(
-                            f"Could not retrieve image for paragraph from storage",
-                            extra={
-                                "kbid": self.kbid,
-                                "paragraph": pid.full(),
-                                "page_number": paragraph_page_number,
-                            },
-                        )
-
-            add_table = table_image_strategy is not None and paragraph.is_a_table
-            add_paragraph = paragraph_image_strategy is not None and not paragraph.is_a_table
-            if (add_table or add_paragraph) and (
-                paragraph.reference is not None and paragraph.reference != ""
-            ):
-                pimage = await get_paragraph_image(self.kbid, pid, paragraph.reference)
-                if pimage is not None:
-                    ops += 1
-                    context.images[paragraph.id] = pimage
-                else:
-                    logger.warning(
-                        f"Could not retrieve image for paragraph from storage",
-                        extra={
-                            "kbid": self.kbid,
-                            "paragraph": pid.full(),
-                            "reference": paragraph.reference,
-                        },
-                    )
-        self.metrics.set("image_ops", ops)
 
     async def _build_context(self, context: CappedPromptContext) -> None:
         if self.strategies is None or len(self.strategies) == 0:

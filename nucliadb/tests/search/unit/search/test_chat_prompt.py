@@ -37,9 +37,6 @@ from nucliadb_models.search import (
     MetadataExtensionStrategy,
     MetadataExtensionType,
     MinScore,
-    PageImageStrategy,
-    ParagraphImageStrategy,
-    TableImageStrategy,
 )
 from nucliadb_protos import resources_pb2 as rpb2
 
@@ -443,94 +440,6 @@ async def test_extend_prompt_context_with_metadata():
         assert "DOCUMENT EXTRA METADATA" in text_block
 
         assert augmented_context.paragraphs.popitem()[1].text == context.output[paragraph_id.full()]
-
-
-async def test_prompt_context_image_context_builder():
-    result_text = " ".join(["text"] * 10)
-    find_results = KnowledgeboxFindResults(
-        resources={
-            "bmid": _create_find_result(
-                FindParagraph(
-                    id="bmid/f/file/0-1",
-                    score=1,
-                    score_type=SCORE_TYPE.BM25,
-                    order=1,
-                    text=result_text,
-                    is_a_table=True,
-                    reference="table_image_data",
-                    page_with_visual=False,
-                )
-            ),
-            "vecid": _create_find_result(
-                FindParagraph(
-                    id="vecid/f/file/0-1",
-                    score=0,
-                    score_type=SCORE_TYPE.VECTOR,
-                    order=2,
-                    text=result_text,
-                    is_a_table=False,
-                    reference="paragraph_image_data",
-                    page_with_visual=False,
-                )
-            ),
-            "both_id": _create_find_result(
-                FindParagraph(
-                    id="both_id/f/file/0-1",
-                    score=2,
-                    score_type=SCORE_TYPE.BOTH,
-                    order=0,
-                    text=result_text,
-                    is_a_table=False,
-                    reference="page_image_data",
-                    page_with_visual=True,
-                )
-            ),
-        },
-    )
-
-    # By default, no image strategies are provided so no images should be added
-    builder = chat_prompt.PromptContextBuilder(
-        kbid="kbid",
-        ordered_paragraphs=get_ordered_paragraphs(find_results),
-        user_context=["Carrots are orange"],
-        image_strategies=[],
-    )
-    context = chat_prompt.CappedPromptContext(max_size=int(1e6))
-    await builder._build_context_images(context)
-    assert len(context.images) == 0
-
-    # Test that the image strategies are applied correctly
-    builder = chat_prompt.PromptContextBuilder(
-        kbid="kbid",
-        ordered_paragraphs=get_ordered_paragraphs(find_results),
-        user_context=["Carrots are orange"],
-        image_strategies=[PageImageStrategy(count=10), TableImageStrategy(), ParagraphImageStrategy()],
-    )
-    with (
-        mock.patch("nucliadb.search.search.chat.prompt.get_paragraph_page_number", return_value=1),
-        mock.patch(
-            "nucliadb.search.search.chat.prompt.get_page_image",
-            return_value=Image(b64encoded="page_image_data", content_type="image/png"),
-        ),
-        mock.patch(
-            "nucliadb.search.search.chat.prompt.get_paragraph_image",
-            return_value=Image(b64encoded="table_image_data", content_type="image/png"),
-        ),
-    ):
-        context = chat_prompt.CappedPromptContext(max_size=int(1e6))
-        await builder._build_context_images(context)
-        assert len(context.output) == 0
-        assert len(context.images) == 6
-        assert set(context.images.keys()) == {
-            # The paragraph images
-            "bmid/f/file/0-1",
-            "both_id/f/file/0-1",
-            "vecid/f/file/0-1",
-            # The page images
-            "bmid/f/file/1",
-            "both_id/f/file/1",
-            "vecid/f/file/1",
-        }
 
 
 async def test_prompt_context_builder_with_extra_image_context():
