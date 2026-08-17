@@ -17,21 +17,17 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import json
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
-from pydantic import ValidationError
 from starlette.responses import StreamingResponse
 
-from nucliadb.common import datamanagers
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.search import cache
 from nucliadb.search.search.chat.ask import AskResult, ask, handled_ask_exceptions
 from nucliadb.search.search.chat.exceptions import AnswerJsonSchemaTooLong
 from nucliadb.search.search.utils import maybe_log_request_payload
-from nucliadb_models.configuration import AskConfig
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     AskRequest,
@@ -75,26 +71,6 @@ async def ask_knowledgebox_endpoint(
             item.security = RequestSecurity(groups=current_user.security_groups)
         else:
             item.security.groups = current_user.security_groups
-
-    if item.search_configuration is not None:
-        search_config = await datamanagers.atomic.search_configurations.get(
-            kbid=kbid, name=item.search_configuration
-        )
-        if search_config is None:
-            return HTTPClientError(status_code=400, detail="Search configuration not found")
-
-        if not isinstance(search_config.config, AskConfig):
-            return HTTPClientError(
-                status_code=400, detail="This search configuration is not valid for `ask`"
-            )
-
-        try:
-            item = AskRequest.model_validate(
-                search_config.config.model_dump(exclude_unset=True) | item.model_dump(exclude_unset=True)
-            )
-        except ValidationError as e:
-            detail = json.loads(e.json())
-            return HTTPClientError(status_code=422, detail=detail)
 
     return await create_ask_response(
         kbid=kbid,
