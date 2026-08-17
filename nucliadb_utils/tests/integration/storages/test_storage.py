@@ -24,16 +24,21 @@ from nucliadb_utils.storages.storage import Storage
 async def test_azure_driver(azure_storage: AzureStorage):
     assert isinstance(azure_storage, AzureStorage)
     await storage_test(azure_storage)
+    await delete_kb_test(azure_storage)
 
 
 async def test_s3_driver(s3_storage: S3Storage):
     assert isinstance(s3_storage, S3Storage)
     await storage_test(s3_storage)
+    await delete_kb_test(s3_storage)
+    await delete_kb_conflict_test(s3_storage)
 
 
 async def test_gcs_driver(gcs_storage: GCSStorage):
     assert isinstance(gcs_storage, GCSStorage)
     await storage_test(gcs_storage)
+    await delete_kb_test(gcs_storage)
+    await delete_kb_conflict_test(gcs_storage)
 
     kbid = "kbid"
     cf = CloudFile(bucket_name="foo", uri=f"kbs/{kbid}/foo/bar")
@@ -43,6 +48,38 @@ async def test_gcs_driver(gcs_storage: GCSStorage):
 async def test_local_driver(local_storage: LocalStorage):
     assert isinstance(local_storage, LocalStorage)
     await storage_test(local_storage)
+    await delete_kb_test(local_storage)
+
+
+async def delete_kb_conflict_test(storage: Storage):
+    kbid = uuid4().hex
+    await storage.create_kb(kbid)
+    bucket = storage.get_bucket_name(kbid)
+    # Upload an object so the bucket is non-empty when we try to delete it
+    await storage.upload_object(bucket, "some/object", b"data")
+    deleted, conflict = await storage.delete_kb(kbid)
+    assert deleted is False
+    assert conflict is True
+
+
+async def delete_kb_test(storage: Storage):
+    kbid = uuid4().hex
+
+    # Deleting a KB that doesn't exist returns (False, False)
+    deleted, conflict = await storage.delete_kb(kbid)
+    assert deleted is False
+    assert conflict is False
+
+    # Create the KB, then delete it — must report deleted=True, conflict=False
+    await storage.create_kb(kbid)
+    deleted, conflict = await storage.delete_kb(kbid)
+    assert deleted is True
+    assert conflict is False
+
+    # Deleting the same KB a second time is a no-op: deleted=False, conflict=False
+    deleted, conflict = await storage.delete_kb(kbid)
+    assert deleted is False
+    assert conflict is False
 
 
 async def storage_test(storage: Storage):

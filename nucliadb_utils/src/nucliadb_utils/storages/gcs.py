@@ -650,13 +650,34 @@ class GCSStorage(Storage):
         deleted = False
         conflict = False
         async with self.session.delete(url, headers=headers) as resp:
-            if resp.status == 204:
+            if resp.status in (200, 204):
+                # Bucket deleted successfully. fake-gcs-server returns 200, real GCS returns 204
                 logger.info(f"Deleted bucket: {bucket_name}")
                 deleted = True
             elif resp.status == 409:
                 details = await resp.text()
                 logger.info(f"Conflict on deleting bucket {bucket_name}: {details}")
                 conflict = True
+            elif resp.status == 412:
+                details = await resp.text()
+                try:
+                    reason = ((json.loads(details).get("error") or {}).get("errors") or [{}])[0].get(
+                        "reason"
+                    )
+                except Exception:
+                    reason = None
+                if reason:
+                    # real GCS precondition failure (conditionNotMet, etc.)
+                    msg = f"Delete KB bucket returned an unexpected status 412: {details}"
+                    logger.error(msg, extra={"kbid": kbid})
+                    with errors.push_scope() as scope:
+                        scope.set_extra("kbid", kbid)
+                        scope.set_extra("status_code", resp.status)
+                        errors.capture_message(msg, "error", scope)
+                else:
+                    # fake-gcs-server returns 412 with errors:null for non-empty buckets
+                    logger.info(f"Conflict on deleting bucket {bucket_name}: {details}")
+                    conflict = True
             elif resp.status == 404:
                 logger.info(f"Does not exist on deleting: {bucket_name}")
             else:
