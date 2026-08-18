@@ -134,11 +134,6 @@ async def _kb_counters(
     return counters
 
 
-async def get_resources_count(kbid: str) -> int:
-    async with datamanagers.with_ro_transaction() as txn:
-        return await datamanagers.resources.count(txn, kbid=kbid)
-
-
 async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
     """
     Get the index counts for a knowledgebox that has an index in the index node cluster.

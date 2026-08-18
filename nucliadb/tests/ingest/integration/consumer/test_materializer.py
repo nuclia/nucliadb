@@ -71,8 +71,7 @@ async def test_materialize_kb_data(
 
     await asyncio.sleep(0.2)
 
-    async with datamanagers.with_transaction() as txn:
-        assert await datamanagers.resources.count(txn, kbid=knowledgebox) == count
+    assert await datamanagers.atomic.resources.count(kbid=knowledgebox) == count
 
     await mz.finalize()
     assert audit_storage.js.publish.call_count == 1  # type: ignore[ty:unresolved-attribute]
