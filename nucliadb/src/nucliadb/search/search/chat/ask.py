@@ -64,7 +64,6 @@ from nucliadb.search.search.chat.query import (
 from nucliadb.search.search.exceptions import (
     IncompleteFindResultsError,
 )
-from nucliadb.search.search.graph_strategy import get_graph_results
 from nucliadb.search.search.metrics import AskMetrics, Metrics
 from nucliadb.search.search.query_parser.fetcher import Fetcher
 from nucliadb.search.search.query_parser.parsers.ask import fetcher_for_ask, parse_ask
@@ -777,8 +776,7 @@ async def retrieval_in_kb(
     metrics: Metrics,
 ) -> RetrievalResults:
     prequeries = parse_prequeries(ask_request)
-    graph_strategy = parse_graph_strategy(ask_request)
-    main_results, prequeries_results, fetcher, reranker = await get_find_results(
+    main_results, prequeries_results, fetcher, _ = await get_find_results(
         kbid=kbid,
         query=main_query,
         item=ask_request,
@@ -788,25 +786,6 @@ async def retrieval_in_kb(
         metrics=metrics.child_span("hybrid_retrieval"),
         prequeries_strategy=prequeries,
     )
-
-    if graph_strategy is not None:
-        graph_results, graph_request = await get_graph_results(
-            kbid=kbid,
-            query=main_query,
-            item=ask_request,
-            ndb_client=client_type,
-            user=user_id,
-            origin=origin,
-            graph_strategy=graph_strategy,
-            metrics=metrics.child_span("graph_retrieval"),
-            text_block_reranker=reranker,
-        )
-
-        if prequeries_results is None:
-            prequeries_results = []
-
-        prequery = PreQuery(id="graph", request=graph_request, weight=graph_strategy.weight)
-        prequeries_results.append((prequery, graph_results))
 
     if len(main_results.resources) == 0 and all(
         len(prequery_result.resources) == 0 for (_, prequery_result) in prequeries_results or []
