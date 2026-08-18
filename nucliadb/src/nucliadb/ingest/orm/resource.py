@@ -164,19 +164,32 @@ class Resource:
         self.modified = True
 
     def _cache_resource_data(self, resource_data: datamanagers.resources.ResourceData) -> None:
-        for column_name in ("basic", "origin", "security", "extra"):
-            value = getattr(resource_data, column_name)
-            if value is datamanagers.resources.UNSET:
-                continue
-            setattr(self, column_name, value)
-            self._loaded_resource_columns.add(column_name)
+        if resource_data.basic is not datamanagers.resources.UNSET:
+            self.basic = resource_data.basic
+            self._loaded_resource_columns.add("basic")
+        if resource_data.origin is not datamanagers.resources.UNSET:
+            self.origin = resource_data.origin
+            self._loaded_resource_columns.add("origin")
+        if resource_data.security is not datamanagers.resources.UNSET:
+            self.security = resource_data.security
+            self._loaded_resource_columns.add("security")
+        if resource_data.extra is not datamanagers.resources.UNSET:
+            self.extra = resource_data.extra
+            self._loaded_resource_columns.add("extra")
 
     def _resource_data_from_cache(
         self, columns: tuple[datamanagers.resources.ResourceColumn, ...]
     ) -> datamanagers.resources.ResourceData:
         resource_data = datamanagers.resources.ResourceData()
-        for column_name in columns:
-            setattr(resource_data, column_name, getattr(self, column_name))
+        for column in columns:
+            if column == "basic":
+                resource_data.basic = self.basic
+            elif column == "origin":
+                resource_data.origin = self.origin
+            elif column == "security":
+                resource_data.security = self.security
+            elif column == "extra":
+                resource_data.extra = self.extra
         return resource_data
 
     async def get_data(

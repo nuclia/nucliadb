@@ -87,6 +87,7 @@ class resources:
     exists = ro_txn_wrap(resources_dm.exists)
     slug_exists = ro_txn_wrap(resources_dm.slug_exists)
     get_all_field_ids = ro_txn_wrap(fields_dm.get_all_field_ids)
+    count = ro_txn_wrap(resources_dm.count)
 
 
 class labelset:

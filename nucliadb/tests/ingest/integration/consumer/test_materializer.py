@@ -59,8 +59,7 @@ async def test_materialize_kb_data(
     )
     await mz.initialize()
 
-    async with datamanagers.with_transaction() as txn:
-        assert await datamanagers.resources.count(txn, kbid=knowledgebox) == count
+    assert await datamanagers.atomic.resources.count(kbid=knowledgebox) == count
 
     await pubsub.publish(
         const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=knowledgebox),

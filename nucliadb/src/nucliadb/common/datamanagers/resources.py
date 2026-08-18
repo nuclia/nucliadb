@@ -39,6 +39,7 @@ from typing import Final, Literal, TypeAlias, cast
 
 import psycopg.errors
 import psycopg.sql
+from typing_extensions import assert_never
 
 from nucliadb.common.datamanagers.utils import (
     UNSET,
@@ -73,38 +74,69 @@ class ResourceData:
     extra: resources_pb2.Extra | None = UNSET_EXTRA
 
 
-def _serialize_resource_column(value):
-    if value is UNSET:
+ResourceColumnValueType = (
+    str
+    | None
+    | resources_pb2.Basic
+    | resources_pb2.Origin
+    | resources_pb2.Security
+    | resources_pb2.Extra
+)
+SerializedResourceColumnValueType = str | None | bytes
+
+
+def _serialize_resource_column(
+    value: _UnsetType | ResourceColumnValueType,
+) -> _UnsetType | SerializedResourceColumnValueType:
+    if isinstance(value, _UnsetType):
         return UNSET
-    if value is None:
+    elif value is None:
         return None
-    if isinstance(
-        value,
-        (
-            resources_pb2.Basic,
-            resources_pb2.Origin,
-            resources_pb2.Security,
-            resources_pb2.Extra,
-        ),
-    ):
+    elif isinstance(value, str):
+        return value
+    elif isinstance(value, resources_pb2.Basic):
         return value.SerializeToString()
-    return value
+    elif isinstance(value, resources_pb2.Origin):
+        return value.SerializeToString()
+    elif isinstance(value, resources_pb2.Security):
+        return value.SerializeToString()
+    elif isinstance(value, resources_pb2.Extra):
+        return value.SerializeToString()
+    else:  # pragma: no cover
+        assert_never(value)
 
 
-def _deserialize_resource_column(column: ResourceColumn, value):
+def _deserialize_resource_column(
+    column: ResourceColumn, value: SerializedResourceColumnValueType
+) -> ResourceColumnValueType:
     if value is None:
         return None
-    if column == "slug" or column == "shard":
+    if column == "slug":
         return str(value)
-    message_types = {
-        "basic": resources_pb2.Basic,
-        "origin": resources_pb2.Origin,
-        "security": resources_pb2.Security,
-        "extra": resources_pb2.Extra,
-    }
-    pb = message_types[column]()
-    pb.ParseFromString(bytes(value))
-    return pb
+    elif column == "shard":
+        return str(value)
+    elif column == "basic":
+        assert isinstance(value, bytes)
+        pb = resources_pb2.Basic()
+        pb.ParseFromString(value)
+        return pb
+    elif column == "origin":
+        assert isinstance(value, bytes)
+        pb_origin = resources_pb2.Origin()
+        pb_origin.ParseFromString(value)
+        return pb_origin
+    elif column == "security":
+        assert isinstance(value, bytes)
+        pb_security = resources_pb2.Security()
+        pb_security.ParseFromString(value)
+        return pb_security
+    elif column == "extra":
+        assert isinstance(value, bytes)
+        pb_extra = resources_pb2.Extra()
+        pb_extra.ParseFromString(value)
+        return pb_extra
+    else:  # pragma: no cover
+        assert_never(column)
 
 
 def _to_rid(value: uuid.UUID) -> str:
