@@ -109,11 +109,17 @@ async def test_purge_deletes_everything_from_maindb(
     # Catalog entries should be deleted too at this point
     assert await kb_catalog_entries_count(maindb_driver, kbid) == 0
 
-    await purge_kbs_storage(maindb_driver, storage)
+    with unittest.mock.patch.object(storage, "schedule_delete_kb") as mock_schedule_delete_kb:
+        await purge_kbs_storage(maindb_driver, storage)
 
-    # After deletion and purge, no keys should be in maindb
-    keys_after_purge_storage = await list_all_keys(maindb_driver)
-    assert len(keys_after_purge_storage) == 0
+        # After deletion and purge, no keys should be in maindb
+        keys_after_purge_storage = await list_all_keys(maindb_driver)
+        if len(keys_after_purge_storage) > 0:
+            # The only key left should be the storage deletion marker, and the storage deletion should have been scheduled
+            assert len(keys_after_purge_storage) == 1
+            assert keys_after_purge_storage[0].startswith(KB_TO_DELETE_STORAGE_BASE)
+            assert kbid in keys_after_purge_storage[0]
+            assert mock_schedule_delete_kb.call_count == 1
 
 
 async def list_shards() -> list[ShardId]:

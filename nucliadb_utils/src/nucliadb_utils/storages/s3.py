@@ -517,13 +517,12 @@ class S3Storage(Storage):
 
         if missing is False:
             try:
-                res = await self._s3aioclient.delete_bucket(Bucket=bucket_name)
+                await self._s3aioclient.delete_bucket(Bucket=bucket_name)
+                deleted = True
             except botocore.exceptions.ClientError as e:
                 error_code = parse_status_code(e)
                 if error_code == 409:
                     conflict = True
-                if error_code in (200, 204):
-                    deleted = True
         return deleted, conflict
 
     @backoff.on_exception(
