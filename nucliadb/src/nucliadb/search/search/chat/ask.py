@@ -19,7 +19,6 @@
 #
 import dataclasses
 import functools
-import json
 from collections.abc import AsyncGenerator
 from typing import cast
 
@@ -54,12 +53,10 @@ from nucliadb.search.search.chat.exceptions import (
 from nucliadb.search.search.chat.prompt import PromptContextBuilder
 from nucliadb.search.search.chat.query import (
     NOT_ENOUGH_CONTEXT_ANSWER,
-    ChatAuditor,
     add_resource_filter,
     get_answer_stream,
     get_find_results,
     get_relations_results,
-    maybe_audit_chat,
     rephrase_query,
     sorted_prompt_context_list,
     tokens_to_chars,
@@ -155,7 +152,7 @@ class AskResult:
         predict_answer_stream: AsyncGenerator[GenerativeChunk, None] | None,
         prompt_context: PromptContext,
         prompt_context_order: PromptContextOrder,
-        auditor: ChatAuditor,
+        auditor: None,
         metrics: AskMetrics,
         best_matches: list[RetrievalMatch],
         debug_chat_model: ChatModel | None,
@@ -171,7 +168,7 @@ class AskResult:
         self.prompt_context = prompt_context
         self.debug_chat_model = debug_chat_model
         self.prompt_context_order = prompt_context_order
-        self.auditor: ChatAuditor = auditor
+        self.auditor = None
         self.metrics: AskMetrics = metrics
         self.best_matches: list[RetrievalMatch] = best_matches
         self.augmented_context = augmented_context
@@ -287,21 +284,6 @@ class AskResult:
         yield StatusAskResponseItem(
             code=self.status_code.value,
             status=self.status_code.prettify(),
-        )
-
-        # Audit the answer
-        if self._object is None:
-            audit_answer = self._answer_text.encode("utf-8")
-        else:
-            audit_answer = json.dumps(self._object.object).encode("utf-8")
-        self.auditor.audit(
-            text_answer=audit_answer,
-            text_reasoning=self._reasoning_text,
-            generative_answer_time=self.metrics["stream_predict_answer"],
-            generative_answer_first_chunk_time=self.metrics.get_first_chunk_time() or 0,
-            generative_reasoning_first_chunk_time=self.metrics.get_first_reasoning_chunk_time(),
-            rephrase_time=self.metrics.get("rephrase"),
-            status_code=self.status_code,
         )
 
         yield AugmentedContextResponseItem(augmented=self.augmented_context)
@@ -597,28 +579,6 @@ async def ask(
                 resource=resource,
             )
     except NoRetrievalResultsError as err:
-        maybe_audit_chat(
-            kbid=kbid,
-            user_id=user_id,
-            client_type=client_type,
-            origin=origin,
-            generative_answer_time=0,
-            generative_answer_first_chunk_time=0,
-            generative_reasoning_first_chunk_time=None,
-            rephrase_time=metrics.get("rephrase"),
-            user_query=user_query,
-            rephrased_query=rephrased_query,
-            retrieval_rephrase_query=err.main_query.rephrased_query if err.main_query else None,
-            text_answer=b"",
-            text_reasoning=None,
-            status_code=AnswerStatusCode.NO_RETRIEVAL_DATA,
-            chat_history=chat_history,
-            query_context={},
-            query_context_order={},
-            learning_id=None,
-            model=ask_request.generative_model,
-        )
-
         # If a retrieval was attempted but no results were found,
         # early return the ask endpoint without querying the generative model
         return NotEnoughContextAskResult(
@@ -677,30 +637,15 @@ async def ask(
     )
 
     nuclia_learning_id = None
-    nuclia_learning_model = None
     predict_answer_stream = None
     if ask_request.generate_answer:
         with metrics.time("stream_start"):
             (
                 nuclia_learning_id,
-                nuclia_learning_model,
+                _nuclia_learning_model,
                 predict_answer_stream,
             ) = await get_answer_stream(kbid=kbid, item=chat_model, extra_headers=extra_predict_headers)
 
-    auditor = ChatAuditor(
-        kbid=kbid,
-        user_id=user_id,
-        client_type=client_type,
-        origin=origin,
-        user_query=user_query,
-        rephrased_query=rephrased_query,
-        retrieval_rephrased_query=retrieval_results.main_query.rephrased_query,
-        chat_history=chat_history,
-        learning_id=nuclia_learning_id,
-        query_context=prompt_context,
-        query_context_order=prompt_context_order,
-        model=nuclia_learning_model,
-    )
     return AskResult(
         kbid=kbid,
         ask_request=ask_request,
@@ -710,7 +655,7 @@ async def ask(
         predict_answer_stream=predict_answer_stream,
         prompt_context=prompt_context,
         prompt_context_order=prompt_context_order,
-        auditor=auditor,
+        auditor=None,
         metrics=metrics,
         best_matches=retrieval_results.best_matches,
         debug_chat_model=chat_model,

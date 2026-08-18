@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from nidx_protos.nodereader_pb2 import SearchRequest
 
-from nucliadb_protos.audit_pb2 import AuditRequest, ChatContext, RetrievedContext
+from nucliadb_protos.audit_pb2 import AuditRequest
 from nucliadb_utils.audit.stream import (
     AuditedEndpoint,
     RequestContext,
@@ -121,53 +121,6 @@ async def test_search(audit_storage: StreamAuditStorage, nats):
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
 
 
-async def test_chat(audit_storage: StreamAuditStorage, nats):
-    context = RequestContext()
-    request_context_var.set(context)
-
-    audit_storage.chat(
-        kbid="kbid",
-        user="user",
-        client_type=0,
-        origin="origin",
-        generative_answer_time=1,
-        generative_answer_first_chunk_time=1,
-        generative_reasoning_first_chunk_time=1,
-        rephrase_time=1,
-        question="foo",
-        rephrased_question="rephrased",
-        retrieval_rephrased_question="rephrased_user_query_for_better_retrieval",
-        chat_context=[ChatContext(author="USER", text="epa")],
-        retrieved_context=[RetrievedContext(text="epa", text_block_id="some/id/path")],
-        answer="bar",
-        reasoning="reasoning",
-        learning_id="learning_id",
-        status_code=0,
-        model="xx",
-    )
-
-    audit_storage.send(context.audit_request)
-    await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
-
-    arg = nats.jetstream().publish.call_args[0][1]
-    pb = AuditRequest()
-    pb.ParseFromString(arg)
-
-    assert pb.retrieval_rephrased_question == "rephrased_user_query_for_better_retrieval"
-    assert pb.chat.question == "foo"
-    assert pb.chat.rephrased_question == "rephrased"
-    assert pb.chat.answer == "bar"
-    assert pb.chat.learning_id == "learning_id"
-    assert pb.chat.status_code == 0
-    assert pb.chat.model == "xx"
-    assert pb.chat.chat_context[0].author == "USER"
-    assert pb.chat.chat_context[0].text == "epa"
-    assert pb.chat.retrieved_context[0].text_block_id == "some/id/path"
-    assert pb.chat.retrieved_context[0].text == "epa"
-    assert pb.generative_answer_first_chunk_time == 1
-    assert pb.generative_reasoning_first_chunk_time == 1
-
-
 # ---------------------------------------------------------------------------
 # Tests for valid_payload
 # ---------------------------------------------------------------------------
@@ -213,25 +166,6 @@ class TestValidUserRequest:
         result = await valid_payload(request, AuditedEndpoint.CHAT)
         assert result is None
 
-    # --- ask endpoint ---
-
-    @pytest.mark.asyncio
-    async def test_valid_ask_body_returns_json(self, make_request):
-        payload = {"query": "what is nucliadb?"}
-        request = make_request("POST", "/kb/x/ask", body=payload)
-        result = await valid_payload(request, AuditedEndpoint.ASK)
-        assert result is not None
-        parsed = json.loads(result)
-        assert parsed["query"] == "what is nucliadb?"
-
-    @pytest.mark.asyncio
-    async def test_invalid_ask_body_missing_required_field_returns_none(self, make_request):
-        # 'query' is required for AskRequest
-        payload = {}
-        request = make_request("POST", "/kb/x/ask", body=payload)
-        result = await valid_payload(request, AuditedEndpoint.ASK)
-        assert result is None
-
     # --- find / search endpoints (no required fields) ---
 
     @pytest.mark.asyncio
@@ -250,9 +184,9 @@ class TestValidUserRequest:
 
     @pytest.mark.asyncio
     async def test_invalid_json_returns_none(self, make_request):
-        request = make_request("POST", "/kb/x/ask", body=None)
+        request = make_request("POST", "/kb/x/find", body=None)
         request.json = AsyncMock(side_effect=json.JSONDecodeError("bad json", "", 0))
-        result = await valid_payload(request, AuditedEndpoint.ASK)
+        result = await valid_payload(request, AuditedEndpoint.FIND)
         assert result is None
 
     # --- audit_metadata field pass-through ---
@@ -305,8 +239,8 @@ class TestValidQueryParams:
 
     @pytest.mark.asyncio
     async def test_empty_query_params_returns_empty_dict(self, make_request):
-        request = make_request("/kb/x/ask", query={})
-        result = await valid_query_params(request, AuditedEndpoint.ASK)
+        request = make_request("/kb/x/find", query={})
+        result = await valid_query_params(request, AuditedEndpoint.FIND)
         assert result is not None
         assert json.loads(result) == {}
 

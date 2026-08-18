@@ -371,68 +371,6 @@ def tokens_to_chars(n_tokens: int) -> int:
     return n_tokens * 3
 
 
-class ChatAuditor:
-    def __init__(
-        self,
-        kbid: str,
-        user_id: str,
-        client_type: NucliaDBClientType,
-        origin: str,
-        user_query: str,
-        rephrased_query: str | None,
-        retrieval_rephrased_query: str | None,
-        chat_history: list[ChatContextMessage],
-        learning_id: str | None,
-        query_context: PromptContext,
-        query_context_order: PromptContextOrder,
-        model: str | None,
-    ):
-        self.kbid = kbid
-        self.user_id = user_id
-        self.client_type = client_type
-        self.origin = origin
-        self.user_query = user_query
-        self.rephrased_query = rephrased_query
-        self.retrieval_rephrased_query = retrieval_rephrased_query
-        self.chat_history = chat_history
-        self.learning_id = learning_id
-        self.query_context = query_context
-        self.query_context_order = query_context_order
-        self.model = model
-
-    def audit(
-        self,
-        text_answer: bytes,
-        text_reasoning: str | None,
-        generative_answer_time: float,
-        generative_answer_first_chunk_time: float,
-        generative_reasoning_first_chunk_time: float | None,
-        rephrase_time: float | None,
-        status_code: AnswerStatusCode,
-    ):
-        maybe_audit_chat(
-            kbid=self.kbid,
-            user_id=self.user_id,
-            client_type=self.client_type,
-            origin=self.origin,
-            user_query=self.user_query,
-            rephrased_query=self.rephrased_query,
-            retrieval_rephrase_query=self.retrieval_rephrased_query,
-            generative_answer_time=generative_answer_time,
-            generative_answer_first_chunk_time=generative_answer_first_chunk_time,
-            generative_reasoning_first_chunk_time=generative_reasoning_first_chunk_time,
-            rephrase_time=rephrase_time,
-            text_answer=text_answer,
-            text_reasoning=text_reasoning,
-            status_code=status_code,
-            chat_history=self.chat_history,
-            query_context=self.query_context,
-            query_context_order=self.query_context_order,
-            learning_id=self.learning_id or "unknown",
-            model=self.model,
-        )
-
-
 def sorted_prompt_context_list(context: PromptContext, order: PromptContextOrder) -> list[str]:
     """
     context = {"x": "foo", "y": "bar"}
