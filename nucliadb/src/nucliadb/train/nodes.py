@@ -124,7 +124,7 @@ class TrainShardManager(manager.KBShardManager):
     async def kb_resources(self, request: GetResourcesRequest) -> AsyncIterator[TrainResource]:
         async with self.driver.ro_transaction() as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
-            async for rid in datamanagers.resources.iterate_resource_ids(kbid=request.kb.uuid):
+            async for rid in datamanagers.resources.iter(kbid=request.kb.uuid):
                 resource = await kb.get(rid)
                 if resource is not None:
                     yield await generate_train_resource(resource, request.metadata)

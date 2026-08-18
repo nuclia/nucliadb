@@ -191,7 +191,7 @@ async def test_resource_crud_sync(nucliadb_writer: AsyncClient, knowledgebox: st
     assert "elapsed" in data
     rid = data["uuid"]
 
-    assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is True
+    assert (await datamanagers.atomic.resources.exists(kbid=kbid, rid=rid)) is True
 
     # Test update resource
     resp = await nucliadb_writer.patch(
@@ -213,7 +213,7 @@ async def test_resource_crud_sync(nucliadb_writer: AsyncClient, knowledgebox: st
     )
     assert resp.status_code == 204
 
-    assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is False
+    assert (await datamanagers.atomic.resources.exists(kbid=kbid, rid=rid)) is False
 
 
 @pytest.mark.deploy_modes("component")
@@ -245,7 +245,7 @@ async def test_create_resource_async(
     assert "elapsed" in data
     assert data["elapsed"] is not None
     rid = data["uuid"]
-    assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is True
+    assert (await datamanagers.atomic.resources.exists(kbid=kbid, rid=rid)) is True
     assert spy.call_args.kwargs["wait"] is True
 
     # now without waiting for commit
@@ -264,7 +264,7 @@ async def test_create_resource_async(
     assert "elapsed" in data
     assert data["elapsed"] is None
     rid = data["uuid"]
-    assert (await datamanagers.atomic.resources.resource_exists(kbid=kbid, rid=rid)) is False, (
+    assert (await datamanagers.atomic.resources.exists(kbid=kbid, rid=rid)) is False, (
         "shouldn't be ingest yet"
     )
     assert spy.call_args.kwargs["wait"] is False

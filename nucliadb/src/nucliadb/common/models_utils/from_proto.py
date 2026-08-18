@@ -54,6 +54,7 @@ from nucliadb_models.metadata import (
     UserMetadata,
 )
 from nucliadb_models.resource import KnowledgeBoxConfig
+from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.synonyms import KnowledgeBoxSynonyms
 from nucliadb_models.text import FieldText
 from nucliadb_protos import knowledgebox_pb2, resources_pb2, utils_pb2, writer_pb2
@@ -206,6 +207,13 @@ def extra(message: resources_pb2.Extra) -> Extra:
             always_print_fields_with_no_presence=False,
         )
     )
+
+
+def security(message: resources_pb2.Security) -> ResourceSecurity:
+    result = ResourceSecurity(access_groups=[])
+    for gid in message.access_groups:
+        result.access_groups.append(gid)
+    return result
 
 
 def metadata(message: resources_pb2.Metadata) -> Metadata:

@@ -49,14 +49,14 @@ def processor(driver):
 @pytest.fixture()
 def resource():
     mock = MagicMock()
-    mock.set_basic = AsyncMock()
+    mock.set_data = AsyncMock()
     yield mock
 
 
 @pytest.fixture()
 def kb():
     mock = MagicMock(kbid="kbid")
-    mock.get_resource_shard_id = AsyncMock()
+    mock.get_shard = AsyncMock()
     mock.get_resource_shard = AsyncMock()
     yield mock
 
@@ -74,19 +74,19 @@ async def test_commit_slug(processor: Processor, txn, resource):
 
 
 async def test_mark_resource_error(processor: Processor, txn, resource, kb):
-    await processor._mark_resource_error(kb, resource, partition="partition", seqid=1)
+    await processor._mark_resource_error(kb, resource)
     txn.commit.assert_called_once()
-    resource.set_basic.assert_awaited_once()
+    resource.set_data.assert_awaited_once()
 
 
 async def test_mark_resource_error_handle_error(processor: Processor, kb, resource, txn):
-    resource.set_basic.side_effect = Exception("test")
-    await processor._mark_resource_error(kb, resource, partition="partition", seqid=1)
+    resource.set_data.side_effect = Exception("test")
+    await processor._mark_resource_error(kb, resource)
     txn.commit.assert_not_called()
 
 
 async def test_mark_resource_error_skip_no_resource(processor: Processor, kb, driver, txn):
-    await processor._mark_resource_error(kb, None, partition="partition", seqid=1)
+    await processor._mark_resource_error(kb, None)
     txn.commit.assert_not_called()
 
 

@@ -561,7 +561,7 @@ async def create_resource(
         basic.created.FromDatetime(datetime.now(timezone.utc))
         basic.modified.FromDatetime(datetime.now(timezone.utc))
 
-        await test_resource.set_basic(basic)
+        await test_resource.set_data(basic=basic)
 
         # 1.2 USER RELATIONS
 
@@ -583,7 +583,7 @@ async def create_resource(
         o2.created.FromDatetime(datetime.now())
         o2.modified.FromDatetime(datetime.now())
 
-        await test_resource.set_origin(o2)
+        await test_resource.set_data(origin=o2)
 
         # 2.  FIELDS
         #

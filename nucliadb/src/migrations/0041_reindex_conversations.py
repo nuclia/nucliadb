@@ -71,9 +71,7 @@ async def reindex_resource(
 
         # Get the shard for the resource
         shard: ShardObject | None = None
-        shard_id = await datamanagers.resources.get_resource_shard_id(
-            rs_txn, kbid=kbid, rid=rid, for_update=False
-        )
+        shard_id = await datamanagers.resources.get_shard(rs_txn, kbid=kbid, rid=rid, for_update=False)
         if shard_id is not None:
             shard = next((shard for shard in kb_shards.shards if shard.shard == shard_id), None)
         if shard is None:

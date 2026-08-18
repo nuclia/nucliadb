@@ -31,7 +31,6 @@ from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
@@ -281,15 +280,12 @@ async def test_pagination_resources(processor: Processor, knowledgebox: str):
         await processor.process(message=message, seqid=-1, transaction_check=False)
         # Give processed data some time to reach the node
 
-    driver = get_driver()
-
     t0 = time()
 
     while time() - t0 < 30:  # wait max 30 seconds for it
-        async with driver.ro_transaction() as txn:
-            count = await datamanagers.resources.calculate_number_of_resources(txn, kbid=knowledgebox)
-            if count == amount:
-                break
+        count = await datamanagers.atomic.resources.count(kbid=knowledgebox)
+        if count == amount:
+            break
         print(f"got {count}, retrying")
         await asyncio.sleep(2)
 

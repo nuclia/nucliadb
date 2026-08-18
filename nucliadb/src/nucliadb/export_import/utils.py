@@ -199,7 +199,7 @@ async def set_labels(context: ApplicationContext, kbid: str, labels: kb_pb2.Labe
 
 
 async def iter_kb_resource_uuids(context: ApplicationContext, kbid: str) -> AsyncGenerator[str, None]:
-    async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+    async for rid in datamanagers.resources.iter(kbid=kbid):
         yield rid
 
 

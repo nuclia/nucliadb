@@ -208,7 +208,7 @@ async def schedule_resource_indexing(app_context: ApplicationContext, kbid: str)
             return
 
     batch = []
-    async for resource_id in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+    async for resource_id in datamanagers.resources.iter(kbid=kbid):
         batch.append(resource_id)
 
         if len(batch) > 100:
@@ -300,9 +300,7 @@ async def _index_resource_to_rollover_index(
 ) -> None:
     async with resource_index_semaphore:
         async with datamanagers.with_transaction() as txn:
-            shard_id = await datamanagers.resources.get_resource_shard_id(
-                txn, kbid=kbid, rid=resource_id
-            )
+            shard_id = await datamanagers.resources.get_shard(txn, kbid=kbid, rid=resource_id)
         if shard_id is None:
             logger.warning(
                 "Shard id not found for resource. Skipping indexing as it may have been deleted",
@@ -491,7 +489,7 @@ async def validate_indexed_data(
     logger.info("Validating indexed data", extra=extra)
 
     repaired_resources: list[str] = []
-    async for resource_id in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+    async for resource_id in datamanagers.resources.iter(kbid=kbid):
         async with datamanagers.with_ro_transaction() as txn:
             indexed_data = await datamanagers.rollover.get_indexed_data(
                 txn, kbid=kbid, resource_id=resource_id
@@ -503,7 +501,7 @@ async def validate_indexed_data(
                 continue
         else:
             async with datamanagers.with_transaction() as txn:
-                shard_id = await datamanagers.resources.get_resource_shard_id(  # type: ignore[assignment]
+                shard_id = await datamanagers.resources.get_shard(  # type: ignore[assignment]
                     txn, kbid=kbid, rid=resource_id
                 )
             if shard_id is None:

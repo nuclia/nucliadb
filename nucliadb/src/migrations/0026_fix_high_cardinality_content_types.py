@@ -45,7 +45,7 @@ async def migrate(context: ExecutionContext) -> None: ...
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     if kbid not in AFFECTED_KBS:
         return
-    async for rid in datamanagers.resources.iterate_resource_ids(kbid=kbid):
+    async for rid in datamanagers.resources.iter(kbid=kbid):
         async with datamanagers.with_rw_transaction() as txn:
             basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
             if not basic or not basic.icon:
@@ -57,5 +57,5 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
                 continue
             logger.info("Fixing content type for resource", extra={"kbid": kbid, "rid": rid})
             basic.icon = "multipart/form-data"
-            await datamanagers.resources.set_basic(txn, kbid=kbid, rid=rid, basic=basic)
+            await datamanagers.resources.set(txn, kbid=kbid, rid=rid, basic=basic)
             await txn.commit()

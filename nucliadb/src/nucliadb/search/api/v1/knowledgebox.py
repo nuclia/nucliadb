@@ -109,7 +109,7 @@ async def _kb_counters(
     Index size is estimated from the paragraphs count.
     """
     counters = KnowledgeboxCounters(
-        resources=0,
+        resources=await datamanagers.atomic.resources.count(kbid=kbid),
         paragraphs=0,
         fields=0,
         sentences=0,
@@ -120,38 +120,18 @@ async def _kb_counters(
         index_counts = await external_index_manager.get_index_counts()
         counters.paragraphs = index_counts.paragraphs
         counters.sentences = index_counts.sentences
-        is_small_kb = index_counts.paragraphs < MAX_PARAGRAPHS_FOR_SMALL_KB
-        resource_count = await get_resources_count(kbid, force_calculate=is_small_kb)
         # TODO: Find a way to query the fields count and size from the external index provider or use the catalog
-        counters.resources = counters.fields = resource_count
+        counters.fields = counters.resources
         counters.index_size = counters.paragraphs * AVG_PARAGRAPH_SIZE_BYTES
     else:
         node_index_counts, queried_shards = await get_node_index_counts(kbid)
         counters.fields = node_index_counts.fields
         counters.paragraphs = node_index_counts.paragraphs
         counters.sentences = node_index_counts.sentences
-        is_small_kb = node_index_counts.paragraphs < MAX_PARAGRAPHS_FOR_SMALL_KB
-        resource_count = await get_resources_count(kbid, force_calculate=is_small_kb)
-        counters.resources = resource_count
         counters.index_size = node_index_counts.size_bytes
     if debug and queried_shards is not None:
         counters.shards = queried_shards
     return counters
-
-
-async def get_resources_count(kbid: str, force_calculate: bool = False) -> int:
-    async with datamanagers.with_ro_transaction() as txn:
-        if force_calculate:
-            # For small kbs, this is faster and more up to date
-            resource_count = await datamanagers.resources.calculate_number_of_resources(txn, kbid=kbid)
-        else:
-            resource_count = await datamanagers.resources.get_number_of_resources(txn, kbid=kbid)
-            if resource_count == -1:
-                # WARNING: standalone, this value will never be cached
-                resource_count = await datamanagers.resources.calculate_number_of_resources(
-                    txn, kbid=kbid
-                )
-    return resource_count
 
 
 async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
