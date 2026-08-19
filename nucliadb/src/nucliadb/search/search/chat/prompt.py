@@ -213,7 +213,7 @@ async def get_expanded_conversation_messages(
     resource = await kb.get(rid)
     if resource is None:  # pragma: no cover
         return []
-    field_obj: Conversation = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=False)
+    field_obj: Conversation = await resource.get_field(field_id, FIELD_TYPE_STR_TO_PB["c"], load=True)
     found_message, found_page, found_idx = await find_conversation_message(
         field_obj=field_obj, mident=mident
     )
@@ -835,7 +835,7 @@ async def conversation_prompt_context(
                     continue
 
                 field_obj: Conversation = await resource.get_field(
-                    field_id, FIELD_TYPE_STR_TO_PB["c"], load=False
+                    field_id, FIELD_TYPE_STR_TO_PB["c"], load=True
                 )
                 cmetadata = await field_obj.get_metadata()
                 if cmetadata is None:
@@ -925,7 +925,7 @@ async def conversation_prompt_context(
                     for attachment in attachments:
                         ops += 1
                         field: File = await resource.get_field(
-                            attachment.field_id, attachment.field_type, load=False
+                            attachment.field_id, attachment.field_type, load=True
                         )
                         extracted_text = await field.get_extracted_text()
                         if extracted_text is not None:

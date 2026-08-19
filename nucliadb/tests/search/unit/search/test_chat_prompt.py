@@ -145,7 +145,7 @@ async def test_get_expanded_conversation_messages_question(kb, messages):
     )
 
     kb.get.assert_called_with("rid")
-    kb.get.return_value.get_field.assert_called_with("field_id", FIELD_TYPE_STR_TO_PB["c"], load=False)
+    kb.get.return_value.get_field.assert_called_with("field_id", FIELD_TYPE_STR_TO_PB["c"], load=True)
 
 
 async def test_get_expanded_conversation_messages_missing(kb, messages):
