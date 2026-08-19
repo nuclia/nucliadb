@@ -387,7 +387,7 @@ async def get_shard(txn: Transaction, *, kbid: str, rid: str, for_update: bool =
 
 @observer.wrap({"type": "resources", "op": "get_shards"})
 async def get_shards(txn: Transaction, *, kbid: str, rids: list[str]) -> dict[str, str]:
-    """Return a mapping of rid → shard for the given rids in a single query."""
+    """Return a mapping of rid to shard for the given rids in a single query."""
     result: dict[str, str] = {}
     if not rids:
         return result
