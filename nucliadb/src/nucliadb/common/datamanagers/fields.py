@@ -41,7 +41,7 @@ from typing import Sequence
 
 from google.protobuf.message import Message
 
-from nucliadb.common.datamanagers.utils import _pg_cursor
+from nucliadb.common.datamanagers.utils import _pg_cursor, observer
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb_protos import resources_pb2 as rpb2
@@ -52,6 +52,7 @@ from nucliadb_protos import writer_pb2 as wpb2
 # ---------------------------------------------------------------------------
 
 
+@observer.wrap({"type": "field", "op": "set_status"})
 async def set_status(
     txn: Transaction,
     *,
@@ -79,6 +80,7 @@ async def set_status(
         )
 
 
+@observer.wrap({"type": "field", "op": "set"})
 async def set(
     txn: Transaction,
     *,
@@ -106,6 +108,7 @@ async def set(
         )
 
 
+@observer.wrap({"type": "field", "op": "delete"})
 async def delete(
     txn: Transaction,
     *,
@@ -135,6 +138,7 @@ async def delete(
 # ---------------------------------------------------------------------------
 
 
+@observer.wrap({"type": "field", "op": "get_raw"})
 async def get_raw(
     txn: Transaction,
     *,
@@ -163,6 +167,7 @@ async def get_raw(
         return bytes(row[0])
 
 
+@observer.wrap({"type": "field", "op": "get_status"})
 async def get_status(
     txn: Transaction,
     *,
@@ -193,6 +198,7 @@ async def get_status(
         return pb
 
 
+@observer.wrap({"type": "field", "op": "get_statuses"})
 async def get_statuses(
     txn: Transaction,
     *,
@@ -238,6 +244,7 @@ def _to_abbr(field_type: rpb2.FieldType.ValueType) -> str:
     return from_proto.field_type_name(field_type).abbreviation()
 
 
+@observer.wrap({"type": "field", "op": "get_all_field_ids"})
 async def get_all_field_ids(
     txn: Transaction,
     *,
@@ -262,7 +269,8 @@ async def get_all_field_ids(
         return pb
 
 
-async def has_field(
+@observer.wrap({"type": "field", "op": "exists"})
+async def exists(
     txn: Transaction,
     *,
     kbid: str,

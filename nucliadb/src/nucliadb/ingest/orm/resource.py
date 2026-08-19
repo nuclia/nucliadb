@@ -328,7 +328,7 @@ class Resource:
         self.modified = True
 
     async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
-        return await datamanagers.fields.has_field(
+        return await datamanagers.fields.exists(
             self.txn,
             kbid=self.kbid,
             rid=self.uuid,

@@ -89,7 +89,7 @@ async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, 
     async with maindb_driver.ro_transaction() as txn:
         all_fields = await datamanagers.fields.get_all_field_ids(txn, kbid=kbid, rid=rid)
         assert all_fields is None or len(all_fields.fields) == 0
-        assert (await datamanagers.fields.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is False
+        assert (await datamanagers.fields.exists(txn, kbid=kbid, rid=rid, field_id=field)) is False
 
     # set a field for a resource
 
@@ -111,7 +111,7 @@ async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, 
         assert all_fields is not None
         assert len(all_fields.fields) == 1
 
-        assert (await datamanagers.fields.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is True
+        assert (await datamanagers.fields.exists(txn, kbid=kbid, rid=rid, field_id=field)) is True
 
     # set no fields
 
@@ -126,4 +126,4 @@ async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, 
         assert all_fields is not None
         assert len(all_fields.fields) == 0
 
-        assert (await datamanagers.fields.has_field(txn, kbid=kbid, rid=rid, field_id=field)) is False
+        assert (await datamanagers.fields.exists(txn, kbid=kbid, rid=rid, field_id=field)) is False
