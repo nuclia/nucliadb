@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import copy
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -30,7 +29,6 @@ from nucliadb.common import datamanagers
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import from_proto
-from nucliadb.ingest.fields.base import Field
 from nucliadb.search import logger
 from nucliadb.search.augmentor.fields import get_field_extracted_text
 from nucliadb.search.search import cache
@@ -49,17 +47,14 @@ from nucliadb_models.search import (
     ImageRagStrategy,
     MetadataExtensionStrategy,
     MetadataExtensionType,
-    NeighbouringParagraphsStrategy,
     PromptContext,
     PromptContextImages,
     PromptContextOrder,
     RagStrategy,
     RagStrategyName,
     TextBlockAugmentationType,
-    TextPosition,
 )
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.resources_pb2 import ExtractedText, FieldComputedMetadata
 from nucliadb_utils.asyncio_utils import ConcurrentRunner, run_concurrently
 
 MAX_RESOURCE_TASKS = 5
@@ -550,144 +545,6 @@ async def get_matching_field_ids(
     return extend_field_ids
 
 
-async def get_orm_field(kbid: str, field_id: FieldId) -> Field | None:
-    resource = await cache.get_resource(kbid, field_id.rid)
-    if resource is None:  # pragma: no cover
-        return None
-    return await resource.get_field(key=field_id.key, type=field_id.pb_type, load=False)
-
-
-async def neighbouring_paragraphs_prompt_context(
-    context: CappedPromptContext,
-    kbid: str,
-    ordered_text_blocks: list[FindParagraph],
-    strategy: NeighbouringParagraphsStrategy,
-    metrics: Metrics,
-    augmented_context: AugmentedContext,
-) -> None:
-    """
-    This function will get the paragraph texts and then craft a context with the neighbouring paragraphs of the
-    paragraphs in the ordered_paragraphs list.
-    """
-    retrieved_paragraphs_ids = [
-        ParagraphId.from_string(text_block.id) for text_block in ordered_text_blocks
-    ]
-    unique_field_ids = list({pid.field_id for pid in retrieved_paragraphs_ids})
-
-    # Get extracted texts and metadatas for all fields
-    fm_ops = []
-    et_ops = []
-    for field_id in unique_field_ids:
-        field = await get_orm_field(kbid, field_id)
-        if field is None:
-            continue
-        fm_ops.append(asyncio.create_task(field.get_field_metadata()))
-        et_ops.append(asyncio.create_task(field.get_extracted_text()))
-
-    field_metadatas: dict[FieldId, FieldComputedMetadata] = {
-        fid: fm for fid, fm in zip(unique_field_ids, await asyncio.gather(*fm_ops)) if fm is not None
-    }
-    extracted_texts: dict[FieldId, ExtractedText] = {
-        fid: et for fid, et in zip(unique_field_ids, await asyncio.gather(*et_ops)) if et is not None
-    }
-
-    def _get_paragraph_text(extracted_text: ExtractedText, pid: ParagraphId) -> str:
-        if pid.field_id.subfield_id:
-            text = extracted_text.split_text.get(pid.field_id.subfield_id) or ""
-        else:
-            text = extracted_text.text
-        return text[pid.paragraph_start : pid.paragraph_end]
-
-    for pid in retrieved_paragraphs_ids:
-        # Add the retrieved paragraph first
-        field_extracted_text = extracted_texts.get(pid.field_id, None)
-        if field_extracted_text is None:
-            continue
-        ptext = _get_paragraph_text(field_extracted_text, pid)
-        if ptext and pid.full() not in context:
-            context[pid.full()] = ptext
-
-        # Now add the neighbouring paragraphs
-        field_extracted_metadata = field_metadatas.get(pid.field_id, None)
-        if field_extracted_metadata is None:
-            continue
-
-        field_pids = [
-            ParagraphId(
-                field_id=pid.field_id,
-                paragraph_start=p.start,
-                paragraph_end=p.end,
-            )
-            for p in field_extracted_metadata.metadata.paragraphs
-        ]
-        try:
-            index = field_pids.index(pid)
-        except ValueError:
-            continue
-
-        for neighbour_index in get_neighbouring_indices(
-            index=index,
-            before=strategy.before,
-            after=strategy.after,
-            field_pids=field_pids,
-        ):
-            if neighbour_index == index:
-                # Already handled above
-                continue
-            try:
-                npid = field_pids[neighbour_index]
-            except IndexError:
-                continue
-            if npid in retrieved_paragraphs_ids or npid.full() in context:
-                # Already added
-                continue
-            ptext = _get_paragraph_text(field_extracted_text, npid)
-            if not ptext:
-                continue
-            context[npid.full()] = ptext
-            augmented_context.paragraphs[npid.full()] = AugmentedTextBlock(
-                id=npid.full(),
-                text=ptext,
-                position=get_text_position(npid, neighbour_index, field_extracted_metadata),
-                parent=pid.full(),
-                augmentation_type=TextBlockAugmentationType.NEIGHBOURING_PARAGRAPHS,
-            )
-
-    metrics.set("neighbouring_paragraphs_ops", len(augmented_context.paragraphs))
-
-
-def get_text_position(
-    paragraph_id: ParagraphId, index: int, field_metadata: FieldComputedMetadata
-) -> TextPosition | None:
-    if paragraph_id.field_id.subfield_id:
-        metadata = field_metadata.split_metadata[paragraph_id.field_id.subfield_id]
-    else:
-        metadata = field_metadata.metadata
-    try:
-        pmetadata = metadata.paragraphs[index]
-    except IndexError:
-        return None
-    page_number = None
-    if pmetadata.HasField("page"):
-        page_number = pmetadata.page.page
-    return TextPosition(
-        page_number=page_number,
-        index=index,
-        start=pmetadata.start,
-        end=pmetadata.end,
-        start_seconds=list(pmetadata.start_seconds),
-        end_seconds=list(pmetadata.end_seconds),
-    )
-
-
-def get_neighbouring_indices(
-    index: int, before: int, after: int, field_pids: list[ParagraphId]
-) -> list[int]:
-    lb_index = max(0, index - before)
-    ub_index = min(len(field_pids), index + after + 1)
-    return list(range(lb_index, index)) + list(range(index + 1, ub_index))
-
-
 async def hierarchy_prompt_context(
     context: CappedPromptContext,
     kbid: str,
@@ -869,7 +726,6 @@ class PromptContextBuilder:
 
         full_resource: FullResourceStrategy | None = None
         hierarchy: HierarchyResourceStrategy | None = None
-        neighbouring_paragraphs: NeighbouringParagraphsStrategy | None = None
         field_extension: FieldExtensionStrategy | None = None
         metadata_extension: MetadataExtensionStrategy | None = None
         for strategy in self.strategies:
@@ -886,7 +742,7 @@ class PromptContextBuilder:
             elif strategy.name == RagStrategyName.HIERARCHY:
                 hierarchy = cast(HierarchyResourceStrategy, strategy)
             elif strategy.name == RagStrategyName.NEIGHBOURING_PARAGRAPHS:
-                neighbouring_paragraphs = cast(NeighbouringParagraphsStrategy, strategy)
+                pass
             elif strategy.name == RagStrategyName.METADATA_EXTENSION:
                 metadata_extension = cast(MetadataExtensionStrategy, strategy)
             elif strategy.name not in strategies_not_handled_here:  # pragma: no cover
@@ -923,15 +779,6 @@ class PromptContextBuilder:
                 self.kbid,
                 self.ordered_paragraphs,
                 hierarchy,
-                self.metrics,
-                self.augmented_context,
-            )
-        if neighbouring_paragraphs:
-            await neighbouring_paragraphs_prompt_context(
-                context,
-                self.kbid,
-                self.ordered_paragraphs,
-                neighbouring_paragraphs,
                 self.metrics,
                 self.augmented_context,
             )

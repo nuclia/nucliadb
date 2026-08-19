@@ -37,10 +37,8 @@ from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     AskRequest,
     AskResponseItem,
-    AugmentedTextBlock,
     ChatRequest,
     FieldExtensionStrategy,
-    FindParagraph,
     FindRequest,
     FullResourceStrategy,
     HierarchyResourceStrategy,
@@ -896,24 +894,6 @@ async def test_ask_assert_audit_retrieval_contexts(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_ask_rag_strategy_neighbouring_paragraphs(
-    nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
-):
-    resp = await nucliadb_reader.post(
-        f"/kb/{standalone_knowledgebox}/ask",
-        json={
-            "query": "title",
-            "rag_strategies": [{"name": "neighbouring_paragraphs", "before": 2, "after": 2}],
-            "debug": True,
-        },
-        headers={"X-Synchronous": "True"},
-    )
-    assert resp.status_code == 200
-    ask_response = SyncAskResponse.model_validate_json(resp.content)
-    assert ask_response.prompt_context is not None
-
-
-@pytest.mark.deploy_modes("standalone")
 async def test_ask_rag_strategy_metadata_extension(
     nucliadb_reader: AsyncClient, standalone_knowledgebox: str, resources
 ):
@@ -1387,173 +1367,6 @@ async def test_ask_chat_history_relevance_threshold(
         ).model_dump(),
     )
     assert resp.status_code == 200, resp.text
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_ask_neighbouring_paragraphs_rag_strategy(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-    standalone_knowledgebox: str,
-):
-    kbid = standalone_knowledgebox
-
-    # Create a resource with a text field that has 3 paragraphs
-    paragraphs = [
-        "Mario is my older brother.",
-        "Nuria used be friends with Mario.",
-        "We all know each other now.",
-    ]
-    extracted_text = "\n".join(paragraphs)
-
-    positions = {}
-    start = 0
-    for i, paragraph in enumerate(paragraphs):
-        end = start + len(paragraph)
-        positions[i] = (start, end)
-        start = end + 1
-
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
-        json={"title": "My resource", "texts": {"text1": {"body": extracted_text}}},
-    )
-    resp.raise_for_status()
-    rid = resp.json()["uuid"]
-
-    # Inject the processing broker message
-    bmb = BrokerMessageBuilder(kbid=kbid, rid=rid, source=wpb2.BrokerMessage.MessageSource.PROCESSOR)
-    fb = bmb.field_builder("text1", wpb2.FieldType.TEXT)
-    fb.with_extracted_text(extracted_text)
-
-    for i, (start, end) in positions.items():
-        pbpar = rpb2.Paragraph(
-            start=start,
-            end=end,
-            text=paragraphs[i],
-        )
-        fb.with_extracted_paragraph_metadata(pbpar)
-
-    await inject_message(nucliadb_ingest_grpc, bmb.build(), wait_for_ready=True)
-
-    await mark_dirty()
-    await wait_for_sync()
-
-    # Now check that neighbouring paragraphs rag strategy works
-    # First off, fetch only one of the paragraphs
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/ask",
-        json={
-            "query": "Nuria",  # To match the middle paragraph
-            "features": ["keyword"],
-            "top_k": 1,
-            "rag_strategies": [
-                {
-                    "name": "neighbouring_paragraphs",
-                    "before": 0,
-                    "after": 0,
-                }
-            ],
-        },
-        headers={"x-synchronous": "true"},
-    )
-    resp.raise_for_status()
-    ask = SyncAskResponse.model_validate(resp.json())
-
-    retrieved, augmented = _fetch_paragraphs(ask)
-    assert len(retrieved) == 1
-    assert retrieved[0].text == paragraphs[1]
-    assert len(augmented) == 0
-
-    # Now fetch all neighbouring paragraphs
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/ask",
-        json={
-            "query": "Nuria",  # To match the middle paragraph
-            "features": ["keyword"],
-            "top_k": 1,
-            "rag_strategies": [
-                {
-                    "name": "neighbouring_paragraphs",
-                    "before": 1,
-                    "after": 1,
-                }
-            ],
-        },
-        headers={"x-synchronous": "true"},
-    )
-    resp.raise_for_status()
-    ask = SyncAskResponse.model_validate(resp.json())
-
-    retrieved, augmented = _fetch_paragraphs(ask)
-    assert len(retrieved) == 1
-    assert retrieved[0].text == paragraphs[1]
-    assert len(augmented) == 2
-    augmented.sort(key=lambda p: p.id)
-    assert augmented[0].text == paragraphs[0]
-    assert augmented[0].position
-    assert augmented[0].position.start == positions[0][0]
-    assert augmented[0].position.end == positions[0][1]
-    assert augmented[0].position.index == 0
-    assert augmented[1].text == paragraphs[2]
-    assert augmented[1].position
-    assert augmented[1].position.start == positions[2][0]
-    assert augmented[1].position.end == positions[2][1]
-    assert augmented[1].position.index == 2
-
-    # Check that combined with hierarchy rag strategy works well
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/ask",
-        json={
-            "query": "Nuria",  # To match the middle paragraph
-            "features": ["keyword"],
-            "top_k": 1,
-            "debug": True,
-            "rag_strategies": [
-                {
-                    "name": "hierarchy",
-                    # TODO: we are using this to test hierarchy.count too but we
-                    # should extract it to another test
-                    "count": 100,
-                },
-                {
-                    "name": "neighbouring_paragraphs",
-                    "before": 1,
-                    "after": 1,
-                },
-            ],
-        },
-        headers={"x-synchronous": "true"},
-    )
-    resp.raise_for_status()
-    ask = SyncAskResponse.model_validate(resp.json())
-    prompt_context = ask.prompt_context
-    assert prompt_context is not None
-    assert len(prompt_context) == 3
-    # The retrieved paragraph is the one with the hierarchy information
-    assert (
-        prompt_context[0]
-        == "DOCUMENT: My resource \n SUMMARY:  \n RESOURCE CONTENT: \n EXTRACTED BLOCK: \n Nuria used be friends with Mario.\nWe all know each other now."
-    )
-    assert prompt_context[1] == "Mario is my older brother."
-    assert prompt_context[2] == "We all know each other now."
-    _, augmented = _fetch_paragraphs(ask)
-    assert len(augmented) == 3
-    assert augmented[0].augmentation_type.value == "hierarchy"
-
-
-def _fetch_paragraphs(
-    ask_response: SyncAskResponse,
-) -> tuple[list[FindParagraph], list[AugmentedTextBlock]]:
-    retrieval = [
-        paragraph
-        for resource in ask_response.retrieval_results.resources.values()
-        for field in resource.fields.values()
-        for paragraph in field.paragraphs.values()
-    ]
-    if ask_response.augmented_context is None:
-        return retrieval, []
-    augmented = [text_block for text_block in ask_response.augmented_context.paragraphs.values()]
-    return retrieval, augmented
 
 
 @pytest.mark.deploy_modes("standalone")
