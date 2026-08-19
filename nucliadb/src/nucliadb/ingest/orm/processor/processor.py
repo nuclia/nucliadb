@@ -19,6 +19,7 @@
 #
 import asyncio
 import logging
+from collections.abc import Iterable
 
 import aiohttp.client_exceptions
 import nats.errors
@@ -70,6 +71,11 @@ from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage, has_feature
 
 logger = logging.getLogger("ingest-processor")
+
+RESOURCE_ADVISORY_LOCK_KEY = "resource-{kbid}-{resource_id}"
+FIELD_ADVISORY_LOCK_KEY = "field-{kbid}-{resource_id}-{field_type}-{field_id}"
+RESOURCE_ADVISORY_LOCK_SEED = locking.PG_ADVISORY_LOCK_DEFAULT_SEED
+FIELD_ADVISORY_LOCK_SEED = 12
 
 MESSAGE_TO_NOTIFICATION_SOURCE = {
     writer_pb2.BrokerMessage.MessageSource.WRITER: writer_pb2.NotificationSource.WRITER,
@@ -161,6 +167,121 @@ class Processor:
         self.pubsub = pubsub
         self.index_node_shard_manager = get_shard_manager()
 
+    @staticmethod
+    def _iter_message_fields(
+        message: writer_pb2.BrokerMessage,
+    ) -> Iterable[tuple[resources_pb2.FieldType.ValueType, str]]:
+        for field_id in message.texts.keys():
+            yield resources_pb2.FieldType.TEXT, field_id
+        for field_id in message.links.keys():
+            yield resources_pb2.FieldType.LINK, field_id
+        for field_id in message.files.keys():
+            yield resources_pb2.FieldType.FILE, field_id
+        for field_id in message.conversations.keys():
+            yield resources_pb2.FieldType.CONVERSATION, field_id
+        for field_id in message.key_value_fields.keys():
+            yield resources_pb2.FieldType.KEY_VALUE, field_id
+        for field in message.delete_fields:
+            yield field.field_type, field.field
+        for delete_splits in message.delete_splits:
+            yield delete_splits.field.field_type, delete_splits.field.field
+
+    @classmethod
+    def _get_message_touched_fields(
+        cls,
+        message: writer_pb2.BrokerMessage,
+    ) -> set[tuple[resources_pb2.FieldType.ValueType, str]]:
+        return set(cls._iter_message_fields(message))
+
+    @staticmethod
+    def _resource_lock_key(kbid: str, rid: str) -> str:
+        return RESOURCE_ADVISORY_LOCK_KEY.format(kbid=kbid, resource_id=rid)
+
+    @staticmethod
+    def _field_lock_key(
+        kbid: str,
+        rid: str,
+        field_type: resources_pb2.FieldType.ValueType,
+        field_id: str,
+    ) -> str:
+        return FIELD_ADVISORY_LOCK_KEY.format(
+            kbid=kbid,
+            resource_id=rid,
+            field_type=FIELD_TYPE_PB_TO_STR[field_type],
+            field_id=field_id,
+        )
+
+    @classmethod
+    def _should_use_single_field_locking(
+        cls,
+        message: writer_pb2.BrokerMessage,
+        *,
+        resource_exists: bool,
+    ) -> tuple[bool, tuple[resources_pb2.FieldType.ValueType, str] | None]:
+        if message.source != writer_pb2.BrokerMessage.MessageSource.WRITER:
+            return False, None
+
+        # Resource creation and resource-level mutations stay serialized.
+        if not resource_exists:
+            return False, None
+        if message.HasField("basic"):
+            return False, None
+        if message.HasField("origin") or message.HasField("extra") or message.HasField("security"):
+            return False, None
+        if message.HasField("user_relations"):
+            return False, None
+        if len(message.delete_fields) > 0:
+            return False, None
+
+        # Extracted-data updates mutate aggregate basic fields (languages, icon,
+        # thumbnail, classifications), so they require resource-level serialization.
+        if (
+            len(message.link_extracted_data) > 0
+            or len(message.file_extracted_data) > 0
+            or len(message.field_metadata) > 0
+        ):
+            return False, None
+
+        touched_fields = cls._get_message_touched_fields(message)
+        if len(touched_fields) != 1:
+            return False, None
+        return True, next(iter(touched_fields))
+
+    async def _acquire_txn_locks(
+        self,
+        txn: Transaction,
+        *,
+        message: writer_pb2.BrokerMessage,
+        kbid: str,
+        rid: str,
+        resource_exists: bool,
+    ) -> None:
+        single_field_locking, touched_field = self._should_use_single_field_locking(
+            message,
+            resource_exists=resource_exists,
+        )
+
+        if single_field_locking and touched_field is not None:
+            field_type, field_id = touched_field
+            await locking.advisory_xact_lock(
+                txn,
+                key=self._resource_lock_key(kbid, rid),
+                shared=True,
+                seed=RESOURCE_ADVISORY_LOCK_SEED,
+            )
+            await locking.advisory_xact_lock(
+                txn,
+                key=self._field_lock_key(kbid, rid, field_type, field_id),
+                seed=FIELD_ADVISORY_LOCK_SEED,
+            )
+            return
+
+        await locking.advisory_xact_lock(
+            txn,
+            key=self._resource_lock_key(kbid, rid),
+            seed=RESOURCE_ADVISORY_LOCK_SEED,
+        )
+
     async def process(
         self,
         message: writer_pb2.BrokerMessage,
@@ -215,10 +336,12 @@ class Processor:
                     await txn.commit()
             return
 
-        async with (
-            locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)),
-            self.driver.rw_transaction() as txn,
-        ):
+        async with self.driver.rw_transaction() as txn:
+            await locking.advisory_xact_lock(
+                txn,
+                key=self._resource_lock_key(kbid, uuid),
+                seed=RESOURCE_ADVISORY_LOCK_SEED,
+            )
             try:
                 logger.info("Deleting resource", extra={"kbid": kbid, "rid": uuid})
                 kb = KnowledgeBox(txn, self.storage, kbid)
@@ -317,10 +440,15 @@ class Processor:
                     await txn.commit()
             return None
 
-        async with (
-            locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)),
-            self.driver.rw_transaction() as txn,
-        ):
+        async with self.driver.rw_transaction() as txn:
+            resource_exists = await datamanagers.resources.exists(txn, kbid=kbid, rid=uuid)
+            await self._acquire_txn_locks(
+                txn,
+                message=message,
+                kbid=kbid,
+                rid=uuid,
+                resource_exists=resource_exists,
+            )
             logger.info(
                 "Processing message",
                 extra={"kbid": kbid, "rid": uuid, "seqid": seqid, "partition": partition},

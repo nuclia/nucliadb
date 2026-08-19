@@ -42,6 +42,10 @@ KB_SHARDS_LOCK = "shards-kb-{kbid}"
 MIGRATIONS_LOCK = "migration"
 KB_MIGRATIONS_LOCK = "migration-{kbid}"
 
+# PostgreSQL advisory lock seed used by default in hashtextextended().
+# Keep this stable to maintain compatibility across processes.
+PG_ADVISORY_LOCK_DEFAULT_SEED = 0
+
 
 # Metrics
 lock_acquired_counter = Counter(
@@ -324,3 +328,83 @@ def distributed_lock(
 
 async def is_locked(key: str) -> bool:
     return await distributed_lock(key).is_locked()
+
+
+async def advisory_xact_lock(
+    txn: PGTransaction,
+    *,
+    key: str,
+    shared: bool = False,
+    seed: int = PG_ADVISORY_LOCK_DEFAULT_SEED,
+) -> None:
+    """
+    Acquire a PostgreSQL transaction-scoped advisory lock for a logical key.
+
+    The lock is automatically released when the transaction ends
+    (commit/rollback/abort).
+
+    Params:
+    - txn: an open PG rw transaction.
+    - key: logical lock key (e.g. "resource:{kbid}:{rid}").
+    - shared: if True, acquire a shared lock. If False, acquire an exclusive lock.
+    - seed: hash seed for hashtextextended(); use different seeds to separate lock domains.
+    """
+    fn = "pg_advisory_xact_lock_shared" if shared else "pg_advisory_xact_lock"
+    async with txn.connection.cursor() as cur:
+        await cur.execute(f"SELECT {fn}(hashtextextended(%s, %s))", (key, seed))
+
+
+async def advisory_xact_locks(
+    txn: PGTransaction,
+    *,
+    keys: list[str],
+    shared: bool = False,
+    seed: int = PG_ADVISORY_LOCK_DEFAULT_SEED,
+) -> None:
+    """
+    Acquire multiple PostgreSQL transaction-scoped advisory locks.
+
+    Keys are deduplicated and acquired in sorted order to minimize deadlock risk
+    when multiple concurrent transactions lock overlapping sets.
+
+    Params:
+    - txn: an open PG rw transaction.
+    - keys: logical lock keys.
+    - shared: if True, acquire shared locks. If False, acquire exclusive locks.
+    - seed: hash seed for hashtextextended(); use different seeds to separate lock domains.
+    """
+    if len(keys) == 0:
+        return
+
+    for key in sorted(set(keys)):
+        await advisory_xact_lock(txn, key=key, shared=shared, seed=seed)
+
+
+@contextlib.asynccontextmanager
+async def advisory_transaction_lock(
+    txn: PGTransaction,
+    *,
+    key: str,
+    shared: bool = False,
+    seed: int = PG_ADVISORY_LOCK_DEFAULT_SEED,
+) -> AsyncGenerator[None, None]:
+    """
+    Context manager variant of advisory_xact_lock().
+    """
+    await advisory_xact_lock(txn, key=key, shared=shared, seed=seed)
+    yield
+
+
+@contextlib.asynccontextmanager
+async def advisory_transaction_locks(
+    txn: PGTransaction,
+    *,
+    keys: list[str],
+    shared: bool = False,
+    seed: int = PG_ADVISORY_LOCK_DEFAULT_SEED,
+) -> AsyncGenerator[None, None]:
+    """
+    Context manager variant of advisory_xact_locks().
+    """
+    await advisory_xact_locks(txn, keys=keys, shared=shared, seed=seed)
+    yield

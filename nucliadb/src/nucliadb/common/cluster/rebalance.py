@@ -463,10 +463,11 @@ async def move_resource_to_shard(
     indexed_to_new = False
     deleted_from_old = False
     try:
-        async with (
-            locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=resource_id)),
-            datamanagers.with_transaction() as txn,
-        ):
+        async with datamanagers.with_transaction() as txn:
+            await locking.advisory_xact_lock(
+                txn,
+                key=locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=resource_id),
+            )
             found_shard_id = await datamanagers.resources.get_shard(
                 txn, kbid=kbid, rid=resource_id, for_update=True
             )

@@ -311,10 +311,11 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         try:
             kbid = request.kbid
             rid = request.rid
-            async with (
-                locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=rid)),
-                self.driver.rw_transaction() as txn,
-            ):
+            async with self.driver.rw_transaction() as txn:
+                await locking.advisory_xact_lock(
+                    txn,
+                    key=locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=rid),
+                )
                 kbobj = KnowledgeBoxORM(txn, self.storage, kbid)
                 resobj = ResourceORM(txn, self.storage, kbid, rid)
                 resobj.disable_vectors = not request.reindex_vectors
