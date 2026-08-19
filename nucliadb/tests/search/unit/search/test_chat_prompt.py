@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB, ParagraphId
+from nucliadb.common.ids import ParagraphId
 from nucliadb.search.search.chat import prompt as chat_prompt
 from nucliadb.search.search.metrics import Metrics
 from nucliadb_models.search import (
@@ -77,84 +77,6 @@ def kb(field_obj):
     mock = AsyncMock()
     mock.get.return_value.get_field.return_value = field_obj
     yield mock
-
-
-async def test_get_next_conversation_messages(field_obj, messages):
-    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import prompt as chat_prompt
-
-    assert (
-        len(
-            await chat_prompt.get_next_conversation_messages(
-                field_obj=field_obj, page=1, start_idx=0, num_messages=5
-            )
-        )
-        == 5
-    )
-    assert (
-        len(
-            await chat_prompt.get_next_conversation_messages(
-                field_obj=field_obj, page=1, start_idx=0, num_messages=1
-            )
-        )
-        == 1
-    )
-
-    assert await chat_prompt.get_next_conversation_messages(
-        field_obj=field_obj,
-        page=1,
-        start_idx=0,
-        num_messages=1,
-        message_type=rpb2.Message.MessageType.ANSWER,
-        msg_to="1",
-    ) == [messages[3]]
-
-
-async def test_find_conversation_message(field_obj, messages):
-    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import prompt as chat_prompt
-
-    assert await chat_prompt.find_conversation_message(field_obj, mident="3") == (
-        messages[2],
-        1,
-        2,
-    )
-
-
-async def test_get_expanded_conversation_messages(kb, messages):
-    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import prompt as chat_prompt
-
-    assert await chat_prompt.get_expanded_conversation_messages(
-        kb=kb, rid="rid", field_id="field_id", mident="3"
-    ) == [messages[3]]
-
-
-async def test_get_expanded_conversation_messages_question(kb, messages):
-    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import prompt as chat_prompt
-
-    assert (
-        await chat_prompt.get_expanded_conversation_messages(
-            kb=kb, rid="rid", field_id="field_id", mident="1"
-        )
-        == messages[1:]
-    )
-
-    kb.get.assert_called_with("rid")
-    kb.get.return_value.get_field.assert_called_with("field_id", FIELD_TYPE_STR_TO_PB["c"], load=True)
-
-
-async def test_get_expanded_conversation_messages_missing(kb, messages):
-    # DEPRECATED(decoupled-ask): now this is implemented through augmentor
-    from nucliadb.search.search.chat import prompt as chat_prompt
-
-    assert (
-        await chat_prompt.get_expanded_conversation_messages(
-            kb=kb, rid="rid", field_id="field_id", mident="missing"
-        )
-        == []
-    )
 
 
 def get_ordered_paragraphs(find_results):
