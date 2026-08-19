@@ -84,6 +84,8 @@ async def augment_field(
     if resource is None:
         # skip resources that aren't in the DB
         return None
+    # Skip the field existence check: the field will exist in the vast majority of cases, and any
+    # missing metadata from stale deletions is handled gracefully downstream by db_augment_field.
     field = await resource.get_field(field_id.key, field_id.pb_type, load=False)
     return await db_augment_field(field, field_id, select)
 
