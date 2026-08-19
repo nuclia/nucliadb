@@ -39,7 +39,7 @@ SYNC_FINALIZERS: list[Callable[[], None] | Callable[[], Awaitable[None]]] = []
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if ingest_settings.disable_pull_worker or True:
+    if ingest_settings.disable_pull_worker:
         finalizers = await initialize_ingest_grpc()
     else:
         finalizers = await initialize_pull_workers()
