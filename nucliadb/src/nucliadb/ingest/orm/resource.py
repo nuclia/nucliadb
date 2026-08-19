@@ -24,11 +24,12 @@ import logging
 import uuid
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import Any, cast, overload
 
 from nucliadb.common import datamanagers, file_md5
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.models_utils import to_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
@@ -327,13 +328,22 @@ class Resource:
         await conv.delete_messages(payload.splits)
         self.modified = True
 
-    async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
-        """Return whether this resource has this field or not."""
-        all_fields_ids = await self.get_fields_ids()
-        for field_type, field_id in all_fields_ids:
-            if field_type == type and field_id == field:
-                return True
-        return False
+    @overload
+    async def field_exists(self, type: FieldType.ValueType, field: str) -> bool: ...
+
+    @overload
+    async def field_exists(self, type: str, field: str) -> bool: ...
+
+    async def field_exists(self, type: FieldType.ValueType | str, field: str) -> bool:
+        field_type = type
+        if isinstance(field_type, str):
+            field_type = to_proto.field_type(field_type)
+        return await datamanagers.fields.has_field(
+            self.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_id=FieldID(field_type=field_type, field=field),
+        )
 
     async def get_all_field_ids(self) -> PBAllFieldIDs | None:
         return await datamanagers.fields.get_all_field_ids(self.txn, kbid=self.kbid, rid=self.uuid)
