@@ -328,12 +328,12 @@ class Resource:
         self.modified = True
 
     async def field_exists(self, type: FieldType.ValueType, field: str) -> bool:
-        """Return whether this resource has this field or not."""
-        all_fields_ids = await self.get_fields_ids()
-        for field_type, field_id in all_fields_ids:
-            if field_type == type and field_id == field:
-                return True
-        return False
+        return await datamanagers.fields.exists(
+            self.txn,
+            kbid=self.kbid,
+            rid=self.uuid,
+            field_id=FieldID(field_type=type, field=field),
+        )
 
     async def get_all_field_ids(self) -> PBAllFieldIDs | None:
         return await datamanagers.fields.get_all_field_ids(self.txn, kbid=self.kbid, rid=self.uuid)

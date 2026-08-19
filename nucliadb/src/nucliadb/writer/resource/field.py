@@ -108,7 +108,7 @@ async def extract_file_field(
     password: str | None = None,
 ):
     field_type = resources_pb2.FieldType.FILE
-    field = await resource.get_field(field_id, field_type)
+    field = await resource.get_field(field_id, field_type, load=False)
     field_pb = await field.get_value()
     if field_pb is None:
         raise KeyError(f"Field {field_id} does not exists")

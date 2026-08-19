@@ -946,7 +946,7 @@ async def conversation_prompt_context(
                     for attachment in attachments:
                         ops += 1
                         file_field: File = await resource.get_field(
-                            attachment.field_id, attachment.field_type, load=True
+                            attachment.field_id, attachment.field_type, load=False
                         )
                         image = await get_file_thumbnail_image(file_field)
                         if image is not None:

@@ -421,7 +421,7 @@ async def _get_resource_field(
         if not await resource.field_exists(pb_field_id, field_id):
             raise HTTPException(status_code=404, detail="Resource field does not exist")
 
-        field = await resource.get_field(field_id, pb_field_id, load=True)
+        field = await resource.get_field(field_id, pb_field_id, load=False)
 
         resource_field = ResourceField(field_id=field_id, field_type=field_type)
 
