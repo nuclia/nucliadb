@@ -212,9 +212,6 @@ class Hydrator:
                 # skip resources that aren't in the DB
                 continue
 
-            if not (await resource.field_exists(field_id.pb_type, field_id.key)):
-                # skip a fields that aren't in the DB
-                continue
             field = await resource.get_field(field_id.key, field_id.pb_type, load=False)
 
             if field_id not in self.field_paragraphs:
@@ -276,9 +273,6 @@ class Hydrator:
                     # skip resources that aren't in the DB
                     continue
 
-                if not (await resource.field_exists(field_id.pb_type, field_id.key)):
-                    # skip a fields that aren't in the DB
-                    continue
                 field = await resource.get_field(field_id.key, field_id.pb_type, load=False)
 
                 if field_id not in self.field_paragraphs:

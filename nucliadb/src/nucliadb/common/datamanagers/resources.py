@@ -385,6 +385,19 @@ async def get_shard(txn: Transaction, *, kbid: str, rid: str, for_update: bool =
     return resource.shard
 
 
+@observer.wrap({"type": "resources", "op": "get_shards"})
+async def get_shards(txn: Transaction, *, kbid: str, rids: list[str]) -> dict[str, str]:
+    """Return a mapping of rid to shard for the given rids in a single query."""
+    if not rids:
+        return {}
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(
+            "SELECT rid, shard FROM kb_resources WHERE kbid = %(kbid)s AND rid = ANY(%(rids)s)",
+            {"kbid": kbid, "rids": rids},
+        )
+        return {_to_rid(rid): shard async for rid, shard in cur}
+
+
 @observer.wrap({"type": "resources", "op": "get"})
 async def get(
     txn: Transaction,
