@@ -101,7 +101,7 @@ async def _build_requests(
         for field_id in fields:
             rid = field_id.rid
             if rid not in resource_nidx_shard:
-                if rid not in resource_shards or resource_shards[rid] is None:
+                if rid not in resource_shards:
                     # Resource not in DB, either a dirty read (reading a delete)
                     # or a user requesting a deleted or wrong resource. Skip
                     continue
@@ -130,7 +130,7 @@ async def _build_requests(
         for paragraph_id in paragraphs:
             rid = paragraph_id.rid
             if rid not in resource_nidx_shard:
-                if rid not in resource_shards or resource_shards[rid] is None:
+                if rid not in resource_shards:
                     # Resource not in DB, either a dirty read (reading a delete)
                     # or a user requesting a deleted or wrong resource. Skip
                     continue
