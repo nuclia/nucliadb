@@ -90,16 +90,22 @@ async def _build_requests(
         for shard in kb_shards.shards:
             logical_to_nidx_shard[shard.shard] = shard.nidx_shard_id
 
-        resource_nidx_shard = {}
+        rids = list(
+            {field_id.rid for field_id in fields}.union(
+                {paragraph_id.rid for paragraph_id in paragraphs}
+            )
+        )
+        resource_shards = await datamanagers.resources.get_shards(txn, kbid=kbid, rids=rids)
+        resource_nidx_shard: dict[str, str] = {}
 
         for field_id in fields:
             rid = field_id.rid
             if rid not in resource_nidx_shard:
-                resource_shard_id = await datamanagers.resources.get_shard(txn, kbid=kbid, rid=rid)
-                if resource_shard_id is None:
+                if rid not in resource_shards or resource_shards[rid] is None:
                     # Resource not in DB, either a dirty read (reading a delete)
                     # or a user requesting a deleted or wrong resource. Skip
                     continue
+                resource_shard_id = resource_shards[rid]
                 nidx_shard_id = logical_to_nidx_shard.get(resource_shard_id)
                 if nidx_shard_id is None:
                     logger.warning(
@@ -107,7 +113,6 @@ async def _build_requests(
                         extra={"kbid": kbid, "resource_shard_id": resource_shard_id},
                     )
                     return None
-
                 resource_nidx_shard[rid] = nidx_shard_id
 
             nidx_shard_id = resource_nidx_shard[rid]
@@ -125,11 +130,12 @@ async def _build_requests(
         for paragraph_id in paragraphs:
             rid = paragraph_id.rid
             if rid not in resource_nidx_shard:
-                resource_shard_id = await datamanagers.resources.get_shard(txn, kbid=kbid, rid=rid)
-                if resource_shard_id is None:
+                if rid not in resource_shards or resource_shards[rid] is None:
                     # Resource not in DB, either a dirty read (reading a delete)
                     # or a user requesting a deleted or wrong resource. Skip
                     continue
+
+                resource_shard_id = resource_shards[rid]
                 nidx_shard_id = logical_to_nidx_shard.get(resource_shard_id)
                 if nidx_shard_id is None:
                     logger.warning(

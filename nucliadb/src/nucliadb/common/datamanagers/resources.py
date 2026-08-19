@@ -385,6 +385,25 @@ async def get_shard(txn: Transaction, *, kbid: str, rid: str, for_update: bool =
     return resource.shard
 
 
+@observer.wrap({"type": "resources", "op": "get_shards"})
+async def get_shards(txn: Transaction, *, kbid: str, rids: list[str]) -> dict[str, str]:
+    """Return a mapping of rid → shard for the given rids in a single query."""
+    result: dict[str, str] = {}
+    if not rids:
+        return result
+    placeholders = [psycopg.sql.Placeholder(f"rid_{i}") for i in range(len(rids))]
+    query = psycopg.sql.SQL(
+        "SELECT rid, shard FROM kb_resources WHERE kbid = %(kbid)s AND rid IN ({placeholders})"
+    ).format(placeholders=psycopg.sql.SQL(", ").join(placeholders))
+    params = {"kbid": kbid, **{f"rid_{i}": rid for i, rid in enumerate(rids)}}
+    async with _pg_cursor(txn) as cur:
+        await cur.execute(query, params)
+        async for row in cur:
+            rid, shard = row
+            result[_to_rid(rid)] = shard
+        return result
+
+
 @observer.wrap({"type": "resources", "op": "get"})
 async def get(
     txn: Transaction,

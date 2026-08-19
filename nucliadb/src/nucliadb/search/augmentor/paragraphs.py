@@ -60,10 +60,8 @@ async def augment_paragraph(
     if resource is None:
         # skip resources that aren't in the DB
         return None
-
     field_id = paragraph_id.field_id
     field = await resource.get_field(field_id.key, field_id.pb_type, load=False)
-
     return await db_augment_paragraph(resource, field, paragraph_id, select, metadata)
 
 
