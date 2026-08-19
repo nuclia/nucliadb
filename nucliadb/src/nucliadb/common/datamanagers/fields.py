@@ -294,6 +294,7 @@ async def exists(
         return await cur.fetchone() is not None
 
 
+@observer.wrap({"type": "field", "op": "exists_md5"})
 async def exists_md5(
     txn: Transaction,
     *,
@@ -309,6 +310,7 @@ async def exists_md5(
         return await cur.fetchone() is not None
 
 
+@observer.wrap({"type": "field", "op": "set_md5"})
 async def set_md5(
     txn: Transaction, *, kbid: str, md5: str, rid: str, field_id: str, field_type: str
 ) -> None:
