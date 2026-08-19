@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import copy
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import cast
@@ -33,7 +32,6 @@ from nucliadb.search import logger
 from nucliadb.search.augmentor.fields import get_field_extracted_text
 from nucliadb.search.search import cache
 from nucliadb.search.search.metrics import Metrics
-from nucliadb.search.search.paragraphs import get_paragraph_text
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.search import (
@@ -42,7 +40,6 @@ from nucliadb_models.search import (
     FieldExtensionStrategy,
     FindParagraph,
     FullResourceStrategy,
-    HierarchyResourceStrategy,
     Image,
     ImageRagStrategy,
     MetadataExtensionStrategy,
@@ -545,115 +542,6 @@ async def get_matching_field_ids(
     return extend_field_ids
 
 
-async def hierarchy_prompt_context(
-    context: CappedPromptContext,
-    kbid: str,
-    ordered_paragraphs: list[FindParagraph],
-    strategy: HierarchyResourceStrategy,
-    metrics: Metrics,
-    augmented_context: AugmentedContext,
-) -> None:
-    """
-    This function will get the paragraph texts (possibly with extra characters, if extra_characters > 0) and then
-    craft a context with all paragraphs of the same resource grouped together. Moreover, on each group of paragraphs,
-    it includes the resource title and summary so that the LLM can have a better understanding of the context.
-    """
-    paragraphs_extra_characters = max(strategy.count, 0)
-    # Make a copy of the ordered paragraphs to avoid modifying the original list, which is returned
-    # in the response to the user
-    ordered_paragraphs_copy = copy.deepcopy(ordered_paragraphs)
-    resources: dict[str, ExtraCharsParagraph] = {}
-
-    # Iterate paragraphs to get extended text
-    for paragraph in ordered_paragraphs_copy:
-        paragraph_id = ParagraphId.from_string(paragraph.id)
-        extended_paragraph_text = paragraph.text
-        if paragraphs_extra_characters > 0:
-            extended_paragraph_id = ParagraphId(
-                field_id=paragraph_id.field_id,
-                paragraph_start=paragraph_id.paragraph_start,
-                paragraph_end=paragraph_id.paragraph_end + paragraphs_extra_characters,
-            )
-            extended_paragraph_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=extended_paragraph_id,
-                log_on_missing_field=True,
-            )
-        rid = paragraph_id.rid
-        if rid not in resources:
-            # Get the title and the summary of the resource
-            title_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=ParagraphId(
-                    field_id=FieldId(
-                        rid=rid,
-                        type="a",
-                        key="title",
-                    ),
-                    paragraph_start=0,
-                    paragraph_end=500,
-                ),
-                log_on_missing_field=False,
-            )
-            summary_text = await get_paragraph_text(
-                kbid=kbid,
-                paragraph_id=ParagraphId(
-                    field_id=FieldId(
-                        rid=rid,
-                        type="a",
-                        key="summary",
-                    ),
-                    paragraph_start=0,
-                    paragraph_end=1000,
-                ),
-                log_on_missing_field=False,
-            )
-            resources[rid] = ExtraCharsParagraph(
-                title=title_text,
-                summary=summary_text,
-                paragraphs=[(paragraph, extended_paragraph_text)],
-            )
-        else:
-            resources[rid].paragraphs.append((paragraph, extended_paragraph_text))
-
-    metrics.set("hierarchy_ops", len(resources))
-    augmented_paragraphs = set()
-
-    # Modify the first paragraph of each resource to include the title and summary of the resource, as well as the
-    # extended paragraph text of all the paragraphs in the resource.
-    for values in resources.values():
-        title_text = values.title
-        summary_text = values.summary
-        first_paragraph = None
-        text_with_hierarchy = ""
-        for paragraph, extended_paragraph_text in values.paragraphs:
-            if first_paragraph is None:
-                first_paragraph = paragraph
-            text_with_hierarchy += "\n EXTRACTED BLOCK: \n " + extended_paragraph_text + " \n\n "
-            # All paragraphs of the resource are cleared except the first one, which will be the
-            # one containing the whole hierarchy information
-            paragraph.text = ""
-
-        if first_paragraph is not None:
-            # The first paragraph is the only one holding the hierarchy information
-            first_paragraph.text = f"DOCUMENT: {title_text} \n SUMMARY: {summary_text} \n RESOURCE CONTENT: {text_with_hierarchy}"
-            augmented_paragraphs.add(first_paragraph.id)
-
-    # Now that the paragraphs have been modified, we can add them to the context
-    for paragraph in ordered_paragraphs_copy:
-        if paragraph.text == "":
-            # Skip paragraphs that were cleared in the hierarchy expansion
-            continue
-        paragraph_text = _clean_paragraph_text(paragraph)
-        context[paragraph.id] = paragraph_text
-        if paragraph.id in augmented_paragraphs:
-            pid = ParagraphId.from_string(paragraph.id)
-            augmented_context.paragraphs[pid.full()] = AugmentedTextBlock(
-                id=pid.full(), text=paragraph_text, augmentation_type=TextBlockAugmentationType.HIERARCHY
-            )
-    return
-
-
 class PromptContextBuilder:
     """
     Builds the context for the LLM prompt.
@@ -725,7 +613,6 @@ class PromptContextBuilder:
         ]
 
         full_resource: FullResourceStrategy | None = None
-        hierarchy: HierarchyResourceStrategy | None = None
         field_extension: FieldExtensionStrategy | None = None
         metadata_extension: MetadataExtensionStrategy | None = None
         for strategy in self.strategies:
@@ -740,7 +627,7 @@ class PromptContextBuilder:
                     # the full resource strategy only includes that resource
                     full_resource.count = 1
             elif strategy.name == RagStrategyName.HIERARCHY:
-                hierarchy = cast(HierarchyResourceStrategy, strategy)
+                pass
             elif strategy.name == RagStrategyName.NEIGHBOURING_PARAGRAPHS:
                 pass
             elif strategy.name == RagStrategyName.METADATA_EXTENSION:
@@ -773,15 +660,6 @@ class PromptContextBuilder:
                 )
             return
 
-        if hierarchy:
-            await hierarchy_prompt_context(
-                context,
-                self.kbid,
-                self.ordered_paragraphs,
-                hierarchy,
-                self.metrics,
-                self.augmented_context,
-            )
         if field_extension:
             await field_extension_prompt_context(
                 context,
