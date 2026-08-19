@@ -101,11 +101,11 @@ async def _build_requests(
         for field_id in fields:
             rid = field_id.rid
             if rid not in resource_nidx_shard:
-                if rid not in resource_shards:
+                resource_shard_id = resource_shards.get(rid)
+                if resource_shard_id is None:
                     # Resource not in DB, either a dirty read (reading a delete)
                     # or a user requesting a deleted or wrong resource. Skip
                     continue
-                resource_shard_id = resource_shards[rid]
                 nidx_shard_id = logical_to_nidx_shard.get(resource_shard_id)
                 if nidx_shard_id is None:
                     logger.warning(
@@ -130,12 +130,11 @@ async def _build_requests(
         for paragraph_id in paragraphs:
             rid = paragraph_id.rid
             if rid not in resource_nidx_shard:
-                if rid not in resource_shards:
+                resource_shard_id = resource_shards.get(rid)
+                if resource_shard_id is None:
                     # Resource not in DB, either a dirty read (reading a delete)
                     # or a user requesting a deleted or wrong resource. Skip
                     continue
-
-                resource_shard_id = resource_shards[rid]
                 nidx_shard_id = logical_to_nidx_shard.get(resource_shard_id)
                 if nidx_shard_id is None:
                     logger.warning(
