@@ -212,11 +212,10 @@ class Hydrator:
                 # skip resources that aren't in the DB
                 continue
 
-            field_type_pb = FIELD_TYPE_STR_TO_PB[field_id.type]
-            if not (await resource.field_exists(field_type_pb, field_id.key)):
+            if not (await resource.field_exists(field_id.pb_type, field_id.key)):
                 # skip a fields that aren't in the DB
                 continue
-            field = await resource.get_field(field_id.key, field_id.pb_type)
+            field = await resource.get_field(field_id.key, field_id.pb_type, load=False)
 
             if field_id not in self.field_paragraphs:
                 field_paragraphs_index = ParagraphIndex(field_id)
@@ -281,7 +280,7 @@ class Hydrator:
                 if not (await resource.field_exists(field_type_pb, field_id.key)):
                     # skip a fields that aren't in the DB
                     continue
-                field = await resource.get_field(field_id.key, field_id.pb_type)
+                field = await resource.get_field(field_id.key, field_id.pb_type, load=False)
 
                 if field_id not in self.field_paragraphs:
                     field_paragraphs_index = ParagraphIndex(field_id)
