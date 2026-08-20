@@ -44,6 +44,7 @@ from typing_extensions import assert_never
 from nucliadb.common.datamanagers.utils import (
     UNSET,
     _pg_cursor,
+    _pg_server_cursor,
     _UnsetType,
     observer,
     with_ro_transaction,
@@ -356,7 +357,7 @@ async def get_basic(
 @observer.wrap({"type": "resources", "op": "iter"})
 async def iter(*, kbid: str) -> AsyncIterator[str]:
     async with with_ro_transaction() as txn:
-        async with _pg_cursor(txn) as cur:
+        async with _pg_server_cursor(txn, name="resources_iter", batch_size=1000) as cur:
             await cur.execute(
                 "SELECT rid FROM kb_resources WHERE kbid = %(kbid)s ORDER BY rid",
                 {"kbid": kbid},

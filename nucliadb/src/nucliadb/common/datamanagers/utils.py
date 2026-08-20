@@ -89,11 +89,44 @@ def _pg(txn: Transaction) -> PGTransaction:
 
 @asynccontextmanager
 async def _pg_cursor(txn: Transaction) -> AsyncGenerator[psycopg.AsyncCursor]:
+    """Return a regular client-side cursor.
+
+    Use this for point lookups and small result sets, where the simplicity of a
+    standard cursor is preferable and materializing the result client-side is not
+    a scaling concern.
+    """
     if isinstance(txn, PGTransaction):
         async with _pg(txn).connection.cursor() as cur:
             yield cur
     elif isinstance(txn, ReadOnlyPGTransaction):
         async with txn.driver._get_connection() as conn, conn.cursor() as cur:
+            yield cur
+    else:
+        raise TypeError(f"Unsupported transaction type: {type(txn)}")
+
+
+@asynccontextmanager
+async def _pg_server_cursor(
+    txn: Transaction,
+    *,
+    name: str,
+    batch_size: int | None = None,
+) -> AsyncGenerator[psycopg.AsyncServerCursor]:
+    """Return a server-side cursor for batched iteration over large result sets.
+
+    Use this when rows should be consumed incrementally to reduce client memory
+    usage and avoid materializing the full result set at once. `batch_size`
+    controls how many rows psycopg fetches per round trip while iterating.
+    """
+    if isinstance(txn, PGTransaction):
+        async with _pg(txn).connection.cursor(name=name) as cur:
+            if batch_size is not None:
+                cur.itersize = batch_size
+            yield cur
+    elif isinstance(txn, ReadOnlyPGTransaction):
+        async with txn.driver._get_connection() as conn, conn.cursor(name=name) as cur:
+            if batch_size is not None:
+                cur.itersize = batch_size
             yield cur
     else:
         raise TypeError(f"Unsupported transaction type: {type(txn)}")

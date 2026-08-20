@@ -29,7 +29,6 @@ from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import writer_pb2 as wpb
 from tests.utils.broker_messages import BrokerMessageBuilder
 
-
 pytestmark = pytest.mark.usefixtures("dummy_nidx_utility")
 
 
