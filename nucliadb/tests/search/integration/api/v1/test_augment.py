@@ -18,12 +18,33 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
 
+from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.models.internal.augment import (
+    Augmented,
+    DeepResourceAugment,
+    FieldAugment,
+    FieldClassificationLabels,
+    FieldEntities,
+    FieldText,
+    Paragraph,
+    ParagraphAugment,
+    ParagraphText,
+    RelatedParagraphs,
+    ResourceAugment,
+    ResourceClassificationLabels,
+    ResourceSummary,
+    ResourceTitle,
+)
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_models.augment import AugmentedFileField, AugmentResponse
+from nucliadb_models.common import FieldTypeName
+from nucliadb_models.filters import Field
+from nucliadb_models.search import ResourceProperties
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.ndbfixtures.resources import cookie_tale_resource, smb_wonder_resource
 
@@ -274,3 +295,246 @@ async def test_augment_api_file_thumbnails(
     )
     assert resp.status_code == 200
     assert resp.content == b"cookie recipie (file) thumbnail"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_augment_api_ask_compat(
+    nucliadb_search: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
+) -> None:
+    """/augment endpoint compatibility tests for /ask (now outside nucliadb)."""
+    kbid = knowledgebox
+    rid = await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    augmented = Augmented(resources={}, resources_deep={}, fields={}, paragraphs={})
+    with patch("nucliadb.search.api.v1.augment.augmentor.augment", return_value=augmented) as augment:
+        #
+        # TEST STRATEGY: full resource
+        # It augments resource title, summary and all it's fields text
+        #
+        resp = await nucliadb_search.post(
+            f"/{KB_PREFIX}/{kbid}/augment",
+            json={
+                "resources": [
+                    {
+                        "given": [rid],
+                        "title": True,
+                        "summary": True,
+                        "fields": {
+                            "text": True,
+                            # no filters means all resource fields
+                            "filters": [],
+                        },
+                    }
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        assert augment.call_count == 1
+        assert augment.call_args.args[0] == kbid
+        assert augment.call_args.args[1] == [
+            ResourceAugment(
+                given=[rid],
+                select=[
+                    ResourceTitle(),
+                    ResourceSummary(),
+                ],
+            ),
+            FieldAugment(given=[rid], select=[FieldText()], filter=[]),
+        ]
+        augment.reset_mock()
+
+        #
+        # TEST STRATEGY: field extension
+        # It augments resource title, summary and specific fields text
+        #
+        resp = await nucliadb_search.post(
+            f"/{KB_PREFIX}/{kbid}/augment",
+            json={
+                "resources": [
+                    {
+                        "given": [rid],
+                        "title": True,
+                        "summary": True,
+                        "fields": {
+                            "text": True,
+                            "filters": [
+                                # only text fields
+                                {"prop": "field", "type": "file"}
+                            ],
+                        },
+                    }
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        assert augment.call_count == 1
+        assert augment.call_args.args[0] == kbid
+        assert augment.call_args.args[1] == [
+            ResourceAugment(
+                given=[rid],
+                select=[
+                    ResourceTitle(),
+                    ResourceSummary(),
+                ],
+            ),
+            FieldAugment(given=[rid], select=[FieldText()], filter=[Field(type=FieldTypeName.FILE)]),
+        ]
+        augment.reset_mock()
+
+        resp = await nucliadb_search.post(
+            f"/{KB_PREFIX}/{kbid}/augment",
+            json={
+                "resources": [
+                    {
+                        "given": [rid],
+                        "fields": {
+                            "text": True,
+                            "filters": [
+                                # try with all other field types
+                                {"prop": "field", "type": t}
+                                for t in ["text", "link", "generic", "conversation"]
+                            ],
+                        },
+                    }
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        assert augment.call_count == 1
+        assert augment.call_args.args[0] == kbid
+        assert augment.call_args.args[1] == [
+            FieldAugment(
+                given=[rid],
+                select=[FieldText()],
+                filter=[
+                    Field(type=FieldTypeName.TEXT),
+                    Field(type=FieldTypeName.LINK),
+                    Field(type=FieldTypeName.GENERIC),
+                    Field(type=FieldTypeName.CONVERSATION),
+                ],
+            ),
+        ]
+        augment.reset_mock()
+
+        #
+        # TEST STRATEGY: metadata
+        # It augments origin, classification labels, ners and extra metadata
+        #
+        resp = await nucliadb_search.post(
+            f"/{KB_PREFIX}/{kbid}/augment",
+            json={
+                "resources": [
+                    {
+                        "given": [rid],
+                        "origin": True,
+                        "extra": True,
+                        "classification_labels": True,
+                    }
+                ],
+                "fields": [
+                    {
+                        "given": [f"{rid}/f/smb-wonder"],
+                        "classification_labels": True,
+                        "entities": True,
+                    }
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        assert augment.call_count == 1
+        assert augment.call_args.args[0] == kbid
+        assert augment.call_args.args[1] == [
+            DeepResourceAugment(
+                given=[rid],
+                show=[ResourceProperties.ORIGIN, ResourceProperties.EXTRA],
+                field_type_filter=[
+                    FieldTypeName.TEXT,
+                    FieldTypeName.FILE,
+                    FieldTypeName.LINK,
+                    FieldTypeName.CONVERSATION,
+                    FieldTypeName.GENERIC,
+                    FieldTypeName.KEY_VALUE,
+                ],
+            ),
+            ResourceAugment(given=[rid], select=[ResourceClassificationLabels()]),
+            FieldAugment(
+                given=[FieldId(rid=rid, type="f", key="smb-wonder")],
+                select=[
+                    FieldEntities(),
+                    FieldClassificationLabels(),
+                ],
+            ),
+        ]
+        augment.reset_mock()
+
+        #
+        # TEST STRATEGY: neighbour paragraphs
+        # It augments the paragraphs surrouding a paragraph
+        #
+        resp = await nucliadb_search.post(
+            f"/{KB_PREFIX}/{kbid}/augment",
+            json={
+                "paragraphs": [
+                    {
+                        "given": [
+                            {"id": f"{rid}/f/smb-wonder/145-234"},
+                        ],
+                        "text": True,
+                        "neighbours_before": 3,
+                        "neighbours_after": 2,
+                    }
+                ]
+            },
+        )
+        assert resp.status_code == 200
+        assert augment.call_count == 1
+        assert augment.call_args.args[0] == kbid
+        assert augment.call_args.args[1] == [
+            ParagraphAugment(
+                given=[Paragraph(id=ParagraphId.from_string(f"{rid}/f/smb-wonder/145-234"))],
+                select=[
+                    ParagraphText(),
+                    RelatedParagraphs(neighbours_before=3, neighbours_after=2),
+                ],
+            )
+        ]
+        augment.reset_mock()
+
+        #
+        # TEST STRATEGY: hiearchy
+        # It augments the resource title, summary and paragraph text
+        #
+        resp = await nucliadb_search.post(
+            f"/{KB_PREFIX}/{kbid}/augment",
+            json={
+                "paragraphs": [
+                    {
+                        "given": [
+                            {"id": f"{rid}/a/title/0-500"},
+                            {"id": f"{rid}/a/summary/0-1000"},
+                            {"id": f"{rid}/f/smb-wonder/145-234"},
+                        ],
+                        "text": True,
+                    }
+                ]
+            },
+        )
+        assert resp.status_code == 200
+        assert augment.call_count == 1
+        assert augment.call_args.args[0] == kbid
+        assert augment.call_args.args[1] == [
+            ParagraphAugment(
+                given=[
+                    Paragraph(id=ParagraphId.from_string(f"{rid}/a/title/0-500")),
+                    Paragraph(id=ParagraphId.from_string(f"{rid}/a/summary/0-1000")),
+                    Paragraph(id=ParagraphId.from_string(f"{rid}/f/smb-wonder/145-234")),
+                ],
+                select=[
+                    ParagraphText(),
+                ],
+            )
+        ]
+        augment.reset_mock()
