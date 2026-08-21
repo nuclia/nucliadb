@@ -422,10 +422,6 @@ class ResourceClassificationLabels(SelectProp):
     prop: Literal["classification_labels"] = "classification_labels"
 
 
-class ResourceFieldsFilter(BaseModel):
-    ids: list[str]
-
-
 ResourceProp = Annotated[
     (
         Annotated[ResourceTitle, Tag("title")]

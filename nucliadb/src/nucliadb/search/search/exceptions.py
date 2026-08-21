@@ -18,9 +18,5 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-class IncompleteFindResultsError(Exception):
-    pass
-
-
 class ResourceNotFoundError(Exception):
     pass

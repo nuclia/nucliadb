@@ -36,7 +36,6 @@ from nidx_protos.nodereader_pb2 import (
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.common.models_utils import from_proto
 from nucliadb.common.models_utils.from_proto import (
-    RelationNodeTypeMap,
     RelationNodeTypePbMap,
     RelationTypePbMap,
 )
@@ -54,7 +53,6 @@ from nucliadb_models.labels import translate_system_to_alias_label
 from nucliadb_models.search import (
     DirectionalRelation,
     EntitySubgraph,
-    EntityType,
     KnowledgeboxSearchResults,
     KnowledgeboxSuggestResults,
     Paragraph,
@@ -81,14 +79,6 @@ Bm25Score = tuple[float, bytes, int]
 TimestampScore = datetime.datetime
 TitleScore = str
 SortValue = Bm25Score | TimestampScore | TitleScore
-
-
-def entity_type_to_relation_node_type(node_type: EntityType) -> RelationNode.NodeType.ValueType:
-    return RelationNodeTypeMap[node_type]
-
-
-def sort_results_by_score(results: list[ParagraphResult] | list[DocumentResult]):
-    results.sort(key=lambda x: (x.score.bm25, x.shard_id, -x.score.docaddr), reverse=True)
 
 
 async def merge_documents_results(

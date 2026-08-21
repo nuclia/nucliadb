@@ -19,10 +19,6 @@
 #
 
 
-class AlreadyExists(Exception):
-    pass
-
-
 class NotFound(Exception):
     pass
 
@@ -46,7 +42,3 @@ class ReallyStopPulling(Exception):
 class SequenceOrderViolation(Exception):
     def __init__(self, last_seqid: int):
         self.last_seqid = last_seqid
-
-
-class EntitiesGroupNotFound(NotFound):
-    pass

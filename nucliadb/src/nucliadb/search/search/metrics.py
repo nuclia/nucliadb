@@ -111,8 +111,8 @@ class Metrics:
         return self._metrics[key]
 
 
-class AskMetrics(Metrics):
-    def __init__(self: "AskMetrics"):
+class PredictChatMetrics(Metrics):
+    def __init__(self: "PredictChatMetrics"):
         super().__init__(id="ask")
         self.global_start = time.monotonic()
         self.first_chunk_yielded_at: float | None = None

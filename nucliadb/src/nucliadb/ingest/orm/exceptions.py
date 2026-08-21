@@ -54,10 +54,6 @@ class ResourceNotIndexable(Exception):
         self.message = message
 
 
-class EntityManagementException(Exception):
-    pass
-
-
 class VectorSetConflict(Exception):
     pass
 

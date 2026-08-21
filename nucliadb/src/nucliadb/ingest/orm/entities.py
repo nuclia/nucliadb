@@ -101,10 +101,6 @@ class EntitiesManager:
         eg = EntitiesGroup(entities=entities)
         return eg
 
-    async def entities_group_exists(self, group: str) -> bool:
-        indexed = await self.get_indexed_entities_group(group)
-        return indexed is not None
-
     async def iterate_entities_groups(
         self, exclude_deleted: bool
     ) -> AsyncGenerator[tuple[str, EntitiesGroup], None]:
@@ -147,27 +143,3 @@ class EntitiesManager:
             return set()
         else:
             return {facet.tag.split("/")[-1] for facet in facetresults}
-
-    @staticmethod
-    def merge_entities_groups(indexed: EntitiesGroup, stored: EntitiesGroup):
-        """Create a new EntitiesGroup with the merged entities from `stored` and
-        `indexed`. The values of `stored` take priority when `stored` and
-        `indexed` share entities. That's also true for common fields.
-
-        """
-        merged_entities: dict[str, Entity] = {}
-        merged_entities.update(indexed.entities)
-        merged_entities.update(stored.entities)
-
-        for entity, edata in list(stored.entities.items()):
-            # filter out deleted entities
-            if edata.deleted:
-                del merged_entities[entity]
-
-        merged = EntitiesGroup(
-            entities=merged_entities,
-            title=stored.title or indexed.title or "",
-            color=stored.color or indexed.color or "",
-            custom=False,  # if there are indexed entities, can't be a custom group
-        )
-        return merged
