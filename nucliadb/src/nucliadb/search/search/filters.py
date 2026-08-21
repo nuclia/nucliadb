@@ -23,7 +23,6 @@ from typing import Any
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb_models.labels import translate_alias_to_system_label
 from nucliadb_models.search import Filter
-from nucliadb_protos import knowledgebox_pb2
 
 ENTITY_PREFIX = "/e/"
 CLASSIFICATION_LABEL_PREFIX = "/l/"
@@ -82,48 +81,6 @@ def translate_label_filters(filters: dict[str, Any]) -> dict[str, Any]:
     raise ValueError(f"Invalid filters: {filters}")
 
 
-def split_labels_by_type(
-    filters: list[str], classification_labels: knowledgebox_pb2.Labels
-) -> tuple[list[str], list[str]]:
-    field_labels = []
-    paragraph_labels = []
-    for fltr in filters:
-        if len(fltr) == 0 or fltr[0] != "/":
-            continue
-        if not fltr.startswith(CLASSIFICATION_LABEL_PREFIX):
-            field_labels.append(fltr)
-            continue
-        # Classification labels should have the form /l/labelset/label
-        parts = fltr.split("/")
-        if len(parts) < 4:
-            field_labels.append(fltr)
-            continue
-        labelset_id = parts[2]
-        if is_paragraph_labelset_kind(labelset_id, classification_labels):
-            paragraph_labels.append(fltr)
-        else:
-            field_labels.append(fltr)
-    return field_labels, paragraph_labels
-
-
-def is_paragraph_labelset_kind(labelset_id: str, classification_labels: knowledgebox_pb2.Labels) -> bool:
-    try:
-        labelset: knowledgebox_pb2.LabelSet | None = classification_labels.labelset.get(labelset_id)
-        if labelset is None:
-            return False
-        return knowledgebox_pb2.LabelSet.LabelSetKind.PARAGRAPHS in labelset.kind
-    except KeyError:
-        # labelset_id not found
-        return False
-
-
-def flatten_filter_literals(filters: list[str] | dict[str, Any]) -> list[str]:
-    if isinstance(filters, list):
-        return filters
-    else:
-        return list(iter_filter_expression_literals(filters))
-
-
 def iter_filter_expression_literals(expression: dict[str, Any]) -> Iterator[str]:
     if "literal" in expression:
         yield expression["literal"]
@@ -142,10 +99,6 @@ def iter_filter_expression_literals(expression: dict[str, Any]) -> Iterator[str]
         for or_term in expression["or"]:
             yield from iter_filter_expression_literals(or_term)
         return
-
-
-def has_classification_label_filters(filters: list[str]) -> bool:
-    return any(label.startswith(CLASSIFICATION_LABEL_PREFIX) for label in filters)
 
 
 def convert_to_node_filters(filters: list[str] | list[Filter]) -> dict[str, Any]:

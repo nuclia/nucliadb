@@ -145,36 +145,6 @@ def test_b64_file_upload(kbid: str):
     assert resp.content == image
 
 
-def test_search(kbid: str, resource_id: str):
-    resp = requests.post(
-        os.path.join(BASE_URL, f"api/v1/kb/{kbid}/ask"),
-        headers={
-            "content-type": "application/json",
-            "X-NUCLIADB-ROLES": "READER",
-            "x-ndb-client": "web",
-            "x-synchronous": "true",
-        },
-        json={
-            "query": "Why is soccer called soccer?",
-            "context": [],
-            "show": ["basic", "values", "origin"],
-            "features": ["keyword", "relations"],
-            "highlight": True,
-            "page_number": 0,
-            "filters": [],
-            "debug": True,
-        },
-    )
-
-    raise_for_status(resp)
-    ask_response = resp.json()
-    print(f"Search results: {ask_response['retrieval_results']}")
-    assert len(ask_response["retrieval_results"]["resources"]) == 1
-    print(f"Relations payload: {ask_response['relations']}")
-    print(f"Answer: {ask_response['answer']}")
-    print(f"Citations: {ask_response['citations']}")
-
-
 def test_predict_proxy(kbid: str):
     _test_predict_proxy_chat(kbid)
     _test_predict_proxy_tokens(kbid)

@@ -18,7 +18,6 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Annotated
 
 from nidx_protos import nodereader_pb2
@@ -109,11 +108,6 @@ class Filters(BaseModel):
     hidden: bool | None = None
     security: search_models.RequestSecurity | None = None
     with_duplicates: bool = False
-
-
-class DateTimeFilter(BaseModel):
-    after: datetime | None = None  # aka, start
-    before: datetime | None = None  # aka, end
 
 
 # rank fusion

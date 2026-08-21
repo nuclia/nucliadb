@@ -16,7 +16,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
-from unittest import mock
 
 import jsonschema  # type: ignore[import-untyped]
 import pytest
@@ -29,12 +28,6 @@ from nucliadb.search.search.filters import (
     translate_label_filters,
 )
 from nucliadb_models.search import Filter
-
-
-@pytest.fixture(scope="function")
-def is_paragraph_labelset_kind_mock():
-    with mock.patch("nucliadb.search.search.filters.is_paragraph_labelset_kind") as mocked:
-        yield mocked
 
 
 @pytest.mark.parametrize(

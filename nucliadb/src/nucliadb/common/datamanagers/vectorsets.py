@@ -26,10 +26,6 @@ from nucliadb_protos import knowledgebox_pb2
 KB_VECTORSETS = "/kbs/{kbid}/vectorsets"
 
 
-class BrokenInvariant(Exception):
-    pass
-
-
 async def initialize(txn: Transaction, *, kbid: str):
     key = KB_VECTORSETS.format(kbid=kbid)
     await txn.set(key, knowledgebox_pb2.KnowledgeBoxVectorSetsConfig().SerializeToString())

@@ -35,6 +35,7 @@ from nuclia_models.predict.generative_responses import (
 from pydantic import BaseModel, ValidationError
 
 from nucliadb.common import datamanagers
+from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
 from nucliadb.search.predict import (
     NUCLIA_LEARNING_ID_HEADER,
@@ -42,11 +43,13 @@ from nucliadb.search.predict import (
     AnswerStatusCode,
     PredictEngine,
 )
-from nucliadb.search.search.chat.query import maybe_audit_chat
-from nucliadb.search.search.metrics import AskMetrics
+from nucliadb.search.search.metrics import PredictChatMetrics
 from nucliadb.search.utilities import get_predict
-from nucliadb_models.search import NucliaDBClientType
+from nucliadb_models.search import (
+    NucliaDBClientType,
+)
 from nucliadb_utils.audit.stream import AuditedChatRequest
+from nucliadb_utils.utilities import get_audit
 
 
 class PredictProxiedEndpoints(str, Enum):
@@ -105,7 +108,7 @@ async def predict_proxy(
     predict_headers = predict.get_predict_headers(kbid)
     user_headers = {k: v for k, v in headers.items() if k.capitalize() in ALLOWED_HEADERS}
 
-    metrics = AskMetrics()
+    metrics = PredictChatMetrics()
     # Proxy the request to predict API
     predict_response = await predict.make_request(
         method=method,
@@ -196,7 +199,7 @@ async def chat_streaming_generator(
     origin: str,
     user_query: str,
     is_ndjson_stream: bool,
-    metrics: AskMetrics,
+    metrics: PredictChatMetrics,
 ):
     first = True
     first_reasoning = True
@@ -285,16 +288,65 @@ def audit_predict_proxy_endpoint(
         user_query=user_query,
         rephrased_query=None,
         retrieval_rephrase_query=None,
-        chat_history=[],
         learning_id=headers.get(NUCLIA_LEARNING_ID_HEADER),
-        query_context={},
-        query_context_order={},
         model=headers.get(NUCLIA_LEARNING_MODEL_HEADER),
         text_answer=text_answer,
         text_reasoning=text_reasoning,
         generative_answer_time=generative_answer_time,
         generative_answer_first_chunk_time=generative_answer_first_chunk_time or 0,
         generative_reasoning_first_chunk_time=generative_reasoning_first_chunk_time,
-        rephrase_time=None,
         status_code=status_code,
     )
+
+
+def maybe_audit_chat(
+    *,
+    kbid: str,
+    user_id: str,
+    client_type: NucliaDBClientType,
+    origin: str,
+    generative_answer_time: float,
+    generative_answer_first_chunk_time: float,
+    generative_reasoning_first_chunk_time: float | None,
+    user_query: str,
+    rephrased_query: str | None,
+    retrieval_rephrase_query: str | None,
+    text_answer: bytes,
+    text_reasoning: str | None,
+    status_code: AnswerStatusCode,
+    learning_id: str | None,
+    model: str | None,
+):
+    audit = get_audit()
+    if audit is None:
+        return
+
+    audit_answer = parse_audit_answer(text_answer, status_code)
+
+    audit.chat(
+        kbid,
+        user_id,
+        to_proto.client_type(client_type),
+        origin,
+        question=user_query,
+        generative_answer_time=generative_answer_time,
+        generative_answer_first_chunk_time=generative_answer_first_chunk_time,
+        generative_reasoning_first_chunk_time=generative_reasoning_first_chunk_time,
+        rephrase_time=None,
+        rephrased_question=rephrased_query,
+        retrieval_rephrased_question=retrieval_rephrase_query,
+        chat_context=[],
+        retrieved_context=[],
+        answer=audit_answer,
+        reasoning=text_reasoning,
+        learning_id=learning_id,
+        status_code=int(status_code.value),
+        model=model,
+    )
+
+
+def parse_audit_answer(raw_text_answer: bytes, status_code: AnswerStatusCode) -> str | None:
+    if status_code == AnswerStatusCode.NO_CONTEXT or status_code == AnswerStatusCode.NO_RETRIEVAL_DATA:
+        # We don't want to audit "Not enough context to answer this." and instead set a None.
+        return None
+    return raw_text_answer.decode()

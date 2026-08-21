@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nucliadb.search.search.metrics import AskMetrics, Metrics
+from nucliadb.search.search.metrics import Metrics, PredictChatMetrics
 
 
 def test_metrics():
@@ -55,7 +55,7 @@ def test_metrics():
 
 
 def test_ask_metrics():
-    metrics = AskMetrics()
+    metrics = PredictChatMetrics()
     assert metrics.id == "ask"
     assert metrics.get_first_chunk_time() is None
     metrics.record_first_chunk_yielded()
