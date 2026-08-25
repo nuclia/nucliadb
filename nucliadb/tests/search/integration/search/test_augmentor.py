@@ -34,6 +34,7 @@ from nucliadb.models.internal.augment import (
     FieldText,
     FullSelector,
     MessageSelector,
+    MessagesSelector,
     NeighboursSelector,
     PageSelector,
     Paragraph,
@@ -51,6 +52,7 @@ from nucliadb.models.internal.augment import (
 )
 from nucliadb.search.augmentor.augmentor import augment
 from nucliadb.search.search.cache import request_caches
+from nucliadb_models.conversation import MessageFormat
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.ndbfixtures.resources import cookie_tale_resource, smb_wonder_resource
 from tests.ndbfixtures.resources.lambs import lambs_resource
@@ -401,6 +403,29 @@ async def test_augmentor_conversation_strategy_text(
         assert augmented_field.messages is not None
         assert len(augmented_field.messages) == 5
         assert {m.ident for m in augmented_field.messages} == {"1", "5", "7", "10", "12"}
+
+        # Augmenting with the messages selector returns only those ids and
+        # includes the message format.
+        augmented = await augment(
+            kbid,
+            [
+                ConversationAugment(
+                    given=[field_id],
+                    select=[
+                        ConversationText(
+                            selector=MessagesSelector(ids=["1", "10", "12"]), content_text=True
+                        ),
+                    ],
+                ),
+            ],
+        )
+        augmented_field = augmented.fields[field_id]
+        assert isinstance(augmented_field, AugmentedConversationField)
+        assert augmented_field.messages is not None
+        assert len(augmented_field.messages) == 3
+        assert {m.ident for m in augmented_field.messages} == {"1", "10", "12"}
+        assert all(m.content_format == MessageFormat.PLAIN for m in augmented_field.messages)
+        assert all(m.content_text is not None for m in augmented_field.messages)
 
         # Augmenting a field with page/neighbour/window selector doesn't yield
         # any message, as we can't know which page/neighbour/window do we want

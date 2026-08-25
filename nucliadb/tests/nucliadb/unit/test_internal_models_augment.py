@@ -313,9 +313,13 @@ def test_field_prop_deduplicator_assumptions() -> None:
     ]
 
     for prop in field_props:
-        if isinstance(prop, augment.ConversationText) or isinstance(
-            prop, augment.ConversationAttachments
-        ):
+        if isinstance(prop, augment.ConversationText):
+            assert prop.__class__.model_fields.keys() == {
+                "prop",
+                f"{prop.selector =}".split()[0].removeprefix("prop."),
+                "content_text",
+            }
+        elif isinstance(prop, augment.ConversationAttachments):
             assert prop.__class__.model_fields.keys() == {
                 "prop",
                 f"{prop.selector =}".split()[0].removeprefix("prop."),

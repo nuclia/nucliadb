@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import json
 from unittest.mock import patch
 
 import pytest
@@ -45,8 +46,11 @@ from nucliadb_models.augment import AugmentedFileField, AugmentResponse
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.filters import Field
 from nucliadb_models.search import ResourceProperties
+from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, FieldID, FieldType
+from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.ndbfixtures.resources import cookie_tale_resource, smb_wonder_resource
+from tests.utils import inject_message
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -538,3 +542,130 @@ async def test_augment_api_ask_compat(
             )
         ]
         augment.reset_mock()
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_augment_api_conversation_message_content_text(
+    nucliadb_search: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
+) -> None:
+    kbid = knowledgebox
+    message_payload_1 = {"foo": "bar", "items": [1, 2, 3]}
+    message_payload_2 = {"foo": "baz", "items": [4, 5, 6]}
+    extracted_payload_1 = {"foo": "bar-extracted", "items": [10, 20, 30]}
+    extracted_payload_2 = {"foo": "baz-extracted", "items": [40, 50, 60]}
+
+    create_resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resources",
+        json={
+            "slug": "json-conversation-resource",
+            "title": "JSON Conversation Resource",
+            "conversations": {
+                "chat": {
+                    "messages": [
+                        {
+                            "to": ["assistant"],
+                            "who": "user",
+                            "content": {
+                                "text": json.dumps(message_payload_1),
+                                "format": "JSON",
+                            },
+                            "ident": "1",
+                            "type": "UNSET",
+                        },
+                        {
+                            "to": ["assistant"],
+                            "who": "user",
+                            "content": {
+                                "text": json.dumps(message_payload_2),
+                                "format": "JSON",
+                            },
+                            "ident": "2",
+                            "type": "UNSET",
+                        },
+                    ]
+                }
+            },
+        },
+    )
+    assert create_resp.status_code == 201
+    rid = create_resp.json()["uuid"]
+
+    # Inject extracted text for both messages and ensure augment returns both in one call.
+    extracted_split_text = {
+        "1": json.dumps(extracted_payload_1),
+        "2": json.dumps(extracted_payload_2),
+    }
+
+    bm = BrokerMessage()
+    bm.source = BrokerMessage.MessageSource.PROCESSOR
+    bm.uuid = rid
+    bm.kbid = kbid
+
+    field = FieldID(field="chat", field_type=FieldType.CONVERSATION)
+    etw = ExtractedTextWrapper()
+    etw.field.MergeFrom(field)
+    etw.body.text = ""
+    etw.body.split_text.update(extracted_split_text)
+    bm.extracted_text.append(etw)
+
+    await inject_message(nucliadb_ingest_grpc, bm)
+
+    augment_resp = await nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/augment",
+        json={
+            "fields": [
+                {
+                    "given": [f"{rid}/c/chat/1", f"{rid}/c/chat/2"],
+                    "conversation_message_content_text": True,
+                }
+            ]
+        },
+    )
+    assert augment_resp.status_code == 200
+
+    field_key = f"{rid}/c/chat"
+    body = augment_resp.json()
+    assert field_key in body["fields"]
+
+    messages = body["fields"][field_key]["messages"]
+    assert messages is not None
+    assert len(messages) == 2
+
+    by_ident = {m["ident"]: m for m in messages}
+    assert set(by_ident.keys()) == {"1", "2"}
+    assert by_ident["1"]["format"] == "JSON"
+    assert by_ident["2"]["format"] == "JSON"
+    assert json.loads(by_ident["1"]["text"]) == message_payload_1
+    assert json.loads(by_ident["2"]["text"]) == message_payload_2
+
+    # Check validation errors for invalid field ids
+    for fields_augmentation, error in (
+        (
+            {
+                "given": [f"{rid}/c/chat/1", f"{rid}/c/other/2"],
+                "conversation_message_content_text": True,
+            },
+            "requires all given field ids to be from the same conversation field",
+        ),
+        (
+            {"given": [f"{rid}/c/chat/1", f"{rid}/c/chat"], "conversation_message_content_text": True},
+            "requires all given field ids to have a subfield_id (aka: ident) in the field id",
+        ),
+        (
+            {
+                "given": [f"{rid}/c/chat/1", f"{rid}/c/chat/2"],
+                "text": True,
+                "conversation_message_content_text": True,
+            },
+            "`conversation_message_content_text` and `text` are not compatible together",
+        ),
+    ):
+        augment_resp = await nucliadb_search.post(
+            f"/{KB_PREFIX}/{kbid}/augment",
+            json={"fields": [fields_augmentation]},
+        )
+        assert augment_resp.status_code == 422
+        assert error in augment_resp.json()["detail"][0]["msg"]

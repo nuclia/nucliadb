@@ -22,7 +22,7 @@ from typing import Any
 from google.protobuf.json_format import MessageToDict
 
 from nucliadb_models.common import Classification, FieldID, FieldTypeName, QuestionAnswers
-from nucliadb_models.conversation import Conversation, FieldConversation
+from nucliadb_models.conversation import Conversation, FieldConversation, MessageFormat
 from nucliadb_models.entities import EntitiesGroup, EntitiesGroupSummary, Entity
 from nucliadb_models.extracted import (
     ExtractedText,
@@ -391,6 +391,20 @@ def conversation_page(
         for attachment_field in conv_message.get("content", {}).get("attachments_fields", []):
             attachment_field["field_type"] = attachment_field["field_type"].lower()
     return Conversation(total=total, pages=pages, page=page, **as_dict)
+
+
+def message_content_format(fmt: resources_pb2.MessageContent.Format.ValueType) -> MessageFormat:
+    try:
+        return {
+            resources_pb2.MessageContent.Format.PLAIN: MessageFormat.PLAIN,
+            resources_pb2.MessageContent.Format.HTML: MessageFormat.HTML,
+            resources_pb2.MessageContent.Format.MARKDOWN: MessageFormat.MARKDOWN,
+            resources_pb2.MessageContent.Format.RST: MessageFormat.RST,
+            resources_pb2.MessageContent.Format.KEEP_MARKDOWN: MessageFormat.KEEP_MARKDOWN,
+            resources_pb2.MessageContent.Format.JSON: MessageFormat.JSON,
+        }[fmt]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported message content format: {fmt}") from exc
 
 
 def field_conversation(message: resources_pb2.FieldConversation) -> FieldConversation:

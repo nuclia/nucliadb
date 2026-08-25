@@ -20,6 +20,7 @@ from typing_extensions import Self, assert_never
 
 from nucliadb_models import filters
 from nucliadb_models.common import FieldTypeName
+from nucliadb_models.conversation import MessageFormat
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import ResourceProperties, TextPosition
 
@@ -194,11 +195,18 @@ class AugmentFields(BaseModel, extra="forbid"):
     # include conversation image attachments
     conversation_image_attachments: bool = False
 
+    # Be able to retrieve the content of the message in its raw format, not the extracted text.
+    conversation_message_content_text: bool = False
+
     @model_validator(mode="after")
     def validate_cross_options(self):
         if self.full_conversation and self.max_conversation_messages is not None:
             raise ValueError(
                 "`full_conversation` and `max_conversation_messages` are not compatible together"
+            )
+        if self.conversation_message_content_text and self.text:
+            raise ValueError(
+                "`conversation_message_content_text` and `text` are not compatible together"
             )
         if (
             (self.conversation_text_attachments or self.conversation_image_attachments)
@@ -208,6 +216,28 @@ class AugmentFields(BaseModel, extra="forbid"):
             raise ValueError(
                 "Attachments are only compatible with `full_conversation` and `max_conversation_messages`"
             )
+        return self
+
+    @model_validator(mode="after")
+    def validate_conversation_message_content_text(self):
+        """
+        Validate that all field ids have the same prefix and that they all have a subfield_id (aka: ident) in the field id. This is because the raw content is only available for a specific message, not for the whole conversation.
+        """
+        if self.conversation_message_content_text:
+            prefixes = set()
+            for field_id in self.given:
+                parts = field_id.split("/")
+                if len(parts) != 4:
+                    raise ValueError(
+                        "`conversation_message_content_text` requires all given field ids to have a subfield_id (aka: ident) in the field id. Field ids: "
+                        + ", ".join(self.given)
+                    )
+                prefixes.add("/".join(parts[:3]))
+            if len(prefixes) > 1:
+                raise ValueError(
+                    "`conversation_message_content_text` requires all given field ids to be from the same conversation field. Field ids: "
+                    + ", ".join(self.given)
+                )
         return self
 
 
@@ -302,6 +332,7 @@ class AugmentedFileField(BaseModel):
 class AugmentedConversationMessage(BaseModel):
     ident: str
     text: str | None = None
+    format: MessageFormat | None = None
     attachments: list[FieldId] | None = None
 
 

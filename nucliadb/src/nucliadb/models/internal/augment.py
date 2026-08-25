@@ -34,7 +34,7 @@ from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb_models import filters
 from nucliadb_models.augment import ResourceId
 from nucliadb_models.common import FieldTypeName
-from nucliadb_models.conversation import FieldConversation
+from nucliadb_models.conversation import FieldConversation, MessageFormat
 from nucliadb_models.file import FieldFile
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import Extra, Origin
@@ -282,6 +282,17 @@ class MessageSelector(BaseModel):
         return self
 
 
+class MessagesSelector(BaseModel):
+    """Selects the conversation field messages specified by the message ids."""
+
+    name: Literal["messages"] = "messages"
+
+    ids: list[str] = Field(
+        default_factory=list,
+        description="List of message identifiers to select",
+    )
+
+
 class PageSelector(BaseModel):
     """Selects all messages from the page of the message specified by the field
     id.
@@ -338,6 +349,7 @@ class FullSelector(BaseModel):
 ConversationSelector = Annotated[
     (
         Annotated[MessageSelector, Tag("message")]
+        | Annotated[MessagesSelector, Tag("messages")]
         | Annotated[PageSelector, Tag("page")]
         | Annotated[NeighboursSelector, Tag("neighbours")]
         | Annotated[WindowSelector, Tag("window")]
@@ -351,6 +363,9 @@ ConversationSelector = Annotated[
 class ConversationText(FieldText):
     prop: Literal["text"] = "text"
     selector: ConversationSelector
+    content_text: bool = (
+        False  # Controls whether to return the content or the extracted text for the messages
+    )
 
 
 class ConversationAttachments(SelectProp):
@@ -589,6 +604,8 @@ class AugmentedLinkField(BaseAugmentedField):
 class AugmentedConversationMessage:
     ident: str
     text: str | None = None
+    content_text: str | None = None
+    content_format: MessageFormat | None = None
     attachments: list[FieldId] | None = None
 
 

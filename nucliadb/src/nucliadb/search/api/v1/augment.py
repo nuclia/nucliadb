@@ -47,6 +47,7 @@ from nucliadb.models.internal.augment import (
     FileThumbnail,
     FullSelector,
     MessageSelector,
+    MessagesSelector,
     Metadata,
     Paragraph,
     ParagraphAugment,
@@ -250,7 +251,11 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
 
             if field_augment.full_conversation:
                 selector = FullSelector()
-                conversation_select.append(ConversationText(selector=selector))
+                conversation_select.append(
+                    ConversationText(
+                        selector=selector, content_text=field_augment.conversation_message_content_text
+                    )
+                )
                 if (
                     field_augment.conversation_text_attachments
                     or field_augment.conversation_image_attachments
@@ -262,14 +267,36 @@ def parse_first_augments(item: AugmentRequest) -> list[Augment]:
                 # requested by the user
                 first_selector = MessageSelector(index="first")
                 window_selector = WindowSelector(size=field_augment.max_conversation_messages)
-                conversation_select.append(ConversationText(selector=first_selector))
-                conversation_select.append(ConversationText(selector=window_selector))
+                conversation_select.append(
+                    ConversationText(
+                        selector=first_selector,
+                        content_text=field_augment.conversation_message_content_text,
+                    )
+                )
+                conversation_select.append(
+                    ConversationText(
+                        selector=window_selector,
+                        content_text=field_augment.conversation_message_content_text,
+                    )
+                )
                 if (
                     field_augment.conversation_text_attachments
                     or field_augment.conversation_image_attachments
                 ):
                     conversation_select.append(ConversationAttachments(selector=first_selector))
                     conversation_select.append(ConversationAttachments(selector=window_selector))
+
+            elif field_augment.conversation_message_content_text:
+                # If no max_conversation_messages or full_conversation is specified,
+                # but content_text is requested, get the messages by their ids.
+                idents = [f.subfield_id for f in given if f.subfield_id is not None]
+                if len(idents) > 0:
+                    conversation_select.append(
+                        ConversationText(
+                            selector=MessagesSelector(ids=idents),
+                            content_text=True,
+                        )
+                    )
 
             if field_augment.conversation_answer_or_messages_after:
                 conversation_select.append(ConversationAnswerOrAfter())
@@ -487,7 +514,8 @@ def build_augment_response(item: AugmentRequest, augmented: Augmented) -> Augmen
                     conversation.messages.append(
                         AugmentedConversationMessage(
                             ident=m.ident,
-                            text=m.text,
+                            text=m.content_text or m.text,
+                            format=m.content_format,
                             attachments=attachments,
                         )
                     )

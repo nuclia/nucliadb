@@ -55,6 +55,7 @@ from nucliadb.models.internal.augment import (
     FileThumbnail,
     FullSelector,
     MessageSelector,
+    MessagesSelector,
     NeighboursSelector,
     PageSelector,
     WindowSelector,
@@ -280,8 +281,10 @@ async def db_augment_conversation_field(
 
     for prop in select:
         if isinstance(prop, FieldText):
+            extracted_text_selected = True
             if isinstance(prop, ConversationText):
                 selector = prop.selector
+                extracted_text_selected = prop.content_text is False
             else:
                 # when asking for the conversation text without details, we
                 # choose the message if a split is provided in the id or the
@@ -291,16 +294,24 @@ async def db_augment_conversation_field(
                 else:
                     selector = FullSelector()
 
-            # gather the text from each message matching the selector
-            extracted_text_pb = await cache.get_field_extracted_text_pb(field)
+            # gather the extracted or raw content text from each message matching the selector
+            extracted_text_pb = None
+            if extracted_text_selected:
+                extracted_text_pb = await cache.get_field_extracted_text_pb(field)
             async for page, index, message in conversation_selector(field, field_id, selector):
                 augmented_message = messages.setdefault(
-                    (page, index), AugmentedConversationMessage(ident=message.ident)
+                    (page, index),
+                    AugmentedConversationMessage(
+                        ident=message.ident,
+                    ),
                 )
                 if extracted_text_pb is not None and message.ident in extracted_text_pb.split_text:
                     augmented_message.text = extracted_text_pb.split_text[message.ident]
                 else:
-                    augmented_message.text = message.content.text
+                    augmented_message.content_text = message.content.text
+                    augmented_message.content_format = from_proto.message_content_format(
+                        message.content.format
+                    )
 
         elif isinstance(prop, FieldValue):
             db_value = await field.get_metadata()
@@ -322,7 +333,10 @@ async def db_augment_conversation_field(
             # and collect all the attachment references
             async for page, index, message in conversation_selector(field, field_id, prop.selector):
                 augmented_message = messages.setdefault(
-                    (page, index), AugmentedConversationMessage(ident=message.ident)
+                    (page, index),
+                    AugmentedConversationMessage(
+                        ident=message.ident,
+                    ),
                 )
                 augmented_message.attachments = []
                 for ref in message.content.attachments_fields:
@@ -334,10 +348,16 @@ async def db_augment_conversation_field(
         elif isinstance(prop, ConversationAnswerOrAfter):
             async for page, index, message in conversation_answer_or_after(field, field_id):
                 augmented_message = messages.setdefault(
-                    (page, index), AugmentedConversationMessage(ident=message.ident)
+                    (page, index),
+                    AugmentedConversationMessage(
+                        ident=message.ident,
+                    ),
                 )
                 if not augmented_message.text:
-                    augmented_message.text = message.content.text
+                    augmented_message.content_text = message.content.text
+                    augmented_message.content_format = from_proto.message_content_format(
+                        message.content.format
+                    )
 
         else:  # pragma: no cover
             assert_never(prop)
@@ -477,9 +497,6 @@ async def find_conversation_message(
     field: Conversation, ident: str
 ) -> tuple[int, int, resources_pb2.Message] | None:
     """Find a message in the conversation identified by `ident`."""
-    conversation_metadata = await field.get_metadata()
-    if conversation_metadata is None:
-        return None
     splits_metadata = await field.get_splits_metadata()
     deleted_splits = set(splits_metadata.deleted_splits)
     if ident in deleted_splits:
@@ -492,14 +509,32 @@ async def find_conversation_message(
         for idx, message in enumerate(conversation.messages):
             if message.ident == ident:
                 return split_meta.page, idx, message
-    else:
-        # Fallback to scroll all the conversation pages until we find it.
-        for page in range(1, conversation_metadata.pages + 1):
-            conversation = await field.db_get_value(page)
-            for idx, message in enumerate(conversation.messages):
-                if message.ident == ident:
-                    return page, idx, message
     return None
+
+
+async def find_conversation_messages(
+    field: Conversation, idents: list[str]
+) -> AsyncIterator[tuple[int, int, resources_pb2.Message]]:
+    """
+    Find multiple messages in the conversation identified by `idents`. Yields tuples of (page, index, message) for each found message.
+    """
+    splits_metadata = await field.get_splits_metadata()
+    deleted_splits = set(splits_metadata.deleted_splits)
+    # Group messages by page
+    messages_by_page: dict[int, list[str]] = {}
+    for ident in idents:
+        if ident in deleted_splits:
+            # The message has been deleted, we consider it not found.
+            continue
+        split_meta = splits_metadata.metadata.get(ident)
+        if split_meta is not None:
+            messages_by_page.setdefault(split_meta.page, []).append(ident)
+    # Now, for each page, get the conversation page and yield the messages.
+    for page, idents in messages_by_page.items():
+        conversation = await field.db_get_value(page)
+        for idx, message in enumerate(conversation.messages):
+            if message.ident in idents:
+                yield page, idx, message
 
 
 async def iter_conversation_messages(
@@ -617,6 +652,10 @@ async def conversation_selector(
                 return
 
             page, index, message = found
+            yield page, index, message
+
+    elif isinstance(selector, MessagesSelector):
+        async for page, index, message in find_conversation_messages(field, selector.ids):
             yield page, index, message
 
     elif isinstance(selector, PageSelector):
