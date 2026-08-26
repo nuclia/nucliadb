@@ -112,7 +112,7 @@ async def _traced_callback(origin_cb: Callable[[Msg], Awaitable[None]], tracer: 
                 {
                     "stream": msg.metadata.stream,
                     "consumer": msg.metadata.consumer or "",
-                    "acked": "yes" if msg._ackd else "no",
+                    "acked": "yes" if msg.is_acked else "no",
                 },
             )
 
@@ -216,7 +216,7 @@ class JetStreamContextTelemetry:
                     {
                         "stream": message.metadata.stream,
                         "consumer": message.metadata.consumer or "",
-                        "acked": "yes" if message._ackd else "no",
+                        "acked": "yes" if message.is_acked else "no",
                     },
                 )
 

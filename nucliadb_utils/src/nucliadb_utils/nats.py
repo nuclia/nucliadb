@@ -53,7 +53,7 @@ class NatsMessageProgressUpdater(MessageProgressUpdater):
 
     def __init__(self, msg: Msg, timeout: float):
         async def update_msg() -> bool:
-            if msg._ackd:  # all done, do not mark with in_progress
+            if msg.is_acked:  # all done, do not mark with in_progress
                 return True
             await msg.in_progress()
             return False
