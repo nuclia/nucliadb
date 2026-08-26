@@ -164,8 +164,7 @@ class NatsTaskConsumer(Generic[MsgType]):
                     exc_info=e,
                 )
                 # Nak the message to retry
-                await asyncio.sleep(BEFORE_NAK_SLEEP_SECONDS)
-                await msg.nak()
+                await msg.nak(delay=BEFORE_NAK_SLEEP_SECONDS)
             else:
                 logger.info(
                     f"Successful task",
