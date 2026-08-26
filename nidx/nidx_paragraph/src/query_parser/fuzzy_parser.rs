@@ -72,25 +72,24 @@ pub fn parse_fuzzy_query(
                 let distance = FUZZY_DISTANCE;
                 let transposition_cost_one = true;
 
-                let q: Box<dyn Query>;
-                if literal.len() < MIN_FUZZY_LEN {
+                let q: Box<dyn Query> = if literal.len() < MIN_FUZZY_LEN {
                     // to avoid noise, we don't want to match too short terms as fuzzy
-                    q = Box::new(TermQuery::new(term, IndexRecordOption::Basic));
+                    Box::new(TermQuery::new(term, IndexRecordOption::Basic))
                 } else if matches!(last_literal_index, Some(idx) if idx == i) && literal.len() >= MIN_FUZZY_PREFIX_LEN {
-                    q = Box::new(FuzzyTermQuery::new_prefix(
+                    Box::new(FuzzyTermQuery::new_prefix(
                         term,
                         distance,
                         transposition_cost_one,
                         term_collector.clone(),
-                    ));
+                    ))
                 } else {
-                    q = Box::new(FuzzyTermQuery::new(
+                    Box::new(FuzzyTermQuery::new(
                         term,
                         distance,
                         transposition_cost_one,
                         term_collector.clone(),
-                    ));
-                }
+                    ))
+                };
                 subqueries.push((Occur::Should, q));
             }
             Token::Quoted(quoted) => {
