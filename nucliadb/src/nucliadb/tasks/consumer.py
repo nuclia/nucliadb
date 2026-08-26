@@ -98,7 +98,6 @@ class NatsTaskConsumer(Generic[MsgType]):
                 deliver_policy=nats.js.api.DeliverPolicy.ALL,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
-                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
                 max_ack_pending=max_ack_pending,
                 max_deliver=self.max_deliver,
             ),

@@ -238,7 +238,6 @@ class NATSConsumerSettings(BaseSettings):
     nats_max_ack_pending: int = 10
     nats_max_deliver: int = 10000
     nats_ack_wait: int = 60
-    nats_idle_heartbeat: float = 5.0
 
 
 nats_consumer_settings = NATSConsumerSettings()
