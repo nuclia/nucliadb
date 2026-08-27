@@ -221,7 +221,8 @@ class AugmentFields(BaseModel, extra="forbid"):
     @model_validator(mode="after")
     def validate_conversation_message_content_text(self):
         """
-        Validate that all field ids have the same prefix and that they all have a subfield_id (aka: ident) in the field id. This is because the raw content is only available for a specific message, not for the whole conversation.
+        Validate that all field ids have a subfield_id (aka: ident) in the field id.
+        This is because the raw content is only available for a specific message, not for the whole conversation.
         """
         if self.conversation_message_content_text:
             prefixes = set()
@@ -233,11 +234,6 @@ class AugmentFields(BaseModel, extra="forbid"):
                         + ", ".join(self.given)
                     )
                 prefixes.add("/".join(parts[:3]))
-            if len(prefixes) > 1:
-                raise ValueError(
-                    "`conversation_message_content_text` requires all given field ids to be from the same conversation field. Field ids: "
-                    + ", ".join(self.given)
-                )
         return self
 
 

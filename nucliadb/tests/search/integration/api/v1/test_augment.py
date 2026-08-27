@@ -644,13 +644,6 @@ async def test_augment_api_conversation_message_content_text(
     # Check validation errors for invalid field ids
     for fields_augmentation, error in (
         (
-            {
-                "given": [f"{rid}/c/chat/1", f"{rid}/c/other/2"],
-                "conversation_message_content_text": True,
-            },
-            "requires all given field ids to be from the same conversation field",
-        ),
-        (
             {"given": [f"{rid}/c/chat/1", f"{rid}/c/chat"], "conversation_message_content_text": True},
             "requires all given field ids to have a subfield_id (aka: ident) in the field id",
         ),
