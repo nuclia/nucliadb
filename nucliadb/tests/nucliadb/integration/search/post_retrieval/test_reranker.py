@@ -47,19 +47,6 @@ async def test_reranker(
 ):
     kbid = philosophy_books_kb
 
-    ask_resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/ask",
-        headers={
-            "x-synchronous": "true",
-        },
-        json={
-            "query": "the",
-            "reranker": reranker,
-            "min_score": {"bm25": 0, "semantic": -10},
-        },
-    )
-    assert ask_resp.status_code == 200
-
     find_resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",
         json={
@@ -71,8 +58,6 @@ async def test_reranker(
     assert find_resp.status_code == 200
 
     find_retrieval = KnowledgeboxFindResults.model_validate(find_resp.json())
-    ask_retrieval = KnowledgeboxFindResults.model_validate(ask_resp.json()["retrieval_results"])
-    assert find_retrieval == ask_retrieval
     assert len(find_retrieval.best_matches) == 7
 
 
@@ -107,23 +92,14 @@ async def test_predict_reranker_requests_more_results(
         "top_k": 5,
     }
 
-    ask_resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/ask",
-        headers={
-            "x-synchronous": "true",
-        },
-        json=payload,
-    )
-    assert ask_resp.status_code == 200
-
     find_resp = await nucliadb_reader.post(
         f"/kb/{kbid}/find",
         json=payload,
     )
     assert find_resp.status_code == 200
 
-    assert spy_build_find_response.call_count == 2
-    assert spy_cut_page.call_count == 2
+    assert spy_build_find_response.call_count == 1
+    assert spy_cut_page.call_count == 1
 
     for i in range(spy_build_find_response.call_count):
         build_find_response_call = spy_build_find_response.call_args_list[i]
@@ -137,8 +113,6 @@ async def test_predict_reranker_requests_more_results(
         assert top_k == extra
 
     find_retrieval = KnowledgeboxFindResults.model_validate(find_resp.json())
-    ask_retrieval = KnowledgeboxFindResults.model_validate(ask_resp.json()["retrieval_results"])
-    assert find_retrieval == ask_retrieval
     assert len(find_retrieval.best_matches) == 5
 
 

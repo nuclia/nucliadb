@@ -140,11 +140,7 @@ def test_conversation(sdk: nucliadb_sdk.NucliaDB, kb, method: str):
 def test_search_endpoints(sdk: nucliadb_sdk.NucliaDB, kb):
     sdk.find(kbid=kb.uuid, query="foo")
     sdk.search(kbid=kb.uuid, query="foo")
-    sdk.ask(kbid=kb.uuid, query="foo")
 
-    resource = sdk.create_resource(kbid=kb.uuid, title="Resource", slug="resource")
-    sdk.ask_on_resource(kbid=kb.uuid, rid=resource.uuid, query="foo")
-    sdk.ask_on_resource_by_slug(kbid=kb.uuid, slug="resource", query="foo")
     sdk.feedback(kbid=kb.uuid, ident="bar", good=True, feedback="baz", task="CHAT")
     with pytest.raises(nucliadb_sdk.exceptions.PreconditionFailed) as err:
         foobar = uuid.uuid4().hex

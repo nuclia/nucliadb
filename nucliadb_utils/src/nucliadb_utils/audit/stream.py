@@ -172,7 +172,6 @@ class AuditedChatRequest(ChatModel, ndb_search_models.AuditMetadataBase):
 
 class AuditedEndpoint(str, enum.Enum):
     CHAT = "chat"
-    ASK = "ask"
     FIND = "find"
     SEARCH = "search"
 
@@ -182,8 +181,6 @@ class AuditedEndpoint(str, enum.Enum):
         match endpoint:
             case "chat":
                 return cls.CHAT
-            case "ask":
-                return cls.ASK
             case "find":
                 return cls.FIND
             case "search":
@@ -193,7 +190,6 @@ class AuditedEndpoint(str, enum.Enum):
 
 endpoint_validators: dict[AuditedEndpoint, type[BaseModel]] = {
     AuditedEndpoint.CHAT: AuditedChatRequest,
-    AuditedEndpoint.ASK: ndb_search_models.AskRequest,
     AuditedEndpoint.FIND: ndb_search_models.FindRequest,
     AuditedEndpoint.SEARCH: ndb_search_models.SearchRequest,
 }
@@ -450,11 +446,7 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.kbid = kbid
         auditrequest.retrieval_time = timeit
         auditrequest.resources = resources
-        if "/ask" in context.path:
-            auditrequest.type = AuditRequest.CHAT
-            auditrequest.chat.question = ""
-        else:
-            auditrequest.type = AuditRequest.SEARCH
+        auditrequest.type = AuditRequest.SEARCH
 
         fill_audit_search_request(auditrequest.search, search)
         if retrieval_rephrased_question is not None:

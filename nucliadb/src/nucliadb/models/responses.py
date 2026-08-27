@@ -41,10 +41,3 @@ class HTTPConflict(HTTPClientError):
 
     def __init__(self, detail: str):
         super().__init__(status_code=self.status_code, detail=detail)
-
-
-class HTTPInternalServerError(Response):
-    status_code = 500
-
-    def __init__(self, detail: str):
-        super().__init__(content=detail, status_code=self.status_code)
