@@ -501,11 +501,6 @@ class ParagraphAugment(BaseModel, extra="forbid"):
     from_: Literal["paragraphs"] = Field(default="paragraphs", alias="from")
 
 
-class AugmentationLimits(BaseModel, extra="forbid"):
-    # TODO(decoupled-ask): global augmentation limits (max chars, images, image size...)
-    ...
-
-
 Augment = Annotated[
     (
         Annotated[ResourceAugment, Tag("resources")]
@@ -523,11 +518,6 @@ class AugmentRequest(BaseModel, extra="forbid"):
     augmentations: list[Augment] = Field(
         default_factory=list,
         description="List of augmentations to be performed",
-    )
-
-    limits: AugmentationLimits | None = Field(
-        default=None,
-        description="Global hydration limits applied to the whole request",
     )
 
 

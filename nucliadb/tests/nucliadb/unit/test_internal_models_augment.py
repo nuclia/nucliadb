@@ -215,7 +215,6 @@ def test_conversational_strategy():
                         {"prop": "attachments", "kind": "image"},
                     ],
                     "from": "conversations",
-                    "limits": {"max_messages": 5},
                 },
                 {
                     "given": field_ids,
