@@ -476,16 +476,10 @@ class FileAugment(BaseModel, extra="forbid"):
     from_: Literal["files"] = Field(default="files", alias="from")
 
 
-class ConversationAugmentLimits(BaseModel):
-    max_messages: int | None = Field(default=15, ge=0)
-
-
 class ConversationAugment(BaseModel, extra="forbid"):
     given: list[FieldId | ParagraphId]
     select: list[ConversationProp]
     from_: Literal["conversations"] = Field(default="conversations", alias="from")
-    # TODO(decoupled-storage): remove?
-    limits: ConversationAugmentLimits | None = Field(default_factory=ConversationAugmentLimits)
 
 
 FieldFilter = Annotated[
