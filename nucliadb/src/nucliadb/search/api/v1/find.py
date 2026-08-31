@@ -30,7 +30,7 @@ from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.api.v1.utils import fastapi_query
+from nucliadb.search.api.v1.utils import fastapi_query, get_injected_security_groups
 from nucliadb.search.search import cache
 from nucliadb.search.search.find import find
 from nucliadb.search.search.metrics import Metrics
@@ -171,6 +171,12 @@ async def find_knowledgebox(
         detail = json.loads(exc.json())
         return HTTPClientError(status_code=422, detail=detail)
 
+    # Backend-injected security groups (e.g. from a service account) always
+    # take priority over any groups the client supplied.
+    injected_groups = get_injected_security_groups(request)
+    if injected_groups is not None:
+        item.security = RequestSecurity(groups=injected_groups)
+
     return await _find_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
 
 
@@ -194,6 +200,11 @@ async def find_post_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> KnowledgeboxFindResults | HTTPClientError:
+    # Backend-injected security groups (e.g. from a service account) always
+    # take priority over any groups the client supplied.
+    injected_groups = get_injected_security_groups(request)
+    if injected_groups is not None:
+        item.security = RequestSecurity(groups=injected_groups)
     return await _find_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
 
 

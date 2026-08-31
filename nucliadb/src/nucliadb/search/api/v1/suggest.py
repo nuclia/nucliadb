@@ -27,7 +27,7 @@ from pydantic import ValidationError
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.api.v1.utils import fastapi_query
+from nucliadb.search.api.v1.utils import fastapi_query, get_injected_security_groups
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.merge import merge_suggest_results
@@ -77,6 +77,12 @@ async def suggest_knowledgebox(
     try:
         expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
 
+        # Backend-injected security groups (e.g. from a service account) always
+        # take priority over any groups the client supplied.
+        injected_groups = get_injected_security_groups(request)
+        if injected_groups is not None:
+            security_groups = injected_groups
+
         return await suggest(
             response,
             kbid,
@@ -119,6 +125,13 @@ async def suggest_post_knowledgebox(
     item: SuggestRequest,
 ) -> KnowledgeboxSuggestResults | HTTPClientError:
     try:
+        # Backend-injected security groups (e.g. from a service account) always
+        # take priority over any groups the client supplied.
+        security_groups: list[str] | None = item.security.groups if item.security else None
+        injected_groups = get_injected_security_groups(request)
+        if injected_groups is not None:
+            security_groups = injected_groups
+
         return await suggest(
             response,
             kbid,
@@ -127,7 +140,7 @@ async def suggest_post_knowledgebox(
             debug=item.debug,
             highlight=item.highlight,
             show_hidden=item.show_hidden,
-            security_groups=item.security.groups if item.security else None,
+            security_groups=security_groups,
             filter_expression=item.filter_expression,
             # all these fields are superseeded by filter expression. In the POST
             # endpoint we don't support any of these fields

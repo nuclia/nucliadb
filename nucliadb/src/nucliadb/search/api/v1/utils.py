@@ -20,10 +20,20 @@
 from typing import Any
 
 from fastapi import Query
+from starlette.requests import Request
 
 from nucliadb_models.search import ParamDefault
+from nucliadb_utils.authentication import NucliaUser
 
 _NOT_SET = object()
+
+
+def get_injected_security_groups(request: Request) -> list[str] | None:
+    """Return security groups injected by the backend authentication layer."""
+    user = request.user
+    if isinstance(user, NucliaUser):
+        return user.security_groups
+    return None
 
 
 def fastapi_query(param: ParamDefault, default: Any | None = _NOT_SET, **kw) -> Query:  # type: ignore

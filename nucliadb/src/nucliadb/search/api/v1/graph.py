@@ -21,6 +21,7 @@ from fastapi import Header, Request, Response
 from fastapi_versioning import version
 
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.api.v1.utils import get_injected_security_groups
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.graph_merge import (
     build_graph_nodes_response,
@@ -46,6 +47,7 @@ from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     NucliaDBClientType,
 )
+from nucliadb_models.security import RequestSecurity
 from nucliadb_utils.authentication import requires
 
 
@@ -69,6 +71,11 @@ async def graph_search_knowledgebox(
     x_forwarded_for: str = Header(""),
 ) -> GraphSearchResponse:
     # TODO: audit this request!
+    # Backend-injected security groups (e.g. from a service account) always
+    # take priority over any groups the client supplied.
+    injected_groups = get_injected_security_groups(request)
+    if injected_groups is not None:
+        item.security = RequestSecurity(groups=injected_groups)
     return await graph_path_search(kbid, item)
 
 
@@ -100,6 +107,11 @@ async def graph_nodes_search_knowledgebox(
     x_forwarded_for: str = Header(""),
 ) -> GraphNodesSearchResponse:
     # TODO: audit this request!
+    # Backend-injected security groups (e.g. from a service account) always
+    # take priority over any groups the client supplied.
+    injected_groups = get_injected_security_groups(request)
+    if injected_groups is not None:
+        item.security = RequestSecurity(groups=injected_groups)
     return await graph_nodes_search(kbid, item)
 
 
@@ -131,6 +143,11 @@ async def graph_relations_search_knowledgebox(
     x_forwarded_for: str = Header(""),
 ) -> GraphRelationsSearchResponse:
     # TODO: audit this request!
+    # Backend-injected security groups (e.g. from a service account) always
+    # take priority over any groups the client supplied.
+    injected_groups = get_injected_security_groups(request)
+    if injected_groups is not None:
+        item.security = RequestSecurity(groups=injected_groups)
     return await graph_relations_search(kbid, item)
 
 
