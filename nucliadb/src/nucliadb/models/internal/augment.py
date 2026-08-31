@@ -476,16 +476,10 @@ class FileAugment(BaseModel, extra="forbid"):
     from_: Literal["files"] = Field(default="files", alias="from")
 
 
-class ConversationAugmentLimits(BaseModel):
-    max_messages: int | None = Field(default=15, ge=0)
-
-
 class ConversationAugment(BaseModel, extra="forbid"):
     given: list[FieldId | ParagraphId]
     select: list[ConversationProp]
     from_: Literal["conversations"] = Field(default="conversations", alias="from")
-    # TODO(decoupled-storage): remove?
-    limits: ConversationAugmentLimits | None = Field(default_factory=ConversationAugmentLimits)
 
 
 FieldFilter = Annotated[
@@ -507,11 +501,6 @@ class ParagraphAugment(BaseModel, extra="forbid"):
     from_: Literal["paragraphs"] = Field(default="paragraphs", alias="from")
 
 
-class AugmentationLimits(BaseModel, extra="forbid"):
-    # TODO(decoupled-ask): global augmentation limits (max chars, images, image size...)
-    ...
-
-
 Augment = Annotated[
     (
         Annotated[ResourceAugment, Tag("resources")]
@@ -529,11 +518,6 @@ class AugmentRequest(BaseModel, extra="forbid"):
     augmentations: list[Augment] = Field(
         default_factory=list,
         description="List of augmentations to be performed",
-    )
-
-    limits: AugmentationLimits | None = Field(
-        default=None,
-        description="Global hydration limits applied to the whole request",
     )
 
 
