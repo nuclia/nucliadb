@@ -93,7 +93,7 @@ message Predict {
     uint32 image = 6;
     uint32 num_predicts = 7;
     bool customer_key = 8;
-    uint32 internet_search = 9;
+    uint32 external_requests = 9;
 }
 
 enum ActivityLogMatchType {
