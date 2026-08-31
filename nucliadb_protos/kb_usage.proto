@@ -44,7 +44,6 @@ enum PredictType {
     REMI = 15;
     VLLM_EXTRACTION = 17;
     LLM_SPLITTING = 18;
-    INTERNET_SEARCH = 20;
 }
 
 enum ClientType {
@@ -94,6 +93,7 @@ message Predict {
     uint32 image = 6;
     uint32 num_predicts = 7;
     bool customer_key = 8;
+    uint32 external_requests = 9;
 }
 
 enum ActivityLogMatchType {
