@@ -13,6 +13,7 @@
 # limitations under the License.
 #
 
+from datetime import datetime
 from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
@@ -330,6 +331,7 @@ class AugmentedConversationMessage(BaseModel):
     text: str | None = None
     format: MessageFormat | None = None
     attachments: list[FieldId] | None = None
+    timestamp: datetime | None = None
 
 
 class AugmentedConversationField(BaseModel):

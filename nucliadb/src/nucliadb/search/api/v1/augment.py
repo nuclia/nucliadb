@@ -517,6 +517,7 @@ def build_augment_response(item: AugmentRequest, augmented: Augmented) -> Augmen
                             text=m.content_text or m.text,
                             format=m.content_format,
                             attachments=attachments,
+                            timestamp=m.timestamp,
                         )
                     )
 

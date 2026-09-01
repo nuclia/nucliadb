@@ -308,6 +308,7 @@ async def db_augment_conversation_field(
                 if extracted_text_pb is not None and message.ident in extracted_text_pb.split_text:
                     augmented_message.text = extracted_text_pb.split_text[message.ident]
                 else:
+                    augmented_message.timestamp = message.timestamp.ToDatetime()
                     augmented_message.content_text = message.content.text
                     augmented_message.content_format = from_proto.message_content_format(
                         message.content.format
@@ -336,6 +337,7 @@ async def db_augment_conversation_field(
                     (page, index),
                     AugmentedConversationMessage(
                         ident=message.ident,
+                        timestamp=message.timestamp.ToDatetime(),
                     ),
                 )
                 augmented_message.attachments = []
@@ -354,6 +356,7 @@ async def db_augment_conversation_field(
                     ),
                 )
                 if not augmented_message.text:
+                    augmented_message.timestamp = message.timestamp.ToDatetime()
                     augmented_message.content_text = message.content.text
                     augmented_message.content_format = from_proto.message_content_format(
                         message.content.format
