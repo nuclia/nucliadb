@@ -19,6 +19,7 @@
 #
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from nidx_protos.nodereader_pb2 import (
@@ -591,6 +592,7 @@ class AugmentedConversationMessage:
     content_text: str | None = None
     content_format: MessageFormat | None = None
     attachments: list[FieldId] | None = None
+    timestamp: datetime | None = None
 
 
 @dataclass
