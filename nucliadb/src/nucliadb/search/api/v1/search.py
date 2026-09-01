@@ -31,7 +31,7 @@ from nucliadb.common.models_utils import to_proto
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
-from nucliadb.search.api.v1.utils import fastapi_query
+from nucliadb.search.api.v1.utils import fastapi_query, get_injected_security_groups
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
@@ -41,9 +41,7 @@ from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
     convert_retrieval_to_proto,
     is_incomplete,
 )
-from nucliadb.search.search.utils import (
-    min_score_from_query_params,
-)
+from nucliadb.search.search.utils import min_score_from_query_params
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.resource import ExtractedDataTypeName, NucliaDBRoles
@@ -189,6 +187,13 @@ async def search_knowledgebox(
     except ValidationError as exc:
         detail = json.loads(exc.json())
         return HTTPClientError(status_code=422, detail=detail)
+
+    # Backend-injected security groups (e.g. from a service account) always
+    # take priority over any groups the client supplied.
+    injected_groups = get_injected_security_groups(request)
+    if injected_groups is not None:
+        item.security = RequestSecurity(groups=injected_groups)
+
     return await _search_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
 
 
@@ -212,6 +217,11 @@ async def search_post_knowledgebox(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> KnowledgeboxSearchResults | HTTPClientError:
+    # Backend-injected security groups (e.g. from a service account) always
+    # take priority over any groups the client supplied.
+    injected_groups = get_injected_security_groups(request)
+    if injected_groups is not None:
+        item.security = RequestSecurity(groups=injected_groups)
     return await _search_endpoint(response, kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for)
 
 

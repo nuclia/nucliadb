@@ -30,7 +30,11 @@ from nucliadb_models.graph.requests import (
     Not,
     Or,
 )
-from nucliadb_models.graph.responses import GraphSearchResponse
+from nucliadb_models.graph.responses import (
+    GraphNodesSearchResponse,
+    GraphRelationsSearchResponse,
+    GraphSearchResponse,
+)
 from nucliadb_models.metadata import RelationType
 from nucliadb_protos.resources_pb2 import FieldComputedMetadataWrapper, FieldType, Relations
 from nucliadb_protos.utils_pb2 import Relation, RelationMetadata, RelationNode
@@ -535,70 +539,127 @@ async def test_graph_search__security(
     )
     assert resp.status_code == 200, resp.text
 
+    graph_query = {
+        "query": {
+            "prop": "path",
+            "source": {"value": "Anna"},
+            "relation": {"label": "IS_FRIEND"},
+            "undirected": True,
+        },
+        "top_k": 100,
+    }
+
     # Without groups, returns it
+    resp = await nucliadb_reader.post(f"/kb/{kbid}/graph", json=graph_query)
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+
+    # With the proper group via body, returns it
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/graph",
-        json={
-            "query": {
-                "prop": "path",
-                "source": {
-                    "value": "Anna",
-                },
-                "relation": {
-                    "label": "IS_FRIEND",
-                },
-                "undirected": True,
-            },
-            "top_k": 100,
-        },
+        json={**graph_query, "security": {"groups": ["secret"]}},
     )
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
     assert len(paths) == 1
 
-    # With the proper group, returns it
+    # With the proper group via header, returns it
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/graph",
-        json={
-            "query": {
-                "prop": "path",
-                "source": {
-                    "value": "Anna",
-                },
-                "relation": {
-                    "label": "IS_FRIEND",
-                },
-                "undirected": True,
-            },
-            "top_k": 100,
-            "security": {"groups": ["secret"]},
-        },
+        json=graph_query,
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "secret"},
     )
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
     assert len(paths) == 1
 
-    # With other groups, returns nothing
+    # With other groups via body, returns nothing
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/graph",
-        json={
-            "query": {
-                "prop": "path",
-                "source": {
-                    "value": "Anna",
-                },
-                "relation": {
-                    "label": "IS_FRIEND",
-                },
-                "undirected": True,
-            },
-            "top_k": 100,
-            "security": {"groups": ["fake"]},
-        },
+        json={**graph_query, "security": {"groups": ["fake"]}},
     )
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
     assert len(paths) == 0
+
+    # With other groups via header, returns nothing
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json=graph_query,
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "fake"},
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+    # Multiple groups in header (semicolon-separated), one matching: returns it
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json=graph_query,
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "fake;secret"},
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+
+    # Header takes priority over body: matching body group but non-matching header → returns nothing
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={**graph_query, "security": {"groups": ["secret"]}},
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "fake"},
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+    # Header takes priority over body: non-matching body group but matching header → returns it
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={**graph_query, "security": {"groups": ["fake"]}},
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "secret"},
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+
+    # Header security groups also apply to /graph/nodes
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph/nodes",
+        json={"query": {"prop": "node"}, "top_k": 100},
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "secret"},
+    )
+    assert resp.status_code == 200
+    nodes_with_match = GraphNodesSearchResponse.model_validate(resp.json()).nodes
+    assert len(nodes_with_match) > 0
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph/nodes",
+        json={"query": {"prop": "node"}, "top_k": 100},
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "fake"},
+    )
+    assert resp.status_code == 200
+    nodes_no_match = GraphNodesSearchResponse.model_validate(resp.json()).nodes
+    assert len(nodes_no_match) == 0
+
+    # Header security groups also apply to /graph/relations
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph/relations",
+        json={"query": {"prop": "relation", "label": "IS_FRIEND"}, "top_k": 100},
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "secret"},
+    )
+    assert resp.status_code == 200
+    relations_with_match = GraphRelationsSearchResponse.model_validate(resp.json()).relations
+    assert len(relations_with_match) == 1
+
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph/relations",
+        json={"query": {"prop": "relation", "label": "IS_FRIEND"}, "top_k": 100},
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "fake"},
+    )
+    assert resp.status_code == 200
+    relations_no_match = GraphRelationsSearchResponse.model_validate(resp.json()).relations
+    assert len(relations_no_match) == 0
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -1003,7 +1064,7 @@ async def test_graph_search__enforce_security(
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
     assert len(paths) == 0
 
-    # With matching security groups, should return the paths
+    # With matching security groups via body, should return the paths
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/graph",
         json={**graph_query, "security": {"groups": ["secret"]}},
@@ -1013,10 +1074,41 @@ async def test_graph_search__enforce_security(
     assert len(paths) == 1
     assert ("Anastasia", "IS_FRIEND", "Anna") in paths
 
-    # With non-matching security groups, should NOT return the paths
+    # With matching security groups via header, should return the paths
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json=graph_query,
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "secret"},
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 1
+    assert ("Anastasia", "IS_FRIEND", "Anna") in paths
+
+    # With non-matching security groups via body, should NOT return the paths
     resp = await nucliadb_reader.post(
         f"/kb/{kbid}/graph",
         json={**graph_query, "security": {"groups": ["other-group"]}},
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+    # With non-matching security groups via header, should NOT return the paths
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json=graph_query,
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "other-group"},
+    )
+    assert resp.status_code == 200
+    paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)
+    assert len(paths) == 0
+
+    # Header takes priority over body: matching body group but non-matching header → no paths
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/graph",
+        json={**graph_query, "security": {"groups": ["secret"]}},
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "other-group"},
     )
     assert resp.status_code == 200
     paths = simple_paths(GraphSearchResponse.model_validate(resp.json()).paths)

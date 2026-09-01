@@ -507,3 +507,80 @@ async def test_retrieve_with_kv_field_filter(
         }
     )
     assert products == {"white-t-shirt"}
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_retrieve_security_groups(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    """Security groups on /retrieve should filter results both when provided
+    via the request body and via the X-NUCLIADB-SECURITY-GROUPS header.
+    The header always takes priority over the body.
+    """
+    kbid = standalone_knowledgebox
+    rid = await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    resp = await nucliadb_writer.patch(
+        f"/kb/{kbid}/resource/{rid}",
+        json={"security": {"access_groups": ["secret"]}},
+    )
+    assert resp.status_code == 200, resp.text
+
+    retrieve_query = {
+        "query": {"keyword": {"query": "smb wonder", "min_score": 0.0}},
+        "top_k": 10,
+    }
+
+    def has_match(body: dict) -> bool:
+        return len(body["matches"]) > 0
+
+    # Without security groups: resource is returned (legacy behaviour)
+    resp = await nucliadb_reader.post(f"/kb/{kbid}/retrieve", json=retrieve_query)
+    assert resp.status_code == 200, resp.text
+    assert has_match(resp.json())
+
+    # Via body: matching group returns results
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/retrieve",
+        json={**retrieve_query, "filters": {"security": {"groups": ["secret"]}}},
+    )
+    assert resp.status_code == 200, resp.text
+    assert has_match(resp.json())
+
+    # Via body: non-matching group returns nothing
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/retrieve",
+        json={**retrieve_query, "filters": {"security": {"groups": ["other-group"]}}},
+    )
+    assert resp.status_code == 200, resp.text
+    assert not has_match(resp.json())
+
+    # Via header: matching group returns results
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/retrieve",
+        json=retrieve_query,
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "secret"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert has_match(resp.json())
+
+    # Via header: non-matching group returns nothing
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/retrieve",
+        json=retrieve_query,
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "other-group"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert not has_match(resp.json())
+
+    # Header overrides body: matching body group but non-matching header → no results
+    resp = await nucliadb_reader.post(
+        f"/kb/{kbid}/retrieve",
+        json={**retrieve_query, "filters": {"security": {"groups": ["secret"]}}},
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "other-group"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert not has_match(resp.json())

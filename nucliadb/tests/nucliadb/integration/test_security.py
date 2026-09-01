@@ -211,6 +211,42 @@ async def test_resource_security_search(
         expected_resources=[],
     )
 
+    # Via header: matching group returns the resource
+    await _test_search_request_with_security(
+        method,
+        endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[resource_id],
+        headers={"X-NUCLIADB-SECURITY-GROUPS": PLATFORM_GROUP},
+    )
+
+    # Via header: non-matching group does not return the resource
+    await _test_search_request_with_security(
+        method,
+        endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[],
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "some-unknown-group"},
+    )
+
+    # Header overrides body/params: matching body/params group but non-matching header → not returned
+    await _test_search_request_with_security(
+        method,
+        endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=[PLATFORM_GROUP],
+        expected_resources=[],
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "some-unknown-group"},
+    )
+
     # Make it public now
     resp = await nucliadb_writer.patch(
         f"/kb/{kbid}/resource/{resource_id}",
@@ -246,6 +282,7 @@ async def _test_search_request_with_security(
     query: str,
     security_groups: list[str] | None,
     expected_resources: list[str],
+    headers: dict[str, str] | None = None,
 ):
     payload: dict[str, Any] = {
         "query": query,
@@ -261,31 +298,37 @@ async def _test_search_request_with_security(
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",
             json=payload,
+            headers=headers,
         )
     elif method == "GET" and endpoint == "find":
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/find",
             params=params,
+            headers=headers,
         )
     elif method == "POST" and endpoint == "search":
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/search",
             json=payload,
+            headers=headers,
         )
     elif method == "GET" and endpoint == "search":
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/search",
             params=params,
+            headers=headers,
         )
     elif method == "GET" and endpoint == "suggest":
         resp = await nucliadb_reader.get(
             f"/kb/{kbid}/suggest",
             params=params,
+            headers=headers,
         )
     elif method == "POST" and endpoint == "suggest":
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/suggest",
             json=payload,
+            headers=headers,
         )
     else:
         raise ValueError(f"Unknown method and/or search endpoint: {method} {endpoint}")
@@ -412,6 +455,42 @@ async def test_security_groups_enforce_hides_secured_resources_without_matching_
         query="resource",
         security_groups=["unknown-group"],
         expected_resources=[public_rid],
+    )
+
+    # Via header: matching group returns both resources
+    await _test_search_request_with_security(
+        method,
+        endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[secured_rid, public_rid],
+        headers={"X-NUCLIADB-SECURITY-GROUPS": PLATFORM_GROUP},
+    )
+
+    # Via header: non-matching group only returns the public resource
+    await _test_search_request_with_security(
+        method,
+        endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=None,
+        expected_resources=[public_rid],
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "unknown-group"},
+    )
+
+    # Header overrides body/params: matching body/params group but non-matching header → only public
+    await _test_search_request_with_security(
+        method,
+        endpoint,
+        nucliadb_reader,
+        kbid,
+        query="resource",
+        security_groups=[PLATFORM_GROUP],
+        expected_resources=[public_rid],
+        headers={"X-NUCLIADB-SECURITY-GROUPS": "unknown-group"},
     )
 
 

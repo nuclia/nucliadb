@@ -28,6 +28,7 @@ from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.models_utils import to_proto
 from nucliadb.models.internal.augment import Paragraph, ParagraphText
 from nucliadb.search.api.v1.router import KB_PREFIX, api
+from nucliadb.search.api.v1.utils import get_injected_security_groups
 from nucliadb.search.augmentor import augment_paragraphs
 from nucliadb.search.search import cache, rerankers
 from nucliadb.search.search.query_parser.parsers.retrieve import parse_retrieve
@@ -44,6 +45,7 @@ from nucliadb_models.retrieval import (
     Scores,
 )
 from nucliadb_models.search import NucliaDBClientType
+from nucliadb_models.security import RequestSecurity
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.utilities import get_audit
 
@@ -65,6 +67,11 @@ async def _retrieve_endpoint(
     x_nucliadb_user: str = Header(""),
     x_forwarded_for: str = Header(""),
 ) -> RetrievalResponse:
+    # Backend-injected security groups (e.g. from a service account) always
+    # take priority over any groups the client supplied.
+    injected_groups = get_injected_security_groups(request)
+    if injected_groups is not None:
+        item.filters.security = RequestSecurity(groups=injected_groups)
     return await retrieve_endpoint(
         kbid,
         item,
