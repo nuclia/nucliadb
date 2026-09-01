@@ -272,6 +272,10 @@ async def _tus_post(
     else:
         metadata = {}
 
+    # Allow overriding the field name via TUS metadata (e.g., for idempotent updates)
+    if field_id is None and metadata.get("field"):
+        field_id = metadata["field"]
+
     path, rid, field = await validate_field_upload(kbid, path_rid, field_id, metadata.get("md5"))
 
     if implies_resource_creation:
