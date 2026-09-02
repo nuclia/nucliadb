@@ -33,7 +33,7 @@ class ExportsNatsConfig:
     )
     consumer = NatsConsumer(
         subject="ndb-exports",
-        group="ndb-exports",
+        group="ndb-exports-pull",
     )
 
 
@@ -44,7 +44,7 @@ class ImportsNatsConfig:
     )
     consumer = NatsConsumer(
         subject="ndb-imports",
-        group="ndb-imports",
+        group="ndb-imports-pull",
     )
 
 
