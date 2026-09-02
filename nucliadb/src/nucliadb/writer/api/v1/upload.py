@@ -29,6 +29,7 @@ from fastapi import HTTPException
 from fastapi.requests import Request
 from fastapi.responses import Response
 from fastapi_versioning import version
+from pydantic import TypeAdapter, ValidationError
 from starlette.requests import Request as StarletteRequest
 
 from nucliadb.common import datamanagers, file_md5
@@ -89,6 +90,8 @@ from nucliadb_utils.utilities import (
 from .router import KB_PREFIX, RESOURCE_PREFIX, RESOURCES_PREFIX, RSLUG_PREFIX, api
 
 logger = logging.getLogger(__name__)
+
+field_id_string_adapter = TypeAdapter(FieldIdString)
 
 TUS_HEADERS = {
     "Tus-Resumable": "1.0.0",
@@ -271,6 +274,13 @@ async def _tus_post(
             raise HTTPBadRequest(detail=f"Upload-Metadata header contains errors: {exc!s}")
     else:
         metadata = {}
+
+    # Allow overriding the field name via TUS metadata (e.g., for idempotent updates)
+    if field_id is None and metadata.get("field_id"):
+        try:
+            field_id = field_id_string_adapter.validate_python(metadata["field_id"])
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
 
     path, rid, field = await validate_field_upload(kbid, path_rid, field_id, metadata.get("md5"))
 

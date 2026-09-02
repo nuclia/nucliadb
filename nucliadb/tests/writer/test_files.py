@@ -162,6 +162,131 @@ async def test_knowledgebox_file_tus_upload_root(nucliadb_writer: AsyncClient, k
 
 
 @pytest.mark.deploy_modes("component")
+async def test_tus_upload_with_field_in_metadata(nucliadb_writer: AsyncClient, knowledgebox: str):
+    """Field name passed in TUS metadata is used instead of a random UUID."""
+    kbid = knowledgebox
+    custom_field = "file"
+    filename = base64.b64encode(b"doc.pdf").decode()
+    field_b64 = base64.b64encode(custom_field.encode()).decode()
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{TUSUPLOAD}",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {filename},field_id {field_b64}",
+            "content-type": "application/pdf",
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 201
+    url = resp.headers["location"]
+
+    data = b"fake pdf content"
+    resp = await nucliadb_writer.patch(
+        url,
+        content=data,
+        headers={
+            "upload-offset": "0",
+            "content-length": str(len(data)),
+            "upload-length": str(len(data)),
+        },
+    )
+    assert resp.headers["Tus-Upload-Finished"] == "1"
+
+    ndb_field = resp.headers["ndb-field"]
+    assert ndb_field.endswith(f"/field/{custom_field}")
+
+
+@pytest.mark.deploy_modes("component")
+async def test_tus_upload_with_invalid_field_in_metadata_returns_422(
+    nucliadb_writer: AsyncClient, knowledgebox: str
+):
+    kbid = knowledgebox
+    filename = base64.b64encode(b"doc.pdf").decode()
+    invalid_field = base64.b64encode(b"file/invalid").decode()
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{TUSUPLOAD}",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {filename},field_id {invalid_field}",
+            "content-type": "application/pdf",
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.deploy_modes("component")
+async def test_tus_upload_to_existing_field_overwrites_it(
+    nucliadb_writer: AsyncClient, knowledgebox: str, resource
+):
+    """Uploading twice to the same field id replaces its content instead of adding a new field."""
+    kbid = knowledgebox
+    field = "file"
+    filename = base64.b64encode(b"doc.pdf").decode()
+
+    async def tus_upload(content: bytes) -> str:
+        resp = await nucliadb_writer.post(
+            f"/{KB_PREFIX}/{kbid}/resource/{resource}/file/{field}/{TUSUPLOAD}",
+            headers={
+                "tus-resumable": "1.0.0",
+                "upload-metadata": f"filename {filename}",
+                "content-type": "application/pdf",
+                "upload-length": str(len(content)),
+            },
+        )
+        assert resp.status_code == 201
+
+        resp = await nucliadb_writer.patch(
+            resp.headers["location"],
+            content=content,
+            headers={
+                "upload-offset": "0",
+                "content-length": str(len(content)),
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.headers["Tus-Upload-Finished"] == "1"
+        return resp.headers["ndb-field"]
+
+    first_content = b"first version of the file"
+    second_content = b"second version of the file, with a different length"
+
+    first_ndb_field = await tus_upload(first_content)
+    second_ndb_field = await tus_upload(second_content)
+
+    # Same field path means we targeted the same field, not a newly created one
+    assert first_ndb_field == second_ndb_field
+    assert first_ndb_field.endswith(f"/field/{field}")
+
+    transaction = get_transaction_utility()
+    sub = await transaction.js.pull_subscribe(const.Streams.INGEST.subject.format(partition="1"), "auto")
+    # msgs[0] is the resource creation from the `resource` fixture
+    msgs = await sub.fetch(3)
+
+    first_writer = BrokerMessage()
+    first_writer.ParseFromString(msgs[1].data)
+    await msgs[1].ack()
+
+    second_writer = BrokerMessage()
+    second_writer.ParseFromString(msgs[2].data)
+    await msgs[2].ack()
+
+    # The storage location is derived from the field id, so it must not change
+    assert first_writer.files[field].file.uri == second_writer.files[field].file.uri
+    assert first_writer.files[field].file.size == len(first_content)
+    assert second_writer.files[field].file.size == len(second_content)
+
+    storage = await get_storage()
+    download_data = await storage.downloadbytes(
+        bucket=second_writer.files[field].file.bucket_name,
+        key=second_writer.files[field].file.uri,
+    )
+    assert download_data.read() == second_content
+
+
+@pytest.mark.deploy_modes("component")
 async def test_knowledgebox_file_upload_root(
     nucliadb_writer: AsyncClient,
     knowledgebox: str,
