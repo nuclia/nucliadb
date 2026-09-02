@@ -162,6 +162,62 @@ async def test_knowledgebox_file_tus_upload_root(nucliadb_writer: AsyncClient, k
 
 
 @pytest.mark.deploy_modes("component")
+async def test_tus_upload_with_field_in_metadata(nucliadb_writer: AsyncClient, knowledgebox: str):
+    """Field name passed in TUS metadata is used instead of a random UUID."""
+    kbid = knowledgebox
+    custom_field = "file"
+    filename = base64.b64encode(b"doc.pdf").decode()
+    field_b64 = base64.b64encode(custom_field.encode()).decode()
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{TUSUPLOAD}",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {filename},field {field_b64}",
+            "content-type": "application/pdf",
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 201
+    url = resp.headers["location"]
+
+    data = b"fake pdf content"
+    resp = await nucliadb_writer.patch(
+        url,
+        content=data,
+        headers={
+            "upload-offset": "0",
+            "content-length": str(len(data)),
+            "upload-length": str(len(data)),
+        },
+    )
+    assert resp.headers["Tus-Upload-Finished"] == "1"
+
+    ndb_field = resp.headers["ndb-field"]
+    assert ndb_field.endswith(f"/field/{custom_field}")
+
+
+@pytest.mark.deploy_modes("component")
+async def test_tus_upload_with_invalid_field_in_metadata_returns_422(
+    nucliadb_writer: AsyncClient, knowledgebox: str
+):
+    kbid = knowledgebox
+    filename = base64.b64encode(b"doc.pdf").decode()
+    invalid_field = base64.b64encode(b"file/invalid").decode()
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{TUSUPLOAD}",
+        headers={
+            "tus-resumable": "1.0.0",
+            "upload-metadata": f"filename {filename},field {invalid_field}",
+            "content-type": "application/pdf",
+            "upload-defer-length": "1",
+        },
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.deploy_modes("component")
 async def test_knowledgebox_file_upload_root(
     nucliadb_writer: AsyncClient,
     knowledgebox: str,
