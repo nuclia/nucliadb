@@ -173,7 +173,7 @@ async def test_tus_upload_with_field_in_metadata(nucliadb_writer: AsyncClient, k
         f"/{KB_PREFIX}/{kbid}/{TUSUPLOAD}",
         headers={
             "tus-resumable": "1.0.0",
-            "upload-metadata": f"filename {filename},field {field_b64}",
+            "upload-metadata": f"filename {filename},field_id {field_b64}",
             "content-type": "application/pdf",
             "upload-defer-length": "1",
         },
@@ -209,7 +209,7 @@ async def test_tus_upload_with_invalid_field_in_metadata_returns_422(
         f"/{KB_PREFIX}/{kbid}/{TUSUPLOAD}",
         headers={
             "tus-resumable": "1.0.0",
-            "upload-metadata": f"filename {filename},field {invalid_field}",
+            "upload-metadata": f"filename {filename},field_id {invalid_field}",
             "content-type": "application/pdf",
             "upload-defer-length": "1",
         },

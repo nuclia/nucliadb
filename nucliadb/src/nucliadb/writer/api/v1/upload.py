@@ -276,9 +276,9 @@ async def _tus_post(
         metadata = {}
 
     # Allow overriding the field name via TUS metadata (e.g., for idempotent updates)
-    if field_id is None and metadata.get("field"):
+    if field_id is None and metadata.get("field_id"):
         try:
-            field_id = field_id_string_adapter.validate_python(metadata["field"])
+            field_id = field_id_string_adapter.validate_python(metadata["field_id"])
         except ValidationError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
 
