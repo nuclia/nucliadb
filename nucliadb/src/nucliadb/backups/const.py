@@ -50,6 +50,6 @@ class BackupFinishedStream:
 
 class BackupsNatsConfig:
     stream = NatsStream(name="ndb-backups", subjects=["ndb-backups.>"])
-    create_consumer = NatsConsumer(subject="ndb-backups.create", group="ndb-backups-create")
-    delete_consumer = NatsConsumer(subject="ndb-backups.delete", group="ndb-backups-delete")
-    restore_consumer = NatsConsumer(subject="ndb-backups.restore", group="ndb-backups-restore")
+    create_consumer = NatsConsumer(subject="ndb-backups.create", group="ndb-backups-create-pull")
+    delete_consumer = NatsConsumer(subject="ndb-backups.delete", group="ndb-backups-delete-pull")
+    restore_consumer = NatsConsumer(subject="ndb-backups.restore", group="ndb-backups-restore-pull")
