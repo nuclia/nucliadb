@@ -81,30 +81,29 @@ class NatsTaskConsumer(Generic[MsgType]):
             pass
 
     async def _setup_nats_subscription(self):
-        # Nats push consumer
         max_ack_pending = (
             self.max_concurrent_messages
             if self.max_concurrent_messages
             else nats_consumer_settings.nats_max_ack_pending
         )
-        self.subscription = await self.context.nats_manager.subscribe(
-            subject=self.consumer.subject,
-            queue=self.consumer.group,
+        self.subscription = await self.context.nats_manager.pull_subscribe(
             stream=self.stream.name,
+            subject=self.consumer.subject,
+            durable=self.consumer.group,
             cb=self._subscription_worker_as_task,
             subscription_lost_cb=self._setup_nats_subscription,
-            manual_ack=True,
             config=nats.js.api.ConsumerConfig(
-                deliver_policy=nats.js.api.DeliverPolicy.ALL,
+                durable_name=self.consumer.group,
+                # NEW: only take new messages, to be used in migration. May skip messages but we can handle manually.
+                deliver_policy=nats.js.api.DeliverPolicy.NEW,
                 ack_policy=nats.js.api.AckPolicy.EXPLICIT,
                 ack_wait=nats_consumer_settings.nats_ack_wait,
-                idle_heartbeat=nats_consumer_settings.nats_idle_heartbeat,
                 max_ack_pending=max_ack_pending,
                 max_deliver=self.max_deliver,
             ),
         )
         logger.info(
-            f"Subscribed {self.consumer.group} to {self.consumer.subject} on stream {self.stream.name}",
+            f"Pull-subscribed {self.consumer.group} to {self.consumer.subject} on stream {self.stream.name}",
             extra={"consumer_name": self.name},
         )
 
