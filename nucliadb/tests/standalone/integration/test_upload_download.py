@@ -289,6 +289,66 @@ async def test_file_tus_supports_empty_files(
 
 
 @pytest.mark.deploy_modes("standalone")
+async def test_tus_upload_to_existing_field_does_not_create_a_new_field(
+    local_storage,
+    configure_redis_dm,
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+    field = "file"
+    upload_metadata = f"filename {header_encode('doc.txt')}"
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={"slug": "resource1", "title": "Resource 1"},
+    )
+    assert resp.status_code == 201, resp.text
+    rid = resp.json()["uuid"]
+
+    async def tus_upload(content: bytes) -> None:
+        resp = await nucliadb_writer.post(
+            f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field}/{TUSUPLOAD}",
+            headers={
+                "tus-resumable": "1.0.0",
+                "upload-metadata": upload_metadata,
+                "content-type": "text/plain",
+                "upload-length": str(len(content)),
+            },
+        )
+        assert resp.status_code == 201, resp.text
+
+        resp = await nucliadb_writer.patch(
+            resp.headers["location"],
+            content=content,
+            headers={"upload-offset": "0"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.headers["Tus-Upload-Finished"] == "1"
+
+    first_content = b"first version"
+    second_content = b"second version, longer than the first one"
+
+    await tus_upload(first_content)
+    await tus_upload(second_content)
+
+    resp = await nucliadb_reader.get(f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}?show=values")
+    assert resp.status_code == 200, resp.text
+    files = resp.json()["data"]["files"]
+
+    # The second upload must have replaced the field, not added another one
+    assert list(files.keys()) == [field]
+    assert files[field]["value"]["file"]["size"] == len(second_content)
+
+    resp = await nucliadb_reader.get(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field}/download/field"
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.content == second_content
+
+
+@pytest.mark.deploy_modes("standalone")
 async def test_tus_uploads_handles_invalid_intermediate_chunk_size(
     gcs_storage: GCSStorage,
     configure_redis_dm,
