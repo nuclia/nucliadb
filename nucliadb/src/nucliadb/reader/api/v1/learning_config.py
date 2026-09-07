@@ -68,6 +68,23 @@ async def get_configuration(request: Request, kbid: str):
 
 
 @api.get(
+    path=f"/{KB_PREFIX}/{{kbid}}/processing_webhooks/webhook/default",
+    status_code=200,
+    summary="Get Knowledge Box processing webhooks configuration",
+    description="Get the processing webhooks configuration for a Knowledge Box",
+    response_model=None,
+    tags=["Processing Webhooks"],
+)
+@requires_one([NucliaDBRoles.READER, NucliaDBRoles.MANAGER])
+@version(1)
+async def get_processing_webhooks(
+    request: Request,
+    kbid: str,
+):
+    return await learning_config_proxy(request, "GET", f"/processing_webhooks/{kbid}/webhook/default")
+
+
+@api.get(
     path=f"/{KB_PREFIX}/{{kbid}}/models",
     status_code=200,
     summary="Get available models",
