@@ -271,6 +271,8 @@ async def _faceted_search_unfiltered(
 ):
     facet_params: dict[str, Any] = {}
     facet_sql: sql.Composable
+
+    changed_page_cost = False
     if list(tmp_facets.keys()) == ["/n/s"]:
         # Special case when querying only for status. We know the list of possible facets and optimize
         # by asking for each facet separately which makes better use of the index
@@ -304,6 +306,9 @@ async def _faceted_search_unfiltered(
             # Worst case: ask for all facets and filter here. This is faster than applying lots of filters
             facet_sql = sql.SQL("")
 
+        # We really don't want sequential table scans here, set a high cost for the duration of the transaction
+        await cur.execute("SET LOCAL seq_page_cost = 5")
+        changed_page_cost = True
         await cur.execute(
             sql.SQL(
                 "SELECT facet, COUNT(*) FROM catalog_facets WHERE kbid = %(kbid)s {} GROUP BY facet"
@@ -318,6 +323,10 @@ async def _faceted_search_unfiltered(
         parent = "/".join(facet_parts[:-1])
         if parent in tmp_facets:
             tmp_facets[parent][translate_system_to_alias_label(facet)] = row["count"]
+
+    # Restore page cost
+    if changed_page_cost:
+        await cur.execute("SET LOCAL seq_page_cost = 1")
 
 
 async def _faceted_search_filtered(
