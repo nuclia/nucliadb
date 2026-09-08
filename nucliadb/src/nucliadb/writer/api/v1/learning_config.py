@@ -62,6 +62,40 @@ async def patch_configuration(
     )
 
 
+@api.put(
+    path=f"/{KB_PREFIX}/{{kbid}}/processing_webhooks/webhook/default",
+    status_code=204,
+    summary="Set Knowledge Box processing webhooks configuration",
+    description="Configure the processing webhooks for a Knowledge Box",
+    response_model=None,
+    tags=["Processing Webhooks"],
+)
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
+@version(1)
+async def set_processing_webhooks(
+    request: Request,
+    kbid: str,
+):
+    return await learning_config_proxy(request, "PUT", f"/processing_webhooks/{kbid}/webhook/default")
+
+
+@api.delete(
+    path=f"/{KB_PREFIX}/{{kbid}}/processing_webhooks/webhook/default",
+    status_code=204,
+    summary="Delete Knowledge Box processing webhooks configuration",
+    description="Remove the processing webhooks configuration for a Knowledge Box",
+    response_model=None,
+    tags=["Processing Webhooks"],
+)
+@requires_one([NucliaDBRoles.MANAGER, NucliaDBRoles.OWNER])
+@version(1)
+async def delete_processing_webhooks(
+    request: Request,
+    kbid: str,
+):
+    return await learning_config_proxy(request, "DELETE", f"/processing_webhooks/{kbid}/webhook/default")
+
+
 @api.post(
     path=f"/{KB_PREFIX}/{{kbid}}/extract_strategies",
     status_code=200,

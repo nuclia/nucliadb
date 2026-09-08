@@ -32,6 +32,10 @@ spec:
           method:
             regex: "GET|OPTIONS"
         - uri:
+            regex: '^/api/v\d+/kb/[^/]+/processing_webhooks.*'
+          method:
+            regex: "GET|OPTIONS"
+        - uri:
             regex: '^/api/v\d+/kb/[^/]+/kv-schemas.*'
           method:
             regex: "GET|OPTIONS"
