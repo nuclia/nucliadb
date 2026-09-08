@@ -104,6 +104,5 @@ async def test_delete_kb_errors():
     assert conflict
 
     response_mock.status = 500
-    deleted, conflict = await storage.delete_kb(kbid)
-    assert not deleted
-    assert not conflict
+    with pytest.raises(GoogleCloudException):
+        await storage.delete_kb(kbid)

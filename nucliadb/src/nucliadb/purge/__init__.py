@@ -105,7 +105,19 @@ async def purge_kbs_storage(driver: Driver, storage: Storage):
             continue
 
         logger.info("Purging storage for KB", extra={"kbid": kbid})
-        deleted, conflict = await storage.delete_kb(kbid)
+        try:
+            # Buckets are not automatically deleted by cloud providers' lifecycle
+            # policies (those only expire the objects inside), so we always try
+            # to delete the bucket itself here.
+            deleted, conflict = await storage.delete_kb(kbid)
+        except Exception as exc:
+            errors.capture_exception(exc)
+            logger.error(
+                "Error while deleting KB storage, will retry next time",
+                exc_info=exc,
+                extra={"kbid": kbid},
+            )
+            continue
 
         delete_marker = False
         if conflict:
@@ -113,9 +125,17 @@ async def purge_kbs_storage(driver: Driver, storage: Storage):
                 "Nothing was deleted for KB. (Bucket not yet empty), will try next time",
                 extra={"kbid": kbid},
             )
-            # Just in case something failed while setting a lifecycle policy to
-            # remove all elements from the bucket, reschedule it
-            await storage.schedule_delete_kb(kbid)
+            # Bucket still has contents: (re)schedule the lifecycle policy that
+            # purges them, so a future run can delete the now-empty bucket.
+            try:
+                await storage.schedule_delete_kb(kbid)
+            except Exception as exc:
+                errors.capture_exception(exc)
+                logger.error(
+                    "Error while scheduling KB storage deletion, will retry next time",
+                    exc_info=exc,
+                    extra={"kbid": kbid},
+                )
         elif not deleted:
             logger.info("Expected bucket for KB was not found, will delete marker", extra={"kbid": kbid})
             delete_marker = True
