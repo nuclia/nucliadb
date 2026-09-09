@@ -340,24 +340,7 @@ async def _faceted_search_labels_nidx_unfiltered(
     facets: list[str],
     tmp_facets: dict[str, dict[str, int]],
 ) -> None:
-    """Populate ``tmp_facets`` for label (/l) prefixes by asking nidx instead of PG.
-
-    Uses ``/a/title`` as a per-resource proxy field: there is exactly one title doc
-    per resource, so Tantivy's ``FacetCollector`` counts collapse to per-resource
-    counts.
-
-    Coverage caveats:
-    - Only labels that live in ``resource.labels`` reach the title doc
-      (``_set_resource_labels`` in ``ingest/orm/brain_v2.py``). That includes
-      ``basic.usermetadata.classifications`` (with cancelled ones filtered out),
-      but NOT ``basic.computedmetadata.field_classifications``, which are attached
-      to the fields they were computed on. Counts here will therefore be lower than
-      the PG catalog for KBs with auto-classified field labels.
-    - PENDING/ERROR resources are indexed by nidx from the initial writer message,
-      so their user labels are visible here.
-    - Tantivy's ``FacetCollector`` returns only the top 50 children per requested
-      prefix (see ``nidx_text/src/reader.rs::facet_count``).
-    """
+    """Get /l facets from nidx, output to tmp_facets"""
     shard_manager = get_shard_manager()
     shards = await shard_manager.get_shards_by_kbid(kbid)
     shard_ids = [s.nidx_shard_id for s in shards]
@@ -370,9 +353,7 @@ async def _faceted_search_labels_nidx_unfiltered(
         only_faceted=True,
         faceted=nodereader_pb2.Faceted(labels=facets),
         field_filter=nodereader_pb2.FilterExpression(
-            field=nodereader_pb2.FilterExpression.FieldFilter(
-                field_type="a", field_id="title"
-            )
+            field=nodereader_pb2.FilterExpression.FieldFilter(field_type="a", field_id="title")
         ),
     )
     response = await get_nidx_searcher_client().Search(request)
@@ -381,9 +362,7 @@ async def _faceted_search_labels_nidx_unfiltered(
         if prefix not in tmp_facets:
             continue
         for facet_result in results.facetresults:
-            tmp_facets[prefix][
-                translate_system_to_alias_label(facet_result.tag)
-            ] = facet_result.total
+            tmp_facets[prefix][translate_system_to_alias_label(facet_result.tag)] = facet_result.total
 
 
 async def _faceted_search_filtered(
