@@ -971,6 +971,12 @@ async def store_file_on_nuclia_db(
         if kb_config and kb_config.hidden_resources_hide_on_creation:
             writer.basic.hidden = True
 
+        async with datamanagers.with_ro_transaction() as txn:
+            basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
+        if basic is not None:
+            toprocess.title = basic.title
+            toprocess.slug = basic.slug
+
     async with unique_slug_context_manager:
         if override_resource_title and filename is not None:
             set_title(writer, toprocess, filename)
