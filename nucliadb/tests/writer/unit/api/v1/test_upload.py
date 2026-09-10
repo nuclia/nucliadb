@@ -88,6 +88,16 @@ async def atomic_get_stored_resource_classifications_mock():
         yield mock
 
 
+@pytest.fixture(scope="function", autouse=True)
+async def get_basic_mock():
+    with (
+        patch(f"{UPLOAD_PACKAGE}.datamanagers.with_ro_transaction"),
+        patch(f"{UPLOAD_PACKAGE}.datamanagers.resources.get_basic", new_callable=AsyncMock) as mock,
+    ):
+        mock.return_value = None
+        yield mock
+
+
 async def test_store_file_on_nucliadb_does_not_store_passwords(
     processing_mock, partitioning_mock, transaction_mock, atomic_get_stored_resource_classifications_mock
 ):
@@ -107,6 +117,27 @@ async def test_store_file_on_nucliadb_does_not_store_passwords(
     transaction_mock.commit.assert_awaited_once()
     writer_bm = transaction_mock.commit.call_args[0][0]
     assert not writer_bm.files[field].password
+
+
+async def test_store_file_on_existing_resource_sends_title_and_slug_to_processing(
+    processing_mock, partitioning_mock, transaction_mock, get_basic_mock
+):
+    get_basic_mock.return_value = Mock(title="Resource title", slug="resource-slug")
+
+    await store_file_on_nuclia_db(
+        10,
+        "kbid",
+        "/some/path",
+        Request({"type": "http", "headers": []}),
+        "bucket",
+        CloudFile.Source.LOCAL,
+        "rid",
+        "field",
+    )
+
+    toprocess = processing_mock.send_to_process.call_args[0][0]
+    assert toprocess.title == "Resource title"
+    assert toprocess.slug == "resource-slug"
 
 
 @pytest.mark.parametrize(
