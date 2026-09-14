@@ -484,6 +484,7 @@ async def _reprocess_resource(
         resource = await kb.get(rid)
         if resource is None:
             raise HTTPException(status_code=404, detail="Resource does not exist")
+        basic = resource.basic
 
         resource_fields = await resource.get_fields()
         for field_type, field_id in resource_fields.keys():
@@ -516,8 +517,9 @@ async def _reprocess_resource(
             userid=x_nucliadb_user,
             source=Source.HTTP,
         )
-        toprocess.title = resource.basic.title
-        toprocess.slug = resource.basic.slug
+        if basic is not None:
+            toprocess.title = basic.title
+            toprocess.slug = basic.slug
         async with driver.ro_transaction() as txn:
             resource.txn = txn
             await collect_fields_for_reprocessing(
