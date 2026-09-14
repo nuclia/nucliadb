@@ -19,18 +19,12 @@
 #
 import pytest
 
-from nucliadb.models.internal.processing import PushPayload
-from nucliadb.writer.resource.basic import (
-    compute_title,
-    parse_icon_on_create,
-    set_processing_metadata_from_basic,
-)
+from nucliadb.writer.resource.basic import compute_title, parse_icon_on_create
 from nucliadb_models.common import File
 from nucliadb_models.file import FileField
 from nucliadb_models.link import LinkField
 from nucliadb_models.text import TextField, TextFormat
 from nucliadb_models.writer import CreateResourcePayload
-from nucliadb_protos.resources_pb2 import Basic
 from nucliadb_protos.writer_pb2 import BrokerMessage
 
 
@@ -47,16 +41,6 @@ def get_resource_payload(link_uri=None, filename=None, slug=None, text=None, ico
     if icon:
         payload.icon = icon
     return payload
-
-
-async def test_set_processing_metadata_from_basic():
-    toprocess = PushPayload(uuid="rid", kbid="kbid", partition=0, userid="user")
-    basic = Basic(title="Resource title", slug="resource-slug")
-
-    await set_processing_metadata_from_basic(toprocess, "kbid", "rid", basic=basic)
-
-    assert toprocess.title == "Resource title"
-    assert toprocess.slug == "resource-slug"
 
 
 @pytest.mark.parametrize(

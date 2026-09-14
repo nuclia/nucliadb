@@ -301,9 +301,16 @@ async def modify_resource(
     toprocess.kbid = kbid
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
-    await set_processing_metadata_from_basic(toprocess, kbid, rid)
+
+    if item.title is None or item.slug is None:
+        await set_processing_metadata_from_basic(toprocess, kbid, rid)
 
     parse_basic_modify(writer, item, toprocess)
+    if item.title is not None:
+        toprocess.title = writer.basic.title
+    if item.slug is not None:
+        toprocess.slug = item.slug
+
     parse_audit(writer.audit, request)
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)
@@ -509,12 +516,8 @@ async def _reprocess_resource(
             userid=x_nucliadb_user,
             source=Source.HTTP,
         )
-        await set_processing_metadata_from_basic(
-            toprocess,
-            kbid,
-            rid,
-            basic=resource.basic,
-        )
+        toprocess.title = resource.basic.title
+        toprocess.slug = resource.basic.slug
         async with driver.ro_transaction() as txn:
             resource.txn = txn
             await collect_fields_for_reprocessing(

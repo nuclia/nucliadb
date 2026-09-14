@@ -66,11 +66,9 @@ async def set_processing_metadata_from_basic(
     toprocess: PushPayload,
     kbid: str,
     rid: str,
-    basic: Basic | None = None,
 ) -> None:
-    if basic is None:
-        async with datamanagers.with_ro_transaction() as txn:
-            basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
+    async with datamanagers.with_ro_transaction() as txn:
+        basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
     if basic is not None:
         toprocess.title = basic.title
         toprocess.slug = basic.slug

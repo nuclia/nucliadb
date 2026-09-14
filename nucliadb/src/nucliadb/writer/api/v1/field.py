@@ -750,12 +750,8 @@ async def _reprocess_resource_field(
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
         if resource.basic is not None:
-            await set_processing_metadata_from_basic(
-                toprocess,
-                kbid,
-                rid,
-                basic=resource.basic,
-            )
+            toprocess.title = resource.basic.title
+            toprocess.slug = resource.basic.slug
 
         file_password_overrides = None
         if x_file_password is not None:

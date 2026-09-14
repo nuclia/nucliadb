@@ -128,7 +128,7 @@ async def test_resource_crud(nucliadb_writer: AsyncClient, knowledgebox: str):
 
 
 @pytest.mark.deploy_modes("component")
-async def test_update_resource_sends_stored_title_and_slug_to_processing(
+async def test_update_resource_sends_request_title_and_slug_to_processing(
     nucliadb_writer: AsyncClient,
     knowledgebox: str,
     mocker: MockerFixture,
@@ -149,13 +149,17 @@ async def test_update_resource_sends_stored_title_and_slug_to_processing(
 
     resp = await nucliadb_writer.patch(
         f"/{KB_PREFIX}/{knowledgebox}/{RESOURCE_PREFIX}/{rid}",
-        json={"texts": {"text": TEST_TEXT_PAYLOAD}},
+        json={
+            "title": "Updated title",
+            "slug": "updated-resource-metadata",
+            "texts": {"text": TEST_TEXT_PAYLOAD},
+        },
     )
     assert resp.status_code == 200
 
     payload = send_to_process_mock.call_args.args[0]
-    assert payload.title == "Resource title"
-    assert payload.slug == "resource-metadata"
+    assert payload.title == "Updated title"
+    assert payload.slug == "updated-resource-metadata"
 
 
 @pytest.mark.deploy_modes("component")
