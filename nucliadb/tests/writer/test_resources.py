@@ -144,7 +144,8 @@ async def test_update_resource_sends_stored_title_and_slug_to_processing(
 
     processing = get_processing()
     original = processing.send_to_process
-    mocker.patch.object(processing, "send_to_process", AsyncMock(side_effect=original))
+    send_to_process_mock = AsyncMock(side_effect=original)
+    mocker.patch.object(processing, "send_to_process", send_to_process_mock)
 
     resp = await nucliadb_writer.patch(
         f"/{KB_PREFIX}/{knowledgebox}/{RESOURCE_PREFIX}/{rid}",
@@ -152,7 +153,7 @@ async def test_update_resource_sends_stored_title_and_slug_to_processing(
     )
     assert resp.status_code == 200
 
-    payload = processing.send_to_process.call_args.args[0]
+    payload = send_to_process_mock.call_args.args[0]
     assert payload.title == "Resource title"
     assert payload.slug == "resource-metadata"
 
@@ -329,6 +330,7 @@ async def test_reprocess_resource(
     assert isinstance(payload, PushPayload)
     assert payload.uuid == rid
     assert payload.kbid == kbid
+    assert rsc.basic is not None
     assert payload.title == rsc.basic.title
     assert payload.slug == rsc.basic.slug
 

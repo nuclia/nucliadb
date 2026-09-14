@@ -107,7 +107,8 @@ async def test_resource_field_add(nucliadb_writer: AsyncClient, knowledgebox: st
 
     processing = get_processing()
     original = processing.send_to_process
-    mocker.patch.object(processing, "send_to_process", AsyncMock(side_effect=original))
+    send_to_process_mock = AsyncMock(side_effect=original)
+    mocker.patch.object(processing, "send_to_process", send_to_process_mock)
 
     # Text
     resp = await nucliadb_writer.put(
@@ -165,8 +166,8 @@ async def test_resource_field_add(nucliadb_writer: AsyncClient, knowledgebox: st
     data = resp.json()
     assert "seqid" in data
 
-    assert processing.send_to_process.call_count == 6
-    for call in processing.send_to_process.call_args_list:
+    assert send_to_process_mock.call_count == 6
+    for call in send_to_process_mock.call_args_list:
         payload = call.args[0]
         assert payload.title == "My resource"
         assert payload.slug == "resource1"
