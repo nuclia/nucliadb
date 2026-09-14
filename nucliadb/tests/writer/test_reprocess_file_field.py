@@ -199,6 +199,9 @@ async def test_reprocess_field_generic_endpoint(
     assert resp.status_code == 202
 
     assert processing_mock.send_to_process.await_count == 1
+    payload = processing_mock.send_to_process.call_args.args[0]
+    assert payload.title == "My resource"
+    assert payload.slug.startswith("resource-")
 
 
 @pytest.mark.deploy_modes("component")

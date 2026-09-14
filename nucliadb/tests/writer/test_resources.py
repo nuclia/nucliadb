@@ -128,6 +128,36 @@ async def test_resource_crud(nucliadb_writer: AsyncClient, knowledgebox: str):
 
 
 @pytest.mark.deploy_modes("component")
+async def test_update_resource_sends_stored_title_and_slug_to_processing(
+    nucliadb_writer: AsyncClient,
+    knowledgebox: str,
+    mocker: MockerFixture,
+):
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCES_PREFIX}",
+        json={"slug": "resource-metadata", "title": "Resource title"},
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    from nucliadb.writer.utilities import get_processing
+
+    processing = get_processing()
+    original = processing.send_to_process
+    mocker.patch.object(processing, "send_to_process", AsyncMock(side_effect=original))
+
+    resp = await nucliadb_writer.patch(
+        f"/{KB_PREFIX}/{knowledgebox}/{RESOURCE_PREFIX}/{rid}",
+        json={"texts": {"text": TEST_TEXT_PAYLOAD}},
+    )
+    assert resp.status_code == 200
+
+    payload = processing.send_to_process.call_args.args[0]
+    assert payload.title == "Resource title"
+    assert payload.slug == "resource-metadata"
+
+
+@pytest.mark.deploy_modes("component")
 async def test_resource_crud_sync(nucliadb_writer: AsyncClient, knowledgebox: str):
     kbid = knowledgebox
 
@@ -299,6 +329,8 @@ async def test_reprocess_resource(
     assert isinstance(payload, PushPayload)
     assert payload.uuid == rid
     assert payload.kbid == kbid
+    assert payload.title == rsc.basic.title
+    assert payload.slug == rsc.basic.slug
 
     assert isinstance(payload.filefield.get("file1"), str)
     assert payload.filefield["file1"] == "convert_internal_filefield_to_str,0"

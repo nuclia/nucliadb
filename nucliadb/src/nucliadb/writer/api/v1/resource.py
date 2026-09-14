@@ -50,6 +50,7 @@ from nucliadb.writer.resource.basic import (
     parse_basic_creation,
     parse_basic_modify,
     parse_user_classifications,
+    set_processing_metadata_from_basic,
     set_status,
     set_status_modify,
 )
@@ -300,6 +301,7 @@ async def modify_resource(
     toprocess.kbid = kbid
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
+    await set_processing_metadata_from_basic(toprocess, kbid, rid)
 
     parse_basic_modify(writer, item, toprocess)
     parse_audit(writer.audit, request)
@@ -327,8 +329,6 @@ async def modify_resource(
         resource_classifications=resource_classifications,
     )
     set_status_modify(writer.basic, item)
-
-    toprocess.title = writer.basic.title
 
     writer.source = BrokerMessage.MessageSource.WRITER
 
@@ -508,6 +508,12 @@ async def _reprocess_resource(
             partition=partition,
             userid=x_nucliadb_user,
             source=Source.HTTP,
+        )
+        await set_processing_metadata_from_basic(
+            toprocess,
+            kbid,
+            rid,
+            basic=resource.basic,
         )
         async with driver.ro_transaction() as txn:
             resource.txn = txn
