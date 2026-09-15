@@ -48,6 +48,7 @@ from nucliadb.writer.api.v1.resource import (
 )
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.writer.resource.audit import parse_audit
+from nucliadb.writer.resource.basic import set_processing_metadata_from_basic
 from nucliadb.writer.resource.field import (
     REPROCESSABLE_FIELD_TYPES,
     ResourceClassifications,
@@ -123,6 +124,7 @@ async def add_field_to_resource(
     toprocess.kbid = kbid
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
+    await set_processing_metadata_from_basic(toprocess, kbid, rid)
 
     parse_audit(writer.audit, request)
 
@@ -749,6 +751,7 @@ async def _reprocess_resource_field(
 
         if resource.basic is not None:
             toprocess.title = resource.basic.title
+            toprocess.slug = resource.basic.slug
 
         file_password_overrides = None
         if x_file_password is not None:

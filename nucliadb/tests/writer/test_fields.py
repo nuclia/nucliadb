@@ -21,6 +21,7 @@
 from copy import deepcopy
 from datetime import datetime, timezone
 from os.path import dirname
+from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
@@ -31,6 +32,7 @@ from nucliadb.writer.api.v1.router import (
     RESOURCES_PREFIX,
     RSLUG_PREFIX,
 )
+from nucliadb.writer.utilities import get_processing
 from tests.writer.utils import load_file_as_FileB64_payload
 
 TEST_FILE = {f"{dirname(__file__)}/orm/"}
@@ -90,7 +92,7 @@ TEST_CONVERSATION_APPEND_MESSAGES_PAYLOAD = [
 
 
 @pytest.mark.deploy_modes("component")
-async def test_resource_field_add(nucliadb_writer: AsyncClient, knowledgebox: str):
+async def test_resource_field_add(nucliadb_writer: AsyncClient, knowledgebox: str, mocker):
     kbid = knowledgebox
 
     resp = await nucliadb_writer.post(
@@ -102,6 +104,11 @@ async def test_resource_field_add(nucliadb_writer: AsyncClient, knowledgebox: st
     assert "uuid" in data
     assert "seqid" in data
     rid = data["uuid"]
+
+    processing = get_processing()
+    original = processing.send_to_process
+    send_to_process_mock = AsyncMock(side_effect=original)
+    mocker.patch.object(processing, "send_to_process", send_to_process_mock)
 
     # Text
     resp = await nucliadb_writer.put(
@@ -158,6 +165,12 @@ async def test_resource_field_add(nucliadb_writer: AsyncClient, knowledgebox: st
     assert resp.status_code == 201
     data = resp.json()
     assert "seqid" in data
+
+    assert send_to_process_mock.call_count == 6
+    for call in send_to_process_mock.call_args_list:
+        payload = call.args[0]
+        assert payload.title == "My resource"
+        assert payload.slug == "resource1"
 
 
 @pytest.mark.deploy_modes("component")
