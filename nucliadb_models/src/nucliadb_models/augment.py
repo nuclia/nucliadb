@@ -360,10 +360,6 @@ class AugmentedConversationField(BaseModel):
         if self.messages is None:
             return None
 
-
-class AugmentedKeyValueField(BaseModel):
-    value: dict[str, KVValue] | None = None
-
         has_attachments = False
         attachments = []
         for message in self.messages:
@@ -376,6 +372,10 @@ class AugmentedKeyValueField(BaseModel):
             return attachments
         else:
             return None
+
+
+class AugmentedKeyValueField(BaseModel):
+    value: dict[str, KVValue] | None = None
 
 
 class AugmentedResource(Resource):

@@ -452,12 +452,6 @@ ResourceProp = Annotated[
 ]
 
 
-KeyValueProp = Annotated[
-    (Annotated[FieldValue, Tag("value")]),
-    Discriminator(prop_discriminator),
-]
-
-
 # Augmentations
 
 
@@ -488,12 +482,6 @@ class ConversationAugment(BaseModel, extra="forbid"):
     given: list[FieldId | ParagraphId]
     select: list[ConversationProp]
     from_: Literal["conversations"] = Field(default="conversations", alias="from")
-
-
-class KeyValueAugment(BaseModel, extra="forbid"):
-    given: list[FieldId]
-    select: list[KeyValueProp]
-    from_: Literal["key_values"] = Field(default="key_values", alias="from")
 
 
 FieldFilter = Annotated[
@@ -632,6 +620,7 @@ AugmentedField = (
     | AugmentedLinkField
     | AugmentedConversationField
     | AugmentedGenericField
+    | AugmentedKeyValueField
 )
 
 

@@ -19,6 +19,7 @@
 #
 
 import json
+from typing import cast
 from unittest.mock import patch
 
 import pytest
@@ -42,14 +43,18 @@ from nucliadb.models.internal.augment import (
     ResourceTitle,
 )
 from nucliadb.search.api.v1.router import KB_PREFIX
-from nucliadb_models.augment import AugmentedFileField, AugmentResponse
+from nucliadb_models.augment import AugmentedFileField, AugmentedKeyValueField, AugmentResponse
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.filters import Field
 from nucliadb_models.search import ResourceProperties
 from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, FieldID, FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.ndbfixtures.resources import clothing_store_resources, cookie_tale_resource, smb_wonder_resource
+from tests.ndbfixtures.resources import (
+    clothing_store_resources,
+    cookie_tale_resource,
+    smb_wonder_resource,
+)
 from tests.utils import inject_message
 
 
@@ -125,6 +130,7 @@ async def test_augment_api_resource_fields(
 
     body = AugmentResponse.model_validate(resp.json())
     field = body.fields[f"{rid}/f/smb-wonder"]
+    field = cast(AugmentedFileField, field)
     assert field.text is not None and len(field.text) == 234
 
     resp = await nucliadb_search.post(
@@ -148,6 +154,7 @@ async def test_augment_api_resource_fields(
 
     body = AugmentResponse.model_validate(resp.json())
     field = body.fields[f"{rid}/f/smb-wonder"]
+    field = cast(AugmentedFileField, field)
     assert field.text is not None and len(field.text) == 234
 
     resp = await nucliadb_search.post(
@@ -204,7 +211,8 @@ async def test_augment_api_key_value_field(
 
     body = AugmentResponse.model_validate(resp.json())
     field = body.fields[f"{rid}/k/product"]
-    assert field.value == {
+    key_value_field = cast(AugmentedKeyValueField, field)
+    assert key_value_field.value == {
         "color": "white",
         "price": 19.99,
         "featured": True,
