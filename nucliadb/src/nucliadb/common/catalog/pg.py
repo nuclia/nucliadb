@@ -23,6 +23,7 @@ import re
 from collections import defaultdict
 from typing import Any, Literal, cast
 
+from nidx_protos import nodereader_pb2
 from psycopg import AsyncCursor, sql
 from psycopg.rows import DictRow, dict_row
 from typing_extensions import assert_never
@@ -33,10 +34,12 @@ from nucliadb.common.catalog.interface import (
     CatalogQuery,
     CatalogResourceData,
 )
+from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb_models import search as search_models
 from nucliadb_models.labels import translate_alias_to_system_label, translate_system_to_alias_label
 from nucliadb_models.search import (
@@ -299,9 +302,21 @@ async def _faceted_search_unfiltered(
                 facet_params[f"facet_len_{cnt}"] = -(len(prefix) + 1)
             facet_sql = sql.SQL("AND {}").format(sql.SQL(" OR ").join(prefixes_sql))
         elif all(facet.startswith("/l") or facet.startswith("/n/i") for facet in tmp_facets.keys()):
-            # Special case for the catalog query, which can have many facets asked for
-            # Filter for the categories (icon and labels) in the query, filter the rest in the code below
-            facet_sql = sql.SQL("AND (facet LIKE '/l/%%' OR facet like '/n/i/%%')")
+            # Special case for the catalog query, which can have many facets asked for.
+            # Route labels (/l) to nidx and keep icons (/n/i) on the PG catalog.
+            l_facets = [f for f in tmp_facets.keys() if f.startswith("/l")]
+            ni_facets = [f for f in tmp_facets.keys() if f.startswith("/n/i")]
+
+            if l_facets:
+                with search_observer({"op": "facets_labels_nidx"}):
+                    await _faceted_search_labels_nidx_unfiltered(
+                        catalog_query.kbid, l_facets, tmp_facets
+                    )
+
+            if not ni_facets:
+                # Nothing else to fetch from PG
+                return
+            facet_sql = sql.SQL("AND facet LIKE '/n/i/%%'")
         else:
             # Worst case: ask for all facets and filter here. This is faster than applying lots of filters
             facet_sql = sql.SQL("")
@@ -327,6 +342,36 @@ async def _faceted_search_unfiltered(
     # Restore page cost
     if changed_page_cost:
         await cur.execute("SET LOCAL seq_page_cost = 1")
+
+
+async def _faceted_search_labels_nidx_unfiltered(
+    kbid: str,
+    facets: list[str],
+    tmp_facets: dict[str, dict[str, int]],
+) -> None:
+    """Get /l facets from nidx, output to tmp_facets"""
+    shard_manager = get_shard_manager()
+    shards = await shard_manager.get_shards_by_kbid(kbid)
+    shard_ids = [s.nidx_shard_id for s in shards]
+
+    request = nodereader_pb2.SearchRequest(
+        shard_ids=shard_ids,
+        document=True,
+        paragraph=False,
+        result_per_page=0,
+        only_faceted=True,
+        faceted=nodereader_pb2.Faceted(labels=facets),
+        field_filter=nodereader_pb2.FilterExpression(
+            field=nodereader_pb2.FilterExpression.FieldFilter(field_type="a", field_id="title")
+        ),
+    )
+    response = await get_nidx_searcher_client().Search(request)
+
+    for prefix, results in response.document.facets.items():
+        if prefix not in tmp_facets:
+            continue
+        for facet_result in results.facetresults:
+            tmp_facets[prefix][translate_system_to_alias_label(facet_result.tag)] = facet_result.total
 
 
 async def _faceted_search_filtered(
