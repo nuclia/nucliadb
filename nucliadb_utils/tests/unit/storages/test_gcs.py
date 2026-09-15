@@ -81,10 +81,11 @@ async def test_delete_kb_errors():
 
     delete_context = Mock()
     delete_context.__aenter__ = AsyncMock(return_value=response_mock)
-    delete_context.__aexit__ = AsyncMock()
+    delete_context.__aexit__ = AsyncMock(return_value=False)
 
     storage._session = Mock()
     storage._session.delete = Mock(return_value=delete_context)
+    storage.get_access_headers = AsyncMock(return_value={})
 
     # Test GCS responses and how we behave
 

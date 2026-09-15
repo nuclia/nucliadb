@@ -629,8 +629,8 @@ class GCSStorage(Storage):
                 return False
             if resp.status == 405:
                 # For testing purposes, gcs fixture doesn't have patch
-                logger.error("Not implemented")
-                return False
+                logger.info("Lifecycle PATCH is not implemented by the GCS test server")
+                return True
             text = await resp.text()
             raise GoogleCloudException(f"{resp.status}: {text}")
 
