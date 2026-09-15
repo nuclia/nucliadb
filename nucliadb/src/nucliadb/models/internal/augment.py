@@ -37,6 +37,7 @@ from nucliadb_models.augment import ResourceId
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import FieldConversation, MessageFormat
 from nucliadb_models.file import FieldFile
+from nucliadb_models.key_value import KVValue
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
@@ -451,6 +452,12 @@ ResourceProp = Annotated[
 ]
 
 
+KeyValueProp = Annotated[
+    (Annotated[FieldValue, Tag("value")]),
+    Discriminator(prop_discriminator),
+]
+
+
 # Augmentations
 
 
@@ -481,6 +488,12 @@ class ConversationAugment(BaseModel, extra="forbid"):
     given: list[FieldId | ParagraphId]
     select: list[ConversationProp]
     from_: Literal["conversations"] = Field(default="conversations", alias="from")
+
+
+class KeyValueAugment(BaseModel, extra="forbid"):
+    given: list[FieldId]
+    select: list[KeyValueProp]
+    from_: Literal["key_values"] = Field(default="key_values", alias="from")
 
 
 FieldFilter = Annotated[
@@ -605,6 +618,11 @@ class AugmentedConversationField(BaseAugmentedField):
 class AugmentedGenericField(BaseAugmentedField):
     value: str | None = None
     text: str | None = None
+
+
+@dataclass
+class AugmentedKeyValueField(BaseAugmentedField):
+    value: dict[str, KVValue] | None = None
 
 
 AugmentedField = (

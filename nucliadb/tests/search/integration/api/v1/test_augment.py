@@ -49,7 +49,7 @@ from nucliadb_models.search import ResourceProperties
 from nucliadb_protos.resources_pb2 import ExtractedTextWrapper, FieldID, FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.ndbfixtures.resources import cookie_tale_resource, smb_wonder_resource
+from tests.ndbfixtures.resources import clothing_store_resources, cookie_tale_resource, smb_wonder_resource
 from tests.utils import inject_message
 
 
@@ -173,6 +173,43 @@ async def test_augment_api_resource_fields(
     body = AugmentResponse.model_validate(resp.json())
     # no field returned, as the resource only has a file field
     assert len(body.fields) == 0
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_augment_api_key_value_field(
+    nucliadb_search: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
+) -> None:
+    kbid = knowledgebox
+    resources = await clothing_store_resources(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+    rid = resources["white-t-shirt"]
+
+    resp = await nucliadb_search.post(
+        f"/{KB_PREFIX}/{kbid}/augment",
+        json={
+            "resources": [
+                {
+                    "given": [rid],
+                    "fields": {
+                        "text": True,
+                        "filters": [{"prop": "field", "type": "key_value"}],
+                    },
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    body = AugmentResponse.model_validate(resp.json())
+    field = body.fields[f"{rid}/k/product"]
+    assert field.value == {
+        "color": "white",
+        "price": 19.99,
+        "featured": True,
+        "stock": 140,
+    }
 
 
 @pytest.mark.deploy_modes("standalone")

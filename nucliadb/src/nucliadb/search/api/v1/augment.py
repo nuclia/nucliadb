@@ -74,6 +74,7 @@ from nucliadb_models.augment import (
     AugmentedConversationMessage,
     AugmentedField,
     AugmentedFileField,
+    AugmentedKeyValueField,
     AugmentedParagraph,
     AugmentedResource,
     AugmentParagraphs,
@@ -522,6 +523,10 @@ def build_augment_response(item: AugmentRequest, augmented: Augmented) -> Augmen
                     )
 
             response.fields[field_id.full()] = conversation
+
+        elif field_id.type == FieldTypeName.KEY_VALUE.abbreviation():
+            field = cast(internal_augment.AugmentedKeyValueField, field)
+            response.fields[field_id.full()] = AugmentedKeyValueField(value=field.value)
 
         else:  # pragma: no cover
             assert False, f"unknown field type: {field_id.type}"
