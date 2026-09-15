@@ -617,30 +617,22 @@ class GCSStorage(Storage):
         return created
 
     @storage_ops_observer.wrap({"type": "schedule_delete"})
-    async def schedule_delete_kb(self, kbid: str):
+    async def schedule_delete_kb(self, kbid: str) -> bool:
         bucket_name = self.get_bucket_name(kbid)
         headers = await self.get_access_headers()
         url = f"{self.object_base_url}/{bucket_name}?fields=lifecycle"
-        deleted = False
         async with self.session.patch(url, headers=headers, json=POLICY_DELETE) as resp:
-            try:
-                data = await resp.json()
-            except Exception:
-                text = await resp.text()
-                data = {"text": text}
-            if resp.status not in (200, 204, 404):
-                if resp.status == 405:
-                    # For testing purposes, gcs fixture doesn't have patch
-                    logger.error("Not implemented")
-                elif resp.status == 404:
-                    logger.error(
-                        f"Attempt to delete not found gcloud: {data}, status: {resp.status}",
-                        exc_info=True,
-                    )
-                else:
-                    raise GoogleCloudException(f"{resp.status}: {json.dumps(data)}")
-            deleted = True
-        return deleted
+            if resp.status in (200, 204):
+                return True
+            if resp.status == 404:
+                logger.info(f"Bucket not found while scheduling deletion: {bucket_name}")
+                return False
+            if resp.status == 405:
+                # For testing purposes, gcs fixture doesn't have patch
+                logger.info("Lifecycle PATCH is not implemented by the GCS test server")
+                return True
+            text = await resp.text()
+            raise GoogleCloudException(f"{resp.status}: {text}")
 
     @storage_ops_observer.wrap({"type": "delete"})
     async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
@@ -657,6 +649,9 @@ class GCSStorage(Storage):
                 scope.set_extra("kbid", kbid)
                 scope.set_extra("status_code", status)
                 errors.capture_message(msg, "error", scope)
+            # Never treat an unhandled status as "bucket doesn't exist": raise so
+            # the caller retries instead of assuming deletion succeeded.
+            raise GoogleCloudException(msg)
 
         async with self.session.delete(url, headers=headers) as resp:
             if resp.status in (200, 204):

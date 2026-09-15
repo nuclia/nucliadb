@@ -126,6 +126,18 @@ async def test_delete_bucket_nosuchbucket():
     assert conflict is False
 
 
+async def test_delete_bucket_unexpected_error_is_raised():
+    storage = make_storage()
+    storage._s3aioclient.head_bucket = AsyncMock(  # type: ignore[ty:unresolved-attribute]
+        return_value={"ResponseMetadata": {"HTTPStatusCode": 200}}
+    )
+    storage._s3aioclient.delete_bucket.side_effect = make_client_error("AccessDenied", 403)
+
+    mykb = str(uuid.uuid4())
+    with pytest.raises(botocore.exceptions.ClientError):
+        await storage.delete_kb(mykb)
+
+
 # --- exists: error code handling ---
 
 
