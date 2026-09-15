@@ -50,6 +50,7 @@ from nucliadb.writer.resource.basic import (
     parse_basic_creation,
     parse_basic_modify,
     parse_user_classifications,
+    set_processing_metadata_from_basic,
     set_status,
     set_status_modify,
 )
@@ -301,7 +302,15 @@ async def modify_resource(
     toprocess.uuid = rid
     toprocess.source = Source.HTTP
 
+    if item.title is None or item.slug is None:
+        await set_processing_metadata_from_basic(toprocess, kbid, rid)
+
     parse_basic_modify(writer, item, toprocess)
+    if item.title is not None:
+        toprocess.title = writer.basic.title
+    if item.slug is not None:
+        toprocess.slug = item.slug
+
     parse_audit(writer.audit, request)
     if item.origin is not None:
         parse_origin(writer.origin, item.origin)
@@ -327,8 +336,6 @@ async def modify_resource(
         resource_classifications=resource_classifications,
     )
     set_status_modify(writer.basic, item)
-
-    toprocess.title = writer.basic.title
 
     writer.source = BrokerMessage.MessageSource.WRITER
 
@@ -477,6 +484,7 @@ async def _reprocess_resource(
         resource = await kb.get(rid)
         if resource is None:
             raise HTTPException(status_code=404, detail="Resource does not exist")
+        basic = resource.basic
 
         resource_fields = await resource.get_fields()
         for field_type, field_id in resource_fields.keys():
@@ -509,6 +517,9 @@ async def _reprocess_resource(
             userid=x_nucliadb_user,
             source=Source.HTTP,
         )
+        if basic is not None:
+            toprocess.title = basic.title
+            toprocess.slug = basic.slug
         async with driver.ro_transaction() as txn:
             resource.txn = txn
             await collect_fields_for_reprocessing(

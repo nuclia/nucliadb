@@ -54,7 +54,11 @@ from nucliadb.writer.api.v1.resource import (
 )
 from nucliadb.writer.api.v1.slug import ensure_slug_uniqueness, noop_context_manager
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.basic import parse_basic_creation, parse_user_classifications
+from nucliadb.writer.resource.basic import (
+    parse_basic_creation,
+    parse_user_classifications,
+    set_processing_metadata_from_basic,
+)
 from nucliadb.writer.resource.field import (
     atomic_get_stored_resource_classifications,
     parse_fields,
@@ -971,11 +975,7 @@ async def store_file_on_nuclia_db(
         if kb_config and kb_config.hidden_resources_hide_on_creation:
             writer.basic.hidden = True
 
-        async with datamanagers.with_ro_transaction() as txn:
-            basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
-        if basic is not None:
-            toprocess.title = basic.title
-            toprocess.slug = basic.slug
+        await set_processing_metadata_from_basic(toprocess, kbid, rid)
 
     async with unique_slug_context_manager:
         if override_resource_title and filename is not None:

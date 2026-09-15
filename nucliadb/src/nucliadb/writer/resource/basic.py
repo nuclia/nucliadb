@@ -21,6 +21,7 @@ from datetime import datetime
 
 from fastapi import HTTPException
 
+from nucliadb.common import datamanagers
 from nucliadb.common.models_utils import to_proto
 from nucliadb.common.models_utils.from_proto import (
     RelationNodeTypeMap,
@@ -59,6 +60,18 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
+
+
+async def set_processing_metadata_from_basic(
+    toprocess: PushPayload,
+    kbid: str,
+    rid: str,
+) -> None:
+    async with datamanagers.with_ro_transaction() as txn:
+        basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
+    if basic is not None:
+        toprocess.title = basic.title
+        toprocess.slug = basic.slug
 
 
 def parse_basic_modify(bm: BrokerMessage, item: ComingResourcePayload, toprocess: PushPayload):
