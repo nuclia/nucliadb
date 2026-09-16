@@ -523,6 +523,13 @@ class S3Storage(Storage):
                 error_code = parse_status_code(e)
                 if error_code == 409:
                     conflict = True
+                elif error_code == 404:
+                    # Bucket was already gone (e.g. deleted concurrently)
+                    pass
+                else:
+                    # Don't swallow unexpected errors as if the bucket was gone:
+                    # let the caller know deletion actually failed and should retry.
+                    raise
         return deleted, conflict
 
     @backoff.on_exception(
