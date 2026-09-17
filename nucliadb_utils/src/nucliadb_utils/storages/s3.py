@@ -401,6 +401,8 @@ class S3Storage(Storage):
         else:
             config = aiobotocore.config.AioConfig(
                 None,
+                connect_timeout=30,
+                read_timeout=10,
                 max_pool_connections=max_pool_connections,
                 s3=s3_config,
             )
