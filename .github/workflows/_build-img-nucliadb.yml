@@ -33,9 +33,9 @@ on:
         value: ${{ jobs.build-img.outputs.metadata }}
 
 permissions:
-  id-token: write   # This is required for requesting the JWT
-  contents: read    # This is required for actions/checkout
-  actions: read     # This is required for provenance
+  id-token: write # This is required for requesting the JWT
+  contents: read # This is required for actions/checkout
+  actions: read # This is required for provenance
 
 env:
   GCP_WORKLOAD_IDENTITY_PROVIDER: "projects/224545243904/locations/global/workloadIdentityPools/gh-nuclia/providers/gh-nuclia-provider"
@@ -58,8 +58,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          app-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
-          private-key: ${{ secrets.PK_GHAPP_NUCLIABOT }}
+          client-id: ${{ secrets.NUCLIA_EXTERNAL_GHAPP_ID }}
+          private-key: ${{ secrets.NUCLIA_EXTERNAL_GHAPP_PK }}
           owner: nuclia
 
       - name: Checkout tooling repository
@@ -94,5 +94,5 @@ jobs:
           aws-ecr-role: ${{ secrets.AWS_ECR_ROLE }}
           tag-latest: ${{ github.ref == 'refs/heads/main' && 'latest' || 'dev-latest' }}
           push: true
-          ghapp-nuclia-service-bot-id: ${{ secrets.GHAPP_ID_NUCLIABOT }}
-          ghapp-nuclia-service-bot-pk: ${{ secrets.PK_GHAPP_NUCLIABOT }}
+          ghapp-nuclia-service-bot-id: ${{ secrets.NUCLIA_EXTERNAL_GHAPP_ID }}
+          ghapp-nuclia-service-bot-pk: ${{ secrets.NUCLIA_EXTERNAL_GHAPP_PK }}
