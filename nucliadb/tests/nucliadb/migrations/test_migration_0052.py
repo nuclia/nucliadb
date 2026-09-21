@@ -1,0 +1,55 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+
+import uuid
+from unittest.mock import Mock
+
+from nucliadb.common import datamanagers
+from nucliadb.common.maindb.driver import Driver
+from nucliadb.migrator.models import Migration
+from nucliadb_models.configuration import (
+    AskConfig,
+    AskSearchConfiguration,
+    FindConfig,
+    FindSearchConfiguration,
+    SearchConfiguration,
+)
+from tests.nucliadb.migrations import get_migration
+
+migration: Migration = get_migration(52)
+
+
+async def test_migration_0052(maindb_driver: Driver):
+    execution_context = Mock()
+    execution_context.kv_driver = maindb_driver
+    execution_context.blob_storage = Mock()
+    kbid = str(uuid.uuid4())
+
+    async with maindb_driver.rw_transaction() as txn:
+        find: SearchConfiguration = FindSearchConfiguration(
+            kind="find", config=FindConfig(generative_model="chatgpt-azure-4o")
+        )
+        await datamanagers.search_configurations.set(txn, kbid=kbid, name="find", config=find)
+        ask: SearchConfiguration = AskSearchConfiguration(
+            kind="ask", config=AskConfig(generative_model="claude-4-5-sonnet")
+        )
+        await datamanagers.search_configurations.set(txn, kbid=kbid, name="ask", config=ask)
+        await txn.commit()
+
+    await migration.module.migrate_kb(execution_context, kbid)
+
+    async with maindb_driver.ro_transaction() as txn:
+        find_ = await datamanagers.search_configurations.get(txn, kbid=kbid, name="find")
+        assert find_ is not None
+        assert find_.config.generative_model == "chatgpt-azure-5.6-terra"  # type: ignore[attr-defined]
+        ask_ = await datamanagers.search_configurations.get(txn, kbid=kbid, name="ask")
+        assert ask_ is not None
+        assert ask_.config.generative_model == "claude-5-sonnet"  # type: ignore[attr-defined]
