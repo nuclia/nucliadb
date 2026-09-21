@@ -218,8 +218,10 @@ class AzureStorage(Storage):
 
     async def schedule_delete_kb(self, kbid: str) -> bool:
         bucket_name = self.get_bucket_name(kbid)
-        deleted, _ = await self.kb_object_store.bucket_delete(bucket_name)
-        return deleted
+        # Azure has no lifecycle-managed bucket deletion, so scheduling means
+        # eagerly deleting the whole container (blobs + container) right away.
+        await self.kb_object_store.bucket_schedule_delete(bucket_name)
+        return True
 
     async def delete_kb(self, kbid: str) -> tuple[bool, bool]:
         bucket_name = self.get_bucket_name(kbid)

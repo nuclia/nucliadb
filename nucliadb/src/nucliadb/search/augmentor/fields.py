@@ -29,6 +29,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
 from nucliadb.ingest.fields.generic import Generic
+from nucliadb.ingest.fields.key_value import KeyValue
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.resource import Resource
@@ -39,6 +40,7 @@ from nucliadb.models.internal.augment import (
     AugmentedField,
     AugmentedFileField,
     AugmentedGenericField,
+    AugmentedKeyValueField,
     AugmentedLinkField,
     AugmentedTextField,
     ConversationAnswerOrAfter,
@@ -128,6 +130,10 @@ async def db_augment_field(
         field = cast(Generic, field)
         select = cast(list[FieldProp], select)
         return await db_augment_generic_field(field, field_id, select)
+
+    elif field_type == FieldTypeName.KEY_VALUE.abbreviation():
+        field = cast(KeyValue, field)
+        return await db_augment_key_value_field(field)
 
     else:  # pragma: no cover
         assert False, f"unknown field type: {field_type}"
@@ -400,6 +406,19 @@ async def db_augment_generic_field(
         else:  # pragma: no cover
             assert_never(prop)
 
+    return augmented
+
+
+@augmentor_observer.wrap({"type": "db_key_value_field"})
+async def db_augment_key_value_field(
+    field: KeyValue,
+) -> AugmentedKeyValueField:
+    augmented = AugmentedKeyValueField(id=field.field_id)
+    db_value = await field.get_value()
+    if db_value is not None:
+        field_key_value = from_proto.field_key_value(db_value)
+        if field_key_value is not None:
+            augmented.value = field_key_value.data
     return augmented
 
 

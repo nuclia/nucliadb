@@ -47,7 +47,7 @@ pub fn is_label(facet: &Facet) -> bool {
 
 fn facet_count(facet: &str, facets_count: &FacetCounts) -> Vec<FacetResult> {
     facets_count
-        .top_k(facet, 50)
+        .top_k(facet, 100)
         .into_iter()
         .map(|(facet, count)| FacetResult {
             tag: facet.to_string(),

@@ -81,10 +81,11 @@ async def test_delete_kb_errors():
 
     delete_context = Mock()
     delete_context.__aenter__ = AsyncMock(return_value=response_mock)
-    delete_context.__aexit__ = AsyncMock()
+    delete_context.__aexit__ = AsyncMock(return_value=False)
 
     storage._session = Mock()
     storage._session.delete = Mock(return_value=delete_context)
+    storage.get_access_headers = AsyncMock(return_value={})
 
     # Test GCS responses and how we behave
 
@@ -104,6 +105,5 @@ async def test_delete_kb_errors():
     assert conflict
 
     response_mock.status = 500
-    deleted, conflict = await storage.delete_kb(kbid)
-    assert not deleted
-    assert not conflict
+    with pytest.raises(GoogleCloudException):
+        await storage.delete_kb(kbid)

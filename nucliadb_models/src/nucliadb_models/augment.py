@@ -22,6 +22,7 @@ from typing_extensions import Self, assert_never
 from nucliadb_models import filters
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import MessageFormat
+from nucliadb_models.key_value import KVValue
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
 from nucliadb_models.search import ResourceProperties, TextPosition
 
@@ -31,7 +32,7 @@ ResourceId = Annotated[
     StringConstraints(pattern=ResourceIdPattern, min_length=32, max_length=36),
 ]
 
-FieldIdPattern = r"^[0-9a-f]{32}/[acftu]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?$"
+FieldIdPattern = r"^[0-9a-f]{32}/[acftuk]/[a-zA-Z0-9:_-]+(/[^/]{1,128})?$"
 FieldId = Annotated[
     str,
     StringConstraints(
@@ -373,6 +374,10 @@ class AugmentedConversationField(BaseModel):
             return None
 
 
+class AugmentedKeyValueField(BaseModel):
+    value: dict[str, KVValue] | None = None
+
+
 class AugmentedResource(Resource):
     classification_labels: dict[str, list[str]] | None = None
 
@@ -383,5 +388,8 @@ class AugmentedResource(Resource):
 
 class AugmentResponse(BaseModel):
     resources: dict[ResourceId, AugmentedResource]
-    fields: dict[FieldId, AugmentedField | AugmentedFileField | AugmentedConversationField]
+    fields: dict[
+        FieldId,
+        AugmentedField | AugmentedFileField | AugmentedConversationField | AugmentedKeyValueField,
+    ]
     paragraphs: dict[ParagraphId, AugmentedParagraph]

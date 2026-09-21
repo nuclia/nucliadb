@@ -37,6 +37,7 @@ from nucliadb_models.augment import ResourceId
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import FieldConversation, MessageFormat
 from nucliadb_models.file import FieldFile
+from nucliadb_models.key_value import KVValue
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import Extra, Origin
 from nucliadb_models.resource import ExtractedDataTypeName, Resource
@@ -607,6 +608,11 @@ class AugmentedGenericField(BaseAugmentedField):
     text: str | None = None
 
 
+@dataclass
+class AugmentedKeyValueField(BaseAugmentedField):
+    value: dict[str, KVValue] | None = None
+
+
 AugmentedField = (
     BaseAugmentedField
     | AugmentedTextField
@@ -614,6 +620,7 @@ AugmentedField = (
     | AugmentedLinkField
     | AugmentedConversationField
     | AugmentedGenericField
+    | AugmentedKeyValueField
 )
 
 

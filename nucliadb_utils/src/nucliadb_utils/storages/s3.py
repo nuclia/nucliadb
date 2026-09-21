@@ -391,6 +391,8 @@ class S3Storage(Storage):
         if disable_checksums:
             config = aiobotocore.config.AioConfig(
                 None,
+                connect_timeout=30,
+                read_timeout=10,
                 max_pool_connections=max_pool_connections,
                 s3=s3_config,
                 request_checksum_calculation="when_required",
@@ -399,6 +401,8 @@ class S3Storage(Storage):
         else:
             config = aiobotocore.config.AioConfig(
                 None,
+                connect_timeout=30,
+                read_timeout=10,
                 max_pool_connections=max_pool_connections,
                 s3=s3_config,
             )
@@ -523,6 +527,13 @@ class S3Storage(Storage):
                 error_code = parse_status_code(e)
                 if error_code == 409:
                     conflict = True
+                elif error_code == 404:
+                    # Bucket was already gone (e.g. deleted concurrently)
+                    pass
+                else:
+                    # Don't swallow unexpected errors as if the bucket was gone:
+                    # let the caller know deletion actually failed and should retry.
+                    raise
         return deleted, conflict
 
     @backoff.on_exception(
