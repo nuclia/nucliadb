@@ -51,6 +51,10 @@ async def test_migration_0052(maindb_driver: Driver):
             kind="ask", config=AskConfig(generative_model="claude-4-5-sonnet")
         )
         await datamanagers.search_configurations.set(txn, kbid=kbid, name="ask", config=ask)
+        azure: SearchConfiguration = AskSearchConfiguration(
+            kind="ask", config=AskConfig(generative_model="chatgpt-azure-o3-mini")
+        )
+        await datamanagers.search_configurations.set(txn, kbid=kbid, name="azure", config=azure)
         await txn.commit()
 
     await migration.module.migrate_kb(execution_context, kbid)
@@ -62,3 +66,6 @@ async def test_migration_0052(maindb_driver: Driver):
         ask_ = await datamanagers.search_configurations.get(txn, kbid=kbid, name="ask")
         assert ask_ is not None
         assert ask_.config.generative_model == "claude-5-sonnet"  # type: ignore[attr-defined]
+        azure_ = await datamanagers.search_configurations.get(txn, kbid=kbid, name="azure")
+        assert azure_ is not None
+        assert azure_.config.generative_model == "chatgpt-azure-5.6-luna"  # type: ignore[attr-defined]
