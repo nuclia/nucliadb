@@ -343,7 +343,7 @@ class ResourceField(BaseModel):
 class BatchDeleteFilterExpression(BaseModel, extra="forbid"):
     field: FieldFilterExpression = Field(
         title="Batch delete field filters",
-        description="Resources matching this filter will be deleted",
+        description="Resources with fields matching this filter will be deleted",
     )
 
 
@@ -352,5 +352,5 @@ class BatchDeleteRequest(BaseModel, extra="forbid"):
 
 
 class BatchDeleteResponse(BaseModel):
-    delete_id: UUID
-    resources: list[str]
+    delete_id: UUID = Field(description="Unique delete id representing this batch delete operation")
+    resources: list[str] = Field(description="Resources that will be deleted")
