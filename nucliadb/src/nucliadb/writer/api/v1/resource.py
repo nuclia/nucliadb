@@ -20,18 +20,23 @@
 import contextlib
 from time import time
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from fastapi import BackgroundTasks, HTTPException, Query, Response
+from fastapi import BackgroundTasks, Header, HTTPException, Query, Response
 from fastapi_versioning import version
+from nidx_protos.nodereader_pb2 import StreamRequest
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
 from nucliadb.common.back_pressure import maybe_back_pressure
+from nucliadb.common.cluster.exceptions import ShardsNotFound
+from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.filter_expression import parse_expression
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.models.internal.processing import ProcessingInfo, PushPayload, Source
 from nucliadb.writer import SERVICE_NAME, logger
@@ -64,7 +69,7 @@ from nucliadb.writer.resource.field import (
 )
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.utilities import get_processing
-from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.resource import BatchDeleteRequest, BatchDeleteResponse, NucliaDBRoles
 from nucliadb_models.writer import (
     CreateResourcePayload,
     ResourceCreated,
@@ -72,7 +77,14 @@ from nucliadb_models.writer import (
     UpdateResourcePayload,
 )
 from nucliadb_protos.resources_pb2 import FieldID, Metadata
-from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus, IndexResource
+from nucliadb_protos.writer_pb2 import (
+    Audit,
+    BrokerMessage,
+    FieldIDStatus,
+    FieldStatus,
+    IndexResource,
+    ShardObject,
+)
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -534,6 +546,63 @@ async def _reprocess_resource(
         await transaction.commit(writer, partition, wait=False)
 
     return ResourceUpdated(seqid=processing_info.seqid if processing_info else None)
+
+
+@api.delete(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCES_PREFIX}",
+    status_code=200,
+    summary="Delete multiple resources at once",
+    tags=["Resources"],
+    response_model=BatchDeleteResponse,
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def delete_resource_batch(
+    request: Request,
+    item: BatchDeleteRequest,
+    kbid: str,
+    background: BackgroundTasks,
+    x_synchronous: bool = Header(
+        default=False, description="When set to true, wait until batch deletion has finished"
+    ),
+):
+    filter_pb = await parse_expression(item.filter_expression.field, kbid)
+
+    shard_manager = get_shard_manager()
+    try:
+        shard_groups: list[ShardObject] = await shard_manager.get_shards_by_kbid(kbid)
+    except ShardsNotFound:
+        raise HTTPException(
+            status_code=404,
+            detail="The knowledgebox or its shards configuration is missing",
+        )
+
+    stream_request = StreamRequest()
+    stream_request.filter_expression.CopyFrom(filter_pb)
+
+    deletes = set()
+    for shard_obj in shard_groups:
+        if shard_obj.nidx_shard_id is not None:
+            stream_request.shard_id.id = shard_obj.nidx_shard_id
+            async for doc in get_nidx_searcher_client().Documents(stream_request):
+                # make sure resource ids are 32-char UUIDs (without "-"s)
+                rid = UUID(doc.uuid).hex
+                deletes.add(rid)
+
+    # store the delete set and create an async task to remove them
+    deletion_id = uuid4()
+
+    from nucliadb.tasks.deleter import ResourceBatch, batch_deleter_task, schedule_batch_delete
+
+    audit = Audit()
+    parse_audit(audit, request)
+    deletion_id = await schedule_batch_delete(request.app.state.context, kbid, deletes, audit)
+
+    await batch_deleter_task(
+        request.app.state.context, ResourceBatch(kbid=kbid, deletion_id=deletion_id)
+    )
+    deleted = deletes
+    return BatchDeleteResponse(delete_id=deletion_id, resources=list(deleted))
 
 
 @api.delete(

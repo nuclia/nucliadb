@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
+import random
+import re
 import time
 from collections.abc import AsyncIterator
 
@@ -28,7 +30,12 @@ from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.writer.api.v1.router import KB_PREFIX
+from nucliadb_protos.resources_pb2 import FieldType
+from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
+from tests.utils.dirty_index import wait_for_sync
 
 
 # Used by: nucliadb writer tests
@@ -73,3 +80,79 @@ async def simple_resources(
         await asyncio.sleep(0.1)
 
     yield knowledgebox, resource_ids
+
+
+async def create_simple_resource(
+    kbid: str,
+    name: str,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+) -> str:
+    slug = f"simple-resource::{slugify(name)}"
+    field_id = "simple-text"
+
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/resources",
+        json={
+            "slug": slug,
+            "title": name,
+            "origin": {
+                "metadata": {
+                    "name": name,
+                }
+            },
+            "texts": {
+                field_id: {
+                    "body": f"A simple resource text: {name}",
+                    "format": "PLAIN",
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    vectorsets = {}
+    async with datamanagers.with_ro_transaction() as txn:
+        async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kbid):
+            vectorsets[vectorset_id] = vs
+    # use a controlled random seed for vector generation
+    random.seed(23)
+
+    bmb = BrokerMessageBuilder(
+        kbid=kbid,
+        rid=rid,
+        slug=slug,
+        source=BrokerMessage.MessageSource.PROCESSOR,
+    )
+    bmb.with_title(name)
+    bmb.with_summary(f"A summary for {name}")
+
+    text_builder = bmb.field_builder(field_id, FieldType.TEXT)
+    text_builder.add_paragraph(
+        f"A simple resource processed text: {name}",
+        vectors={
+            vectorset_id: [
+                random.random() for _ in range(config.vectorset_index_config.vector_dimension)
+            ]
+            for i, (vectorset_id, config) in enumerate(vectorsets.items())
+        },
+    )
+
+    bm = bmb.build()
+    bm.origin.metadata["name"] = name
+
+    await inject_message(nucliadb_ingest_grpc, bm)
+    await wait_for_sync()
+
+    return rid
+
+
+def slugify(s: str) -> str:
+    # replace non-word chars (not numbers, letters or underscore) for spaces
+    s = re.sub(r"\W", " ", s, flags=re.ASCII)
+    # replace multiple spaces for a single one
+    s = re.sub(" +", " ", s)
+    # convert spaces to dashes
+    s = re.sub(" ", "-", s)
+    return s

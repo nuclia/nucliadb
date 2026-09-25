@@ -36,6 +36,7 @@ from nucliadb_models.extracted import (
     VectorObject,
 )
 from nucliadb_models.file import FieldFile
+from nucliadb_models.filters import FieldFilterExpression
 from nucliadb_models.key_value import KeyValueField
 from nucliadb_models.link import FieldLink
 from nucliadb_models.metadata import (
@@ -334,3 +335,22 @@ class ResourceField(BaseModel):
     field_id: str
     value: FieldText | FieldFile | FieldLink | Conversation | None = None
     extracted: ExtractedDataType = None
+
+
+# Batch DELETE
+
+
+class BatchDeleteFilterExpression(BaseModel, extra="forbid"):
+    field: FieldFilterExpression = Field(
+        title="Batch delete field filters",
+        description="Resources matching this filter will be deleted",
+    )
+
+
+class BatchDeleteRequest(BaseModel, extra="forbid"):
+    filter_expression: BatchDeleteFilterExpression
+
+
+class BatchDeleteResponse(BaseModel):
+    delete_id: UUID
+    resources: list[str]
