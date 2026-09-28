@@ -15,12 +15,13 @@ import os
 import sys
 from collections.abc import Iterator
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from pytest import FixtureRequest
 from pytest_lazy_fixtures import lazy_fixture
 
+from nucliadb_utils.settings import nuclia_settings
 from nucliadb_utils.storages.azure import AzureStorage
 from nucliadb_utils.storages.gcs import GCSStorage
 from nucliadb_utils.storages.local import LocalStorage
@@ -31,22 +32,14 @@ from nucliadb_utils.utilities import Utility, clean_utility, set_utility
 
 @pytest.fixture(scope="function")
 def onprem_nucliadb():
-    from nucliadb_utils.settings import nuclia_settings
-
-    original = nuclia_settings.onprem
-    nuclia_settings.onprem = True
-    yield
-    nuclia_settings.onprem = original
+    with patch.object(nuclia_settings, "onprem", True):
+        yield
 
 
 @pytest.fixture(scope="function")
 def hosted_nucliadb():
-    from nucliadb_utils.settings import nuclia_settings
-
-    original = nuclia_settings.onprem
-    nuclia_settings.onprem = False
-    yield
-    nuclia_settings.onprem = original
+    with patch.object(nuclia_settings, "onprem", False):
+        yield
 
 
 def get_testing_storage_backend() -> str:
