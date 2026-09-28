@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
 import base64
 import itertools
 from datetime import datetime
@@ -27,6 +28,12 @@ from uuid import UUID, uuid4
 from pydantic import Base64Bytes, BaseModel
 
 from nucliadb.common import datamanagers
+from nucliadb.common.back_pressure.cache import cached_back_pressure
+from nucliadb.common.back_pressure.materializer import get_materializer
+from nucliadb.common.back_pressure.utils import (
+    BackPressureException,
+    is_back_pressure_enabled,
+)
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.tasks import create_consumer
@@ -37,6 +44,10 @@ from nucliadb.tasks.utils import NatsConsumer, NatsStream
 from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.utilities import get_processing
 from nucliadb_protos.writer_pb2 import Audit, BrokerMessage
+from nucliadb_utils.transaction import (
+    StreamingServerError,
+    TransactionCommitTimeoutError,
+)
 from nucliadb_utils.utilities import get_partitioning
 
 BATCH_SIZE = 20
@@ -135,12 +146,13 @@ async def batch_deleter_task(context: ApplicationContext, msg: DeleteBatch):
     audit.ParseFromString(metadata.serialized_audit_pb)
     pending = metadata.pending.copy()
     for batch in batched(pending, BATCH_SIZE):
-        # TODO: backoff
         for rid in batch:
             if not (await datamanagers.atomic.resources.exists(kbid=kbid, rid=rid)):
                 # already deleted, skipping
                 metadata.pending.remove(rid)
                 continue
+
+            await maybe_back_pressure(kbid, rid)
 
             writer = BrokerMessage()
             writer.kbid = kbid
@@ -149,8 +161,15 @@ async def batch_deleter_task(context: ApplicationContext, msg: DeleteBatch):
             writer.audit.CopyFrom(audit)
 
             partition = partitioning.generate_partition(kbid, rid)
-            # TODO: handle exceptions on commit (retry later, backoff...)
-            await transaction.commit(writer, partition)
+            try:
+                await transaction.transaction_commit(writer, partition)
+            except (TransactionCommitTimeoutError, StreamingServerError):
+                # Something is off with ingest/nats. We just save progress and
+                # raise the exception. The NATS task consumer will NAK the
+                # message and deliver it again later.
+                # These errors shouldn't be persistent or something is really broken
+                await set_deletion_metadata(context.kv_driver, kbid, deletion_id, metadata)
+                raise
 
             await processing.delete_from_processing(kbid=kbid, resource_id=rid)
 
@@ -160,9 +179,7 @@ async def batch_deleter_task(context: ApplicationContext, msg: DeleteBatch):
         # Update task progress
         await set_deletion_metadata(context.kv_driver, kbid, deletion_id, metadata)
 
-    # TODO: handle retries on failed deletions
-
-    # cleanup maindb
+    # cleanup deletion state
     await delete_deletion_metadata(context.kv_driver, kbid, deletion_id)
 
     logger.info(
@@ -194,6 +211,40 @@ async def delete_deletion_metadata(driver: Driver, kbid: str, deletion_id: UUID)
     async with driver.rw_transaction() as txn:
         await txn.delete(DELETION_METADATA.format(kbid=kbid, deletion_id=deletion_id))
         await txn.commit()
+
+
+async def maybe_back_pressure(kbid: str, rid: str):
+    """Check back pressure for a specific resource. If back pressure is applied,
+    never give up and wait until we can operate. This should be a reasonable and
+    finite time.
+
+    """
+    materializer = get_materializer()
+
+    if not is_back_pressure_enabled():
+        return
+
+    with cached_back_pressure(kbid, rid):
+        while True:
+            try:
+                materializer.check_ingest()
+                materializer.check_indexing()
+            except BackPressureException as exc:
+                logger.info(
+                    "Deleter got back pressure",
+                    extra={
+                        "kbid": kbid,
+                        "resource_uuid": rid,
+                        "try_after": exc.data.try_after,
+                        "back_pressure_type": exc.data.type,
+                        "pending": exc.data.pending,
+                    },
+                )
+                wait = (exc.data.try_after - datetime.now()).total_seconds()
+                if wait > 0:
+                    await asyncio.sleep(wait)
+            else:
+                return
 
 
 # Adapted from itertools docs.

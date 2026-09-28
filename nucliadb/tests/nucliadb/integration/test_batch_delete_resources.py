@@ -23,12 +23,13 @@ import datetime
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterable
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
 
 import pytest
 from httpx import AsyncClient
 from pytest import LogCaptureFixture
 
+from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
 from nucliadb.common.nidx import NidxUtility
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.tasks.consumer import NatsTaskConsumer
@@ -40,15 +41,6 @@ from tests.ndbfixtures.resources.simples import create_simple_resource
 
 
 @pytest.fixture(autouse=True)
-def patch_back_pressure_materializer():
-    processing_client = AsyncMock()
-    processing_client.stats.return_value = Mock()
-    processing_client.stats.return_value.incomplete = 10
-    with patch("nucliadb.common.back_pressure.materializer.ProcessingHTTPClient", new=processing_client):
-        yield
-
-
-@pytest.fixture(autouse=True)
 def patch_deleter_batch_size():
     # use a small batch size in order to trigger multiple batches and test that logic
     with patch("nucliadb.tasks.deleter.BATCH_SIZE", 2):
@@ -57,7 +49,7 @@ def patch_deleter_batch_size():
 
 @pytest.fixture
 async def simple_resources(
-    nidx,
+    nidx_utility: NidxUtility,
     nucliadb_writer: AsyncClient,
     nucliadb_ingest_grpc: WriterStub,
     knowledgebox: str,
@@ -76,6 +68,7 @@ async def test_batch_delete_resources_by_rid(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     ingest_deleter_consumer: NatsTaskConsumer[DeleteBatch],
+    back_pressure_materializer: BackPressureMaterializer,
     nidx_utility: NidxUtility,
     knowledgebox: str,
     simple_resources: list[str],
@@ -123,6 +116,7 @@ async def test_batch_delete_resources_by_created_date(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     ingest_deleter_consumer: NatsTaskConsumer[DeleteBatch],
+    back_pressure_materializer: BackPressureMaterializer,
     nidx_utility: NidxUtility,
     knowledgebox: str,
     simple_resources: list[str],
@@ -158,6 +152,7 @@ async def test_batch_delete_resources_by_origin_metadata(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
     ingest_deleter_consumer: NatsTaskConsumer[DeleteBatch],
+    back_pressure_materializer: BackPressureMaterializer,
     nidx_utility: NidxUtility,
     knowledgebox: str,
     simple_resources: list[str],
@@ -191,20 +186,80 @@ async def test_batch_delete_resources_by_origin_metadata(
     assert set((resource.id for resource in resource_list.resources)) == set(rids[1:])
 
 
+@pytest.mark.deploy_modes("component")
+async def test_batch_delete_resources_with_back_pressure(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    ingest_deleter_consumer: NatsTaskConsumer[DeleteBatch],
+    back_pressure_materializer: BackPressureMaterializer,
+    nidx_utility: NidxUtility,
+    knowledgebox: str,
+    simple_resources: list[str],
+    caplog: LogCaptureFixture,
+) -> None:
+    kbid = knowledgebox
+    rids = simple_resources
+
+    def try_after(*args, **kwargs):
+        return datetime.datetime.now()
+
+    with (
+        patch.object(back_pressure_materializer, "get_ingest_pending", side_effect=[100, 30, 5]),
+        patch(
+            "nucliadb.common.back_pressure.materializer.estimate_try_after",
+            side_effect=try_after,
+        ),
+        caplog.at_level(logging.INFO),
+    ):
+        async with wait_for_deleter_job(caplog, timeout=2.0):
+            resp = await nucliadb_writer.request(
+                "DELETE",
+                f"{KB_PREFIX}/{kbid}/resources",
+                json={
+                    "filter_expression": {
+                        "field": {
+                            "or": [{"prop": "origin_metadata", "field": "name", "value": "my simple 0"}],
+                        },
+                    }
+                },
+            )
+            assert resp.status_code == 200
+            assert resp.json()["resources"] == [rids[0]]
+
+        back_pressured = False
+        for log in caplog.records:
+            # NOTE this is coupled with the log message from the deleter
+            if log.msg == "Deleter got back pressure":
+                back_pressured = True
+                break
+        assert back_pressured, "deleter should have got back pressure"
+
+        # after waiting the back pressure, the deletion still happens
+        resp = await nucliadb_reader.get(
+            f"{KB_PREFIX}/{kbid}/resources",
+            params={"size": 50},
+        )
+        assert resp.status_code == 200
+        resource_list = ResourceList.model_validate(resp.json())
+        assert len(resource_list.resources) == 4
+        assert set((resource.id for resource in resource_list.resources)) == set(rids[1:])
+
+
 @asynccontextmanager
 async def wait_for_deleter_job(caplog: LogCaptureFixture, *, timeout: float = 2.0):
     with caplog.at_level(logging.INFO):
         yield
 
         finished = False
+        last_read = 0
         while not finished and timeout > 0.0:
-            for log in caplog.records:
+            for log in caplog.records[last_read:]:
                 # NOTE this is coupled with the log message from the deleter
                 if log.msg == "Batch deletion job completed":
                     finished = True
                     break
             else:
-                caplog.clear()
+                last_read = len(caplog.records)
                 await asyncio.sleep(0.5)
                 timeout -= 0.5
 
