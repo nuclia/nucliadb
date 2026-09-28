@@ -22,7 +22,7 @@ from time import time
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import BackgroundTasks, Header, HTTPException, Query, Response
+from fastapi import BackgroundTasks, HTTPException, Query, Response
 from fastapi_versioning import version
 from nidx_protos.nodereader_pb2 import StreamRequest
 from starlette.requests import Request
@@ -558,15 +558,7 @@ async def _reprocess_resource(
 )
 @requires(NucliaDBRoles.WRITER)
 @version(1)
-async def delete_resource_batch(
-    request: Request,
-    item: BatchDeleteRequest,
-    kbid: str,
-    background: BackgroundTasks,
-    x_synchronous: bool = Header(
-        default=False, description="When set to true, wait until batch deletion has finished"
-    ),
-):
+async def delete_resource_batch(request: Request, item: BatchDeleteRequest, kbid: str):
     filter_pb = await parse_expression(item.filter_expression.field, kbid)
 
     shard_manager = get_shard_manager()
