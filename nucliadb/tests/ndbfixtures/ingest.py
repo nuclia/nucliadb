@@ -35,6 +35,7 @@ from grpc import aio
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import KBShardManager
+from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
@@ -43,6 +44,8 @@ from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.standalone.settings import Settings
+from nucliadb.tasks.consumer import NatsTaskConsumer
+from nucliadb.tasks.deleter import deleter_consumer
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
@@ -172,6 +175,31 @@ async def ingest_processed_consumer(
 
     await ingest_consumer_finalizer()
     clear_global_cache()
+
+
+@pytest.fixture(scope="function")
+async def ingest_deleter_consumer(
+    maindb_driver: Driver,
+    nats_manager: NatsConnectionManager,
+):
+    context = ApplicationContext(
+        nats_manager=True,
+        kv_driver=True,
+        # skip unused utilities
+        blob_storage=False,
+        shard_manager=False,
+        partitioning=False,
+        transaction=False,
+        nidx=False,
+    )
+    await context.initialize()
+
+    consumer: NatsTaskConsumer = deleter_consumer()
+    await consumer.initialize(context)
+    yield consumer
+    await consumer.finalize()
+
+    await context.finalize()
 
 
 @pytest.fixture(scope="function")

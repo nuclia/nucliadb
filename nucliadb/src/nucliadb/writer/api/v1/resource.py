@@ -39,6 +39,7 @@ from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.models.internal.processing import ProcessingInfo, PushPayload, Source
+from nucliadb.tasks.deleter import schedule_batch_delete
 from nucliadb.writer import SERVICE_NAME, logger
 from nucliadb.writer.api.constants import X_NUCLIADB_USER, X_REPROCESS_BATCH_SIZE, X_SKIP_STORE
 from nucliadb.writer.api.v1 import transaction
@@ -589,20 +590,16 @@ async def delete_resource_batch(
                 rid = UUID(doc.uuid).hex
                 deletes.add(rid)
 
-    # store the delete set and create an async task to remove them
-    deletion_id = uuid4()
-
-    from nucliadb.tasks.deleter import ResourceBatch, batch_deleter_task, schedule_batch_delete
-
+    # schedule a delete job with the delete set. We ignore out-of-sync index
+    # issues and return the set of resources got from nidx to the user.
     audit = Audit()
     parse_audit(audit, request)
     deletion_id = await schedule_batch_delete(request.app.state.context, kbid, deletes, audit)
 
-    await batch_deleter_task(
-        request.app.state.context, ResourceBatch(kbid=kbid, deletion_id=deletion_id)
+    return BatchDeleteResponse(
+        delete_id=deletion_id,
+        resources=list(deletes),
     )
-    deleted = deletes
-    return BatchDeleteResponse(delete_id=deletion_id, resources=list(deleted))
 
 
 @api.delete(

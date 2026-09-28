@@ -20,6 +20,7 @@
 
 import base64
 import itertools
+from datetime import datetime
 from typing import Iterable
 from uuid import UUID, uuid4
 
@@ -28,13 +29,29 @@ from pydantic import Base64Bytes, BaseModel
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.tasks import create_consumer
+from nucliadb.tasks.consumer import NatsTaskConsumer
+from nucliadb.tasks.logger import logger
+from nucliadb.tasks.producer import create_producer
+from nucliadb.tasks.utils import NatsConsumer, NatsStream
 from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.utilities import get_processing
 from nucliadb_protos.writer_pb2 import Audit, BrokerMessage
 from nucliadb_utils.utilities import get_partitioning
 
+BATCH_SIZE = 20
 
-class ResourceBatch(BaseModel):
+
+class DeleterNatsConfig:
+    stream = NatsStream(name="ndb-tasks", subjects=["delete.>"])
+    consumer = NatsConsumer(subject="delete.resources", group="ndb-batch-deleter")
+
+
+# maindb key for deletion metadata
+DELETION_METADATA = "kbs/{kbid}/task/batch_delete/{deletion_id}"
+
+
+class DeleteBatch(BaseModel):
     kbid: str
     deletion_id: UUID
 
@@ -43,32 +60,58 @@ class BatchDeletionMetadata(BaseModel):
     deleted: int
     pending: set[str]
     total: int
+    requested_at: datetime
     serialized_audit_pb: Base64Bytes
 
 
-BATCH_SIZE = 2
-
-METADATA = "kbs/{kbid}/batch_delete/{deletion_id}"
+def deleter_consumer() -> NatsTaskConsumer[DeleteBatch]:
+    consumer: NatsTaskConsumer[DeleteBatch] = create_consumer(
+        name="batch_delete_creator",
+        stream=DeleterNatsConfig.stream,
+        consumer=DeleterNatsConfig.consumer,
+        callback=batch_deleter_task,
+        msg_type=DeleteBatch,
+        max_concurrent_messages=1,
+        max_retries=5,
+    )
+    return consumer
 
 
 async def schedule_batch_delete(
     context: ApplicationContext, kbid: str, resources: set[str], audit: Audit
 ) -> UUID:
-    # TODO: nats stuff
+    # A batch delete job maintains it's status in maindb to avoid repeating
+    # deletes on retries. As we already need to maintain this data, we use a
+    # small NATS message just to notify a deletion and don't include the list of
+    # resources there.
 
     deletion_id = uuid4()
     metadata = BatchDeletionMetadata(
         deleted=0,
         pending=resources,
         total=len(resources),
+        requested_at=datetime.now(),
         serialized_audit_pb=base64.b64encode(audit.SerializeToString()),
     )
     await set_deletion_metadata(context.kv_driver, kbid, deletion_id, metadata)
 
+    producer = create_producer(
+        name="batch_delete_creator",
+        stream=DeleterNatsConfig.stream,
+        producer_subject=DeleterNatsConfig.consumer.subject,
+        msg_type=DeleteBatch,
+    )
+    msg = DeleteBatch(kbid=kbid, deletion_id=deletion_id)
+    try:
+        await producer.send(msg)
+    except Exception:
+        await delete_deletion_metadata(context.kv_driver, kbid, deletion_id)
+        raise
+
     return deletion_id
 
 
-async def batch_deleter_task(context: ApplicationContext, msg: ResourceBatch):
+async def batch_deleter_task(context: ApplicationContext, msg: DeleteBatch):
     partitioning = get_partitioning()
     processing = get_processing()
 
@@ -76,8 +119,17 @@ async def batch_deleter_task(context: ApplicationContext, msg: ResourceBatch):
     deletion_id = msg.deletion_id
     metadata = await get_deletion_metadata(context.kv_driver, kbid, deletion_id)
     if metadata is None:
-        # TODO: ?
+        logger.warning(
+            "Trying to run a batch deletion but no metadata found in maindb, "
+            "is this a retry of a successful not-acked job?",
+            extra={
+                "kbid": kbid,
+                "deletion_id": deletion_id,
+            },
+        )
         return
+
+    logger.info("Running batch deletion job", extra={"kbid": kbid, "deletion_id": deletion_id})
 
     audit = Audit()
     audit.ParseFromString(metadata.serialized_audit_pb)
@@ -108,12 +160,22 @@ async def batch_deleter_task(context: ApplicationContext, msg: ResourceBatch):
         # Update task progress
         await set_deletion_metadata(context.kv_driver, kbid, deletion_id, metadata)
 
+    # TODO: handle retries on failed deletions
+
+    # cleanup maindb
+    await delete_deletion_metadata(context.kv_driver, kbid, deletion_id)
+
+    logger.info(
+        "Batch deletion job completed",
+        extra={"kbid": kbid, "deletion_id": deletion_id, "deleted": metadata.deleted},
+    )
+
 
 async def get_deletion_metadata(
     driver: Driver, kbid: str, deletion_id: UUID
 ) -> BatchDeletionMetadata | None:
     async with driver.ro_transaction() as txn:
-        raw = await txn.get(METADATA.format(kbid=kbid, deletion_id=deletion_id))
+        raw = await txn.get(DELETION_METADATA.format(kbid=kbid, deletion_id=deletion_id))
         if raw is None:
             return None
         return BatchDeletionMetadata.model_validate_json(raw)
@@ -124,7 +186,13 @@ async def set_deletion_metadata(
 ):
     async with driver.rw_transaction() as txn:
         raw = metadata.model_dump_json().encode()
-        await txn.set(METADATA.format(kbid=kbid, deletion_id=deletion_id), raw)
+        await txn.set(DELETION_METADATA.format(kbid=kbid, deletion_id=deletion_id), raw)
+        await txn.commit()
+
+
+async def delete_deletion_metadata(driver: Driver, kbid: str, deletion_id: UUID):
+    async with driver.rw_transaction() as txn:
+        await txn.delete(DELETION_METADATA.format(kbid=kbid, deletion_id=deletion_id))
         await txn.commit()
 
 
