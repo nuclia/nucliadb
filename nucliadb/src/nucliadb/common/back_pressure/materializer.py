@@ -292,7 +292,7 @@ async def back_pressure_checks(kbid: str, resource_uuid: str | None = None):
     """
     materializer = get_materializer()
     try:
-        with cached_back_pressure(f"{kbid}-{resource_uuid}"):
+        with cached_back_pressure(kbid, resource_uuid):
             materializer.check_indexing()
             materializer.check_ingest()
             await materializer.check_processing(kbid)

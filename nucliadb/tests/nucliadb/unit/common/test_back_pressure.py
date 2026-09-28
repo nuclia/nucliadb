@@ -185,7 +185,7 @@ async def test_check_ingest_behind_does_not_raise_if_configured_max_is_zero(sett
 def test_cached_back_pressure_context_manager(cache):
     func = mock.Mock()
 
-    with cached_back_pressure("foo-bar"):
+    with cached_back_pressure(kbid="foo", rid="bar"):
         func()
 
     func.assert_called_once()
@@ -194,7 +194,7 @@ def test_cached_back_pressure_context_manager(cache):
     func.side_effect = Exception("Boom")
 
     with pytest.raises(Exception):
-        with cached_back_pressure("foo-bar"):
+        with cached_back_pressure(kbid="foo", rid="bar"):
             func()
 
     func.reset_mock()
@@ -205,7 +205,7 @@ def test_cached_back_pressure_context_manager(cache):
     func.side_effect = BackPressureException(data)
 
     with pytest.raises(BackPressureException) as exc:
-        with cached_back_pressure("foo-bar"):
+        with cached_back_pressure(kbid="foo", rid="bar"):
             func()
     assert exc.value.data == data
 
