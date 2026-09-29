@@ -556,7 +556,7 @@ async def _reprocess_resource(
 @requires(NucliaDBRoles.WRITER)
 @version(1)
 async def delete_resource_batch(request: Request, item: BatchDeleteRequest, kbid: str):
-    filter_pb = await parse_expression(item.filter_expression.field, kbid)
+    filter_pb = await parse_expression(item.filter_expression.resource, kbid)
 
     async with datamanagers.with_ro_transaction() as txn:
         shards = await datamanagers.kb.get_shards(txn, kbid=kbid)

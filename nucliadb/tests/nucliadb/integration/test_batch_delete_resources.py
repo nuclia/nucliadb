@@ -70,7 +70,7 @@ async def test_batch_delete_resources_by_rid(
             f"{KB_PREFIX}/{kbid}/resources",
             json={
                 "filter_expression": {
-                    "field": {
+                    "resource": {
                         "or": [{"prop": "resource", "id": rid} for rid in rids[0:3]],
                     },
                 }
@@ -107,7 +107,7 @@ async def test_batch_delete_resources_by_created_date(
             f"{KB_PREFIX}/{kbid}/resources",
             json={
                 "filter_expression": {
-                    "field": {
+                    "resource": {
                         "prop": "created",
                         "until": datetime.datetime.now().isoformat(),
                     },
@@ -141,7 +141,7 @@ async def test_batch_delete_resources_by_origin_metadata(
             f"{KB_PREFIX}/{kbid}/resources",
             json={
                 "filter_expression": {
-                    "field": {
+                    "resource": {
                         "or": [{"prop": "origin_metadata", "field": "name", "value": "my simple 0"}],
                     },
                 }
@@ -190,7 +190,7 @@ async def test_batch_delete_resources_with_back_pressure(
                 f"{KB_PREFIX}/{kbid}/resources",
                 json={
                     "filter_expression": {
-                        "field": {
+                        "resource": {
                             "or": [{"prop": "origin_metadata", "field": "name", "value": "my simple 0"}],
                         },
                     }
