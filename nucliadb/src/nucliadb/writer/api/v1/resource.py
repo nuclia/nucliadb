@@ -29,8 +29,6 @@ from starlette.requests import Request
 
 from nucliadb.common import datamanagers
 from nucliadb.common.back_pressure import maybe_back_pressure
-from nucliadb.common.cluster.exceptions import ShardsNotFound
-from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context.fastapi import get_app_context
 from nucliadb.common.filter_expression import parse_expression
 from nucliadb.common.maindb.driver import Driver
@@ -84,7 +82,6 @@ from nucliadb_protos.writer_pb2 import (
     FieldIDStatus,
     FieldStatus,
     IndexResource,
-    ShardObject,
 )
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
@@ -561,20 +558,19 @@ async def _reprocess_resource(
 async def delete_resource_batch(request: Request, item: BatchDeleteRequest, kbid: str):
     filter_pb = await parse_expression(item.filter_expression.field, kbid)
 
-    shard_manager = get_shard_manager()
-    try:
-        shard_groups: list[ShardObject] = await shard_manager.get_shards_by_kbid(kbid)
-    except ShardsNotFound:
-        raise HTTPException(
-            status_code=404,
-            detail="The knowledgebox or its shards configuration is missing",
-        )
+    async with datamanagers.with_ro_transaction() as txn:
+        shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
+        if shards is None:
+            raise HTTPException(
+                status_code=404,
+                detail="The knowledgebox or its shards configuration is missing",
+            )
 
     stream_request = StreamRequest()
     stream_request.filter_expression.CopyFrom(filter_pb)
 
     deletes = set()
-    for shard_obj in shard_groups:
+    for shard_obj in shards.shards:
         if shard_obj.nidx_shard_id is not None:
             stream_request.shard_id.id = shard_obj.nidx_shard_id
             async for doc in get_nidx_searcher_client().Documents(stream_request):
