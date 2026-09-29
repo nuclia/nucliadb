@@ -75,9 +75,9 @@ class BatchDeletionMetadata(BaseModel):
     serialized_audit_pb: Base64Bytes
 
 
-def deleter_consumer() -> NatsTaskConsumer[DeleteBatch]:
+def batch_resource_deleter_consumer() -> NatsTaskConsumer[DeleteBatch]:
     consumer: NatsTaskConsumer[DeleteBatch] = create_consumer(
-        name="batch_delete_creator",
+        name="batch_resource_delete_creator",
         stream=DeleterNatsConfig.stream,
         consumer=DeleterNatsConfig.consumer,
         callback=batch_deleter_task,

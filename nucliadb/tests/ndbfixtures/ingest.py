@@ -44,7 +44,7 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.standalone.settings import Settings
 from nucliadb.tasks.consumer import NatsTaskConsumer
-from nucliadb.tasks.deleter import deleter_consumer
+from nucliadb.tasks.deleter import batch_resource_deleter_consumer
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
@@ -178,7 +178,7 @@ async def ingest_processed_consumer(
 
 
 @pytest.fixture(scope="function")
-async def ingest_deleter_consumer(
+async def ingest_batch_resource_deleter_consumer(
     maindb_driver: Driver,
     nats_manager: NatsConnectionManager,
 ):
@@ -186,7 +186,7 @@ async def ingest_deleter_consumer(
         maindb_driver=maindb_driver,
         nats_manager=nats_manager,
     )
-    consumer: NatsTaskConsumer = deleter_consumer()
+    consumer: NatsTaskConsumer = batch_resource_deleter_consumer()
     await consumer.initialize(context)
     yield consumer
     await consumer.finalize()
