@@ -552,7 +552,7 @@ async def _reprocess_resource(
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCES_PREFIX}",
     status_code=200,
-    summary="Delete multiple resources at once",
+    summary="Delete multiple resources asynchronously based on a filtered query",
     tags=["Resources"],
     response_model=BatchDeleteResponse,
 )
