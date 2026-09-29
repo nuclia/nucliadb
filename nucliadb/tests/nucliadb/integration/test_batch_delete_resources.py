@@ -22,7 +22,6 @@ import asyncio
 import datetime
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncIterable
 from unittest.mock import patch
 
 import pytest
@@ -35,9 +34,6 @@ from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.tasks.consumer import NatsTaskConsumer
 from nucliadb.tasks.deleter import DeleteBatch
 from nucliadb_models.resource import ResourceList
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.ndbfixtures.nidx import SEARCHER_REFRESH_INTERVAL_SECONDS
-from tests.ndbfixtures.resources.simples import create_simple_resource
 
 
 @pytest.fixture(autouse=True)
@@ -47,35 +43,17 @@ def patch_deleter_batch_size():
         yield
 
 
-@pytest.fixture
-async def simple_resources(
-    nidx_utility: NidxUtility,
-    nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-    knowledgebox: str,
-) -> AsyncIterable[list[str]]:
-    kbid = knowledgebox
-    rids = [
-        await create_simple_resource(kbid, f"my simple {i}", nucliadb_writer, nucliadb_ingest_grpc)
-        for i in range(5)
-    ]
-    await asyncio.sleep(SEARCHER_REFRESH_INTERVAL_SECONDS)
-    yield rids
-
-
 @pytest.mark.deploy_modes("component")
 async def test_batch_delete_resources_by_rid(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
+    nidx_utility: NidxUtility,
     ingest_deleter_consumer: NatsTaskConsumer[DeleteBatch],
     back_pressure_materializer: BackPressureMaterializer,
-    nidx_utility: NidxUtility,
-    knowledgebox: str,
-    simple_resources: list[str],
+    simple_resources: tuple[str, list[str]],
     caplog: LogCaptureFixture,
 ) -> None:
-    kbid = knowledgebox
-    rids = simple_resources
+    kbid, rids = simple_resources
 
     resp = await nucliadb_reader.get(
         f"{KB_PREFIX}/{kbid}/resources",
@@ -83,7 +61,7 @@ async def test_batch_delete_resources_by_rid(
     )
     assert resp.status_code == 200
     resource_list = ResourceList.model_validate(resp.json())
-    assert len(resource_list.resources) == 5
+    assert len(resource_list.resources) == 10
     assert set((resource.id for resource in resource_list.resources)) == set(rids)
 
     async with wait_for_deleter_job(caplog, timeout=2.0):
@@ -107,7 +85,7 @@ async def test_batch_delete_resources_by_rid(
     )
     assert resp.status_code == 200
     resource_list = ResourceList.model_validate(resp.json())
-    assert len(resource_list.resources) == 2
+    assert len(resource_list.resources) == 7
     assert set((resource.id for resource in resource_list.resources)) == set(rids[3:])
 
 
@@ -115,15 +93,13 @@ async def test_batch_delete_resources_by_rid(
 async def test_batch_delete_resources_by_created_date(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
+    nidx_utility: NidxUtility,
     ingest_deleter_consumer: NatsTaskConsumer[DeleteBatch],
     back_pressure_materializer: BackPressureMaterializer,
-    nidx_utility: NidxUtility,
-    knowledgebox: str,
-    simple_resources: list[str],
+    simple_resources: tuple[str, list[str]],
     caplog: LogCaptureFixture,
 ) -> None:
-    kbid = knowledgebox
-    rids = simple_resources
+    kbid, rids = simple_resources
 
     async with wait_for_deleter_job(caplog, timeout=2.0):
         resp = await nucliadb_writer.request(
@@ -151,15 +127,13 @@ async def test_batch_delete_resources_by_created_date(
 async def test_batch_delete_resources_by_origin_metadata(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
+    nidx_utility: NidxUtility,
     ingest_deleter_consumer: NatsTaskConsumer[DeleteBatch],
     back_pressure_materializer: BackPressureMaterializer,
-    nidx_utility: NidxUtility,
-    knowledgebox: str,
-    simple_resources: list[str],
+    simple_resources: tuple[str, list[str]],
     caplog: LogCaptureFixture,
 ) -> None:
-    kbid = knowledgebox
-    rids = simple_resources
+    kbid, rids = simple_resources
 
     async with wait_for_deleter_job(caplog, timeout=2.0):
         resp = await nucliadb_writer.request(
@@ -182,7 +156,7 @@ async def test_batch_delete_resources_by_origin_metadata(
     )
     assert resp.status_code == 200
     resource_list = ResourceList.model_validate(resp.json())
-    assert len(resource_list.resources) == 4
+    assert len(resource_list.resources) == 9
     assert set((resource.id for resource in resource_list.resources)) == set(rids[1:])
 
 
@@ -190,15 +164,14 @@ async def test_batch_delete_resources_by_origin_metadata(
 async def test_batch_delete_resources_with_back_pressure(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
+    nidx_utility: NidxUtility,
     ingest_deleter_consumer: NatsTaskConsumer[DeleteBatch],
     back_pressure_materializer: BackPressureMaterializer,
-    nidx_utility: NidxUtility,
     knowledgebox: str,
-    simple_resources: list[str],
+    simple_resources: tuple[str, list[str]],
     caplog: LogCaptureFixture,
 ) -> None:
-    kbid = knowledgebox
-    rids = simple_resources
+    kbid, rids = simple_resources
 
     def try_after(*args, **kwargs):
         return datetime.datetime.now()
@@ -241,7 +214,7 @@ async def test_batch_delete_resources_with_back_pressure(
         )
         assert resp.status_code == 200
         resource_list = ResourceList.model_validate(resp.json())
-        assert len(resource_list.resources) == 4
+        assert len(resource_list.resources) == 9
         assert set((resource.id for resource in resource_list.resources)) == set(rids[1:])
 
 

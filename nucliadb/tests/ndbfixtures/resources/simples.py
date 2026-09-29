@@ -20,22 +20,21 @@
 import asyncio
 import random
 import re
-import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterable
 
 import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
-from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.processor import Processor
-from nucliadb.writer.api.v1.router import KB_PREFIX
+from nucliadb.common.nidx import NidxBindingUtility, NidxServiceUtility, get_nidx
+from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
+from tests.ndbfixtures.nidx import SEARCHER_REFRESH_INTERVAL_SECONDS
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
+from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
 # Used by: nucliadb writer tests
@@ -56,30 +55,28 @@ async def resource(nucliadb_writer: AsyncClient, knowledgebox: str):
 
 @pytest.fixture(scope="function")
 async def simple_resources(
-    maindb_driver: Driver, processor: Processor, knowledgebox: str
-) -> AsyncIterator[tuple[str, list[str]]]:
-    """Create a set of resources with basic information on `knowledgebox`."""
-    total = 10
-    resource_ids = []
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    knowledgebox: str,
+) -> AsyncIterable[tuple[str, list[str]]]:
+    kbid = knowledgebox
+    rids = [
+        await create_simple_resource(kbid, f"my simple {i}", nucliadb_writer, nucliadb_ingest_grpc)
+        for i in range(10)
+    ]
 
-    for i in range(1, total + 1):
-        slug = f"simple-resource-{i}"
-        bmb = BrokerMessageBuilder(kbid=knowledgebox, slug=slug)
-        bmb.with_title(f"My simple resource {i}")
-        bmb.with_summary(f"Summary of my simple resource {i}")
-        bm = bmb.build()
-        await processor.process(message=bm, seqid=i)
-        resource_ids.append(bm.uuid)
+    nidx = get_nidx()
+    if isinstance(nidx, NidxServiceUtility):
+        # wait_for_sync is not useful, we wait for the searcher to reload the indexed data
+        await asyncio.sleep(SEARCHER_REFRESH_INTERVAL_SECONDS)
+    elif isinstance(nidx, NidxBindingUtility):
+        await mark_dirty()
+        await wait_for_sync()
+    else:
+        # dummy/mocked nidx
+        pass
 
-    # Give processed data some time to be processed
-    timeout = 5
-    start = time.time()
-    created_count = 0
-    while created_count < total or (time.time() - start) < timeout:
-        created_count = len([rid async for rid in datamanagers.resources.iter(kbid=knowledgebox)])
-        await asyncio.sleep(0.1)
-
-    yield knowledgebox, resource_ids
+    yield kbid, rids
 
 
 async def create_simple_resource(
