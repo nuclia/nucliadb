@@ -230,6 +230,8 @@ jobs:
   build-nidx-docker-image:
     name: Build nidx docker image
     runs-on: ubuntu-24.04
+    needs:
+      - build-nidx-binary
     steps:
       - name: Restore nidx binary
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
