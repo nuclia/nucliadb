@@ -38,7 +38,7 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import set_title
 from nucliadb.models.internal.processing import PushPayload, Source
 from nucliadb.models.responses import HTTPClientError
-from nucliadb.writer import SERVICE_NAME
+from nucliadb.writer import SERVICE_NAME, transaction
 from nucliadb.writer.api.constants import (
     X_EXTRACT_STRATEGY,
     X_FILENAME,
@@ -47,7 +47,6 @@ from nucliadb.writer.api.constants import (
     X_PASSWORD,
     X_SPLIT_STRATEGY,
 )
-from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.resource import (
     get_rid_from_slug_or_raise_error,
     validate_rid_exists_or_raise_error,

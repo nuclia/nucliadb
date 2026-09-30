@@ -41,7 +41,7 @@ from nucliadb.tasks.consumer import NatsTaskConsumer
 from nucliadb.tasks.logger import logger
 from nucliadb.tasks.producer import create_producer
 from nucliadb.tasks.utils import NatsConsumer, NatsStream
-from nucliadb.writer.api.v1 import transaction
+from nucliadb.writer import transaction
 from nucliadb.writer.utilities import get_processing
 from nucliadb_protos.writer_pb2 import Audit, BrokerMessage
 from nucliadb_utils.transaction import (

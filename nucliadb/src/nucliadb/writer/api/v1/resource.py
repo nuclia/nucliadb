@@ -38,9 +38,8 @@ from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.models.internal.processing import ProcessingInfo, PushPayload, Source
 from nucliadb.tasks.deleter import schedule_batch_delete
-from nucliadb.writer import SERVICE_NAME, logger
+from nucliadb.writer import SERVICE_NAME, logger, transaction
 from nucliadb.writer.api.constants import X_NUCLIADB_USER, X_REPROCESS_BATCH_SIZE, X_SKIP_STORE
-from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
