@@ -20,23 +20,26 @@
 import contextlib
 from time import time
 from typing import Annotated
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import BackgroundTasks, HTTPException, Query, Response
 from fastapi_versioning import version
+from nidx_protos.nodereader_pb2 import StreamRequest
 from starlette.requests import Request
 
 from nucliadb.common import datamanagers
 from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.context.fastapi import get_app_context
+from nucliadb.common.filter_expression import parse_expression
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.models.internal.processing import ProcessingInfo, PushPayload, Source
-from nucliadb.writer import SERVICE_NAME, logger
+from nucliadb.tasks.deleter import schedule_batch_delete
+from nucliadb.writer import SERVICE_NAME, logger, transaction
 from nucliadb.writer.api.constants import X_NUCLIADB_USER, X_REPROCESS_BATCH_SIZE, X_SKIP_STORE
-from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
@@ -64,7 +67,7 @@ from nucliadb.writer.resource.field import (
 )
 from nucliadb.writer.resource.origin import parse_extra, parse_origin
 from nucliadb.writer.utilities import get_processing
-from nucliadb_models.resource import NucliaDBRoles
+from nucliadb_models.resource import BatchDeleteRequest, BatchDeleteResponse, NucliaDBRoles
 from nucliadb_models.writer import (
     CreateResourcePayload,
     ResourceCreated,
@@ -72,7 +75,13 @@ from nucliadb_models.writer import (
     UpdateResourcePayload,
 )
 from nucliadb_protos.resources_pb2 import FieldID, Metadata
-from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus, IndexResource
+from nucliadb_protos.writer_pb2 import (
+    Audit,
+    BrokerMessage,
+    FieldIDStatus,
+    FieldStatus,
+    IndexResource,
+)
 from nucliadb_telemetry.errors import capture_exception
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -534,6 +543,50 @@ async def _reprocess_resource(
         await transaction.commit(writer, partition, wait=False)
 
     return ResourceUpdated(seqid=processing_info.seqid if processing_info else None)
+
+
+@api.delete(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCES_PREFIX}",
+    status_code=200,
+    summary="Delete multiple resources asynchronously based on a filtered query",
+    tags=["Resources"],
+    response_model=BatchDeleteResponse,
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def delete_resource_batch(request: Request, item: BatchDeleteRequest, kbid: str):
+    filter_pb = await parse_expression(item.filter_expression.resource, kbid)
+
+    async with datamanagers.with_ro_transaction() as txn:
+        shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
+        if shards is None:
+            raise HTTPException(
+                status_code=404,
+                detail="The knowledgebox or its shards configuration is missing",
+            )
+
+    stream_request = StreamRequest()
+    stream_request.filter_expression.CopyFrom(filter_pb)
+
+    deletes = set()
+    for shard_obj in shards.shards:
+        if shard_obj.nidx_shard_id is not None:
+            stream_request.shard_id.id = shard_obj.nidx_shard_id
+            async for doc in get_nidx_searcher_client().Documents(stream_request):
+                # make sure resource ids are 32-char UUIDs (without "-"s)
+                rid = UUID(doc.uuid).hex
+                deletes.add(rid)
+
+    # schedule a delete job with the delete set. We ignore out-of-sync index
+    # issues and return the set of resources got from nidx to the user.
+    audit = Audit()
+    parse_audit(audit, request)
+    deletion_id = await schedule_batch_delete(request.app.state.context, kbid, deletes, audit)
+
+    return BatchDeleteResponse(
+        delete_id=deletion_id,
+        resources=list(deletes),
+    )
 
 
 @api.delete(

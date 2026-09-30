@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 
 from nucliadb.common.back_pressure.settings import settings
 from nucliadb_utils.nats import NatsConnectionManager
+from nucliadb_utils.settings import is_onprem_nucliadb
 
 
 @dataclass
@@ -40,7 +41,7 @@ class BackPressureException(Exception):
 
 
 def is_back_pressure_enabled() -> bool:
-    return settings.enabled
+    return not is_onprem_nucliadb() and settings.enabled
 
 
 def estimate_try_after(rate: float, pending: int, max_wait: int) -> datetime:

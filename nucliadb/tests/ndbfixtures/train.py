@@ -100,7 +100,7 @@ async def standalone_nucliadb_train(standalone_nucliadb: Settings):
 @pytest.fixture(scope="function")
 async def train_grpc_server(
     storage_settings,
-    dummy_nidx_utility: NidxUtility,
+    component_nidx_utility: NidxUtility,
     maindb_driver: Driver,
 ) -> AsyncIterator[TrainGrpcServer]:
     with (

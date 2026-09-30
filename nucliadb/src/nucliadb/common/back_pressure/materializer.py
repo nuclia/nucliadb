@@ -37,7 +37,6 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.common.http_clients.processing import ProcessingHTTPClient
 from nucliadb_telemetry import metrics
 from nucliadb_utils.nats import NatsConnectionManager
-from nucliadb_utils.settings import is_onprem_nucliadb
 
 logger = logging.getLogger(__name__)
 
@@ -278,7 +277,7 @@ async def maybe_back_pressure(kbid: str, resource_uuid: str | None = None) -> No
     This function does system checks to see if we need to put back pressure on writes.
     In that case, a HTTP 429 will be raised with the estimated time to try again.
     """
-    if not is_back_pressure_enabled() or is_onprem_nucliadb():
+    if not is_back_pressure_enabled():
         return
     await back_pressure_checks(kbid, resource_uuid)
 
@@ -292,7 +291,7 @@ async def back_pressure_checks(kbid: str, resource_uuid: str | None = None):
     """
     materializer = get_materializer()
     try:
-        with cached_back_pressure(f"{kbid}-{resource_uuid}"):
+        with cached_back_pressure(kbid, resource_uuid):
             materializer.check_indexing()
             materializer.check_ingest()
             await materializer.check_processing(kbid)

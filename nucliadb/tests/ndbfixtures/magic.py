@@ -53,6 +53,10 @@ DEPLOY_MODE_FIXTURES = {
         "component",
         "standalone",
     ],
+    "nidx_utility": [
+        "component",
+        "standalone",
+    ],
 }
 
 
@@ -118,3 +122,4 @@ nucliadb_writer = pytest.fixture(_generic_injected_fixture, scope="function")
 nucliadb_train = pytest.fixture(_generic_injected_fixture, scope="function")
 nucliadb_train_grpc = pytest.fixture(_generic_injected_fixture, scope="function")
 nucliadb_ingest_grpc = pytest.fixture(_generic_injected_fixture, scope="function")
+nidx_utility = pytest.fixture(_generic_injected_fixture, scope="function")

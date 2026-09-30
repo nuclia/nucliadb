@@ -29,6 +29,7 @@ from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.models.internal import processing as processing_models
 from nucliadb.models.internal.processing import PushPayload
+from nucliadb.writer import transaction
 from nucliadb.writer.api.v1.router import (
     KB_PREFIX,
     RESOURCE_PREFIX,
@@ -259,8 +260,6 @@ async def test_create_resource_async(
 ):
     """Create a resoure and don't wait for it"""
     kbid = knowledgebox
-
-    from nucliadb.writer.api.v1.resource import transaction
 
     spy = mocker.spy(transaction, "commit")
 

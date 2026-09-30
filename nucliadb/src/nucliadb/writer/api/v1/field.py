@@ -35,13 +35,12 @@ from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.knowledgebox import Resource as ORMResource
 from nucliadb.models.internal.processing import PushPayload, Source
-from nucliadb.writer import SERVICE_NAME
+from nucliadb.writer import SERVICE_NAME, transaction
 from nucliadb.writer.api.constants import (
     X_FILE_PASSWORD,
     X_NUCLIADB_USER,
     X_SKIP_STORE,
 )
-from nucliadb.writer.api.v1 import transaction
 from nucliadb.writer.api.v1.resource import (
     get_rid_from_slug_or_raise_error,
     validate_rid_exists_or_raise_error,

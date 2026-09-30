@@ -56,6 +56,7 @@ from nucliadb_models.filters import (
     ParagraphFilterExpressionType,
     Resource,
     ResourceFieldPrefix,
+    ResourceFilterExpressionType,
     ResourceMimetype,
     Status,
 )
@@ -81,12 +82,12 @@ FacetFilter = (
 
 
 async def parse_expression(
-    expr: FieldFilterExpressionType | ParagraphFilterExpressionType,
+    expr: ResourceFilterExpressionType | FieldFilterExpressionType | ParagraphFilterExpressionType,
     kbid: str,
 ) -> PBFilterExpression:
     f = PBFilterExpression()
 
-    _ExprType = FieldFilterExpressionType | ParagraphFilterExpressionType
+    _ExprType = ResourceFilterExpressionType | FieldFilterExpressionType | ParagraphFilterExpressionType
     if isinstance(expr, And):
         for op in expr.operands:
             f.bool_and.operands.append(await parse_expression(cast(_ExprType, op), kbid))

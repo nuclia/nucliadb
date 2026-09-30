@@ -24,6 +24,11 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from pytest_mock import MockerFixture
 
+from nucliadb.common.back_pressure.materializer import (
+    get_materializer,
+    start_materializer,
+    stop_materializer,
+)
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.search.predict import DummyPredictEngine
@@ -32,6 +37,7 @@ from nucliadb_utils.audit.basic import BasicAuditStorage
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.cache.nats import NatsPubsub
 from nucliadb_utils.cache.pubsub import PubSubDriver
+from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.settings import (
     audit_settings,
     nuclia_settings,
@@ -47,7 +53,7 @@ from nucliadb_utils.utilities import (
     stop_transaction_utility,
 )
 from tests.ndbfixtures.ingest import INGEST_TESTS_DIR
-from tests.ndbfixtures.utils import global_utility
+from tests.ndbfixtures.utils import application_context, global_utility
 
 # Audit
 
@@ -92,6 +98,41 @@ async def stream_audit(nats_server: str, mocker: MockerFixture) -> AsyncIterator
             yield audit
 
         await audit.finalize()
+
+
+# Back pressure
+
+
+@pytest.fixture(scope="function")
+async def back_pressure_materializer(
+    nats_manager: NatsConnectionManager,
+):
+    from nucliadb.common.back_pressure.settings import settings
+
+    processing_client = AsyncMock()
+    processing_client.pull_status.return_value = Mock()
+    processing_client.pull_status.return_value.pending = 10
+    processing_client.stats.return_value = Mock()
+    processing_client.stats.return_value.incomplete = 10
+    with (
+        patch.object(settings, "enabled", True),
+        patch("nucliadb.common.back_pressure.utils.is_onprem_nucliadb", return_value=False),
+        patch.object(settings, "max_indexing_pending", 25),
+        patch.object(settings, "max_ingest_pending", 25),
+        patch(
+            "nucliadb.common.back_pressure.materializer.ProcessingHTTPClient",
+            return_value=processing_client,
+        ),
+    ):
+        context = application_context(
+            nats_manager=nats_manager,
+        )
+        await start_materializer(context)
+
+        materializer = get_materializer()
+        yield materializer
+
+        await stop_materializer()
 
 
 # Feature flags
