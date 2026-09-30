@@ -461,6 +461,7 @@ jobs:
       - nidx-format-rust
       - nidx-clippy-rust
       - pre-checks-python
+      - pre-checks-python-old
       - check-licenses
       - check-migrations
       - lint-helm
