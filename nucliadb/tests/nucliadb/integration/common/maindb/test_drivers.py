@@ -18,10 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import pytest
+import asyncio
+import uuid
 
+import pytest
+from marklogic.documents import Document  # type: ignore[import-untyped]
+
+from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.marklogic import MarkLogicDriver
+from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
 
 
 async def test_marklogic_driver_accessors():
@@ -46,6 +51,67 @@ async def test_marklogic_driver(marklogic_maindb_driver):
     """Run the generic maindb contract against a fixture-managed MarkLogic server."""
     driver = marklogic_maindb_driver
     await driver_basic(driver)
+
+
+async def test_delete_by_prefix_is_scoped_and_transactional(
+    marklogic_maindb_driver: MarkLogicDriver, mocker
+):
+    driver = marklogic_maindb_driver
+    update = mocker.spy(driver.client.rows, "update")
+    prefix = f"/bulk-delete/{uuid.uuid4()}/a"
+    matching = (f"{prefix}/one", f"{prefix}/two")
+    neighbor = f"{prefix[:-1]}b/keep"
+    other_uri = f"knowledgeboxes/{uuid.uuid4()}/config.json"
+    async with driver.rw_transaction() as txn:
+        assert isinstance(txn, MarkLogicTransaction)
+        assert txn.transaction is not None
+        for key in (*matching, neighbor):
+            await txn.set(key, key.encode())
+        response = await asyncio.to_thread(
+            driver.client.documents.write,
+            Document(
+                uri=other_uri,
+                content={"maindb_key": matching[0]},
+                collections=[MarkLogicCollections.KNOWLEDGEBOXES],
+                content_type="application/json",
+            ),
+            tx=txn.transaction,
+            params={"database": driver.database},
+        )
+        driver.data._check(response, "write test document")
+        await txn.commit()
+
+    async with driver.rw_transaction() as txn:
+        await txn.delete_by_prefix(prefix)
+        assert await txn.get(matching[0]) is None
+        await txn.abort()
+
+    async with driver.ro_transaction() as txn:
+        assert await txn.get(matching[0]) == matching[0].encode()
+
+    async with driver.rw_transaction() as txn:
+        await txn.delete_by_prefix(prefix)
+        await txn.commit()
+    assert update.call_count == 2
+
+    async with driver.ro_transaction() as txn:
+        assert await txn.batch_get([*matching, neighbor]) == [None, None, neighbor.encode()]
+    documents = await asyncio.to_thread(
+        driver.client.documents.read, other_uri, params={"database": driver.database}
+    )
+    assert len(documents) == 1
+
+    async with driver.rw_transaction() as txn:
+        assert isinstance(txn, MarkLogicTransaction)
+        assert txn.transaction is not None
+        await txn.delete(neighbor)
+        response = await asyncio.to_thread(
+            driver.client.delete,
+            "/v1/documents",
+            params={"database": driver.database, "uri": other_uri, "txid": txn.transaction.id},
+        )
+        driver.data._check(response, "delete test document")
+        await txn.commit()
 
 
 async def _clear_db(driver: Driver):

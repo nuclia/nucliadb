@@ -36,7 +36,7 @@ class MarkLogicDataLayer:
 
     @staticmethod
     def _encode(key: str, value: bytes) -> dict[str, str]:
-        return {"key": key, "value": base64.b64encode(value).decode("ascii")}
+        return {"maindb_key": key, "value": base64.b64encode(value).decode("ascii")}
 
     @staticmethod
     def _decode(document: Document) -> bytes:
@@ -140,8 +140,26 @@ class MarkLogicTransaction(Transaction):
         self.driver.data._check(response, "delete key")
 
     async def delete_by_prefix(self, prefix: str) -> None:
-        async for key in self.keys(prefix):
-            await self.delete(key)
+        if self.transaction is None:
+            raise RuntimeError("Cannot delete in read only transaction")
+        upper = self.driver.data._prefix_upper_bound(prefix)
+        clauses = [
+            f"cts.collectionQuery({json.dumps(MarkLogicCollections.MAINDB)})",
+            f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.MAINDB_KEY)}, '>=', {json.dumps(prefix)})",
+        ]
+        if upper is not None:
+            clauses.append(
+                f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.MAINDB_KEY)}, '<', {json.dumps(upper)})"
+            )
+        dsl = f"op.fromDocUris(cts.andQuery([{', '.join(clauses)}])).remove()"
+        response = await asyncio.to_thread(
+            self.driver.client.rows.update,
+            dsl=dsl,
+            params={"database": self.driver.database, "txid": self.transaction.id},
+            return_response=True,
+        )
+        if not isinstance(response, list):
+            self.driver.data._check(response, "delete keys by prefix")
 
     async def keys(
         self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
@@ -170,6 +188,9 @@ class MarkLogicTransaction(Transaction):
             )
             or []
         )
+        if not isinstance(uris, list):
+            self.driver.data._check(uris, "fetch keys by prefix")
+            return
         yielded = 0
         for uri in uris:
             key = self.driver.data._key(str(uri))
@@ -197,9 +218,10 @@ class MarkLogicTransaction(Transaction):
             javascript=javascript,
             params={"database": self.driver.database},
         )
-        if isinstance(result, list):
-            result = result[0] if result else 0
-        return int(result or 0)
+        if not isinstance(result, list):
+            self.driver.data._check(result, "count keys by prefix")
+            return 0
+        return int(result[0] if len(result) > 0 else 0)
 
 
 class ReadOnlyMarkLogicTransaction(MarkLogicTransaction):

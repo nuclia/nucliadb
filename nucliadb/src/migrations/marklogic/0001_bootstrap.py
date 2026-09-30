@@ -20,13 +20,11 @@ DATABASE_PROPERTIES = {
 }
 RANGE_PATH_INDEXES = (
     MarkLogicIndexPaths.MAINDB_KEY,
-    MarkLogicIndexPaths.RESOURCE_KBID,
-    MarkLogicIndexPaths.RESOURCE_SHARD,
-    MarkLogicIndexPaths.KNOWLEDGEBOX_SLUG,
-    MarkLogicIndexPaths.RESOURCE_SLUG,
-    MarkLogicIndexPaths.RESOURCE_TITLE,
+    MarkLogicIndexPaths.KBID,
+    MarkLogicIndexPaths.SHARD,
+    MarkLogicIndexPaths.SLUG,
+    MarkLogicIndexPaths.TITLE,
 )
-RANGE_ELEMENT_INDEXES = ("labels",)
 
 
 async def _request(client: httpx.AsyncClient, method: str, path: str, **kwargs) -> httpx.Response:
@@ -85,7 +83,6 @@ async def _ensure_indexes(client: httpx.AsyncClient, database: str) -> None:
     )
     properties = index_response.json()
     path_indexes = properties.get("range-path-index", [])
-    element_indexes = properties.get("range-element-index", [])
     for path in RANGE_PATH_INDEXES:
         if not any(item.get("path-expression") == path for item in path_indexes):
             path_indexes.append(
@@ -97,24 +94,12 @@ async def _ensure_indexes(client: httpx.AsyncClient, database: str) -> None:
                     "invalid-values": "ignore",
                 }
             )
-    for localname in RANGE_ELEMENT_INDEXES:
-        if not any(item.get("localname") == localname for item in element_indexes):
-            element_indexes.append(
-                {
-                    "scalar-type": "string",
-                    "namespace-uri": "",
-                    "localname": localname,
-                    "collation": STRING_COLLATION,
-                    "range-value-positions": False,
-                    "invalid-values": "ignore",
-                }
-            )
     await _request(
         client,
         "PUT",
         f"/manage/v2/databases/{database}/properties",
         headers={"Content-Type": "application/json", "Accept": "application/json"},
-        json={"range-path-index": path_indexes, "range-element-index": element_indexes},
+        json={"range-path-index": path_indexes},
     )
 
 

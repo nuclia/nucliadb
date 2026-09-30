@@ -178,6 +178,8 @@ async def get(
         value = content.get(column)
         if column == "deleted_at" and value is not None:
             value = datetime.fromisoformat(value)
+        elif column == "slug" and value is not None:
+            value = str(value)
         elif column in ("config", "shards"):
             value = _deserialize(column, value)
         setattr(result, column, value)
@@ -225,7 +227,7 @@ async def get_kbid(txn: Transaction, *, slug: str) -> str | None:
     javascript = (
         "cts.uris('', ['document'], cts.andQuery(["
         f"cts.collectionQuery({json.dumps(MarkLogicCollections.KNOWLEDGEBOXES)}), "
-        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.KNOWLEDGEBOX_SLUG)}, '=', {json.dumps(slug)})]))"
+        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.SLUG)}, '=', {json.dumps(slug)})]))"
     )
     uris = (
         await asyncio.to_thread(

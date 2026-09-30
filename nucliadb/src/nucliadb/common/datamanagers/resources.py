@@ -41,11 +41,9 @@ from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
 from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb_models.filters import And, Label, Not, Or
 from nucliadb_protos import resources_pb2
 
-ResourceColumn: TypeAlias = Literal["slug", "shard", "basic", "origin", "security", "extra", "labels"]
-LabelFilter: TypeAlias = Label | And | Or | Not
+ResourceColumn: TypeAlias = Literal["slug", "shard", "basic", "origin", "security", "extra"]
 ALL_COLUMNS: tuple[ResourceColumn, ...] = (
     "slug",
     "shard",
@@ -53,7 +51,6 @@ ALL_COLUMNS: tuple[ResourceColumn, ...] = (
     "origin",
     "security",
     "extra",
-    "labels",
 )
 
 UNSET_STR: Final[str | None] = cast(str | None, UNSET)
@@ -61,7 +58,6 @@ UNSET_BASIC: Final[resources_pb2.Basic | None] = cast(resources_pb2.Basic | None
 UNSET_ORIGIN: Final[resources_pb2.Origin | None] = cast(resources_pb2.Origin | None, UNSET)
 UNSET_SECURITY: Final[resources_pb2.Security | None] = cast(resources_pb2.Security | None, UNSET)
 UNSET_EXTRA: Final[resources_pb2.Extra | None] = cast(resources_pb2.Extra | None, UNSET)
-UNSET_LABELS: Final[list[str] | None] = cast(list[str] | None, UNSET)
 
 
 @dataclass(slots=True)
@@ -72,7 +68,6 @@ class ResourceData:
     origin: resources_pb2.Origin | None = UNSET_ORIGIN
     security: resources_pb2.Security | None = UNSET_SECURITY
     extra: resources_pb2.Extra | None = UNSET_EXTRA
-    labels: list[str] | None = UNSET_LABELS
 
 
 ResourceColumnValueType = (
@@ -136,8 +131,6 @@ def _deserialize_resource_column(
         pb_extra = resources_pb2.Extra()
         pb_extra.ParseFromString(value)
         return pb_extra
-    elif column == "labels":
-        raise ValueError("Labels are read directly from the resource document")
     else:  # pragma: no cover
         assert_never(column)
 
@@ -158,7 +151,6 @@ async def set(
     origin: resources_pb2.Origin | None | _UnsetType = UNSET,
     security: resources_pb2.Security | None | _UnsetType = UNSET,
     extra: resources_pb2.Extra | None | _UnsetType = UNSET,
-    labels: list[str] | None | _UnsetType = UNSET,
 ) -> None:
     return await _set(
         txn,
@@ -169,7 +161,6 @@ async def set(
         origin=origin,
         security=security,
         extra=extra,
-        labels=labels,
     )
 
 
@@ -184,7 +175,6 @@ async def _set(
     origin: resources_pb2.Origin | None | _UnsetType = UNSET,
     security: resources_pb2.Security | None | _UnsetType = UNSET,
     extra: resources_pb2.Extra | None | _UnsetType = UNSET,
-    labels: list[str] | None | _UnsetType = UNSET,
 ) -> None:
     """Upsert only explicitly provided resource fields."""
     driver, marklogic_txn = _driver_txn(txn)
@@ -201,33 +191,16 @@ async def _set(
         for column_name in ("slug", "shard", "basic", "origin", "security", "extra")
         if values[column_name] is not UNSET
     ]
-    if not columns_to_set and labels is UNSET:
+    if not columns_to_set:
         return
 
     content = _content(await _read(driver, marklogic_txn, kbid, rid)) or {}
-    content.update(resource_kbid=kbid, rid=rid)
+    content.update(kbid=kbid, rid=rid)
     for column in columns_to_set:
         value = values[column]
-        property_name = "resource_shard" if column == "shard" else column
-        content[property_name] = (
-            base64.b64encode(value).decode("ascii") if isinstance(value, bytes) else value
-        )
-    if "slug" in columns_to_set:
-        content["resource_slug"] = content["slug"]
+        content[column] = base64.b64encode(value).decode("ascii") if isinstance(value, bytes) else value
     if "basic" in columns_to_set:
-        content["resource_title"] = basic.title if isinstance(basic, resources_pb2.Basic) else None
-        content["labels"] = (
-            sorted({f"/l/{item.labelset}/{item.label}" for item in basic.usermetadata.classifications})
-            if isinstance(basic, resources_pb2.Basic)
-            else []
-        )
-    if labels is None:
-        content["labels"] = []
-    elif isinstance(labels, list):
-        explicit_labels = cast(list[str], labels)
-        if any(not label.startswith("/l/") for label in explicit_labels):
-            raise ValueError("Resource labels must use /l/<labelset>/<label> paths")
-        content["labels"] = sorted({label for label in explicit_labels})
+        content["title"] = basic.title if isinstance(basic, resources_pb2.Basic) else None
     response = await asyncio.to_thread(
         driver.client.documents.write,
         Document(
@@ -239,8 +212,7 @@ async def _set(
         tx=marklogic_txn.transaction,
         params={"database": driver.database},
     )
-    if not response.ok:
-        raise RuntimeError(f"Failed to write resource: {response.status_code} {response.text}")
+    driver.data._check(response, "write resource")
 
 
 def _driver_txn(txn: Transaction) -> tuple[MarkLogicDriver, MarkLogicTransaction]:
@@ -330,8 +302,7 @@ async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
     if marklogic_txn.transaction is not None:
         params["txid"] = marklogic_txn.transaction.id
     response = await asyncio.to_thread(driver.client.delete, "/v1/documents", params=params)
-    if not response.ok:
-        raise RuntimeError(f"Failed to delete resource: {response.status_code} {response.text}")
+    driver.data._check(response, "delete resource")
 
 
 # ---------------------------------------------------------------------------
@@ -355,8 +326,8 @@ async def _find_rid(txn: Transaction, kbid: str, slug: str) -> str | None:
     javascript = (
         "cts.uris('', ['document'], cts.andQuery(["
         f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)}), "
-        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.RESOURCE_KBID)}, '=', {json.dumps(kbid)}), "
-        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.RESOURCE_SLUG)}, '=', {json.dumps(slug)})]))"
+        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.KBID)}, '=', {json.dumps(kbid)}), "
+        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.SLUG)}, '=', {json.dumps(slug)})]))"
     )
     params = {"database": driver.database}
     if marklogic_txn.transaction is not None:
@@ -371,33 +342,10 @@ async def get_by_slug(txn: Transaction, *, kbid: str, slug: str) -> ResourceData
     return await _get(txn, kbid=kbid, rid=rid, columns=ALL_COLUMNS) if rid is not None else None
 
 
-def _label_query(expression: LabelFilter) -> str:
-    if isinstance(expression, Label):
-        facet = f"/l/{expression.labelset}"
-        if expression.label:
-            facet += f"/{expression.label}"
-        return (
-            f"cts.jsonPropertyValueQuery('labels', {json.dumps(facet)}, ['exact'])"
-            if expression.label
-            else (
-                "cts.orQuery(["
-                f"cts.jsonPropertyValueQuery('labels', {json.dumps(facet)}, ['exact']), "
-                f"cts.jsonPropertyValueQuery('labels', {json.dumps(facet + '/*')}, ['wildcarded'])])"
-            )
-        )
-    if isinstance(expression, And):
-        return f"cts.andQuery([{', '.join(_label_query(cast(LabelFilter, operand)) for operand in expression.operands)}])"
-    if isinstance(expression, Or):
-        return f"cts.orQuery([{', '.join(_label_query(cast(LabelFilter, operand)) for operand in expression.operands)}])"
-    if isinstance(expression, Not):
-        return f"cts.notQuery({_label_query(cast(LabelFilter, expression.operand))})"
-    raise TypeError(f"Unsupported resource label filter: {type(expression)}")
-
-
 def _kb_query(kbid: str) -> list[str]:
     return [
         f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)})",
-        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.RESOURCE_KBID)}, '=', {json.dumps(kbid)})",
+        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.KBID)}, '=', {json.dumps(kbid)})",
     ]
 
 
@@ -408,21 +356,18 @@ async def search(
     kbid: str,
     title: str | None = None,
     slug: str | None = None,
-    labels: LabelFilter | None = None,
 ) -> list[tuple[str, ResourceData]]:
     driver, marklogic_txn = _driver_txn(txn)
     clauses = _kb_query(kbid)
     for path, value in (
-        (MarkLogicIndexPaths.RESOURCE_TITLE, title),
-        (MarkLogicIndexPaths.RESOURCE_SLUG, slug),
+        (MarkLogicIndexPaths.TITLE, title),
+        (MarkLogicIndexPaths.SLUG, slug),
     ):
         if value is not None:
             clauses.append(
                 f"cts.jsonPropertyValueQuery({json.dumps(path.lstrip('/'))}, "
                 f"{json.dumps('*' + value + '*')}, ['wildcarded'])"
             )
-    if labels is not None:
-        clauses.append(_label_query(labels))
     javascript = f"cts.uris('', ['document', 'item-order'], cts.andQuery([{', '.join(clauses)}]))"
     params = {"database": driver.database}
     if marklogic_txn.transaction is not None:
@@ -435,40 +380,6 @@ async def search(
         if resource is not None:
             results.append((rid, resource))
     return results
-
-
-@observer.wrap({"type": "resources", "op": "label_facets"})
-async def label_facets(txn: Transaction, *, kbid: str) -> dict[str, int]:
-    driver, marklogic_txn = _driver_txn(txn)
-    javascript = (
-        "cts.values(cts.jsonPropertyReference('labels'), null, ['item-order'], "
-        f"cts.andQuery([{', '.join(_kb_query(kbid))}])).toArray().map(String)"
-    )
-    params = {"database": driver.database}
-    if marklogic_txn.transaction is not None:
-        params["txid"] = marklogic_txn.transaction.id
-    values = await asyncio.to_thread(driver.client.eval, javascript=javascript, params=params) or []
-    if len(values) == 1 and isinstance(values[0], list):
-        values = values[0]
-    facets = {"/l"}
-    for value in values:
-        parts = str(value).split("/")
-        if len(parts) >= 4 and parts[1] == "l":
-            facets.update("/".join(parts[:index]) for index in range(3, len(parts) + 1))
-    counts: dict[str, int] = {}
-    for facet in sorted(facets):
-        query = (
-            "cts.orQuery(["
-            f"cts.jsonPropertyValueQuery('labels', {json.dumps(facet)}, ['exact']), "
-            f"cts.jsonPropertyValueQuery('labels', {json.dumps(facet + '/*')}, ['wildcarded'])])"
-        )
-        javascript = f"cts.estimate(cts.andQuery([{', '.join([*_kb_query(kbid), query])}]))"
-        result = await asyncio.to_thread(driver.client.eval, javascript=javascript, params=params)
-        if isinstance(result, list):
-            result = result[0] if result else 0
-        if result:
-            counts[facet] = int(result)
-    return counts
 
 
 @observer.wrap({"type": "resources", "op": "slug_exists"})
@@ -509,7 +420,7 @@ async def count(txn: Transaction, *, kbid: str) -> int:
 def _shard_query(kbid: str, shard_id: str) -> list[str]:
     return [
         *_kb_query(kbid),
-        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.RESOURCE_SHARD)}, '=', {json.dumps(shard_id)})",
+        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.SHARD)}, '=', {json.dumps(shard_id)})",
     ]
 
 
@@ -548,7 +459,7 @@ async def _resource_uris(driver: MarkLogicDriver, txn: MarkLogicTransaction, kbi
     javascript = (
         "cts.uris('', ['document', 'item-order'], cts.andQuery(["
         f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)}), "
-        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.RESOURCE_KBID)}, '=', {json.dumps(kbid)})]))"
+        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.KBID)}, '=', {json.dumps(kbid)})]))"
     )
     params = {"database": driver.database}
     if txn.transaction is not None:
@@ -578,11 +489,11 @@ async def get_shards(txn: Transaction, *, kbid: str, rids: list[str]) -> dict[st
     )
     if not isinstance(result, list):
         driver.data._check(result, "read resource shards")
-        raise RuntimeError("Unexpected response when reading resource shards")
+        return {}
     return {
-        str(document.uri).rsplit("/", 1)[-1].removesuffix(".json"): content["resource_shard"]
+        str(document.uri).rsplit("/", 1)[-1].removesuffix(".json"): content["shard"]
         for document in result
-        if (content := _content(document)) is not None and content.get("resource_shard") is not None
+        if (content := _content(document)) is not None and content.get("shard") is not None
     }
 
 
@@ -623,10 +534,7 @@ async def _get(
         return None
     resource = ResourceData()
     for column_name in columns:
-        value = content.get("resource_shard" if column_name == "shard" else column_name)
-        if column_name == "labels":
-            resource.labels = value
-            continue
+        value = content.get(column_name)
         if value is not None and column_name in ("basic", "origin", "security", "extra"):
             value = base64.b64decode(value)
         setattr(resource, column_name, _deserialize_resource_column(column_name, value))
