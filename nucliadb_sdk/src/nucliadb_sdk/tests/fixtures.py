@@ -138,8 +138,13 @@ def nucliadb(pg) -> Iterator[NucliaFixture]:
                     pass
                 time.sleep(1)
 
-            if httpx.get(f"http://localhost:8080").status_code != 200:
-                raise Exception("No NucliaDB Running")
+            try:
+                status_code = httpx.get(f"http://localhost:8080").status_code
+            except Exception as exc:
+                raise RuntimeError("NucliaDB subprocess is not running") from exc
+            else:
+                if status_code != 200:
+                    raise RuntimeError("NucliaDB subprocess is not running properly")
 
         yield NucliaFixture(
             host=host,
