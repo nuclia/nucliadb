@@ -18,43 +18,43 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import psycopg_pool
 import pytest
 
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.pg import PGDriver
+from nucliadb.common.maindb.marklogic import MarkLogicDriver
 
 
-async def test_pg_driver(pg_maindb_driver):
-    await driver_basic(pg_maindb_driver)
+async def test_marklogic_driver_accessors():
+    driver = MarkLogicDriver(uri="http://127.0.0.1", username="admin", password="admin")
+    with pytest.raises(RuntimeError, match="not initialized"):
+        _ = driver.client
+    with pytest.raises(RuntimeError, match="not initialized"):
+        _ = driver.data
 
-
-async def test_pg_driver_pool_timeout(pg):
-    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-    driver = PGDriver(url, connection_pool_min_size=1, connection_pool_max_size=1)
     await driver.initialize()
+    assert driver.client is driver._client
+    assert driver.data is driver._data
+    await driver.finalize()
 
-    # Get one connection and hold it
-    async with driver.rw_transaction():
-        # Try to get another connection, should fail because pool is full
-        with pytest.raises(psycopg_pool.PoolTimeout):
-            await driver.rw_transaction().__aenter__()
+    with pytest.raises(RuntimeError, match="not initialized"):
+        _ = driver.client
+    with pytest.raises(RuntimeError, match="not initialized"):
+        _ = driver.data
 
-    # Should now work
-    async with driver.rw_transaction():
-        pass
+
+async def test_marklogic_driver(marklogic_maindb_driver):
+    """Run the generic maindb contract against a fixture-managed MarkLogic server."""
+    driver = marklogic_maindb_driver
+    await driver_basic(driver)
 
 
 async def _clear_db(driver: Driver):
-    all_keys = []
-    async with driver.ro_transaction() as txn:
-        async for key in txn.keys("/"):
-            all_keys.append(key)
-
     async with driver.rw_transaction() as txn:
-        for key in all_keys:
-            await txn.delete(key)
+        await txn.delete_by_prefix("/")
         await txn.commit()
+
+    async with driver.ro_transaction() as txn:
+        assert await txn.count("/") == 0
 
 
 async def driver_basic(driver: Driver):
@@ -154,6 +154,8 @@ async def driver_basic(driver: Driver):
     await _test_keys_async_generator(driver)
 
     await _test_transaction_context_manager(driver)
+
+    await _clear_db(driver)
 
     await driver.finalize()
 

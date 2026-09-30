@@ -17,13 +17,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+from unittest.mock import Mock
 
 import pytest
 
 from nucliadb.common.datamanagers import kb, resources
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError
+from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import resources_pb2
@@ -214,3 +215,24 @@ async def test_exists_returns_false_for_invalid_uuid(
     async with maindb_driver.ro_transaction() as txn:
         result = await resources.exists(txn, kbid="not-a-valid-uuid", rid="also-not-valid")
     assert result is False
+
+
+@pytest.mark.parametrize(
+    ("ok", "message"),
+    [
+        (False, "Failed to read resource shards: 503"),
+        (True, "Unexpected response when reading resource shards"),
+    ],
+)
+async def test_get_shards_rejects_non_document_response(
+    maindb_driver: Driver, mocker, ok: bool, message: str
+) -> None:
+    assert isinstance(maindb_driver, MarkLogicDriver)
+    mocker.patch.object(
+        maindb_driver.client.documents,
+        "read",
+        return_value=Mock(ok=ok, status_code=503, text="unavailable"),
+    )
+    async with maindb_driver.ro_transaction() as txn:
+        with pytest.raises(RuntimeError, match=message):
+            await resources.get_shards(txn, kbid="kb", rids=["rid"])

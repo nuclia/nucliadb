@@ -26,6 +26,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
+from nucliadb_models.filters import And, Label, Not, Or
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import Basic, FieldLink
 
@@ -78,6 +79,168 @@ async def test_modify_slug(resource_with_slug, maindb_driver: Driver):
         await txn.commit()
 
     await check_slug(maindb_driver, kbid, rid, new_slug)
+
+
+async def test_marklogic_search_and_facets(maindb_driver: Driver) -> None:
+    from nucliadb.common.datamanagers import resources
+
+    kbid = KnowledgeBox.new_unique_kbid()
+    other_kbid = KnowledgeBox.new_unique_kbid()
+    first = Resource.new_unique_rid()
+    second = Resource.new_unique_rid()
+    other = Resource.new_unique_rid()
+
+    async with maindb_driver.rw_transaction() as txn:
+        for target_kbid, rid, title, labels in (
+            (kbid, first, "Aster Guide", (("topic", "science"), ("team", "red"))),
+            (kbid, second, "Aster Manual", (("topic", "science"), ("team", "blue"))),
+            (other_kbid, other, "Aster Other", (("topic", "science"),)),
+        ):
+            basic = Basic(title=title, slug="shared")
+            for labelset, label in labels:
+                basic.usermetadata.classifications.add(labelset=labelset, label=label)
+            await resources.set(txn, kbid=target_kbid, rid=rid, basic=basic)
+            if rid != second:
+                await resources.set_slug(txn, kbid=target_kbid, rid=rid, slug="shared")
+            else:
+                await resources.set_slug(txn, kbid=target_kbid, rid=rid, slug="different")
+        await txn.commit()
+
+    async with maindb_driver.ro_transaction() as txn:
+        found = await resources.get_by_slug(txn, kbid=kbid, slug="shared")
+        assert found is not None and found.basic is not None
+        assert found.basic.title == "Aster Guide"
+        found = await resources.get_by_slug(txn, kbid=other_kbid, slug="shared")
+        assert found is not None and found.basic is not None
+        assert found.basic.title == "Aster Other"
+        assert {rid for rid, _ in await resources.search(txn, kbid=kbid, title="ster")} == {
+            first,
+            second,
+        }
+        assert {rid for rid, _ in await resources.search(txn, kbid=kbid, slug="iff")} == {second}
+        expression = And(
+            operands=[
+                Label(labelset="topic", label="science"),
+                Or(
+                    operands=[
+                        Label(labelset="team", label="red"),
+                        Not(operand=Label(labelset="team", label="blue")),
+                    ]
+                ),
+            ]
+        )
+        assert {rid for rid, _ in await resources.search(txn, kbid=kbid, labels=expression)} == {first}
+        assert await resources.label_facets(txn, kbid=kbid) == {
+            "/l": 2,
+            "/l/team": 2,
+            "/l/team/blue": 1,
+            "/l/team/red": 1,
+            "/l/topic": 2,
+            "/l/topic/science": 2,
+        }
+
+
+async def test_marklogic_resource_crud(maindb_driver: Driver) -> None:
+    from nucliadb.common.datamanagers import resources
+    from nucliadb.common.maindb.exceptions import ConflictError
+
+    kbid = KnowledgeBox.new_unique_kbid()
+    rid = Resource.new_unique_rid()
+    other = Resource.new_unique_rid()
+    async with maindb_driver.rw_transaction() as txn:
+        await resources.set(
+            txn,
+            kbid=kbid,
+            rid=rid,
+            basic=Basic(title="Original"),
+            shard="shard-1",
+            labels=["/l/team/red", "/l/team/red"],
+        )
+        await resources.set_slug(txn, kbid=kbid, rid=rid, slug="one")
+        await resources.set(txn, kbid=kbid, rid=rid, shard="shard-2")
+        await resources.set(txn, kbid=kbid, rid=other, basic=Basic(title="Other"))
+        with pytest.raises(ConflictError):
+            await resources.set_slug(txn, kbid=kbid, rid=other, slug="one")
+        await txn.commit()
+
+    async with maindb_driver.ro_transaction() as txn:
+        resource = await resources.get(
+            txn, kbid=kbid, rid=rid, columns=("basic", "slug", "shard", "labels")
+        )
+        assert resource is not None and resource.basic is not None
+        assert resource.basic.title == "Original"
+        assert (resource.slug, resource.shard) == ("one", "shard-2")
+        assert resource.labels == ["/l/team/red"]
+        assert await resources.get_shards(txn, kbid=kbid, rids=[rid, other]) == {rid: "shard-2"}
+        assert await resources.exists(txn, kbid=kbid, rid=rid)
+        assert not await resources.exists(txn, kbid=kbid, rid="not-a-uuid")
+        assert await resources.count(txn, kbid=kbid) == 2
+    assert {value async for value in resources.iter(kbid=kbid)} == {rid, other}
+
+    async with maindb_driver.rw_transaction() as txn:
+        await resources.set(txn, kbid=kbid, rid=rid, shard=None, labels=["/l/team/blue"])
+        await resources.delete(txn, kbid=kbid, rid=other)
+        await txn.commit()
+    async with maindb_driver.ro_transaction() as txn:
+        assert await resources.get_shard(txn, kbid=kbid, rid=rid) is None
+        assert await resources.get_rid(txn, kbid=kbid, slug="one") == rid
+        assert await resources.count(txn, kbid=kbid) == 1
+        assert await resources.label_facets(txn, kbid=kbid) == {"/l": 1, "/l/team": 1, "/l/team/blue": 1}
+
+    async with maindb_driver.rw_transaction() as txn:
+        await resources.set(txn, kbid=kbid, rid=rid, labels=None)
+        await txn.commit()
+    async with maindb_driver.ro_transaction() as txn:
+        assert await resources.label_facets(txn, kbid=kbid) == {}
+
+
+async def test_resources_from_shard(maindb_driver: Driver) -> None:
+    from nucliadb.common.cluster.rebalance import count_resources_in_shard, get_resources_from_shard
+
+    kbid = KnowledgeBox.new_unique_kbid()
+    other_kbid = KnowledgeBox.new_unique_kbid()
+    first, second, third, other = (Resource.new_unique_rid() for _ in range(4))
+    async with maindb_driver.rw_transaction() as txn:
+        for resource_kbid, rid, shard_id in (
+            (kbid, first, "source"),
+            (kbid, second, "source"),
+            (kbid, third, "target"),
+            (other_kbid, other, "source"),
+        ):
+            await datamanagers.resources.set(txn, kbid=resource_kbid, rid=rid, shard=shard_id)
+        await txn.commit()
+
+    async with maindb_driver.ro_transaction() as txn:
+        assert (
+            await datamanagers.resources.count_resources_in_shard(txn, kbid=kbid, shard_id="source") == 2
+        )
+        assert set(
+            await datamanagers.resources.get_resources_from_shard(
+                txn, kbid=kbid, shard_id="source", limit=10
+            )
+        ) == {first, second}
+        assert (
+            len(
+                await datamanagers.resources.get_resources_from_shard(
+                    txn, kbid=kbid, shard_id="source", limit=1
+                )
+            )
+            == 1
+        )
+        assert (
+            await datamanagers.resources.get_resources_from_shard(
+                txn, kbid=kbid, shard_id="source", limit=0
+            )
+            == []
+        )
+        assert (
+            await datamanagers.resources.count_resources_in_shard(txn, kbid=kbid, shard_id="missing")
+            == 0
+        )
+
+    assert set(await get_resources_from_shard(maindb_driver, kbid, "source", n=10)) == {first, second}
+    assert await count_resources_in_shard(maindb_driver, kbid, "source") == 2
+    assert await count_resources_in_shard(maindb_driver, other_kbid, "source") == 1
 
 
 async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, str, str]):

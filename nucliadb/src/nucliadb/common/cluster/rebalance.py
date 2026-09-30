@@ -22,7 +22,6 @@ import dataclasses
 import logging
 import math
 import random
-from typing import cast
 
 from grpc import StatusCode
 from grpc.aio import AioRpcError
@@ -32,7 +31,6 @@ from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.pg import PGDriver
 from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 from nucliadb_protos import writer_pb2
 from nucliadb_telemetry import errors
@@ -342,21 +340,10 @@ class Rebalancer:
 
 
 async def get_resources_from_shard(driver: Driver, kbid: str, shard_id: str, n: int) -> list[str]:
-    driver = cast(PGDriver, driver)
-    async with driver._get_connection() as conn:
-        cur = conn.cursor("")
-        await cur.execute(
-            """
-            SELECT rid
-            FROM kb_resources
-            WHERE kbid = %s AND shard = %s
-            LIMIT %s;
-            """,
-            (kbid, shard_id, n),
+    async with driver.ro_transaction() as txn:
+        return await datamanagers.resources.get_resources_from_shard(
+            txn, kbid=kbid, shard_id=shard_id, limit=n
         )
-        records = await cur.fetchall()
-        rids: list[str] = [datamanagers.resources._to_rid(r[0]) for r in records]
-        return rids
 
 
 async def get_resource_paragraphs_count(resource_id: str, nidx_shard_id: str) -> int:
@@ -407,19 +394,8 @@ def get_target_shard(
 
 
 async def count_resources_in_shard(driver: Driver, kbid: str, shard_id: str) -> int:
-    driver = cast(PGDriver, driver)
-    async with driver._get_connection() as conn:
-        cur = conn.cursor("")
-        await cur.execute(
-            """
-            SELECT COUNT(*) FROM kb_resources WHERE kbid = %s AND shard = %s;
-            """,
-            (kbid, shard_id),
-        )
-        record = await cur.fetchone()
-        if record is None:  # pragma: no cover
-            return 0
-        return record[0]
+    async with driver.ro_transaction() as txn:
+        return await datamanagers.resources.count_resources_in_shard(txn, kbid=kbid, shard_id=shard_id)
 
 
 async def get_shard_paragraph_count(nidx_shard_id: str) -> int:

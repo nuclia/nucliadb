@@ -138,18 +138,20 @@ async def test_set_slug_and_get_kbid(maindb_driver: Driver) -> None:
 @pytest.mark.asyncio
 async def test_set_slug_overwrites_slug(maindb_driver: Driver) -> None:
     kbid = new_kbid()
+    old_slug = f"old-slug-{kbid}"
+    new_slug = f"new-slug-{kbid}"
 
     async with maindb_driver.rw_transaction() as txn:
-        await kb.set_slug(txn, kbid=kbid, slug="old-slug")
+        await kb.set_slug(txn, kbid=kbid, slug=old_slug)
         await txn.commit()
 
     async with maindb_driver.rw_transaction() as txn:
-        await kb.set_slug(txn, kbid=kbid, slug="new-slug")
+        await kb.set_slug(txn, kbid=kbid, slug=new_slug)
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
-        assert await kb.get_kbid(txn, slug="new-slug") == kbid
-        assert await kb.get_kbid(txn, slug="old-slug") is None
+        assert await kb.get_kbid(txn, slug=new_slug) == kbid
+        assert await kb.get_kbid(txn, slug=old_slug) is None
 
 
 @pytest.mark.asyncio

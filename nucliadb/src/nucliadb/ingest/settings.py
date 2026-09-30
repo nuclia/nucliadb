@@ -25,6 +25,7 @@ from pydantic_settings import BaseSettings
 
 class DriverConfig(Enum):
     PG = "pg"
+    MARKLOGIC = "marklogic"
     NOT_SET = "notset"  # setting not provided
 
     @classmethod
@@ -38,7 +39,13 @@ class DriverConfig(Enum):
 
 
 class DriverSettings(BaseSettings):
-    driver: DriverConfig = Field(default=DriverConfig.PG, description="K/V storage driver")
+    driver: DriverConfig = Field(default=DriverConfig.MARKLOGIC, description="K/V storage driver")
+    driver_marklogic_uri: str = "http://127.0.0.1"
+    driver_marklogic_username: str = "admin"
+    driver_marklogic_password: str = "admin"
+    driver_marklogic_database: str = "nucliadb-content"
+    driver_marklogic_port: int = 8000
+    driver_marklogic_admin_port: int = 8002
     driver_pg_url: str | None = Field(
         default=None,
         description="PostgreSQL DSN. The connection string to the PG server. Example: postgres://username:password@postgres:5432/nucliadb.",
