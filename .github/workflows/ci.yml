@@ -227,23 +227,6 @@ jobs:
           path: "nidx/target/release/nidx"
           key: nidx-bin-${{ github.sha }}
 
-  build-nidx-docker-image:
-    name: Build nidx docker image
-    runs-on: ubuntu-24.04
-    needs:
-      - build-nidx-binary
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Restore nidx binary
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: "nidx/target/release/nidx"
-          key: nidx-bin-${{ github.sha }}
-          fail-on-cache-miss: true
-
-      - name: Build docker images for nidx
-        run: mkdir builds && mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
-
   build-virtual-env:
     name: Build virtual environment
     runs-on: ubuntu-24.04
@@ -285,20 +268,31 @@ jobs:
     name: NucliaDB search tests
     runs-on: ubuntu-24.04
     needs:
-      - build-nidx-docker-image
       - build-virtual-env
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14.7"
+
       - name: Restore venv
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .venv
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
+
+      - name: Restore nidx binary
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: "nidx/target/release/nidx"
+          key: nidx-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Build docker image for nidx
+        run: mkdir builds && mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
 
       - name: Run tests
         run: source .venv/bin/activate && make -C nucliadb test-cov-search
@@ -316,7 +310,6 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - build-virtual-env
-      - build-nidx-docker-image
     strategy:
       fail-fast: false
       matrix:
@@ -351,6 +344,16 @@ jobs:
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
 
+      - name: Restore nidx binary
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: "nidx/target/release/nidx"
+          key: nidx-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Build docker image for nidx
+        run: mkdir builds && mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
+
       - name: Run NucliaDB tests
         env:
           TESTING_PG_URL: "postgresql://postgres:postgres@localhost/postgres"
@@ -372,7 +375,6 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - build-virtual-env
-      - build-nidx-docker-image
     strategy:
       fail-fast: false
       matrix:
@@ -399,6 +401,16 @@ jobs:
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
 
+      - name: Restore nidx binary
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: "nidx/target/release/nidx"
+          key: nidx-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Build docker image for nidx
+        run: mkdir builds && mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
+
       - name: Run package tests
         run: source .venv/bin/activate && make -C nucliadb test-cov-${{ matrix.component }}
 
@@ -415,7 +427,6 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - build-virtual-env
-      - build-nidx-docker-image
     strategy:
       fail-fast: false
       matrix:
@@ -441,6 +452,16 @@ jobs:
           path: .venv
           key: venv-${{ github.sha }}
           fail-on-cache-miss: true
+
+      - name: Restore nidx binary
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: "nidx/target/release/nidx"
+          key: nidx-bin-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Build docker image for nidx
+        run: mkdir builds && mv nidx/target/release/nidx builds && docker build -t nidx -f Dockerfile.nidx_prebuilt .
 
       - name: Run package tests
         run: source .venv/bin/activate && make -C ${{ matrix.package }} test-cov
