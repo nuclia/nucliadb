@@ -15,7 +15,13 @@
 from google.protobuf.timestamp_pb2 import Timestamp
 from nidx_protos.nodereader_pb2 import SearchRequest
 
-from nucliadb_protos.audit_pb2 import AuditField, AuditRequest, ChatContext, RetrievedContext
+from nucliadb_protos.audit_pb2 import (
+    AuditField,
+    AuditRequest,
+    ChatContext,
+    GuardrailAudit,
+    RetrievedContext,
+)
 from nucliadb_protos.resources_pb2 import FieldID
 
 
@@ -87,6 +93,7 @@ class AuditStorage:
         generative_answer_time: float | None = None,
         generative_answer_first_chunk_time: float | None = None,
         generative_reasoning_first_chunk_time: float | None = None,
+        guardrail: GuardrailAudit | None = None,
     ):
         raise NotImplementedError()
 
