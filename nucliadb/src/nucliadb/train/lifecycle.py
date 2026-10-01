@@ -45,7 +45,7 @@ async def lifespan(app: FastAPI):
     await start_train_grpc(SERVICE_NAME)
     try:
         context = ApplicationContext(
-            service_name="train",
+            service_name=SERVICE_NAME,
             partitioning=False,
             nats_manager=False,
             transaction=False,

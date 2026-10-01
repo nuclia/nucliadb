@@ -42,6 +42,7 @@ from nucliadb_protos.audit_pb2 import (
     AuditSearchRequest,
     ChatContext,
     ClientType,
+    GuardrailAudit,
     RetrievedContext,
 )
 from nucliadb_protos.kb_usage_pb2 import (
@@ -492,6 +493,7 @@ class StreamAuditStorage(AuditStorage):
         generative_answer_time: float | None = None,
         generative_answer_first_chunk_time: float | None = None,
         generative_reasoning_first_chunk_time: float | None = None,
+        guardrail: GuardrailAudit | None = None,
     ):
         rcontext = get_request_context()
         if rcontext is None:
@@ -531,6 +533,8 @@ class StreamAuditStorage(AuditStorage):
         auditrequest.chat.status_code = status_code
         if model is not None:
             auditrequest.chat.model = model
+        if guardrail is not None:
+            auditrequest.chat.guardrail.CopyFrom(guardrail)
 
     def retrieve(
         self,

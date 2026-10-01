@@ -57,6 +57,31 @@ message ChatAudit {
   int32 status_code = 9;
   optional string model = 10;
   optional string reasoning = 11;
+  GuardrailAudit guardrail = 12;
+}
+
+message GuardrailPolicyAudit {
+  optional string policy_id = 1;
+  bool flagged = 2;
+  bool evaluation_failed = 3;
+  bool failure_blocks = 4;
+}
+
+message GuardrailAudit {
+  enum Target {
+    QUERY = 0;
+  }
+
+  enum Outcome {
+    ALLOWED = 0;
+    BLOCKED = 1;
+    FAILED = 2;
+    SKIPPED = 3;
+  }
+
+  Target target = 1;
+  Outcome outcome = 2;
+  repeated GuardrailPolicyAudit policies = 3;
 }
 
 enum TaskType {

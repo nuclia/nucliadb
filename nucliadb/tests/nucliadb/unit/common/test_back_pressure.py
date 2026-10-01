@@ -24,11 +24,7 @@ from unittest import mock
 
 import pytest
 
-from nucliadb.common.back_pressure.cache import (
-    BackPressureCache,
-    BackPressureData,
-    cached_back_pressure,
-)
+from nucliadb.common.back_pressure.cache import BackPressureCache, BackPressureData, cached_back_pressure
 from nucliadb.common.back_pressure.cache import _cache as back_pressure_cache
 from nucliadb.common.back_pressure.materializer import (
     BackPressureMaterializer,
@@ -36,19 +32,46 @@ from nucliadb.common.back_pressure.materializer import (
     maybe_back_pressure,
     start_materializer,
 )
-from nucliadb.common.back_pressure.utils import (
-    BackPressureException,
-    estimate_try_after,
-)
+from nucliadb.common.back_pressure.settings import BackPressureSettings
+from nucliadb.common.back_pressure.utils import BackPressureException, estimate_try_after
 from nucliadb.common.http_clients.processing import PullStatusResponse
 
 MODULE = "nucliadb.common.back_pressure"
 
 
+@pytest.fixture(scope="function")
+def materializer():
+    materializer = mock.Mock()
+    materializer.running = True
+    materializer.get_processing_pending = mock.AsyncMock(return_value=10)
+    materializer.get_indexing_pending = mock.Mock(return_value={"node1": 10, "node2": 2})
+    materializer.get_ingest_pending = mock.Mock(return_value=10)
+    yield materializer
+
+
 @pytest.fixture(scope="function", autouse=True)
-def is_back_pressure_enabled():
-    with mock.patch(f"{MODULE}.materializer.is_back_pressure_enabled", return_value=True) as mock_:
-        yield mock_
+def settings():
+    settings = mock.Mock(
+        enabled=True,
+        max_ingest_pending=10,
+        max_processing_pending=10,
+        max_indexing_pending=10,
+        processing_rate=2,
+        indexing_rate=2,
+        ingest_rate=2,
+        max_wait_time=60,
+    )
+    with (
+        mock.patch(f"{MODULE}.materializer.settings", settings),
+        mock.patch(f"{MODULE}.utils.settings", settings),
+    ):
+        yield settings
+
+
+@pytest.fixture(scope="function")
+def cache():
+    back_pressure_cache._cache.clear()
+    yield back_pressure_cache
 
 
 @pytest.mark.parametrize(
@@ -85,55 +108,28 @@ def test_back_pressure_cache():
     assert cache.get(key) is None
 
 
-async def test_maybe_back_pressure_skip_conditions_onprem(is_back_pressure_enabled, onprem_nucliadb):
+async def test_maybe_back_pressure_skip_conditions_onprem(
+    settings: BackPressureSettings, onprem_nucliadb
+):
     # onprem should never run back pressure even if enabled
     with mock.patch(f"{MODULE}.materializer.back_pressure_checks") as back_pressure_checks_mock:
-        is_back_pressure_enabled.return_value = True
+        settings.enabled = True
         await maybe_back_pressure(mock.Mock(), "kbid")
         back_pressure_checks_mock.assert_not_called()
 
 
-async def test_maybe_back_pressure_skip_conditions_hosted(is_back_pressure_enabled, hosted_nucliadb):
+async def test_maybe_back_pressure_skip_conditions_hosted(
+    settings: BackPressureSettings, hosted_nucliadb
+):
     # Back pressure should only run for hosted deployments, when enabled
     with mock.patch(f"{MODULE}.materializer.back_pressure_checks") as back_pressure_checks_mock:
-        is_back_pressure_enabled.return_value = False
-        await maybe_back_pressure(mock.Mock(), "kbid")
+        settings.enabled = False
+        await maybe_back_pressure("kbid", "rid")
         back_pressure_checks_mock.assert_not_called()
 
-        is_back_pressure_enabled.return_value = True
-        await maybe_back_pressure(mock.Mock(), "kbid")
+        settings.enabled = True
+        await maybe_back_pressure("kbid", "rid")
         back_pressure_checks_mock.assert_awaited_once()
-
-
-@pytest.fixture(scope="function")
-def materializer():
-    materializer = mock.Mock()
-    materializer.running = True
-    materializer.get_processing_pending = mock.AsyncMock(return_value=10)
-    materializer.get_indexing_pending = mock.Mock(return_value={"node1": 10, "node2": 2})
-    materializer.get_ingest_pending = mock.Mock(return_value=10)
-    yield materializer
-
-
-@pytest.fixture(scope="function")
-def settings():
-    settings = mock.Mock(
-        max_ingest_pending=10,
-        max_processing_pending=10,
-        max_indexing_pending=10,
-        processing_rate=2,
-        indexing_rate=2,
-        ingest_rate=2,
-        max_wait_time=60,
-    )
-    with mock.patch(f"{MODULE}.materializer.settings", settings):
-        yield settings
-
-
-@pytest.fixture(scope="function")
-def cache():
-    back_pressure_cache._cache.clear()
-    yield back_pressure_cache
 
 
 async def test_check_processing_behind(settings, cache, nats_conn):
@@ -185,7 +181,7 @@ async def test_check_ingest_behind_does_not_raise_if_configured_max_is_zero(sett
 def test_cached_back_pressure_context_manager(cache):
     func = mock.Mock()
 
-    with cached_back_pressure("foo-bar"):
+    with cached_back_pressure(kbid="foo", rid="bar"):
         func()
 
     func.assert_called_once()
@@ -194,7 +190,7 @@ def test_cached_back_pressure_context_manager(cache):
     func.side_effect = Exception("Boom")
 
     with pytest.raises(Exception):
-        with cached_back_pressure("foo-bar"):
+        with cached_back_pressure(kbid="foo", rid="bar"):
             func()
 
     func.reset_mock()
@@ -205,7 +201,7 @@ def test_cached_back_pressure_context_manager(cache):
     func.side_effect = BackPressureException(data)
 
     with pytest.raises(BackPressureException) as exc:
-        with cached_back_pressure("foo-bar"):
+        with cached_back_pressure(kbid="foo", rid="bar"):
             func()
     assert exc.value.data == data
 

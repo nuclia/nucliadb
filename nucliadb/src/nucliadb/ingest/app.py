@@ -23,6 +23,8 @@ from collections.abc import Awaitable, Callable
 
 from nucliadb import health
 from nucliadb.backups.tasks import initialize_consumers as initialize_backup_consumers
+from nucliadb.common.back_pressure.materializer import start_materializer, stop_materializer
+from nucliadb.common.back_pressure.utils import is_back_pressure_enabled
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.nidx import start_nidx_utility
@@ -35,6 +37,7 @@ from nucliadb.ingest.service import start_grpc
 from nucliadb.ingest.settings import settings
 from nucliadb.ingest.utils import start_ingest as start_ingest_utility
 from nucliadb.ingest.utils import stop_ingest as stop_ingest_utility
+from nucliadb.tasks.deleter import batch_resource_deleter_consumer
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_telemetry.utils import setup_telemetry
@@ -149,6 +152,15 @@ async def main_subscriber_workers():  # pragma: no cover
     auditor_closer = await consumer_service.start_auditor()
     shard_creator_closer = await consumer_service.start_shard_creator()
     materializer_closer = await consumer_service.start_materializer()
+    await start_processing_engine()
+
+    if is_back_pressure_enabled():
+        await start_materializer(context)
+        back_pressure_finalizer = stop_materializer
+    else:
+
+        async def back_pressure_finalizer():
+            pass
 
     await start_ingest_utility()
     exports_consumer = get_exports_consumer()
@@ -156,13 +168,18 @@ async def main_subscriber_workers():  # pragma: no cover
     imports_consumer = get_imports_consumer()
     await imports_consumer.initialize(context)
     backup_consumers_finalizers = await initialize_backup_consumers(context)
+    deleter = batch_resource_deleter_consumer()
+    await deleter.initialize(context)
 
     await run_until_exit(
         [
+            deleter.finalize,
             *backup_consumers_finalizers,
             imports_consumer.finalize,
             exports_consumer.finalize,
             stop_ingest_utility,
+            stop_processing_engine,
+            back_pressure_finalizer,
             materializer_closer,
             shard_creator_closer,
             auditor_closer,

@@ -45,6 +45,7 @@ enum PredictType {
     VLLM_EXTRACTION = 17;
     LLM_SPLITTING = 18;
     INTERNET_SEARCH = 20;
+    GUARDRAIL = 21;
 }
 
 enum ClientType {

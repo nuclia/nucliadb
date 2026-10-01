@@ -21,6 +21,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from nucliadb.common.context import ApplicationContext
 from nucliadb.common.context.fastapi import inject_app_context
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.reader import SERVICE_NAME
@@ -41,7 +42,16 @@ async def lifespan(app: FastAPI):
     await start_audit_utility(SERVICE_NAME)
 
     # Inject application context into the fastapi app's state
-    async with inject_app_context(app):
+    context = ApplicationContext(
+        service_name=SERVICE_NAME,
+        # skip utilities we don't use
+        nats_manager=False,
+        nidx=False,
+        partitioning=False,
+        shard_manager=False,
+        transaction=False,
+    )
+    async with inject_app_context(app, context):
         yield
 
     await stop_ingest()

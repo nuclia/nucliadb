@@ -22,7 +22,7 @@ import logging
 import os
 import platform
 import sys
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
@@ -34,10 +34,10 @@ from pytest_docker_fixtures import images
 from pytest_docker_fixtures.containers._base import BaseImage  # type: ignore[import-untyped]
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
-from nucliadb.common.nidx import NidxUtility
+from nucliadb.common.nidx import NidxUtility, start_nidx_utility, stop_nidx_utility
 from nucliadb_utils.settings import indexing_settings
 from nucliadb_utils.tests.fixtures import get_testing_storage_backend
-from nucliadb_utils.utilities import Utility
+from nucliadb_utils.utilities import MAIN, Utility
 from tests.ndbfixtures.utils import global_utility
 
 logger = logging.getLogger(__name__)
@@ -215,6 +215,22 @@ async def nidx(natsd: str, pg, nidx_storage: dict[str, str]):
         yield
 
     image.stop()
+
+
+@pytest.fixture(scope="function")
+async def component_nidx_utility(nidx: None) -> AsyncIterator[NidxUtility]:
+    with patch.dict(MAIN, values={Utility.NIDX: None}, clear=False):
+        utility = await start_nidx_utility()
+        yield utility
+        await stop_nidx_utility()
+
+
+@pytest.fixture(scope="function")
+async def standalone_nidx_utility() -> AsyncIterator[NidxUtility]:
+    with patch.dict(MAIN, values={Utility.NIDX: None}, clear=False):
+        utility = await start_nidx_utility()
+        yield utility
+        await stop_nidx_utility()
 
 
 @pytest.fixture(scope="function")
