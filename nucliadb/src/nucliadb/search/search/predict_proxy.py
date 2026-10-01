@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import base64
+import binascii
 import json
 from enum import Enum
 from typing import Any, Type
@@ -24,6 +26,7 @@ from typing import Any, Type
 import aiohttp
 from fastapi.datastructures import QueryParams
 from fastapi.responses import Response, StreamingResponse
+from google.protobuf.message import DecodeError
 from multidict import CIMultiDictProxy
 from nuclia_models.predict.generative_responses import (
     GenerativeChunk,
@@ -38,6 +41,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search import logger
 from nucliadb.search.predict import (
+    NUCLIA_GUARDRAIL_AUDIT_HEADER,
     NUCLIA_LEARNING_ID_HEADER,
     NUCLIA_LEARNING_MODEL_HEADER,
     AnswerStatusCode,
@@ -48,6 +52,7 @@ from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import (
     NucliaDBClientType,
 )
+from nucliadb_protos.audit_pb2 import GuardrailAudit
 from nucliadb_utils.audit.stream import AuditedChatRequest
 from nucliadb_utils.utilities import get_audit
 
@@ -120,8 +125,10 @@ async def predict_proxy(
 
     status_code = predict_response.status
 
-    # Only audit /predict/chat successful responses
-    should_audit = endpoint == PredictProxiedEndpoints.CHAT and 200 <= status_code < 300
+    guardrail_audit = parse_guardrail_audit(predict_response.headers.get(NUCLIA_GUARDRAIL_AUDIT_HEADER))
+    should_audit = endpoint == PredictProxiedEndpoints.CHAT and (
+        200 <= status_code < 300 or guardrail_audit is not None
+    )
 
     media_type = predict_response.headers.get("Content-Type")
     response: Response | StreamingResponse
@@ -137,6 +144,7 @@ async def predict_proxy(
                 user_query=user_query,
                 is_ndjson_stream="json" in (media_type or ""),
                 metrics=metrics,
+                guardrail_audit=guardrail_audit,
             )
         else:
             streaming_generator = predict_response.content.iter_any()
@@ -151,12 +159,17 @@ async def predict_proxy(
             content = await predict_response.read()
 
         if should_audit:
-            try:
-                llm_status_code = int(content[-1:].decode())  # Decode just the last char
-                if llm_status_code != 0:
-                    llm_status_code = -llm_status_code
-            except ValueError:
-                llm_status_code = -1
+            if 200 <= status_code < 300:
+                try:
+                    llm_status_code = int(content[-1:].decode())  # Decode just the last char
+                    if llm_status_code != 0:
+                        llm_status_code = -llm_status_code
+                except ValueError:
+                    llm_status_code = -1
+                text_answer: bytes | None = content
+            else:
+                llm_status_code = int(AnswerStatusCode.ERROR.value)
+                text_answer = None
 
             audit_predict_proxy_endpoint(
                 predict_response.headers,
@@ -165,12 +178,13 @@ async def predict_proxy(
                 user_query=user_query,
                 client_type=client_type,
                 origin=origin,
-                text_answer=content,
+                text_answer=text_answer,
                 text_reasoning=None,
                 generative_answer_time=metrics[PREDICT_ANSWER_METRIC],
                 generative_answer_first_chunk_time=None,
                 generative_reasoning_first_chunk_time=None,
                 status_code=AnswerStatusCode(str(llm_status_code)),
+                guardrail_audit=guardrail_audit,
             )
 
         response = Response(
@@ -200,6 +214,7 @@ async def chat_streaming_generator(
     user_query: str,
     is_ndjson_stream: bool,
     metrics: PredictChatMetrics,
+    guardrail_audit: GuardrailAudit | None,
 ):
     first = True
     first_reasoning = True
@@ -263,6 +278,7 @@ async def chat_streaming_generator(
         generative_answer_first_chunk_time=metrics.get_first_chunk_time(),
         generative_reasoning_first_chunk_time=metrics.get_first_reasoning_chunk_time(),
         status_code=AnswerStatusCode(status_code),
+        guardrail_audit=guardrail_audit,
     )
 
 
@@ -273,12 +289,13 @@ def audit_predict_proxy_endpoint(
     user_query: str,
     client_type: NucliaDBClientType,
     origin: str,
-    text_answer: bytes,
+    text_answer: bytes | None,
     text_reasoning: str | None,
     generative_answer_time: float,
     generative_answer_first_chunk_time: float | None,
     generative_reasoning_first_chunk_time: float | None,
     status_code: AnswerStatusCode,
+    guardrail_audit: GuardrailAudit | None,
 ):
     maybe_audit_chat(
         kbid=kbid,
@@ -296,6 +313,7 @@ def audit_predict_proxy_endpoint(
         generative_answer_first_chunk_time=generative_answer_first_chunk_time or 0,
         generative_reasoning_first_chunk_time=generative_reasoning_first_chunk_time,
         status_code=status_code,
+        guardrail_audit=guardrail_audit,
     )
 
 
@@ -311,11 +329,12 @@ def maybe_audit_chat(
     user_query: str,
     rephrased_query: str | None,
     retrieval_rephrase_query: str | None,
-    text_answer: bytes,
+    text_answer: bytes | None,
     text_reasoning: str | None,
     status_code: AnswerStatusCode,
     learning_id: str | None,
     model: str | None,
+    guardrail_audit: GuardrailAudit | None,
 ):
     audit = get_audit()
     if audit is None:
@@ -342,11 +361,27 @@ def maybe_audit_chat(
         learning_id=learning_id,
         status_code=int(status_code.value),
         model=model,
+        guardrail=guardrail_audit,
     )
 
 
-def parse_audit_answer(raw_text_answer: bytes, status_code: AnswerStatusCode) -> str | None:
+def parse_audit_answer(
+    raw_text_answer: bytes | None,
+    status_code: AnswerStatusCode,
+) -> str | None:
+    if raw_text_answer is None:
+        return None
     if status_code == AnswerStatusCode.NO_CONTEXT or status_code == AnswerStatusCode.NO_RETRIEVAL_DATA:
         # We don't want to audit "Not enough context to answer this." and instead set a None.
         return None
     return raw_text_answer.decode()
+
+
+def parse_guardrail_audit(value: str | None) -> GuardrailAudit | None:
+    if value is None:
+        return None
+    try:
+        return GuardrailAudit.FromString(base64.urlsafe_b64decode(value))
+    except (binascii.Error, DecodeError):
+        logger.exception("Invalid Guardrail audit metadata returned by Predict")
+        return None

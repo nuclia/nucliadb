@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import base64
 import json
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -28,6 +29,7 @@ from fastapi.responses import Response, StreamingResponse
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.search.search.predict_proxy import PredictProxiedEndpoints, predict_proxy
 from nucliadb_models.search import NucliaDBClientType
+from nucliadb_protos.audit_pb2 import GuardrailAudit, GuardrailPolicyAudit
 
 MODULE = "nucliadb.search.search.predict_proxy"
 
@@ -146,6 +148,49 @@ async def test_500_text_response(exists_kb, predict, predict_response):
     assert resp.headers["Access-Control-Expose-Headers"] == "NUCLIA-LEARNING-ID"
     assert resp.headers["Content-Type"].startswith("text/plain")
     assert resp.body == b"foo"
+
+
+async def test_blocked_guardrail_response_is_audited(
+    exists_kb,
+    predict,
+    predict_response,
+):
+    guardrail = GuardrailAudit(
+        target=GuardrailAudit.Target.QUERY,
+        outcome=GuardrailAudit.Outcome.BLOCKED,
+        policies=[
+            GuardrailPolicyAudit(
+                policy_id="policy",
+                flagged=True,
+                failure_blocks=True,
+            )
+        ],
+    )
+    predict_response.status = 400
+    predict_response.headers["NUCLIA-GUARDRAIL-AUDIT"] = base64.urlsafe_b64encode(
+        guardrail.SerializeToString()
+    ).decode("ascii")
+    predict_response.read = AsyncMock(return_value=b'{"detail":"blocked"}')
+    audit = Mock()
+
+    with patch(f"{MODULE}.get_audit", return_value=audit):
+        resp = await predict_proxy(
+            kbid="foo",
+            endpoint=PredictProxiedEndpoints.CHAT,
+            method="POST",
+            params=QueryParams(),
+            user_id="test-user",
+            client_type=NucliaDBClientType.API,
+            origin="test-origin",
+            json_payload={"question": "blocked query", "user_id": "test-user"},
+        )
+
+    assert resp.status_code == 400
+    audit.chat.assert_called_once()
+    call = audit.chat.call_args
+    assert call.kwargs["answer"] is None
+    assert call.kwargs["status_code"] == -1
+    assert call.kwargs["guardrail"] == guardrail
 
 
 async def test_json_response_rephrase(exists_kb, predict, predict_response):
