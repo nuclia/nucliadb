@@ -36,7 +36,7 @@ spec:
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/resources'
           method:
-            regex: "POST|OPTIONS"
+            regex: "POST|DELETE|OPTIONS"
         - uri:
             regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+$'
           method:

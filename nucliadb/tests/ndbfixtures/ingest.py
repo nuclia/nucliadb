@@ -43,6 +43,8 @@ from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.standalone.settings import Settings
+from nucliadb.tasks.consumer import NatsTaskConsumer
+from nucliadb.tasks.deleter import batch_resource_deleter_consumer
 from nucliadb.tests.vectors import V1, V2, V3
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2 as upb
@@ -59,6 +61,7 @@ from nucliadb_utils.transaction import TransactionUtility
 from nucliadb_utils.utilities import (
     clear_global_cache,
 )
+from tests.ndbfixtures.utils import application_context
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +175,21 @@ async def ingest_processed_consumer(
 
     await ingest_consumer_finalizer()
     clear_global_cache()
+
+
+@pytest.fixture(scope="function")
+async def ingest_batch_resource_deleter_consumer(
+    maindb_driver: Driver,
+    nats_manager: NatsConnectionManager,
+):
+    context = application_context(
+        maindb_driver=maindb_driver,
+        nats_manager=nats_manager,
+    )
+    consumer: NatsTaskConsumer = batch_resource_deleter_consumer()
+    await consumer.initialize(context)
+    yield consumer
+    await consumer.finalize()
 
 
 @pytest.fixture(scope="function")
