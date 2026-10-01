@@ -152,6 +152,7 @@ async def main_subscriber_workers():  # pragma: no cover
     auditor_closer = await consumer_service.start_auditor()
     shard_creator_closer = await consumer_service.start_shard_creator()
     materializer_closer = await consumer_service.start_materializer()
+    await start_processing_engine()
 
     if is_back_pressure_enabled():
         await start_materializer(context)
@@ -177,6 +178,7 @@ async def main_subscriber_workers():  # pragma: no cover
             imports_consumer.finalize,
             exports_consumer.finalize,
             stop_ingest_utility,
+            stop_processing_engine,
             back_pressure_finalizer,
             materializer_closer,
             shard_creator_closer,
