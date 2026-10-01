@@ -219,10 +219,10 @@ async def maybe_back_pressure(kbid: str, rid: str):
     finite time.
 
     """
-    materializer = get_materializer()
-
     if not is_back_pressure_enabled():
         return
+
+    materializer = get_materializer()
 
     with cached_back_pressure(kbid, rid):
         while True:
