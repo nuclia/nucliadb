@@ -182,7 +182,7 @@ async def test_blocked_guardrail_response_is_audited(
             user_id="test-user",
             client_type=NucliaDBClientType.API,
             origin="test-origin",
-            json_payload={"question": "blocked query"},
+            json_payload={"question": "blocked query", "user_id": "test-user"},
         )
 
     assert resp.status_code == 400
