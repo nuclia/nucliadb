@@ -23,6 +23,8 @@ from collections.abc import Awaitable, Callable
 
 from nucliadb import health
 from nucliadb.backups.tasks import initialize_consumers as initialize_backup_consumers
+from nucliadb.common.back_pressure.materializer import start_materializer, stop_materializer
+from nucliadb.common.back_pressure.utils import is_back_pressure_enabled
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.nidx import start_nidx_utility
@@ -151,6 +153,14 @@ async def main_subscriber_workers():  # pragma: no cover
     shard_creator_closer = await consumer_service.start_shard_creator()
     materializer_closer = await consumer_service.start_materializer()
 
+    if is_back_pressure_enabled():
+        await start_materializer(context)
+        back_pressure_finalizer = stop_materializer
+    else:
+
+        async def back_pressure_finalizer():
+            pass
+
     await start_ingest_utility()
     exports_consumer = get_exports_consumer()
     await exports_consumer.initialize(context)
@@ -167,6 +177,7 @@ async def main_subscriber_workers():  # pragma: no cover
             imports_consumer.finalize,
             exports_consumer.finalize,
             stop_ingest_utility,
+            back_pressure_finalizer,
             materializer_closer,
             shard_creator_closer,
             auditor_closer,

@@ -22,7 +22,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from nucliadb.common.back_pressure import start_materializer, stop_materializer
-from nucliadb.common.back_pressure.settings import settings as back_pressure_settings
+from nucliadb.common.back_pressure.utils import is_back_pressure_enabled
 from nucliadb.common.context.fastapi import inject_app_context
 from nucliadb.ingest.processing import start_processing_engine, stop_processing_engine
 from nucliadb.ingest.utils import start_ingest, stop_ingest
@@ -30,7 +30,6 @@ from nucliadb.writer import SERVICE_NAME
 from nucliadb.writer.tus import finalize as storage_finalize
 from nucliadb.writer.tus import initialize as storage_initialize
 from nucliadb_telemetry.utils import clean_telemetry, setup_telemetry
-from nucliadb_utils.settings import is_onprem_nucliadb
 from nucliadb_utils.utilities import (
     finalize_utilities,
     start_partitioning_utility,
@@ -41,8 +40,6 @@ from nucliadb_utils.utilities import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    back_pressure_enabled = back_pressure_settings.enabled and not is_onprem_nucliadb()
-
     await setup_telemetry(SERVICE_NAME)
     await start_ingest(SERVICE_NAME)
     await start_processing_engine()
@@ -52,11 +49,11 @@ async def lifespan(app: FastAPI):
 
     # Inject application context into the fastapi app's state
     async with inject_app_context(app) as context:
-        if back_pressure_enabled:
+        if is_back_pressure_enabled():
             await start_materializer(context)
         yield
 
-    if back_pressure_enabled:
+    if is_back_pressure_enabled():
         await stop_materializer()
     await stop_transaction_utility()
     await stop_ingest()
