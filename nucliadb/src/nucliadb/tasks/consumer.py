@@ -19,6 +19,7 @@
 #
 
 import asyncio
+import time
 from typing import Generic
 
 import nats
@@ -30,11 +31,14 @@ from nucliadb.common.context import ApplicationContext
 from nucliadb.tasks.logger import logger
 from nucliadb.tasks.models import Callback, MsgType
 from nucliadb.tasks.utils import NatsConsumer, NatsStream, create_nats_stream_if_not_exists
-from nucliadb_telemetry import errors
+from nucliadb_telemetry import errors, metrics
 from nucliadb_utils.nats import NatsMessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 
 BEFORE_NAK_SLEEP_SECONDS = 2
+
+
+task_observer = metrics.Histogram("nucliadb_task_duration_seconds", labels={"name": "", "status": ""})
 
 
 class NatsTaskConsumer(Generic[MsgType]):
@@ -128,6 +132,7 @@ class NatsTaskConsumer(Generic[MsgType]):
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}",
             extra={"consumer_name": self.name},
         )
+        _task_start = time.monotonic()
         async with NatsMessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66):
             try:
                 task_msg = self.msg_type.model_validate_json(msg.data)
@@ -140,6 +145,9 @@ class NatsTaskConsumer(Generic[MsgType]):
                     },
                 )
                 await msg.ack()
+                task_observer.observe(
+                    time.monotonic() - _task_start, labels={"name": self.name, "status": "invalid"}
+                )
                 return
 
             logger.info(f"Starting task consumption", extra={"consumer_name": self.name})
@@ -152,6 +160,9 @@ class NatsTaskConsumer(Generic[MsgType]):
                         "consumer_name": self.name,
                     },
                 )
+                task_observer.observe(
+                    time.monotonic() - _task_start, labels={"name": self.name, "status": "cancelled"}
+                )
                 await msg.nak()
             except Exception as e:
                 errors.capture_exception(e)
@@ -162,6 +173,9 @@ class NatsTaskConsumer(Generic[MsgType]):
                     },
                     exc_info=e,
                 )
+                task_observer.observe(
+                    time.monotonic() - _task_start, labels={"name": self.name, "status": "failed"}
+                )
                 # Nak the message to retry
                 await asyncio.sleep(BEFORE_NAK_SLEEP_SECONDS)
                 await msg.nak()
@@ -171,6 +185,9 @@ class NatsTaskConsumer(Generic[MsgType]):
                     extra={
                         "consumer_name": self.name,
                     },
+                )
+                task_observer.observe(
+                    time.monotonic() - _task_start, labels={"name": self.name, "status": "successful"}
                 )
                 await msg.ack()
 
