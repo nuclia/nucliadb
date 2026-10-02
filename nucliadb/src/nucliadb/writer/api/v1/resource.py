@@ -577,6 +577,13 @@ async def delete_resource_batch(request: Request, item: BatchDeleteRequest, kbid
                 rid = UUID(doc.uuid).hex
                 deletes.add(rid)
 
+    if not deletes:
+        # nothing matched the filter
+        return BatchDeleteResponse(
+            delete_id=uuid4(),
+            resources=[],
+        )
+
     # schedule a delete job with the delete set. We ignore out-of-sync index
     # issues and return the set of resources got from nidx to the user.
     audit = Audit()
