@@ -270,6 +270,24 @@ jobs:
     needs:
       - build-nidx-binary
       - build-virtual-env
+    services:
+      marklogic:
+        image: progressofficial/marklogic-db:12.1.0-ubi-2.3.0
+        env:
+          MARKLOGIC_INIT: "true"
+          MARKLOGIC_ADMIN_USERNAME: admin
+          MARKLOGIC_ADMIN_PASSWORD: admin
+        ports:
+          - 8000:8000
+          - 8002:8002
+        options: >-
+          --hostname marklogic
+          --cap-drop NET_RAW
+          --health-cmd "curl -fsS http://localhost:7997/LATEST/healthcheck || curl -fsS http://localhost:7997"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 60
+          --health-start-period 60s
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Setup Python
@@ -314,18 +332,23 @@ jobs:
         shard: [0, 1, 2]
 
     services:
-      postgres:
-        image: postgres:13
+      marklogic:
+        image: progressofficial/marklogic-db:12.1.0-ubi-2.3.0
         env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 1s
-          --health-retries 5
+          MARKLOGIC_INIT: "true"
+          MARKLOGIC_ADMIN_USERNAME: admin
+          MARKLOGIC_ADMIN_PASSWORD: admin
         ports:
-          - 5432:5432
-
+          - 8000:8000
+          - 8002:8002
+        options: >-
+          --hostname marklogic
+          --cap-drop NET_RAW
+          --health-cmd "curl -fsS http://localhost:7997/LATEST/healthcheck || curl -fsS http://localhost:7997"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 60
+          --health-start-period 60s
     steps:
       - name: Checkout the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -343,8 +366,6 @@ jobs:
           fail-on-cache-miss: true
 
       - name: Run NucliaDB tests
-        env:
-          TESTING_PG_URL: "postgresql://postgres:postgres@localhost/postgres"
         run: |
           source .venv/bin/activate &&
           make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" ||
@@ -363,6 +384,24 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - build-virtual-env
+    services:
+      marklogic:
+        image: progressofficial/marklogic-db:12.1.0-ubi-2.3.0
+        env:
+          MARKLOGIC_INIT: "true"
+          MARKLOGIC_ADMIN_USERNAME: admin
+          MARKLOGIC_ADMIN_PASSWORD: admin
+        ports:
+          - 8000:8000
+          - 8002:8002
+        options: >-
+          --hostname marklogic
+          --cap-drop NET_RAW
+          --health-cmd "curl -fsS http://localhost:7997/LATEST/healthcheck || curl -fsS http://localhost:7997"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 60
+          --health-start-period 60s
     strategy:
       fail-fast: false
       matrix:

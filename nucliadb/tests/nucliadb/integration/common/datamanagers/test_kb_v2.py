@@ -27,7 +27,7 @@ Covers every public function in the module:
 
 import pytest
 
-from nucliadb.common.datamanagers import kb, resources
+from nucliadb.common.datamanagers import kb, marklogic_documents, resources
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -94,13 +94,50 @@ async def test_kb_lifecycle_manages_its_marklogic_database(maindb_driver: Driver
     async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await resources.exists(txn, kbid=kbid, rid=rid) is True
 
-    async with maindb_driver.rw_transaction() as txn:
-        await kb.delete(txn, kbid=kbid)
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
+        await KnowledgeBox.delete_all_kb_keys(txn, kbid)
         await txn.commit()
 
     assert await _database_exists(maindb_driver, database) is False
     async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await resources.exists(txn, kbid=kbid, rid=rid) is False
+
+
+@pytest.mark.asyncio
+async def test_kb_documents_are_isolated_and_soft_delete_preserves_them(maindb_driver: Driver) -> None:
+    assert isinstance(maindb_driver, MarkLogicDriver)
+    kbid = new_kbid()
+    config = make_config("Isolated KB")
+    shards = make_shards(kbid)
+    async with maindb_driver.rw_transaction() as txn:
+        await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
+        await kb.set(txn, kbid=kbid, config=config, shards=shards)
+        await txn.commit()
+
+    async with maindb_driver.ro_transaction() as txn:
+        registry = await marklogic_documents.read(txn, maindb_driver.system_database, kb._uri(kbid))
+        assert registry == {"kbid": kbid, "slug": f"slug-{kbid}"}
+        for column in ("config", "shards"):
+            assert (
+                await marklogic_documents.read(txn, maindb_driver.system_database, kb._uri(kbid, column))
+                is None
+            )
+            content = await marklogic_documents.read(
+                txn, maindb_driver.kb_database(kbid), kb._uri(kbid, column)
+            )
+            assert content is not None and column in content
+
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
+        await kb.soft_delete(txn, kbid=kbid)
+        await txn.commit()
+    assert await _database_exists(maindb_driver, maindb_driver.kb_database(kbid)) is True
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
+        metadata = await kb.get(txn, kbid=kbid, columns=("slug", "deleted_at"))
+        assert metadata is not None
+        assert metadata.slug is None
+        assert metadata.deleted_at is not None
+        assert await kb.get_config(txn, kbid=kbid) == config
+        assert await kb.get_shards(txn, kbid=kbid) == shards
 
 
 # ---------------------------------------------------------------------------

@@ -441,15 +441,12 @@ class KnowledgeBox:
             await catalog_delete_kb(txn, kbid)
             await txn.commit()
 
-        # Delete by prefix in another transaction, as it can be slow and we don't want to block the previous one
         async with driver.rw_transaction(kbid=kbid) as txn:
             await cls.delete_all_kb_keys(txn, kbid)
             await txn.commit()
 
     @classmethod
     async def delete_all_kb_keys(cls, txn: Transaction, kbid: str):
-        prefix = KB_KEYS.format(kbid=kbid)
-        await txn.delete_by_prefix(prefix)
         await datamanagers.kb.delete(txn, kbid=kbid)
 
     async def get_resource_shard(self, shard_id: str) -> writer_pb2.ShardObject | None:
