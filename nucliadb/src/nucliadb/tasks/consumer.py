@@ -35,7 +35,7 @@ from nucliadb_telemetry import errors, metrics
 from nucliadb_utils.nats import NatsMessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 
-BEFORE_NAK_SLEEP_SECONDS = 2
+REDELIVERY_AFTER_NAK_DELAY_SECONDS = 2
 
 
 task_observer = metrics.Histogram("nucliadb_task_duration_seconds", labels={"name": "", "status": ""})
@@ -177,8 +177,7 @@ class NatsTaskConsumer(Generic[MsgType]):
                     time.monotonic() - _task_start, labels={"name": self.name, "status": "failed"}
                 )
                 # Nak the message to retry
-                await asyncio.sleep(BEFORE_NAK_SLEEP_SECONDS)
-                await msg.nak()
+                await msg.nak(delay=REDELIVERY_AFTER_NAK_DELAY_SECONDS)
             else:
                 logger.info(
                     f"Successful task",
