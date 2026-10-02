@@ -1035,7 +1035,7 @@ class ChatModel(BaseModel):
     """
 
     question: str = Field(description="Question to ask the generative model")
-    user_id: str
+    user_id: str = "USER"
     retrieval: bool = True
     system: str | None = Field(
         default=None,

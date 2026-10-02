@@ -21,6 +21,13 @@ from pydantic_core import ValidationError
 from nucliadb_models import common, search
 
 
+def test_chat_model_defaults_user_id():
+    chat = search.ChatModel(question="Test?")
+
+    assert chat.user_id == "USER"
+    assert "user_id" not in search.ChatModel.model_json_schema()["required"]
+
+
 def test_filter_model_validator():
     search.Filter(none=["c"])
 
