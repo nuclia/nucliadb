@@ -47,7 +47,7 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    async with context.kv_driver.ro_transaction() as txn:
+    async with context.kv_driver.ro_transaction(kbid=kbid) as txn:
         vectorsets_count = len([vs async for vs in datamanagers.vectorsets.iter(txn, kbid=kbid)])
     if vectorsets_count > 0:
         logger.info("Skipping KB with vectorsets already populated", extra={"kbid": kbid})

@@ -246,7 +246,7 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
                 purge_payload.ParseFromString(value)
 
             fields: list[Field] = []
-            async with driver.ro_transaction() as txn:
+            async with driver.ro_transaction(kbid=kbid) as txn:
                 kb = KnowledgeBox(txn, storage, kbid)
                 async for resource in kb.iterate_resources():
                     fields.extend((await resource.get_fields()).values())

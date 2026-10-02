@@ -21,13 +21,10 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncGenerator, Callable
-from typing import cast
 
 from nucliadb import logger
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.maindb.pg import PGDriver
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.migrator.datamanager import MigrationsDataManager
 from nucliadb_telemetry import metrics
 from nucliadb_telemetry.logs import setup_logging
@@ -85,22 +82,8 @@ async def update_resource_metrics(context: ApplicationContext):
     """
     Report the number of pending resources older than some estimated processing time
     """
-    driver = get_driver()
-    if not isinstance(driver, PGDriver):
-        return
-
-    async with driver._get_connection() as conn, conn.cursor() as cur:
-        await cur.execute(
-            "SELECT COUNT(*) FROM catalog "
-            "WHERE labels @> '{/n/s/PENDING}' "
-            "AND COALESCE(modified_at, created_at) BETWEEN NOW() - INTERVAL '1 month' AND NOW() - INTERVAL '6 hours'"
-        )
-        count = cast(tuple[int], await cur.fetchone())[0]
-        PENDING_RESOURCE_COUNT.set(count)
-
-        await cur.execute("SELECT COUNT(*) FROM catalog")
-        count = cast(tuple[int], await cur.fetchone())[0]
-        RESOURCES_COUNT.set(count)
+    # TODO(Marklogic)
+    return
 
 
 async def run_exporter_task(context: ApplicationContext, exporter_task: Callable, interval: float):

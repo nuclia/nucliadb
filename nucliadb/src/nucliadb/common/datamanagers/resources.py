@@ -19,16 +19,14 @@
 #
 """MarkLogic datamanager for KB resources."""
 
-import asyncio
-import base64
 import json
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Final, Literal, TypeAlias, cast
 
-from marklogic.documents import Document  # type: ignore[import-untyped]
 from typing_extensions import assert_never
 
+from nucliadb.common.datamanagers import marklogic_documents as documents
 from nucliadb.common.datamanagers.utils import (
     UNSET,
     _UnsetType,
@@ -39,8 +37,6 @@ from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
-from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb_protos import resources_pb2
 
 ResourceColumn: TypeAlias = Literal["slug", "shard", "basic", "origin", "security", "extra"]
@@ -78,7 +74,7 @@ ResourceColumnValueType = (
     | resources_pb2.Security
     | resources_pb2.Extra
 )
-SerializedResourceColumnValueType = str | None | bytes
+SerializedResourceColumnValueType = str | None | dict
 
 
 def _serialize_resource_column(
@@ -90,14 +86,11 @@ def _serialize_resource_column(
         return None
     elif isinstance(value, str):
         return value
-    elif isinstance(value, resources_pb2.Basic):
-        return value.SerializeToString()
-    elif isinstance(value, resources_pb2.Origin):
-        return value.SerializeToString()
-    elif isinstance(value, resources_pb2.Security):
-        return value.SerializeToString()
-    elif isinstance(value, resources_pb2.Extra):
-        return value.SerializeToString()
+    elif isinstance(
+        value,
+        (resources_pb2.Basic, resources_pb2.Origin, resources_pb2.Security, resources_pb2.Extra),
+    ):
+        return documents.to_json(value)
     else:  # pragma: no cover
         assert_never(value)
 
@@ -112,25 +105,17 @@ def _deserialize_resource_column(
     elif column == "shard":
         return str(value)
     elif column == "basic":
-        assert isinstance(value, bytes)
-        pb = resources_pb2.Basic()
-        pb.ParseFromString(value)
-        return pb
+        assert isinstance(value, dict)
+        return documents.from_json(value, resources_pb2.Basic)
     elif column == "origin":
-        assert isinstance(value, bytes)
-        pb_origin = resources_pb2.Origin()
-        pb_origin.ParseFromString(value)
-        return pb_origin
+        assert isinstance(value, dict)
+        return documents.from_json(value, resources_pb2.Origin)
     elif column == "security":
-        assert isinstance(value, bytes)
-        pb_security = resources_pb2.Security()
-        pb_security.ParseFromString(value)
-        return pb_security
+        assert isinstance(value, dict)
+        return documents.from_json(value, resources_pb2.Security)
     elif column == "extra":
-        assert isinstance(value, bytes)
-        pb_extra = resources_pb2.Extra()
-        pb_extra.ParseFromString(value)
-        return pb_extra
+        assert isinstance(value, dict)
+        return documents.from_json(value, resources_pb2.Extra)
     else:  # pragma: no cover
         assert_never(column)
 
@@ -177,7 +162,7 @@ async def _set(
     extra: resources_pb2.Extra | None | _UnsetType = UNSET,
 ) -> None:
     """Upsert only explicitly provided resource fields."""
-    driver, marklogic_txn = _driver_txn(txn)
+    driver, _ = documents.driver_txn(txn)
     values = {
         "slug": _serialize_resource_column(slug),
         "shard": _serialize_resource_column(shard),
@@ -194,59 +179,26 @@ async def _set(
     if not columns_to_set:
         return
 
-    content = _content(await _read(driver, marklogic_txn, kbid, rid)) or {}
-    content.update(kbid=kbid, rid=rid)
+    database = await driver.ensure_kb_database(kbid)
+    content = await documents.read(txn, database, _uri(rid)) or {"rid": rid}
     for column in columns_to_set:
-        value = values[column]
-        content[column] = base64.b64encode(value).decode("ascii") if isinstance(value, bytes) else value
+        content[column] = values[column]
     if "basic" in columns_to_set:
         content["title"] = basic.title if isinstance(basic, resources_pb2.Basic) else None
-    response = await asyncio.to_thread(
-        driver.client.documents.write,
-        Document(
-            uri=_uri(kbid, rid),
-            content=content,
-            collections=[MarkLogicCollections.RESOURCES],
-            content_type="application/json",
-        ),
-        tx=marklogic_txn.transaction,
-        params={"database": driver.database},
-    )
-    driver.data._check(response, "write resource")
+    await documents.write(txn, database, _uri(rid), MarkLogicCollections.RESOURCES, content)
 
 
-def _driver_txn(txn: Transaction) -> tuple[MarkLogicDriver, MarkLogicTransaction]:
-    driver = get_driver()
-    if not isinstance(driver, MarkLogicDriver) or not isinstance(txn, MarkLogicTransaction):
-        raise TypeError("Resource datamanager requires MarkLogicDriver")
-    return driver, txn
+def _uri(rid: str) -> str:
+    return f"/resources/{rid}.json"
 
 
-def _uri(kbid: str, rid: str) -> str:
-    return f"resources/{kbid}/{rid}.json"
+async def _database(txn: Transaction, kbid: str) -> str:
+    driver, _ = documents.driver_txn(txn)
+    return driver.kb_database(kbid)
 
 
-def _content(document: Document | None) -> dict | None:
-    if document is None:
-        return None
-    if not isinstance(document.content, dict):
-        raise RuntimeError(f"Invalid resource document: {document.uri}")
-    return dict(document.content)
-
-
-async def _read(
-    driver: MarkLogicDriver, txn: MarkLogicTransaction, kbid: str, rid: str
-) -> Document | None:
-    params = {"database": driver.database}
-    if txn.transaction is not None:
-        params["txid"] = txn.transaction.id
-    result = await asyncio.to_thread(
-        driver.client.documents.read,
-        _uri(kbid, rid),
-        tx=txn.transaction,
-        params=params,
-    )
-    return result[0] if isinstance(result, list) and result else None
+async def _read(txn: Transaction, kbid: str, rid: str) -> dict | None:
+    return await documents.read(txn, await _database(txn, kbid), _uri(rid))
 
 
 @observer.wrap({"type": "resources", "op": "set_slug"})
@@ -297,12 +249,9 @@ async def update_slug(
 
 @observer.wrap({"type": "resources", "op": "delete"})
 async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
-    driver, marklogic_txn = _driver_txn(txn)
-    params = {"database": driver.database, "uri": _uri(kbid, rid)}
-    if marklogic_txn.transaction is not None:
-        params["txid"] = marklogic_txn.transaction.id
-    response = await asyncio.to_thread(driver.client.delete, "/v1/documents", params=params)
-    driver.data._check(response, "delete resource")
+    database = await _database(txn, kbid)
+    await documents.delete_resource_children(txn, database, rid)
+    await documents.delete(txn, database, _uri(rid))
 
 
 # ---------------------------------------------------------------------------
@@ -312,8 +261,7 @@ async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
 
 @observer.wrap({"type": "resources", "op": "exists"})
 async def exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
-    driver, marklogic_txn = _driver_txn(txn)
-    return await _read(driver, marklogic_txn, kbid, rid) is not None
+    return await _read(txn, kbid, rid) is not None
 
 
 @observer.wrap({"type": "resources", "op": "get_rid"})
@@ -322,18 +270,17 @@ async def get_rid(txn: Transaction, *, kbid: str, slug: str) -> str | None:
 
 
 async def _find_rid(txn: Transaction, kbid: str, slug: str) -> str | None:
-    driver, marklogic_txn = _driver_txn(txn)
     javascript = (
         "cts.uris('', ['document'], cts.andQuery(["
         f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)}), "
-        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.KBID)}, '=', {json.dumps(kbid)}), "
         f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.SLUG)}, '=', {json.dumps(slug)})]))"
     )
-    params = {"database": driver.database}
-    if marklogic_txn.transaction is not None:
-        params["txid"] = marklogic_txn.transaction.id
-    uris = await asyncio.to_thread(driver.client.eval, javascript=javascript, params=params) or []
-    return str(uris[0]).rsplit("/", 1)[-1].removesuffix(".json") if uris else None
+    uris = await documents.evaluate(txn, await _database(txn, kbid), javascript)
+    return _rid_from_uri(uris[0]) if uris else None
+
+
+def _rid_from_uri(uri: object) -> str:
+    return str(uri).rsplit("/", 1)[-1].removesuffix(".json")
 
 
 @observer.wrap({"type": "resources", "op": "get_by_slug"})
@@ -342,11 +289,8 @@ async def get_by_slug(txn: Transaction, *, kbid: str, slug: str) -> ResourceData
     return await _get(txn, kbid=kbid, rid=rid, columns=ALL_COLUMNS) if rid is not None else None
 
 
-def _kb_query(kbid: str) -> list[str]:
-    return [
-        f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)})",
-        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.KBID)}, '=', {json.dumps(kbid)})",
-    ]
+def _resources_query() -> list[str]:
+    return [f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)})"]
 
 
 @observer.wrap({"type": "resources", "op": "search"})
@@ -357,8 +301,7 @@ async def search(
     title: str | None = None,
     slug: str | None = None,
 ) -> list[tuple[str, ResourceData]]:
-    driver, marklogic_txn = _driver_txn(txn)
-    clauses = _kb_query(kbid)
+    clauses = _resources_query()
     for path, value in (
         (MarkLogicIndexPaths.TITLE, title),
         (MarkLogicIndexPaths.SLUG, slug),
@@ -369,13 +312,10 @@ async def search(
                 f"{json.dumps('*' + value + '*')}, ['wildcarded'])"
             )
     javascript = f"cts.uris('', ['document', 'item-order'], cts.andQuery([{', '.join(clauses)}]))"
-    params = {"database": driver.database}
-    if marklogic_txn.transaction is not None:
-        params["txid"] = marklogic_txn.transaction.id
-    uris = await asyncio.to_thread(driver.client.eval, javascript=javascript, params=params) or []
+    uris = await documents.evaluate(txn, await _database(txn, kbid), javascript)
     results: list[tuple[str, ResourceData]] = []
     for uri in uris:
-        rid = str(uri).rsplit("/", 1)[-1].removesuffix(".json")
+        rid = _rid_from_uri(uri)
         resource = await _get(txn, kbid=kbid, rid=rid, columns=ALL_COLUMNS)
         if resource is not None:
             results.append((rid, resource))
@@ -397,29 +337,22 @@ async def get_basic(
 
 @observer.wrap({"type": "resources", "op": "iter"})
 async def iter(*, kbid: str) -> AsyncIterator[str]:
-    async with with_ro_transaction() as txn:
-        driver, marklogic_txn = _driver_txn(txn)
-        uris = await _resource_uris(driver, marklogic_txn, kbid)
+    async with with_ro_transaction(kbid=kbid) as txn:
+        uris = await _resource_uris(txn, kbid)
         for uri in sorted(str(uri) for uri in uris):
-            yield uri.rsplit("/", 1)[-1].removesuffix(".json")
+            yield _rid_from_uri(uri)
 
 
 @observer.wrap({"type": "resources", "op": "count"})
 async def count(txn: Transaction, *, kbid: str) -> int:
-    driver, marklogic_txn = _driver_txn(txn)
-    javascript = f"cts.estimate(cts.andQuery([{', '.join(_kb_query(kbid))}]))"
-    params = {"database": driver.database}
-    if marklogic_txn.transaction is not None:
-        params["txid"] = marklogic_txn.transaction.id
-    result = await asyncio.to_thread(driver.client.eval, javascript=javascript, params=params)
-    if isinstance(result, list):
-        result = result[0] if result else 0
-    return int(result or 0)
+    javascript = f"cts.estimate(cts.andQuery([{', '.join(_resources_query())}]))"
+    result = await documents.evaluate(txn, await _database(txn, kbid), javascript)
+    return int(result[0] if result else 0)
 
 
-def _shard_query(kbid: str, shard_id: str) -> list[str]:
+def _shard_query(shard_id: str) -> list[str]:
     return [
-        *_kb_query(kbid),
+        *_resources_query(),
         f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.SHARD)}, '=', {json.dumps(shard_id)})",
     ]
 
@@ -430,41 +363,26 @@ async def get_resources_from_shard(
 ) -> list[str]:
     if limit <= 0:
         return []
-    driver, marklogic_txn = _driver_txn(txn)
     javascript = (
         f"cts.uris('', {json.dumps(['document', 'item-order', f'limit={limit}'])}, "
-        f"cts.andQuery([{', '.join(_shard_query(kbid, shard_id))}]))"
+        f"cts.andQuery([{', '.join(_shard_query(shard_id))}]))"
     )
-    params = {"database": driver.database}
-    if marklogic_txn.transaction is not None:
-        params["txid"] = marklogic_txn.transaction.id
-    uris = await asyncio.to_thread(driver.client.eval, javascript=javascript, params=params) or []
-    return [str(uri).rsplit("/", 1)[-1].removesuffix(".json") for uri in uris]
+    uris = await documents.evaluate(txn, await _database(txn, kbid), javascript)
+    return [_rid_from_uri(uri) for uri in uris]
 
 
 @observer.wrap({"type": "resources", "op": "count_resources_in_shard"})
 async def count_resources_in_shard(txn: Transaction, *, kbid: str, shard_id: str) -> int:
-    driver, marklogic_txn = _driver_txn(txn)
-    javascript = f"cts.estimate(cts.andQuery([{', '.join(_shard_query(kbid, shard_id))}]))"
-    params = {"database": driver.database}
-    if marklogic_txn.transaction is not None:
-        params["txid"] = marklogic_txn.transaction.id
-    result = await asyncio.to_thread(driver.client.eval, javascript=javascript, params=params)
-    if isinstance(result, list):
-        result = result[0] if result else 0
-    return int(result or 0)
+    javascript = f"cts.estimate(cts.andQuery([{', '.join(_shard_query(shard_id))}]))"
+    result = await documents.evaluate(txn, await _database(txn, kbid), javascript)
+    return int(result[0] if result else 0)
 
 
-async def _resource_uris(driver: MarkLogicDriver, txn: MarkLogicTransaction, kbid: str) -> list[str]:
+async def _resource_uris(txn: Transaction, kbid: str) -> list[str]:
     javascript = (
-        "cts.uris('', ['document', 'item-order'], cts.andQuery(["
-        f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)}), "
-        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.KBID)}, '=', {json.dumps(kbid)})]))"
+        f"cts.uris('', ['document', 'item-order'], cts.andQuery([{', '.join(_resources_query())}]))"
     )
-    params = {"database": driver.database}
-    if txn.transaction is not None:
-        params["txid"] = txn.transaction.id
-    return await asyncio.to_thread(driver.client.eval, javascript=javascript, params=params) or []
+    return await documents.evaluate(txn, await _database(txn, kbid), javascript)
 
 
 @observer.wrap({"type": "resources", "op": "get_shard"})
@@ -480,21 +398,12 @@ async def get_shard(txn: Transaction, *, kbid: str, rid: str, for_update: bool =
 async def get_shards(txn: Transaction, *, kbid: str, rids: list[str]) -> dict[str, str]:
     if not rids:
         return {}
-    driver, marklogic_txn = _driver_txn(txn)
-    result = await asyncio.to_thread(
-        driver.client.documents.read,
-        [_uri(kbid, rid) for rid in rids],
-        tx=marklogic_txn.transaction,
-        params={"database": driver.database},
-    )
-    if not isinstance(result, list):
-        driver.data._check(result, "read resource shards")
-        return {}
-    return {
-        str(document.uri).rsplit("/", 1)[-1].removesuffix(".json"): content["shard"]
-        for document in result
-        if (content := _content(document)) is not None and content.get("shard") is not None
-    }
+    shards: dict[str, str] = {}
+    for rid in rids:
+        content = await _read(txn, kbid, rid)
+        if content is not None and content.get("shard") is not None:
+            shards[rid] = content["shard"]
+    return shards
 
 
 @observer.wrap({"type": "resources", "op": "get"})
@@ -528,14 +437,11 @@ async def _get(
     if not columns:
         raise ValueError("At least one resource column must be requested")
 
-    driver, marklogic_txn = _driver_txn(txn)
-    content = _content(await _read(driver, marklogic_txn, kbid, rid))
+    content = await _read(txn, kbid, rid)
     if content is None:
         return None
     resource = ResourceData()
     for column_name in columns:
         value = content.get(column_name)
-        if value is not None and column_name in ("basic", "origin", "security", "extra"):
-            value = base64.b64decode(value)
         setattr(resource, column_name, _deserialize_resource_column(column_name, value))
     return resource

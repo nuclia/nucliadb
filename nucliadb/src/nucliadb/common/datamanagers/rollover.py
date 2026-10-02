@@ -143,18 +143,18 @@ async def iter_indexed_keys(*, kbid: str) -> AsyncGenerator[str, None]:
     internally managed
     """
     start_key = KB_ROLLOVER_RESOURCES_INDEXED.format(kbid=kbid, resource="")
-    async with with_ro_transaction() as txn:
+    async with with_ro_transaction(kbid=kbid) as txn:
         async for key in txn.keys(match=start_key):
             yield key.split("/")[-1]
 
 
 async def _get_batch_indexed_data(*, kbid, batch: list[str]) -> list[tuple[str, tuple[str, int]]]:
-    async with with_ro_transaction() as txn:
+    async with with_ro_transaction(kbid=kbid) as txn:
         values = await txn.batch_get(
             [
                 KB_ROLLOVER_RESOURCES_INDEXED.format(kbid=kbid, resource=resource_id)
                 for resource_id in batch
-            ]
+            ],
         )
     results: list[tuple[str, tuple[str, int]]] = []
     for key, val in zip(batch, values):

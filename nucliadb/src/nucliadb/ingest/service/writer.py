@@ -238,7 +238,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def GetEntities(self, request: GetEntitiesRequest, context=None) -> GetEntitiesResponse:
         response = GetEntitiesResponse()
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = GetEntitiesResponse.Status.NOTFOUND
@@ -260,7 +260,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: ListEntitiesGroupsRequest, context=None
     ) -> ListEntitiesGroupsResponse:
         response = ListEntitiesGroupsResponse()
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = ListEntitiesGroupsResponse.Status.NOTFOUND
@@ -284,7 +284,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: GetEntitiesGroupRequest, context=None
     ) -> GetEntitiesGroupResponse:
         response = GetEntitiesGroupResponse()
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
@@ -313,7 +313,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             rid = request.rid
             async with (
                 locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=rid)),
-                self.driver.rw_transaction() as txn,
+                self.driver.rw_transaction(kbid=kbid) as txn,
             ):
                 kbobj = KnowledgeBoxORM(txn, self.storage, kbid)
                 resobj = ResourceORM(txn, self.storage, kbid, rid)

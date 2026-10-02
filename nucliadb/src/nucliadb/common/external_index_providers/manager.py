@@ -49,7 +49,7 @@ async def get_default_vectorset_id(kbid: str) -> str | None:
     that KBs that have only one semantic model will have the `vectorset_id` field on BrokerMessage.field_vectors
     set to empty string -- that is the `default` vectorset concept.
     """
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         vss = []
         async for vs_id, vs_config in datamanagers.vectorsets.iter(txn, kbid=kbid):
             vss.append((vs_id, vs_config))
@@ -68,5 +68,5 @@ async def get_default_vectorset_id(kbid: str) -> str | None:
 async def get_rollover_external_index_metadata(
     kbid: str,
 ) -> StoredExternalIndexProviderMetadata | None:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         return await datamanagers.rollover.get_kb_rollover_external_index_metadata(txn, kbid=kbid)

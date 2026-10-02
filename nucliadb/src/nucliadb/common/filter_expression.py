@@ -154,7 +154,7 @@ async def parse_kv_expression(
     used
 
     """
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         all_schemas = await datamanagers.kv_schemas.get_all(txn, kbid=kbid)
     return _parse_kv_expression(expr, all_schemas)
 

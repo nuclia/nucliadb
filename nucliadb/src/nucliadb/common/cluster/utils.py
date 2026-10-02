@@ -71,7 +71,7 @@ def get_shard_manager() -> KBShardManager:
 
 
 async def get_resource(kbid: str, resource_id: str) -> Resource | None:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         return await Resource.get(txn, kbid=kbid, rid=resource_id)
 
 
@@ -79,7 +79,7 @@ async def get_resource(kbid: str, resource_id: str) -> Resource | None:
 async def get_rollover_resource_index_message(
     kbid: str, resource_id: str
 ) -> nodereader_pb2.Resource | None:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         resource = await Resource.get(txn, kbid=kbid, rid=resource_id)
         if resource is None:
             logger.warning(

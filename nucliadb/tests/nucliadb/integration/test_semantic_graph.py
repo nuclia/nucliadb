@@ -65,15 +65,12 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
 
     node_vectorset = None
     edge_vectorset = None
-    async with datamanagers.with_ro_transaction() as txn:
-        node_vectorsets = await datamanagers.graph_vectorsets.node.get_all(
-            txn, kbid=standalone_knowledgebox
-        )
+    kbid = standalone_knowledgebox
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
+        node_vectorsets = await datamanagers.graph_vectorsets.node.get_all(txn, kbid=kbid)
         node_vectorset = node_vectorsets[0].vectorset_id
 
-        edge_vectorsets = await datamanagers.graph_vectorsets.edge.get_all(
-            txn, kbid=standalone_knowledgebox
-        )
+        edge_vectorsets = await datamanagers.graph_vectorsets.edge.get_all(txn, kbid=kbid)
         edge_vectorset = edge_vectorsets[0].vectorset_id
 
     assert node_vectorset is not None

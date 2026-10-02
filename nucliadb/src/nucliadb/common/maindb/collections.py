@@ -1,8 +1,6 @@
 class MarkLogicCollections:
     KNOWLEDGEBOXES = "knowledgeboxes"
     RESOURCES = "resources"
+    FIELDS = "fields"
+    CONVERSATIONS = "conversations"
     MAINDB = "nucliadb-maindb"
-
-    @classmethod
-    def all(cls) -> tuple[str, ...]:
-        return (cls.KNOWLEDGEBOXES, cls.RESOURCES, cls.MAINDB)

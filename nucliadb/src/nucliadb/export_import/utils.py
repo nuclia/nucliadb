@@ -178,7 +178,7 @@ async def import_binary(
 
 
 async def set_synonyms(context: ApplicationContext, kbid: str, synonyms: kb_pb2.Synonyms) -> None:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         await datamanagers.synonyms.set(txn, kbid=kbid, synonyms=synonyms)
         await txn.commit()
 
@@ -186,14 +186,14 @@ async def set_synonyms(context: ApplicationContext, kbid: str, synonyms: kb_pb2.
 async def set_search_configurations(
     context: ApplicationContext, kbid: str, search_configurations: dict[str, SearchConfiguration]
 ) -> None:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         for name, config in search_configurations.items():
             await datamanagers.search_configurations.set(txn, kbid=kbid, name=name, config=config)
         await txn.commit()
 
 
 async def set_labels(context: ApplicationContext, kbid: str, labels: kb_pb2.Labels) -> None:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         await datamanagers.labels.set_labels(txn, kbid=kbid, labels=labels)
         await txn.commit()
 
@@ -206,7 +206,7 @@ async def iter_kb_resource_uuids(context: ApplicationContext, kbid: str) -> Asyn
 async def get_broker_message(
     context: ApplicationContext, kbid: str, rid: str
 ) -> writer_pb2.BrokerMessage | None:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         resource = await Resource.get(txn, kbid=kbid, rid=rid)
         if resource is None:
             return None
@@ -283,29 +283,29 @@ async def download_binary(
 
 
 async def get_labels(context: ApplicationContext, kbid: str) -> kb_pb2.Labels:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         return await datamanagers.labels.get_labels(txn, kbid=kbid)
 
 
 async def get_synonyms(context: ApplicationContext, kbid: str) -> kb_pb2.Synonyms:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         return await datamanagers.synonyms.get(txn, kbid=kbid) or kb_pb2.Synonyms()
 
 
 async def get_search_configurations(
     context: ApplicationContext, kbid: str
 ) -> dict[str, SearchConfiguration]:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         return await datamanagers.search_configurations.list(txn, kbid=kbid)
 
 
 async def get_kv_schemas(context: ApplicationContext, kbid: str) -> KBKVSchemas:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         return await datamanagers.kv_schemas.get_all(txn, kbid=kbid)
 
 
 async def set_kv_schemas(context: ApplicationContext, kbid: str, schemas: KBKVSchemas) -> None:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         for schema in schemas.schemas.values():
             await datamanagers.kv_schemas.set(txn, kbid=kbid, schema=schema)
         await txn.commit()

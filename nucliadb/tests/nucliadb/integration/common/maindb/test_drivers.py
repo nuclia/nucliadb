@@ -18,15 +18,34 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import asyncio
 import uuid
 
 import pytest
-from marklogic.documents import Document  # type: ignore[import-untyped]
 
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
+from nucliadb.common.marklogic.client import Document
+
+
+async def test_transaction_scope_is_backward_compatible():
+    driver = Driver()
+
+    async with driver.ro_transaction():
+        pass
+
+    with pytest.raises(ValueError, match="either kbid or system=True"):
+        async with driver.rw_transaction(kbid="kb", system=True):
+            pass
+
+    with pytest.raises(ValueError, match="either kbid or system=True"):
+        async with driver.rw_transaction(system=False):
+            pass
+
+    async with driver.ro_transaction(system=True):
+        pass
+    async with driver.rw_transaction(kbid="kb"):
+        pass
 
 
 async def test_marklogic_driver_accessors():
@@ -61,21 +80,19 @@ async def test_delete_by_prefix_is_scoped_and_transactional(
     prefix = f"/bulk-delete/{uuid.uuid4()}/a"
     matching = (f"{prefix}/one", f"{prefix}/two")
     neighbor = f"{prefix[:-1]}b/keep"
-    other_uri = f"knowledgeboxes/{uuid.uuid4()}/config.json"
+    other_uri = f"/{uuid.uuid4()}/knowledgeboxes/config.json"
     async with driver.rw_transaction() as txn:
         assert isinstance(txn, MarkLogicTransaction)
-        assert txn.transaction is not None
         for key in (*matching, neighbor):
             await txn.set(key, key.encode())
-        response = await asyncio.to_thread(
-            driver.client.documents.write,
+        response = await driver.client.documents.write(
             Document(
                 uri=other_uri,
                 content={"maindb_key": matching[0]},
                 collections=[MarkLogicCollections.KNOWLEDGEBOXES],
                 content_type="application/json",
             ),
-            tx=txn.transaction,
+            tx=await txn.sdk_transaction(driver.database),
             params={"database": driver.database},
         )
         driver.data._check(response, "write test document")
@@ -96,19 +113,15 @@ async def test_delete_by_prefix_is_scoped_and_transactional(
 
     async with driver.ro_transaction() as txn:
         assert await txn.batch_get([*matching, neighbor]) == [None, None, neighbor.encode()]
-    documents = await asyncio.to_thread(
-        driver.client.documents.read, other_uri, params={"database": driver.database}
-    )
+    documents = await driver.client.documents.read(other_uri, params={"database": driver.database})
+    assert isinstance(documents, list)
     assert len(documents) == 1
 
     async with driver.rw_transaction() as txn:
         assert isinstance(txn, MarkLogicTransaction)
-        assert txn.transaction is not None
         await txn.delete(neighbor)
-        response = await asyncio.to_thread(
-            driver.client.delete,
-            "/v1/documents",
-            params={"database": driver.database, "uri": other_uri, "txid": txn.transaction.id},
+        response = await driver.client.documents.delete(
+            other_uri, params=await txn.params(driver.database)
         )
         driver.data._check(response, "delete test document")
         await txn.commit()

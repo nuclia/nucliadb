@@ -113,7 +113,7 @@ async def test_vectorsets_crud(
             assert {"id": "multilingual"} in body["vectorsets"]
             assert {"id": vectorset_id} in body["vectorsets"]
 
-            async with datamanagers.with_ro_transaction() as txn:
+            async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
                 vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset_id)
                 assert vs is not None
                 assert vs.vectorset_id == vectorset_id
@@ -139,7 +139,7 @@ async def test_vectorsets_crud(
             assert len(body["vectorsets"]) == 1
             assert {"id": "multilingual"} in body["vectorsets"]
 
-            async with datamanagers.with_ro_transaction() as txn:
+            async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
                 vs = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset_id)
                 assert vs is None
 

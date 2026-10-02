@@ -31,24 +31,13 @@ async def run_marklogic_schema_migrations(driver: Driver) -> None:
     if not isinstance(driver, MarkLogicDriver):
         raise RuntimeError("MarkLogic schema migrations require MarkLogicDriver")
 
-    ledger = MarkLogicDriver(
-        uri=driver.uri,
-        username=driver.username,
-        password=driver.password,
-        database="Documents",  # Use the default Documents database for the ledger
-        port=driver.port,
-        admin_port=driver.admin_port,
-    )
-    await ledger.initialize()
-    try:
-        for version, migration in get_marklogic_migrations():
-            key = f"{LEDGER_PREFIX}{version}"
-            async with ledger.ro_transaction() as transaction:
-                if await transaction.get(key) is not None:
-                    continue
-            await migration.migrate(driver)
-            async with ledger.rw_transaction() as transaction:
-                await transaction.set(key, migration.__name__.encode())
-                await transaction.commit()
-    finally:
-        await ledger.finalize()
+    await driver.ensure_system_database()
+    for version, migration in get_marklogic_migrations():
+        key = f"{LEDGER_PREFIX}{version}"
+        async with driver.ro_transaction() as transaction:
+            if await transaction.get(key) is not None:
+                continue
+        await migration.migrate(driver)
+        async with driver.rw_transaction() as transaction:
+            await transaction.set(key, migration.__name__.encode())
+            await transaction.commit()

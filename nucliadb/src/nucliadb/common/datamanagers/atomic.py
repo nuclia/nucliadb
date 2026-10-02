@@ -49,7 +49,7 @@ from . import labels as labels_dm
 from . import resources as resources_dm
 from . import search_configurations as search_configurations_dm
 from . import synonyms as synonyms_dm
-from .utils import with_ro_transaction, with_transaction
+from .utils import with_ro_transaction, with_rw_transaction
 
 P = ParamSpec("P")
 T = TypeVar("T")
@@ -67,7 +67,7 @@ def ro_txn_wrap(fun: Callable[Concatenate[Transaction, P], Awaitable[T]]) -> Cal
 def rw_txn_wrap(fun: Callable[Concatenate[Transaction, P], Awaitable[T]]) -> Callable[P, Awaitable[T]]:
     @wraps(fun)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-        async with with_transaction() as txn:
+        async with with_rw_transaction() as txn:
             result = await fun(txn, *args, **kwargs)
             await txn.commit()
             return result

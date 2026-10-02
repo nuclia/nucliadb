@@ -82,7 +82,7 @@ async def serialize(
     max_parallel_field_serializations: int = 16,
 ) -> Resource | None:
     driver = get_driver()
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         return await managed_serialize(
             txn,
             kbid,
@@ -158,6 +158,7 @@ async def serialize_resource(
     vectorset: str | None = None,
     max_parallel_field_serializations: int = 16,
 ) -> Resource:
+    kbid = orm_resource.kbid
     resource = Resource(id=orm_resource.uuid)
 
     include_values = ResourceProperties.VALUES in show
@@ -211,6 +212,7 @@ async def serialize_resource(
 
         if include_extracted_data:
             await serialize_fields_extracted_data(
+                kbid,
                 selected_fields,
                 extracted,
                 vectorset=vectorset,
@@ -445,6 +447,7 @@ async def serialize_fields_data(
 
 
 async def serialize_fields_extracted_data(
+    kbid: str,
     selected_fields: list[
         tuple[
             Field,
@@ -468,6 +471,7 @@ async def serialize_fields_extracted_data(
         *[
             limited_concurrency(
                 serialize_field_extracted_data(
+                    kbid,
                     field,
                     field_type_name,
                     field_data,
@@ -482,6 +486,7 @@ async def serialize_fields_extracted_data(
 
 
 async def serialize_field_extracted_data(
+    kbid: str,
     field: Field,
     field_type_name: FieldTypeName,
     serialized: (
@@ -719,7 +724,7 @@ async def serialize_extracted_vectors(field: Field, vectorset: str | None = None
 
 async def serialize_relation_node_vectors(field: Field) -> dict[str, list[RelationNodeVector]]:
     vectors: dict[str, list[RelationNodeVector]] = {}
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=field.kbid) as txn:
         for vs in await datamanagers.graph_vectorsets.node.get_all(txn, kbid=field.kbid):
             data_vec = await field.get_relation_node_vectors(vs.vectorset_id)
             if data_vec is None:
@@ -731,7 +736,7 @@ async def serialize_relation_node_vectors(field: Field) -> dict[str, list[Relati
 
 async def serialize_relation_edge_vectors(field: Field) -> dict[str, list[RelationEdgeVector]]:
     vectors: dict[str, list[RelationEdgeVector]] = {}
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=field.kbid) as txn:
         for vs in await datamanagers.graph_vectorsets.edge.get_all(txn, kbid=field.kbid):
             data_vec = await field.get_relation_edge_vectors(vs.vectorset_id)
             if data_vec is None:

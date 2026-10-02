@@ -1,247 +1,121 @@
-# Copyright (C) 2021 Bosutech XXI S.L.
-#
-# nucliadb is offered under the AGPL v3.0 and as commercial software.
-# For commercial licensing, contact us at info@nuclia.com.
-#
-# AGPL:
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Affero General Public License as
-# published by the Free Software Foundation, either version 3 of the
-# License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# GNU Affero General Public License for more details.
-#
-# You should have received a copy of the GNU Affero General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-"""
-Datamanager for the `kb_conversations` PostgreSQL table (migration 0016).
+"""MarkLogic datamanager for paginated conversation fields."""
 
-Each row stores one page of a conversation field, or the SplitsMetadata sentinel:
-  - kbid     - FK → kb_resources.kbid (ON DELETE CASCADE)
-  - rid      - FK → kb_resources.rid  (ON DELETE CASCADE)
-  - field_id - user-defined conversation field name
-  - page     - 1-based page number; the sentinel value 0 stores SplitsMetadata
-  - value    - serialised protobuf bytes:
-                 page = 0  → resources_pb2.SplitsMetadata
-                 page >= 1 → resources_pb2.Conversation (~200 messages each)
+import json
+from typing import TypeVar
+from urllib.parse import quote
 
-The FieldConversation metadata (page count, total, page size, extract/split strategy)
-is stored in kb_fields.value for the corresponding 'c'-type field row and is written
-directly here to avoid a cross-module import cycle with fields.
+from google.protobuf.message import Message
 
-NOTE: deleting a kb_resources row (or its parent kbs row) automatically removes all
-related kb_conversations rows via the ON DELETE CASCADE foreign key.
-"""
-
-from nucliadb.common.datamanagers.utils import _pg_cursor
+from nucliadb.common.datamanagers import fields
+from nucliadb.common.datamanagers import marklogic_documents as documents
+from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import FieldConversation, SplitsMetadata
 
-# Sentinel page number used to store SplitsMetadata in the kb_conversations table.
-# Real conversation pages are 1-based, so 0 is always free.
 _SPLITS_METADATA_PAGE = 0
 
-# ---------------------------------------------------------------------------
-# FieldConversation metadata  (stored in kb_fields, field_type = 'c')
-# ---------------------------------------------------------------------------
+PB = TypeVar("PB", bound=Message)
+
+
+def _directory(rid: str, field_id: str) -> str:
+    return f"/resources/{rid}/conversations/{quote(field_id, safe='')}/"
+
+
+def _page_uri(rid: str, field_id: str, page: int) -> str:
+    return f"{_directory(rid, field_id)}{page}.json"
+
+
+async def _database(txn: Transaction, kbid: str) -> str:
+    driver, _ = documents.driver_txn(txn)
+    return driver.kb_database(kbid)
+
+
+async def _read(
+    txn: Transaction, kbid: str, rid: str, field_id: str, page: int, pb_klass: type[PB]
+) -> PB | None:
+    content = await documents.read(txn, await _database(txn, kbid), _page_uri(rid, field_id, page))
+    if content is None or content.get("value") is None:
+        return None
+    return documents.from_json(content["value"], pb_klass)
+
+
+async def _write(
+    txn: Transaction, kbid: str, rid: str, field_id: str, page: int, value: Message
+) -> None:
+    driver, _ = documents.driver_txn(txn)
+    database = await driver.ensure_kb_database(kbid)
+    await documents.write(
+        txn,
+        database,
+        _page_uri(rid, field_id, page),
+        MarkLogicCollections.CONVERSATIONS,
+        {
+            "rid": rid,
+            "field_id": field_id,
+            "page": page,
+            "value": documents.to_json(value),
+        },
+    )
 
 
 async def get_metadata(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    field_id: str,
+    txn: Transaction, *, kbid: str, rid: str, field_id: str
 ) -> FieldConversation | None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            SELECT value FROM kb_fields
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_type = 'c' AND field_id = %(field_id)s
-            """,
-            {"kbid": kbid, "rid": rid, "field_id": field_id},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = FieldConversation()
-        pb.ParseFromString(bytes(row[0]))
-        return pb
+    return await fields.get(
+        txn, kbid=kbid, rid=rid, field_type="c", field_id=field_id, pb_klass=FieldConversation
+    )
 
 
 async def set_metadata(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    field_id: str,
-    metadata: FieldConversation,
+    txn: Transaction, *, kbid: str, rid: str, field_id: str, metadata: FieldConversation
 ) -> None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_fields (kbid, rid, field_type, field_id, value)
-            VALUES (%(kbid)s, %(rid)s, 'c', %(field_id)s, %(value)s)
-            ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
-                value = EXCLUDED.value
-            """,
-            {
-                "kbid": kbid,
-                "rid": rid,
-                "field_id": field_id,
-                "value": metadata.SerializeToString(),
-            },
-        )
-
-
-# ---------------------------------------------------------------------------
-# Conversation pages  (stored in kb_conversations, page >= 1)
-# ---------------------------------------------------------------------------
+    await fields.set(txn, kbid=kbid, rid=rid, field_type="c", field_id=field_id, value=metadata)
 
 
 async def get_page(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    field_id: str,
-    page: int,
+    txn: Transaction, *, kbid: str, rid: str, field_id: str, page: int
 ) -> PBConversation | None:
     if page <= 0:
         raise ValueError("Conversation pages start at index 1")
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            SELECT value FROM kb_conversations
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_type = 'c' AND field_id = %(field_id)s AND page = %(page)s
-            """,
-            {"kbid": kbid, "rid": rid, "field_id": field_id, "page": page},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = PBConversation()
-        pb.ParseFromString(bytes(row[0]))
-        return pb
+    return await _read(txn, kbid, rid, field_id, page, PBConversation)
 
 
 async def set_page(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    field_id: str,
-    page: int,
-    value: PBConversation,
+    txn: Transaction, *, kbid: str, rid: str, field_id: str, page: int, value: PBConversation
 ) -> None:
     if page <= 0:
         raise ValueError("Conversation pages start at index 1")
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_conversations (kbid, rid, field_type, field_id, page, value)
-            VALUES (%(kbid)s, %(rid)s, 'c', %(field_id)s, %(page)s, %(value)s)
-            ON CONFLICT (kbid, rid, field_type, field_id, page) DO UPDATE SET
-                value = EXCLUDED.value
-            """,
-            {
-                "kbid": kbid,
-                "rid": rid,
-                "field_id": field_id,
-                "page": page,
-                "value": value.SerializeToString(),
-            },
-        )
-
-
-# ---------------------------------------------------------------------------
-# SplitsMetadata  (stored in kb_conversations at sentinel page = 0)
-# ---------------------------------------------------------------------------
+    await _write(txn, kbid, rid, field_id, page, value)
 
 
 async def get_splits_metadata(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    field_id: str,
+    txn: Transaction, *, kbid: str, rid: str, field_id: str
 ) -> SplitsMetadata | None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            SELECT value FROM kb_conversations
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_type = 'c' AND field_id = %(field_id)s AND page = %(page)s
-            """,
-            {"kbid": kbid, "rid": rid, "field_id": field_id, "page": _SPLITS_METADATA_PAGE},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = SplitsMetadata()
-        pb.ParseFromString(bytes(row[0]))
-        return pb
+    return await _read(txn, kbid, rid, field_id, _SPLITS_METADATA_PAGE, SplitsMetadata)
 
 
 async def set_splits_metadata(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    field_id: str,
-    splits_metadata: SplitsMetadata,
+    txn: Transaction, *, kbid: str, rid: str, field_id: str, splits_metadata: SplitsMetadata
 ) -> None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_conversations (kbid, rid, field_type, field_id, page, value)
-            VALUES (%(kbid)s, %(rid)s, 'c', %(field_id)s, %(page)s, %(value)s)
-            ON CONFLICT (kbid, rid, field_type, field_id, page) DO UPDATE SET
-                value = EXCLUDED.value
-            """,
-            {
-                "kbid": kbid,
-                "rid": rid,
-                "field_id": field_id,
-                "page": _SPLITS_METADATA_PAGE,
-                "value": splits_metadata.SerializeToString(),
-            },
-        )
+    await _write(txn, kbid, rid, field_id, _SPLITS_METADATA_PAGE, splits_metadata)
 
 
-# ---------------------------------------------------------------------------
-# Delete
-# ---------------------------------------------------------------------------
+async def delete_pages(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None:
+    driver, marklogic_txn = documents.driver_txn(txn)
+    database = await _database(txn, kbid)
+    if await marklogic_txn.sdk_transaction(database) is None:
+        raise RuntimeError("Cannot delete in read only transaction")
+    dsl = (
+        "op.fromDocUris(cts.andQuery(["
+        f"cts.collectionQuery({json.dumps(MarkLogicCollections.CONVERSATIONS)}), "
+        f"cts.directoryQuery({json.dumps(_directory(rid, field_id))}, 'infinity')"
+        "])).remove()"
+    )
+    response = await driver.client.rows.update(dsl=dsl, params=await marklogic_txn.params(database))
+    if not documents.missing_database(response):
+        driver.data._check(response, "delete conversation pages")
 
 
-async def delete_field(
-    txn: Transaction,
-    *,
-    kbid: str,
-    rid: str,
-    field_id: str,
-) -> None:
-    async with _pg_cursor(txn) as cur:
-        # Delete all conversation pages for this field (including the sentinel page = 0)
-        await cur.execute(
-            """
-            DELETE FROM kb_conversations
-            WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_type = 'c' AND field_id = %(field_id)s
-            """,
-            {"kbid": kbid, "rid": rid, "field_id": field_id},
-        )
-        # Delete the FieldConversation metadata for this field (if it exists)
-        await cur.execute(
-            """
-            DELETE FROM kb_fields
-            WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_type = 'c' AND field_id = %(field_id)s
-            """,
-            {"kbid": kbid, "rid": rid, "field_id": field_id},
-        )
+async def delete_field(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None:
+    await fields.delete(txn, kbid=kbid, rid=rid, field_type="c", field_id=field_id)

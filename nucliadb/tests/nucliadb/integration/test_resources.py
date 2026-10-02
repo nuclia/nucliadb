@@ -24,8 +24,6 @@ import pytest
 from fastapi import HTTPException
 from httpx import AsyncClient
 
-from nucliadb.common.maindb.pg import PGDriver
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCES_PREFIX
 
@@ -337,10 +335,6 @@ async def test_parallel_dup_resource_creation_raises_conflicts(
     nucliadb_writer: AsyncClient,
     standalone_knowledgebox,
 ):
-    driver = get_driver()
-    if not isinstance(driver, PGDriver):
-        pytest.skip("local driver is not totally safe in terms of slug uniqueness")
-
     slug = "foobar-unique"
 
     async def create_resource(kbid: str):

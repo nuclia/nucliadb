@@ -33,7 +33,7 @@ from nucliadb.common.maindb.driver import Transaction
 
 async def exists(*, kbid: str, md5: str) -> bool:
     """Check if a file with the given MD5 hash already exists in the KB."""
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         return await datamanagers.fields.exists_md5(txn, kbid=kbid, md5=md5, field_type="f")
 
 

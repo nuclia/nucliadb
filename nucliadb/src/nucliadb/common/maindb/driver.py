@@ -31,6 +31,7 @@ DEFAULT_BATCH_SCAN_LIMIT = 500
 class Transaction:
     driver: Driver
     open: bool
+    kbid: str | None = None
 
     async def abort(self):
         raise NotImplementedError()
@@ -57,7 +58,10 @@ class Transaction:
         raise NotImplementedError()
 
     def keys(
-        self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
+        self,
+        match: str,
+        count: int = DEFAULT_SCAN_LIMIT,
+        include_start: bool = True,
     ) -> AsyncGenerator[str]:
         raise NotImplementedError()
 
@@ -82,15 +86,34 @@ class Driver:
                     pass
 
     @asynccontextmanager
-    async def _transaction(self, *, read_only: bool) -> AsyncGenerator[Transaction]:
+    async def _transaction(
+        self, *, read_only: bool, kbid: str | None = None
+    ) -> AsyncGenerator[Transaction]:
         yield Transaction()
 
+    @staticmethod
+    def _validate_transaction_scope(kbid: str | None, system: bool | None) -> None:
+        if system is None:
+            return
+        if system and kbid is not None:
+            raise ValueError("Pass either kbid or system=True, not both")
+        if not system and kbid is None:
+            raise ValueError("Pass either kbid or system=True")
+
     @asynccontextmanager
-    async def ro_transaction(self) -> AsyncGenerator[Transaction]:
-        async with self._transaction(read_only=True) as txn:
+    async def ro_transaction(
+        self, *, kbid: str | None = None, system: bool | None = None
+    ) -> AsyncGenerator[Transaction]:
+        """Open a KB-scoped transaction, or a system transaction when kbid is omitted."""
+        self._validate_transaction_scope(kbid, system)
+        async with self._transaction(read_only=True, kbid=kbid) as txn:
             yield txn
 
     @asynccontextmanager
-    async def rw_transaction(self) -> AsyncGenerator[Transaction]:
-        async with self._transaction(read_only=False) as txn:
+    async def rw_transaction(
+        self, *, kbid: str | None = None, system: bool | None = None
+    ) -> AsyncGenerator[Transaction]:
+        """Open a KB-scoped transaction, or a system transaction when kbid is omitted."""
+        self._validate_transaction_scope(kbid, system)
+        async with self._transaction(read_only=False, kbid=kbid) as txn:
             yield txn

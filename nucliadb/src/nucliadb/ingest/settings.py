@@ -78,7 +78,6 @@ class DriverSettings(BaseSettings):
 
 class CatalogConfig(Enum):
     UNSET = "unset"
-    PG = "pg"
 
 
 # For use during migration from pull v1 to pull v2
@@ -90,7 +89,7 @@ class ProcessingPullMode(Enum):
 
 class Settings(DriverSettings):
     # Catalog settings
-    catalog: CatalogConfig = Field(default=CatalogConfig.PG, description="Catalog backend")
+    catalog: CatalogConfig = Field(default=CatalogConfig.UNSET, description="Catalog backend")
 
     # Pull worker settings
     pull_time_error_backoff: int = 30

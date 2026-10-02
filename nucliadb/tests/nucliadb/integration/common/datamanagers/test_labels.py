@@ -24,54 +24,57 @@ from nucliadb_protos.knowledgebox_pb2 import Labels
 
 async def test_labelset_ids(maindb_driver):
     kbid = "foo"
+    async with maindb_driver.rw_transaction() as txn:
+        await datamanagers.kb.set_slug(txn, kbid=kbid, slug=kbid)
+        await txn.commit()
     # Check that initially all are empty
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await datamanagers.labels._get_labelset_ids(txn, kbid=kbid) is None
 
     # Check that deleting from an empty list does not break
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await datamanagers.labels._delete_from_labelset_ids(txn, kbid=kbid, labelsets=["foo"])
         await txn.commit()
 
     # Check that adding to the list creates the list
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await datamanagers.labels._add_to_labelset_ids(txn, kbid=kbid, labelsets=["bar", "ba"])
         await txn.commit()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await datamanagers.labels._add_to_labelset_ids(txn, kbid=kbid, labelsets=["bar", "baz"])
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         labels = await datamanagers.labels._get_labelset_ids(txn, kbid=kbid)
         assert labels
         assert sorted(labels) == ["ba", "bar", "baz"]
 
     # Check that removing from the list removes the item
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await datamanagers.labels._delete_from_labelset_ids(txn, kbid=kbid, labelsets=["ba"])
         await txn.commit()
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         labels = await datamanagers.labels._get_labelset_ids(txn, kbid=kbid)
         assert labels
         assert sorted(labels) == ["bar", "baz"]
 
     # Check that list is empty after removing all
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await datamanagers.labels._delete_from_labelset_ids(txn, kbid=kbid, labelsets=["bar", "baz"])
         await txn.commit()
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await datamanagers.labels._get_labelset_ids(txn, kbid=kbid) == []
 
     # Check that set_labels overwrites the list
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await datamanagers.labels._set_labelset_ids(txn, kbid=kbid, labelsets=["bar", "baz"])
         await txn.commit()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         labels = Labels()
         labels.labelset["bar"].title = "bar"
         await datamanagers.labels.set_labels(txn, kbid=kbid, labels=labels)
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await datamanagers.labels._get_labelset_ids(txn, kbid=kbid) == ["bar"]

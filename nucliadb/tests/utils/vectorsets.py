@@ -52,7 +52,7 @@ async def add_vectorset(
         semantic_vector_similarity="DEPRECATED",
         semantic_vector_size=-1,
     )
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         async for vid, vs in datamanagers.vectorsets.iter(txn, kbid=kbid):
             learning_config.semantic_models.append(vid)
 

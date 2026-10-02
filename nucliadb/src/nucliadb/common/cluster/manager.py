@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 class KBShardManager:
     # TODO: move to data manager
     async def get_shards_by_kbid_inner(self, kbid: str) -> writer_pb2.Shards:
-        async with datamanagers.with_ro_transaction() as txn:
+        async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
             result = await datamanagers.kb.get_shards(txn, kbid=kbid)
             if result is None:
                 # could be None because /shards doesn't exist, or beacause the

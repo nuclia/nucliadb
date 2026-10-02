@@ -74,7 +74,7 @@ async def get_kb(
     request: Request, kbid: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
 ) -> KnowledgeBoxObj:
     driver = get_driver()
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
         if kb_config is None:
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -108,6 +108,7 @@ async def get_kb_by_slug(
             if kbid is None:
                 raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
+    async with driver.ro_transaction(kbid=kbid) as txn:
         kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
         if kb_config is None:
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")

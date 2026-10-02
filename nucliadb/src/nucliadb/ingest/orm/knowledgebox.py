@@ -29,7 +29,6 @@ from nucliadb.common import datamanagers
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
 from nucliadb.common.maindb.driver import Driver, Transaction
-from nucliadb.common.maindb.pg import PGTransaction
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import (
@@ -136,7 +135,7 @@ class KnowledgeBox:
         rollback_ops: list[Callable[[], Coroutine[Any, Any, Any]]] = []
 
         try:
-            async with driver.rw_transaction() as txn:
+            async with driver.rw_transaction(kbid=kbid) as txn:
                 if await datamanagers.kb.exists(txn, kbid=kbid):
                     raise KnowledgeBoxConflict("KB with this kbid already exists")
 
@@ -443,7 +442,7 @@ class KnowledgeBox:
             await txn.commit()
 
         # Delete by prefix in another transaction, as it can be slow and we don't want to block the previous one
-        async with driver.rw_transaction() as txn:
+        async with driver.rw_transaction(kbid=kbid) as txn:
             await cls.delete_all_kb_keys(txn, kbid)
             await txn.commit()
 
@@ -454,7 +453,7 @@ class KnowledgeBox:
         await datamanagers.kb.delete(txn, kbid=kbid)
 
     async def get_resource_shard(self, shard_id: str) -> writer_pb2.ShardObject | None:
-        async with datamanagers.with_ro_transaction() as txn:
+        async with datamanagers.with_ro_transaction(kbid=self.kbid) as txn:
             pb = await datamanagers.kb.get_shards(txn, kbid=self.kbid)
             if pb is None:
                 logger.warning("Shards not found for kbid", extra={"kbid": self.kbid})
@@ -480,7 +479,9 @@ class KnowledgeBox:
 
     async def schedule_delete_resource(self, kbid: str, uuid: str):
         key = RESOURCE_TO_DELETE_STORAGE.format(kbid=kbid, uuid=uuid)
-        await self.txn.set(key, b"")
+        async with self.txn.driver.rw_transaction() as system_txn:
+            await system_txn.set(key, b"")
+            await system_txn.commit()
 
     async def delete_resource(self, uuid: str):
         with processor_observer({"type": "delete_resource_maindb"}):
@@ -534,16 +535,19 @@ class KnowledgeBox:
 
         # Remove the async deletion mark if it exists, just in case there was a previous deletion
         deletion_mark_key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=config.vectorset_id)
-        deletion_mark = await self.txn.get(deletion_mark_key, for_update=True)
-        if deletion_mark is not None:
-            await self.txn.delete(deletion_mark_key)
+        async with self.txn.driver.rw_transaction() as system_txn:
+            deletion_mark = await system_txn.get(deletion_mark_key, for_update=True)
+            if deletion_mark is not None:
+                await system_txn.delete(deletion_mark_key)
+            await system_txn.commit()
 
         shard_manager = get_shard_manager()
         await shard_manager.create_vectorset(self.kbid, config)
 
     async def vectorset_marked_for_deletion(self, vectorset_id: str) -> bool:
         key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id)
-        value = await self.txn.get(key)
+        async with self.txn.driver.ro_transaction() as system_txn:
+            value = await system_txn.get(key)
         return value is not None
 
     async def delete_vectorset(self, vectorset_id: str):
@@ -561,7 +565,9 @@ class KnowledgeBox:
         # mark vectorset for async deletion
         deletion_mark_key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id)
         payload = VectorSetPurge(storage_key_kind=deleted.storage_key_kind)
-        await self.txn.set(deletion_mark_key, payload.SerializeToString())
+        async with self.txn.driver.rw_transaction() as system_txn:
+            await system_txn.set(deletion_mark_key, payload.SerializeToString())
+            await system_txn.commit()
 
         shard_manager = get_shard_manager()
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
@@ -596,7 +602,5 @@ def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:
 
 @processor_observer.wrap({"type": "catalog_delete_kb"})
 async def catalog_delete_kb(txn: Transaction, kbid: str):
-    if not isinstance(txn, PGTransaction):
-        return
-    async with txn.connection.cursor() as cur:
-        await cur.execute("DELETE FROM catalog where kbid = %(kbid)s", {"kbid": kbid})
+    # TODO(Marklogic) Implement catalog deletion for Marklogic backend
+    return

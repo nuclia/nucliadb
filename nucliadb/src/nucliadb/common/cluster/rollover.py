@@ -84,21 +84,21 @@ async def create_rollover_index(
 
 async def create_rollover_external_index(kbid: str, external: ExternalIndexManager) -> None:
     extra = {"kbid": kbid, "external_index_provider": external.type.value}
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         if state.external_index_created:
             logger.info("Rollover external index already created, skipping", extra=extra)
             return
 
     logger.info("Creating rollover external index", extra=extra)
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         stored_metadata = await datamanagers.kb.get_external_index_provider_metadata(txn, kbid=kbid)
         if stored_metadata is None:
             raise UnexpectedRolloverError("External index metadata not found")
 
     rollover_metadata = await external.rollover_create_indexes(stored_metadata)
 
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         await datamanagers.rollover.update_kb_rollover_external_index_metadata(
             txn, kbid=kbid, metadata=rollover_metadata
         )
@@ -118,7 +118,7 @@ async def create_rollover_shards(
     logger.info("Creating rollover shards", extra={"kbid": kbid})
     sm = app_context.shard_manager
 
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         try:
             state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         except RolloverStateNotFoundError:
@@ -176,7 +176,7 @@ async def create_rollover_shards(
             await sm.rollback_shard(created_shard)
         raise e
 
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=kb_shards)
         state.rollover_shards_created = True
         await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
@@ -196,7 +196,7 @@ async def schedule_resource_indexing(app_context: ApplicationContext, kbid: str)
     Schedule indexing all data in a kb in rollover shards
     """
     logger.info("Scheduling resources to be indexed to rollover shards", extra={"kbid": kbid})
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         if not state.rollover_shards_created:
             raise UnexpectedRolloverError(f"No rollover shards found for KB {kbid}")
@@ -212,16 +212,16 @@ async def schedule_resource_indexing(app_context: ApplicationContext, kbid: str)
         batch.append(resource_id)
 
         if len(batch) > 100:
-            async with datamanagers.with_transaction() as txn:
+            async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
                 await datamanagers.rollover.add_batch_to_index(txn, kbid=kbid, batch=batch)
                 await txn.commit()
             batch = []
     if len(batch) > 0:
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
             await datamanagers.rollover.add_batch_to_index(txn, kbid=kbid, batch=batch)
             await txn.commit()
 
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         state.resources_scheduled = True
         await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
         await txn.commit()
@@ -240,7 +240,7 @@ async def index_to_rollover_index(
     extra = {"kbid": kbid, "external_index_provider": None}
     if external is not None:
         extra["external_index_provider"] = external.type.value
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         if not all([state.rollover_shards_created, state.resources_scheduled]):
             raise UnexpectedRolloverError(f"Preconditions not met for KB {kbid}")
@@ -254,7 +254,7 @@ async def index_to_rollover_index(
     logger.info("Indexing to rollover index", extra=extra)
     # now index on all new shards only
     while True:
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
             resource_ids = await datamanagers.rollover.get_to_index(
                 txn, kbid=kbid, count=settings.max_concurrent_rollover_resources
             )
@@ -268,7 +268,7 @@ async def index_to_rollover_index(
         await asyncio.gather(*batch)
         await wait_for_indexing_to_catch_up(app_context)
 
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         state.resources_indexed = True
         await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
         await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=rollover_shards)
@@ -299,14 +299,14 @@ async def _index_resource_to_rollover_index(
     external: ExternalIndexManager | None = None,
 ) -> None:
     async with resource_index_semaphore:
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
             shard_id = await datamanagers.resources.get_shard(txn, kbid=kbid, rid=resource_id)
         if shard_id is None:
             logger.warning(
                 "Shard id not found for resource. Skipping indexing as it may have been deleted",
                 extra={"kbid": kbid, "resource_id": resource_id},
             )
-            async with datamanagers.with_transaction() as txn:
+            async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
                 await datamanagers.rollover.remove_to_index(txn, kbid=kbid, resource=resource_id)
                 await txn.commit()
             return
@@ -324,7 +324,7 @@ async def _index_resource_to_rollover_index(
         index_message = await get_rollover_resource_index_message(kbid, resource_id)
         if resource is None or index_message is None:
             # resource no longer existing, remove indexing and carry on
-            async with datamanagers.with_transaction() as txn:
+            async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
                 await datamanagers.rollover.remove_to_index(txn, kbid=kbid, resource=resource_id)
                 await txn.commit()
             return
@@ -336,7 +336,7 @@ async def _index_resource_to_rollover_index(
                 app_context, kbid, resource_id, shard, resource_index_message=index_message
             )
 
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
             await datamanagers.rollover.add_indexed(
                 txn,
                 kbid=kbid,
@@ -371,7 +371,7 @@ async def cutover_external_index(kbid: str, external: ExternalIndexManager) -> N
     """
     extra = {"kbid": kbid, "external_index_provider": external.type.value}
     logger.info("Cutting over external index", extra=extra)
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         if not all(
             [
@@ -408,7 +408,7 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
     Swaps our the current active shards for a knowledgebox.
     """
     logger.info("Cutting over shards", extra={"kbid": kbid})
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         sm = app_context.shard_manager
 
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
@@ -466,7 +466,7 @@ async def validate_indexed_data(
     extra = {"kbid": kbid, "external_index_provider": None}
     if external is not None:
         extra["external_index_provider"] = external.type.value
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         if not all(
             [
@@ -490,7 +490,7 @@ async def validate_indexed_data(
 
     repaired_resources: list[str] = []
     async for resource_id in datamanagers.resources.iter(kbid=kbid):
-        async with datamanagers.with_ro_transaction() as txn:
+        async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
             indexed_data = await datamanagers.rollover.get_indexed_data(
                 txn, kbid=kbid, resource_id=resource_id
             )
@@ -500,7 +500,7 @@ async def validate_indexed_data(
             if last_indexed == -1:
                 continue
         else:
-            async with datamanagers.with_transaction() as txn:
+            async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
                 shard_id = await datamanagers.resources.get_shard(  # type: ignore[assignment]
                     txn, kbid=kbid, rid=resource_id
                 )
@@ -534,7 +534,7 @@ async def validate_indexed_data(
 
         if _to_ts(res.basic.modified.ToDatetime()) <= last_indexed:  # type: ignore
             # resource was not affected by rollover, carry on
-            async with datamanagers.with_transaction() as txn:
+            async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
                 await datamanagers.rollover.add_indexed(
                     txn,
                     kbid=kbid,
@@ -565,7 +565,7 @@ async def validate_indexed_data(
                 app_context, kbid, resource_id, shard, resource_index_message=index_message
             )
         repaired_resources.append(resource_id)
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
             await datamanagers.rollover.add_indexed(
                 txn,
                 kbid=kbid,
@@ -588,10 +588,11 @@ async def validate_indexed_data(
             raise UnexpectedRolloverError("Shard not found. This should not happen")
         await delete_resource_from_shard(app_context, kbid, resource_id, shard)
 
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         state.resources_validated = True
         await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
         await datamanagers.kb.set(txn, kbid=kbid, shards=rolled_over_shards)
+        await txn.commit()
 
     return repaired_resources
 
@@ -601,18 +602,18 @@ async def clean_indexed_data(app_context: ApplicationContext, kbid: str) -> None
     async for key in datamanagers.rollover.iter_indexed_keys(kbid=kbid):
         batch.append(key)
         if len(batch) >= 100:
-            async with datamanagers.with_transaction() as txn:
+            async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
                 await datamanagers.rollover.remove_indexed(txn, kbid=kbid, batch=batch)
                 await txn.commit()
             batch = []
     if len(batch) >= 0:
-        async with datamanagers.with_transaction() as txn:
+        async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
             await datamanagers.rollover.remove_indexed(txn, kbid=kbid, batch=batch)
             await txn.commit()
 
 
 async def clean_rollover_status(app_context: ApplicationContext, kbid: str) -> None:
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         try:
             await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         except RolloverStateNotFoundError:

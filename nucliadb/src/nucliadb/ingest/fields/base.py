@@ -155,18 +155,14 @@ class Field(Generic[PbType]):
 
     async def db_get_value(self) -> PbType | None:
         if self.value is None:
-            payload = await datamanagers.fields.get_raw(
+            self.value = await datamanagers.fields.get(
                 self.resource.txn,
                 kbid=self.kbid,
                 rid=self.rid,
                 field_type=self.type,
                 field_id=self.id,
+                pb_klass=self.pbklass,
             )
-            if payload is None:
-                return None
-
-            self.value = self.pbklass()
-            self.value.ParseFromString(payload)
         return self.value
 
     async def db_set_value(self, payload: Any):

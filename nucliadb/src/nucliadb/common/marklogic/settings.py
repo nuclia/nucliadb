@@ -31,8 +31,20 @@ class EnvSettings(BaseSettings):
         env_nested_delimiter="__",
     )
 
-    marklogic_meta_server: MarkLogicServerSettings
-    marklogic_data_servers: list[MarkLogicDataServerSettings] = Field(min_length=1)
+    # Dummy defaults so importing the package does not require MarkLogic env settings
+    marklogic_meta_server: MarkLogicServerSettings = Field(
+        default_factory=lambda: MarkLogicServerSettings(
+            uri="http://localhost", username="admin", password=SecretStr("admin")
+        )
+    )
+    marklogic_data_servers: list[MarkLogicDataServerSettings] = Field(
+        default_factory=lambda: [
+            MarkLogicDataServerSettings(
+                id="default", uri="http://localhost", username="admin", password=SecretStr("admin")
+            )
+        ],
+        min_length=1,
+    )
 
     @model_validator(mode="after")
     def _apply_credential_overrides(self) -> "EnvSettings":

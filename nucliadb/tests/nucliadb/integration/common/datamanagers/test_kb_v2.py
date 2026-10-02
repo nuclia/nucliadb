@@ -27,8 +27,9 @@ Covers every public function in the module:
 
 import pytest
 
-from nucliadb.common.datamanagers import kb
+from nucliadb.common.datamanagers import kb, resources
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
@@ -66,6 +67,40 @@ async def kbid(maindb_driver: Driver) -> str:
         await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid
+
+
+async def _database_exists(driver: MarkLogicDriver, database: str) -> bool:
+    async with driver.admin_client() as client:
+        return await client.get_database(database) is not None
+
+
+@pytest.mark.asyncio
+async def test_kb_lifecycle_manages_its_marklogic_database(maindb_driver: Driver) -> None:
+    assert isinstance(maindb_driver, MarkLogicDriver)
+    kbid = new_kbid()
+    database = maindb_driver.kb_database(kbid)
+    assert await _database_exists(maindb_driver, database) is False
+
+    async with maindb_driver.rw_transaction() as txn:
+        await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
+        await txn.commit()
+
+    assert await _database_exists(maindb_driver, database) is True
+
+    rid = "resource-in-its-own-database"
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
+        await resources.set_slug(txn, kbid=kbid, rid=rid, slug="a-slug")
+        await txn.commit()
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
+        assert await resources.exists(txn, kbid=kbid, rid=rid) is True
+
+    async with maindb_driver.rw_transaction() as txn:
+        await kb.delete(txn, kbid=kbid)
+        await txn.commit()
+
+    assert await _database_exists(maindb_driver, database) is False
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
+        assert await resources.exists(txn, kbid=kbid, rid=rid) is False
 
 
 # ---------------------------------------------------------------------------

@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -57,33 +56,38 @@ async def cleanup_maindb(driver: Driver):
 
     if isinstance(driver, MarkLogicDriver):
         await cleanup_marklogic_collections(driver)
+        await cleanup_kb_databases(driver)
 
 
 async def cleanup_marklogic_collections(driver: MarkLogicDriver) -> None:
-    for collection in MarkLogicCollections.all():
-        async with driver.rw_transaction() as txn:
-            assert isinstance(txn, MarkLogicTransaction)
-            assert txn.transaction is not None
-            uris = (
-                await asyncio.to_thread(
-                    driver.client.eval,
-                    javascript=(
-                        f"cts.uris('', ['document'], cts.collectionQuery({json.dumps(collection)}))"
-                    ),
-                    tx=txn.transaction,
-                    params={"database": driver.database},
-                )
-                or []
+    """Clear the KnowledgeBox registry left in the system database."""
+    async with driver.rw_transaction() as txn:
+        assert isinstance(txn, MarkLogicTransaction)
+        database = driver.database
+        transaction = await txn.sdk_transaction(database)
+        assert transaction is not None
+        uris = (
+            await driver.client.eval(
+                javascript=(
+                    "cts.uris('', ['document'], cts.collectionQuery("
+                    f"{json.dumps(MarkLogicCollections.KNOWLEDGEBOXES)}))"
+                ),
+                tx=transaction,
+                params=await txn.params(database),
             )
-            for uri in uris:
-                response = await asyncio.to_thread(
-                    driver.client.delete,
-                    "/v1/documents",
-                    params={
-                        "database": driver.database,
-                        "uri": str(uri),
-                        "txid": txn.transaction.id,
-                    },
-                )
-                response.raise_for_status()
-            await txn.commit()
+            or []
+        )
+        assert isinstance(uris, list)
+        for uri in uris:
+            response = await driver.client.documents.delete(str(uri), params=await txn.params(database))
+            response.raise_for_status()
+        await txn.commit()
+
+
+async def cleanup_kb_databases(driver: MarkLogicDriver) -> None:
+    """Drop every per-KnowledgeBox database created by the test."""
+    async with driver.admin_client() as client:
+        for name in await client.list_databases():
+            if name.startswith(driver.kb_database_prefix):
+                await client.delete_database(name)
+    driver._provisioned.clear()

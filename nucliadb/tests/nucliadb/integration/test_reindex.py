@@ -163,7 +163,7 @@ async def broker_resource(kbid: str, rid: str) -> BrokerMessage:
         )
     )
 
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kbid):
             dimension = vs.vectorset_index_config.vector_dimension
             padding = dimension - len(V1)

@@ -217,7 +217,7 @@ class Processor:
 
         async with (
             locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)),
-            self.driver.rw_transaction() as txn,
+            self.driver.rw_transaction(kbid=kbid) as txn,
         ):
             try:
                 logger.info("Deleting resource", extra={"kbid": kbid, "rid": uuid})
@@ -255,9 +255,11 @@ class Processor:
                         raise exc
             finally:
                 if txn.open:
-                    if transaction_check:
-                        await sequence_manager.set_last_seqid(txn, partition, seqid)
                     await txn.commit()
+                    if transaction_check:
+                        async with self.driver.rw_transaction() as system_txn:
+                            await sequence_manager.set_last_seqid(system_txn, partition, seqid)
+                            await system_txn.commit()
         await self.notify_commit(
             partition=partition,
             seqid=seqid,
@@ -271,7 +273,7 @@ class Processor:
         # so we commit it in a different transaction to make it as short as possible
         prev_txn = resource.txn
         try:
-            async with self.driver.rw_transaction() as txn:
+            async with self.driver.rw_transaction(kbid=resource.kbid) as txn:
                 resource.txn = txn
                 await resource.set_slug()
                 await txn.commit()
@@ -319,7 +321,7 @@ class Processor:
 
         async with (
             locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)),
-            self.driver.rw_transaction() as txn,
+            self.driver.rw_transaction(kbid=kbid) as txn,
         ):
             logger.info(
                 "Processing message",
@@ -400,9 +402,11 @@ class Processor:
                             index_message.labels.append("/n/s/ERROR")
 
                     await catalog_update(txn, kbid, resource, index_message)
-                    if transaction_check:
-                        await sequence_manager.set_last_seqid(txn, partition, seqid)
                     await txn.commit()
+                    if transaction_check:
+                        async with self.driver.rw_transaction() as system_txn:
+                            await sequence_manager.set_last_seqid(system_txn, partition, seqid)
+                            await system_txn.commit()
 
                     if created:
                         await self.commit_slug(resource)

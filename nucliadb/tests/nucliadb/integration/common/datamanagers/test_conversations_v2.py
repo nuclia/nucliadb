@@ -55,7 +55,7 @@ async def kbid(maindb_driver: Driver) -> str:
 @pytest.fixture()
 async def rid(maindb_driver: Driver, kbid: str) -> str:
     rid = Resource.new_unique_rid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await resources.set_slug(txn, kbid=kbid, rid=rid, slug=f"slug-{rid}")
         await txn.commit()
     return rid
@@ -66,7 +66,9 @@ async def field_id(maindb_driver: Driver, kbid: str, rid: str) -> str:
     """Create the parent kb_fields row ('c' type) so FK constraints are satisfied."""
     fid = "chat"
     async with maindb_driver.rw_transaction() as txn:
-        await fields.set(txn, kbid=kbid, rid=rid, field_type="c", field_id=fid, value=b"")
+        await fields.set(
+            txn, kbid=kbid, rid=rid, field_type="c", field_id=fid, value=FieldConversation()
+        )
         await txn.commit()
     return fid
 
@@ -346,3 +348,85 @@ async def test_delete_field_noop_when_no_rows_exist(maindb_driver: Driver, kbid:
     async with maindb_driver.rw_transaction() as txn:
         await conversations.delete_field(txn, kbid=kbid, rid=rid, field_id="ghost")
         await txn.commit()  # must not raise
+
+
+async def test_resource_delete_cascades_to_fields_and_pages(
+    maindb_driver: Driver, kbid: str, rid: str
+) -> None:
+    other_rid = Resource.new_unique_rid()
+    async with maindb_driver.rw_transaction() as txn:
+        await resources.set_slug(txn, kbid=kbid, rid=other_rid, slug=f"slug-{other_rid}")
+        for resource_id in (rid, other_rid):
+            await fields.set(
+                txn,
+                kbid=kbid,
+                rid=resource_id,
+                field_type="c",
+                field_id="chat",
+                value=make_metadata(pages=7),
+            )
+            await conversations.set_page(
+                txn,
+                kbid=kbid,
+                rid=resource_id,
+                field_id="chat",
+                page=1,
+                value=make_conversation("hello"),
+            )
+        await txn.commit()
+
+    async with maindb_driver.rw_transaction() as txn:
+        await resources.delete(txn, kbid=kbid, rid=rid)
+        await txn.commit()
+
+    async with maindb_driver.ro_transaction() as txn:
+        assert await conversations.get_metadata(txn, kbid=kbid, rid=rid, field_id="chat") is None
+        assert await conversations.get_page(txn, kbid=kbid, rid=rid, field_id="chat", page=1) is None
+        surviving = await conversations.get_metadata(txn, kbid=kbid, rid=other_rid, field_id="chat")
+        assert surviving is not None and surviving.pages == 7
+        assert (
+            await conversations.get_page(txn, kbid=kbid, rid=other_rid, field_id="chat", page=1)
+            is not None
+        )
+
+
+async def test_kb_delete_preserves_other_kb_documents(maindb_driver: Driver, kbid: str) -> None:
+    other_kbid = KnowledgeBox.new_unique_kbid()
+    rid = Resource.new_unique_rid()
+    async with maindb_driver.rw_transaction() as txn:
+        await kb.set_slug(txn, kbid=other_kbid, slug=f"slug-{other_kbid}")
+        for resource_kbid in (kbid, other_kbid):
+            await resources.set_slug(txn, kbid=resource_kbid, rid=rid, slug=f"slug-{rid}")
+            await fields.set(
+                txn,
+                kbid=resource_kbid,
+                rid=rid,
+                field_type="c",
+                field_id="chat",
+                value=make_metadata(pages=7),
+            )
+            await conversations.set_page(
+                txn,
+                kbid=resource_kbid,
+                rid=rid,
+                field_id="chat",
+                page=1,
+                value=make_conversation("hello"),
+            )
+        await txn.commit()
+
+    async with maindb_driver.rw_transaction() as txn:
+        await kb.delete(txn, kbid=kbid)
+        await txn.commit()
+
+    async with maindb_driver.ro_transaction() as txn:
+        assert not await resources.exists(txn, kbid=kbid, rid=rid)
+        assert await conversations.get_metadata(txn, kbid=kbid, rid=rid, field_id="chat") is None
+        assert await conversations.get_page(txn, kbid=kbid, rid=rid, field_id="chat", page=1) is None
+        assert await resources.exists(txn, kbid=other_kbid, rid=rid)
+        surviving = await conversations.get_metadata(txn, kbid=other_kbid, rid=rid, field_id="chat")
+        assert surviving is not None and surviving.pages == 7
+        assert (
+            await conversations.get_page(txn, kbid=other_kbid, rid=rid, field_id="chat", page=1)
+            is not None
+        )

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-import base64
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -11,8 +9,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Final, Literal, TypeAlias, cast
 
-from marklogic.documents import Document  # type: ignore[import-untyped]
+import httpx
 
+from nucliadb.common.datamanagers import marklogic_documents as documents
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
 from nucliadb.common.datamanagers.utils import UNSET, _UnsetType, observer
 from nucliadb.common.maindb.collections import MarkLogicCollections
@@ -20,6 +19,7 @@ from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
 from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
 from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.marklogic.client import Document
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
 logger = logging.getLogger(__name__)
@@ -49,22 +49,7 @@ def _driver_txn(txn: Transaction) -> tuple[MarkLogicDriver, MarkLogicTransaction
 
 
 def _uri(kbid: str) -> str:
-    return f"knowledgeboxes/{kbid}/config.json"
-
-
-def _tx_params(driver: MarkLogicDriver, txn: MarkLogicTransaction) -> dict[str, str]:
-    params = {"database": driver.database}
-    if txn.transaction is not None:
-        params["txid"] = txn.transaction.id
-    return params
-
-
-def _encode(value: bytes | None) -> str | None:
-    return base64.b64encode(value).decode("ascii") if value is not None else None
-
-
-def _decode(value: str | None) -> bytes | None:
-    return base64.b64decode(value) if value is not None else None
+    return f"/{kbid}/knowledgeboxes/config.json"
 
 
 def _content(document: Document | None) -> dict | None:
@@ -76,38 +61,34 @@ def _content(document: Document | None) -> dict | None:
 
 
 async def _get(driver: MarkLogicDriver, txn: MarkLogicTransaction, kbid: str) -> Document | None:
-    result = await asyncio.to_thread(
-        driver.client.documents.read,
+    result = await driver.client.documents.read(
         _uri(kbid),
-        tx=txn.transaction,
-        params=_tx_params(driver, txn),
+        tx=await txn.sdk_transaction(driver.database),
+        params=await txn.params(driver.database),
     )
-    return result[0] if isinstance(result, list) and result else None
+    if isinstance(result, httpx.Response) or not result:
+        return None
+    return result[0]
 
 
 async def _write(driver: MarkLogicDriver, txn: MarkLogicTransaction, kbid: str, content: dict) -> None:
-    response = await asyncio.to_thread(
-        driver.client.documents.write,
+    response = await driver.client.documents.write(
         Document(
             uri=_uri(kbid),
             content=content,
             collections=[MarkLogicCollections.KNOWLEDGEBOXES],
             content_type="application/json",
         ),
-        tx=txn.transaction,
+        tx=await txn.sdk_transaction(driver.database),
         params={"database": driver.database},
     )
-    if not response.ok:
+    if not response.is_success:
         raise RuntimeError(f"Failed to write KnowledgeBox: {response.status_code} {response.text}")
 
 
 async def _delete(driver: MarkLogicDriver, txn: MarkLogicTransaction, kbid: str) -> None:
-    response = await asyncio.to_thread(
-        driver.client.delete,
-        "/v1/documents",
-        params={"uri": _uri(kbid), **_tx_params(driver, txn)},
-    )
-    if not response.ok:
+    response = await driver.client.documents.delete(_uri(kbid), params=await txn.params(driver.database))
+    if not response.is_success:
         raise RuntimeError(f"Failed to delete KnowledgeBox: {response.status_code} {response.text}")
 
 
@@ -118,23 +99,16 @@ def _serialize(value: knowledgebox_pb2.KnowledgeBoxConfig | writer_pb2.Shards | 
         return None
     if not isinstance(value, (knowledgebox_pb2.KnowledgeBoxConfig, writer_pb2.Shards)):
         raise ValueError(f"Unsupported KnowledgeBox column value: {type(value)}")
-    return _encode(value.SerializeToString())
+    return documents.to_json(value)
 
 
 def _deserialize(column: KBColumn, value):
     if value is None:
         return None
-    raw = _decode(value)
-    if raw is None:
-        return None
     if column == "config":
-        config = knowledgebox_pb2.KnowledgeBoxConfig()
-        config.ParseFromString(raw)
-        return config
+        return documents.from_json(value, knowledgebox_pb2.KnowledgeBoxConfig)
     elif column == "shards":
-        shards = writer_pb2.Shards()
-        shards.ParseFromString(raw)
-        return shards
+        return documents.from_json(value, writer_pb2.Shards)
     return value
 
 
@@ -192,16 +166,9 @@ async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tupl
     if slug_prefix:
         query += f", cts.jsonPropertyValueQuery('slug', {json.dumps(slug_prefix + '*')}, ['wildcarded'])"
     javascript = f"cts.uris('', ['document', 'item-order'], cts.andQuery([{query}]))"
-    uris = (
-        await asyncio.to_thread(
-            driver.client.eval,
-            javascript=javascript,
-            params=_tx_params(driver, marklogic_txn),
-        )
-        or []
-    )
+    uris = await documents.evaluate(txn, driver.database, javascript)
     for uri in uris:
-        kbid = str(uri).removeprefix("knowledgeboxes/").removesuffix("/config.json")
+        kbid = str(uri).split("/")[1]
         document = await _get(driver, marklogic_txn, kbid)
         content = _content(document)
         if content is None:
@@ -223,21 +190,14 @@ async def exists(txn: Transaction, *, kbid: str) -> bool:
 
 @observer.wrap({"type": "kb", "op": "get_kbid"})
 async def get_kbid(txn: Transaction, *, slug: str) -> str | None:
-    driver, marklogic_txn = _driver_txn(txn)
+    driver, _ = _driver_txn(txn)
     javascript = (
         "cts.uris('', ['document'], cts.andQuery(["
         f"cts.collectionQuery({json.dumps(MarkLogicCollections.KNOWLEDGEBOXES)}), "
         f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.SLUG)}, '=', {json.dumps(slug)})]))"
     )
-    uris = (
-        await asyncio.to_thread(
-            driver.client.eval,
-            javascript=javascript,
-            params=_tx_params(driver, marklogic_txn),
-        )
-        or []
-    )
-    return str(uris[0]).removeprefix("knowledgeboxes/").removesuffix("/config.json") if uris else None
+    uris = await documents.evaluate(txn, driver.database, javascript)
+    return str(uris[0]).split("/")[1] if uris else None
 
 
 @observer.wrap({"type": "kb", "op": "set_slug"})
@@ -245,6 +205,7 @@ async def set_slug(txn: Transaction, *, slug: str, kbid: str) -> None:
     driver, marklogic_txn = _driver_txn(txn)
     document = await _get(driver, marklogic_txn, kbid)
     content = _content(document)
+    is_new = content is None
     if content is None:
         content = {}
     same_slug = content.get("slug") == slug
@@ -256,6 +217,8 @@ async def set_slug(txn: Transaction, *, slug: str, kbid: str) -> None:
     existing = await get_kbid(txn, slug=slug)
     if existing is not None and existing != kbid:
         raise KnowledgeBoxConflict()
+    if is_new:
+        await driver.ensure_kb_database(kbid)
     content["slug"] = slug
     await _write(driver, marklogic_txn, kbid, content)
 
@@ -264,6 +227,7 @@ async def set_slug(txn: Transaction, *, slug: str, kbid: str) -> None:
 async def delete(txn: Transaction, *, kbid: str) -> None:
     driver, marklogic_txn = _driver_txn(txn)
     await _delete(driver, marklogic_txn, kbid)
+    await driver.delete_kb_database(kbid)
 
 
 @observer.wrap({"type": "kb", "op": "soft_delete"})

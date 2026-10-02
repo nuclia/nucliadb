@@ -207,7 +207,7 @@ class Rebalancer:
             # Add new shards where to rebalance the excess of paragraphs
             async with (
                 locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=self.kbid)),
-                datamanagers.with_rw_transaction() as txn,
+                datamanagers.with_rw_transaction(kbid=self.kbid) as txn,
             ):
                 kb_config = await datamanagers.kb.get_config(txn, kbid=self.kbid)
                 prewarm = kb_config is not None and kb_config.prewarm_enabled
@@ -306,7 +306,7 @@ class Rebalancer:
         if empty_shard:
             # If shard was emptied, delete it
             async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=self.kbid)):
-                async with datamanagers.with_rw_transaction() as txn:
+                async with datamanagers.with_rw_transaction(kbid=self.kbid) as txn:
                     kb_shards = await datamanagers.kb.get_shards(txn, kbid=self.kbid, for_update=True)
                     if kb_shards is not None:
                         logger.info(
@@ -340,7 +340,7 @@ class Rebalancer:
 
 
 async def get_resources_from_shard(driver: Driver, kbid: str, shard_id: str, n: int) -> list[str]:
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         return await datamanagers.resources.get_resources_from_shard(
             txn, kbid=kbid, shard_id=shard_id, limit=n
         )
@@ -394,7 +394,7 @@ def get_target_shard(
 
 
 async def count_resources_in_shard(driver: Driver, kbid: str, shard_id: str) -> int:
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         return await datamanagers.resources.count_resources_in_shard(txn, kbid=kbid, shard_id=shard_id)
 
 
@@ -441,7 +441,7 @@ async def move_resource_to_shard(
     try:
         async with (
             locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=resource_id)),
-            datamanagers.with_transaction() as txn,
+            datamanagers.with_rw_transaction(kbid=kbid) as txn,
         ):
             found_shard_id = await datamanagers.resources.get_shard(
                 txn, kbid=kbid, rid=resource_id, for_update=True

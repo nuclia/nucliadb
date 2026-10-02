@@ -20,17 +20,13 @@
 import asyncio
 import contextlib
 import logging
-import random
-import time
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import cast
 
-from nucliadb.common.maindb.exceptions import ConflictError
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb_telemetry.metrics import Counter, Gauge, Histogram
 
-from .maindb.pg import PGDriver, PGTransaction
 from .maindb.utils import get_driver
 
 logger = logging.getLogger(__name__)
@@ -158,145 +154,55 @@ class _Lock:
         self.value = uuid.uuid4().hex
         self.lock_type = _get_lock_type(self.user_key)
         self.acquired_at: float | None = None
-        self.driver = cast(PGDriver, get_driver())
+        self.driver = get_driver()
 
     @contextlib.asynccontextmanager
-    async def transaction(self) -> AsyncGenerator[PGTransaction, None]:
-        async with self.driver._transaction(read_only=False) as txn:
-            txn = cast(PGTransaction, txn)
+    async def transaction(self) -> AsyncGenerator[Transaction, None]:
+        async with self.driver.ro_transaction() as txn:
             yield txn
 
     async def _cleanup_expired_locks(self) -> None:
         """Clean up expired locks older than 1 day."""
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    "DELETE FROM distributed_locks "
-                    "WHERE expires_at < EXTRACT(EPOCH FROM NOW() - INTERVAL '1 day')::DOUBLE PRECISION"
-                )
-            await txn.commit()
+        # TODO(Marklogic) Implement cleanup for Marklogic backend
+        return
 
     async def _maybe_cleanup_expired_locks(self) -> None:
         # Probabilistically run cleanup (1% chance) to distribute cleanup load
         # without adding overhead on every lock acquisition
-        if random.random() < 0.01:
-            try:
-                await self._cleanup_expired_locks()
-            except Exception:
-                # If cleanup fails, log but don't block lock acquisition
-                logger.warning("Failed to cleanup expired locks", exc_info=True)
+        # TODO(Marklogic) Implement probabilistic cleanup for Marklogic backend
+        return
 
     async def _get_lock_data(self) -> LockValue | None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    "SELECT lock_value, expires_at FROM distributed_locks WHERE lock_key = %s FOR UPDATE",
-                    (self.user_key,),
-                )
-                row = await cur.fetchone()
-                if row is None:
-                    return None
-                else:
-                    return LockValue(value=row[0], expires_at=row[1])
+        # TODO(Marklogic) Implement lock retrieval for Marklogic backend
+        return None
 
     async def _set_lock_value(self) -> None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                try:
-                    await cur.execute(
-                        "INSERT INTO distributed_locks (lock_key, lock_value, expires_at) VALUES (%s, %s, %s)",
-                        (self.user_key, self.value, time.time() + self.expire_timeout),
-                    )
-                except Exception as e:
-                    # If there's a unique constraint violation, it means the lock already exists
-                    if "duplicate key value" in str(e).lower() or "unique constraint" in str(e).lower():
-                        raise ConflictError() from e
-                    raise
-            await txn.commit()
+        # TODO(Marklogic) Implement lock setting for Marklogic backend
+        return
 
     async def _update_lock_value(self) -> None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    "UPDATE distributed_locks SET lock_value = %s, expires_at = %s WHERE lock_key = %s",
-                    (self.value, time.time() + self.expire_timeout, self.user_key),
-                )
-            await txn.commit()
+        # TODO(Marklogic) Implement lock update for Marklogic backend
+        return
 
     async def _delete_lock(self) -> None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute("DELETE FROM distributed_locks WHERE lock_key = %s", (self.user_key,))
-            await txn.commit()
+        # TODO(Marklogic) Implement lock deletion for Marklogic backend
+        return
 
     async def __aenter__(self) -> "_Lock":
-        await self._maybe_cleanup_expired_locks()
-
-        start = time.monotonic()
-        while True:
-            try:
-                lock_data = await self._get_lock_data()
-                if lock_data is None:
-                    await self._set_lock_value()
-                    break
-                else:
-                    lock_miss_counter.inc(labels={"lock_type": self.lock_type})
-
-                    if time.time() > lock_data.expires_at:
-                        # if current time is greater than when it expires, take it over
-                        await self._update_lock_value()
-                        break
-
-                    if time.monotonic() > start + self.lock_timeout:
-                        # if current time > start time + lock timeout
-                        # we've waited too long, raise exception that, we can't get the lock
-                        lock_timeout_counter.inc(labels={"lock_type": self.lock_type})
-                        raise ResourceLocked(key=self.user_key)
-            except ConflictError:
-                # if we get a conflict error, retry
-                pass
-            await asyncio.sleep(0.1)  # sleep before trying again
-
-        # Record metrics after successful acquisition
-        self.acquired_at = time.monotonic()
-        wait_duration = self.acquired_at - start
-        lock_wait_duration_histogram.observe(wait_duration, labels={"lock_type": self.lock_type})
-        lock_acquired_counter.inc(labels={"lock_type": self.lock_type})
-        locks_active_gauge.inc(1, labels={"lock_type": self.lock_type})
-
-        self.task = asyncio.create_task(self._refresh_task())
+        # TODO(Marklogic) Implement lock acquisition for Marklogic backend
         return self
 
     async def _refresh_task(self) -> None:
-        while True:
-            try:
-                await asyncio.sleep(self.refresh_timeout)
-                await self._update_lock_value()
-            except (asyncio.CancelledError, RuntimeError):
-                return
-            except Exception:
-                logger.exception("Failed to refresh lock")
+        # TODO(Marklogic) Implement lock refresh for Marklogic backend
+        return
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.task.cancel()
-
-        # Record how long the lock was held
-        if self.acquired_at is not None:
-            held_duration = time.monotonic() - self.acquired_at
-            lock_held_duration_histogram.observe(held_duration, labels={"lock_type": self.lock_type})
-
-        locks_active_gauge.dec(1, labels={"lock_type": self.lock_type})
-
-        await self._delete_lock()
+        # TODO(Marklogic) Implement lock release for Marklogic backend
+        return
 
     async def is_locked(self) -> bool:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    "SELECT expires_at FROM distributed_locks WHERE lock_key = %s", (self.user_key,)
-                )
-                row = await cur.fetchone()
-        return row is not None and time.time() < row[0]
+        # TODO(Marklogic) Implement lock status check for Marklogic backend
+        return False
 
 
 def distributed_lock(
