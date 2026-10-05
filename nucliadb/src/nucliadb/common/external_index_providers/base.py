@@ -52,7 +52,7 @@ _OCR_LABEL = (
 )
 # /k/inception
 _INCEPTION_LABEL = (
-    f"/k/{resources_pb2.Paragraph.TypeParagraph.Name(resources_pb2.Paragraph.TypeParagraph.OCR).lower()}"
+    f"/k/{resources_pb2.Paragraph.TypeParagraph.Name(resources_pb2.Paragraph.TypeParagraph.INCEPTION).lower()}"
 )
 
 
