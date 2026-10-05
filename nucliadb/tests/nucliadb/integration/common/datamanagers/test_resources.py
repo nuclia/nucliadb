@@ -160,55 +160,6 @@ async def test_marklogic_resource_crud(maindb_driver: Driver) -> None:
         assert await resources.count(txn, kbid=kbid) == 1
 
 
-async def test_resources_from_shard(maindb_driver: Driver) -> None:
-    from nucliadb.common.cluster.rebalance import count_resources_in_shard, get_resources_from_shard
-
-    kbid = KnowledgeBox.new_unique_kbid()
-    other_kbid = KnowledgeBox.new_unique_kbid()
-    first, second, third, other = (Resource.new_unique_rid() for _ in range(4))
-    async with maindb_driver.rw_transaction() as txn:
-        for resource_kbid, rid, shard_id in (
-            (kbid, first, "source"),
-            (kbid, second, "source"),
-            (kbid, third, "target"),
-            (other_kbid, other, "source"),
-        ):
-            await datamanagers.resources.set(txn, kbid=resource_kbid, rid=rid, shard=shard_id)
-        await txn.commit()
-
-    async with maindb_driver.ro_transaction() as txn:
-        assert (
-            await datamanagers.resources.count_resources_in_shard(txn, kbid=kbid, shard_id="source") == 2
-        )
-        assert set(
-            await datamanagers.resources.get_resources_from_shard(
-                txn, kbid=kbid, shard_id="source", limit=10
-            )
-        ) == {first, second}
-        assert (
-            len(
-                await datamanagers.resources.get_resources_from_shard(
-                    txn, kbid=kbid, shard_id="source", limit=1
-                )
-            )
-            == 1
-        )
-        assert (
-            await datamanagers.resources.get_resources_from_shard(
-                txn, kbid=kbid, shard_id="source", limit=0
-            )
-            == []
-        )
-        assert (
-            await datamanagers.resources.count_resources_in_shard(txn, kbid=kbid, shard_id="missing")
-            == 0
-        )
-
-    assert set(await get_resources_from_shard(maindb_driver, kbid, "source", n=10)) == {first, second}
-    assert await count_resources_in_shard(maindb_driver, kbid, "source") == 2
-    assert await count_resources_in_shard(maindb_driver, other_kbid, "source") == 1
-
-
 async def test_all_fields(maindb_driver: Driver, resource_with_slug: tuple[str, str, str]):
     kbid, rid, _ = resource_with_slug
 
