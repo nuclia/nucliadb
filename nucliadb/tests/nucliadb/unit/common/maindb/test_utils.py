@@ -17,7 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -34,21 +34,9 @@ def reset_driver_utils():
     clean_utility(Utility.MAINDB_DRIVER)
 
 
-async def test_setup_driver_pg():
-    mock = AsyncMock(initialized=False)
-    with (
-        patch.object(settings, "driver", DriverConfig("pg")),
-        patch.object(settings, "driver_pg_url", "driver_pg_url"),
-        patch("nucliadb.common.maindb.utils.PGDriver", return_value=mock),
-    ):
-        assert await setup_driver() == mock
-        mock.initialize.assert_awaited_once()
-
-
 async def test_setup_driver_error():
     with (
-        patch.object(settings, "driver", DriverConfig("pg")),
-        patch.object(settings, "driver_pg_url", None),
+        patch.object(settings, "driver", DriverConfig("foo")),
         pytest.raises(ConfigurationError),
     ):
         await setup_driver()

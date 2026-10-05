@@ -258,10 +258,10 @@ class MarkLogicDriver(Driver):
         uri: str,
         username: str,
         password: str,
-        database: str = "nucliadb-content",
+        database: str = "nucliadb:system",
         port: int = 8000,
         admin_port: int = 8002,
-        kb_database_prefix: str = "nucliadb-kb-",
+        kb_database_prefix: str = "nucliadb:kb-",
     ):
         self.uri = uri
         self.username = username

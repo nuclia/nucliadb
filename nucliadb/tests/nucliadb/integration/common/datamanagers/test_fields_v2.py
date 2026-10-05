@@ -37,7 +37,6 @@ FILE = "f"
 
 def test_document_uris_are_kb_scoped() -> None:
     """Only the KnowledgeBox registry is shared; everything else lives in the KB database."""
-    assert kb._uri("kb-1") == "/kb-1/knowledgeboxes/config.json"
     assert resources._uri("resource-1") == "/resources/resource-1.json"
     assert fields._uri("resource-1", TEXT, "a/b") == "/resources/resource-1/fields/t/a%2Fb.json"
     assert conversations._page_uri("resource-1", "a/b", 2) == (

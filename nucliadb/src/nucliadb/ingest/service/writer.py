@@ -130,7 +130,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 prewarm_enabled=request.prewarm_enabled,
                 enforce_security=request.enforce_security,
             )
-
         except KnowledgeBoxConflict:
             logger.info("KB already exists", extra={"slug": request.slug})
             return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.CONFLICT)

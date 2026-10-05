@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import time
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from datetime import datetime
 from functools import partial
@@ -120,7 +121,7 @@ class KnowledgeBox:
         enforce_security: bool | None = None,
     ) -> tuple[str, str]:
         """Creates a new knowledge box and return its id and slug."""
-
+        start = time.time()
         if not kbid:
             raise KnowledgeBoxCreationError("A kbid must be provided to create a new KB")
         if not slug:
@@ -220,7 +221,12 @@ class KnowledgeBox:
                     prewarm_enabled=prewarm_enabled,
                 )
                 config.external_index_provider.CopyFrom(stored_external_index_provider)
-                await datamanagers.kb.set(txn, kbid=kbid, shards=kb_shards, config=config)
+                await datamanagers.kb.set(
+                    txn,
+                    kbid=kbid,
+                    shards=kb_shards,
+                    config=config,
+                )
 
                 # shard creation will alter this value on maindb, make sure nobody
                 # uses this variable anymore
@@ -261,6 +267,9 @@ class KnowledgeBox:
                     logger.exception(f"Unexpected error rolling back {name}. Keep rolling back")
             raise exc
 
+        end = time.time()
+        breakpoint()
+        print(f"KB creation took {end - start:.2f} seconds")
         return (kbid, slug)
 
     @classmethod

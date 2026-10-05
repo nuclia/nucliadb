@@ -20,5 +20,5 @@
 from nucliadb.ingest.settings import DriverConfig
 
 
-def test_case_insenstive_driver_config():
-    assert DriverConfig("PG") == DriverConfig.PG
+def test_case_insensitive_driver_config():
+    assert DriverConfig("MARKLOGIC") == DriverConfig.MARKLOGIC

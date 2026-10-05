@@ -43,8 +43,8 @@ def config_standalone_driver(nucliadb_args: Settings):
         setattr(storage_settings, fieldname, getattr(nucliadb_args, fieldname))
 
     if ingest_settings.driver == DriverConfig.NOT_SET:
-        # no driver specified, for standalone, we force defaulting to pg here
-        ingest_settings.driver = DriverConfig.PG
+        # no driver specified, for standalone, we force defaulting to marklogic here
+        ingest_settings.driver = DriverConfig.MARKLOGIC
 
     if storage_settings.file_backend == FileBackendConfig.NOT_SET:
         # no driver specified, for standalone, we try to automate some settings here

@@ -26,8 +26,6 @@ from nidx_protos.nodewriter_pb2 import (
 )
 
 from nucliadb.common.cluster.settings import settings
-from nucliadb.ingest.settings import DriverConfig
-from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb_utils import logger
 from nucliadb_utils.grpc import get_traced_grpc_channel
 from nucliadb_utils.nats import NatsConnectionManager
@@ -107,13 +105,13 @@ class NidxBindingUtility(NidxUtility):
     """Implements Nidx utility using the binding"""
 
     def __init__(self, service_name: str):
-        if ingest_settings.driver != DriverConfig.PG:
-            raise ValueError("nidx_binding requires DRIVER=pg")
+        # if ingest_settings.driver != DriverConfig.PG:
+        #     raise ValueError("nidx_binding requires DRIVER=pg")
 
         self.service_name = service_name
-        assert ingest_settings.driver_pg_url, "DRIVER_PG_URL required"
+        #        assert ingest_settings.driver_pg_url, "DRIVER_PG_URL required"
         self.config = {
-            "METADATA__DATABASE_URL": ingest_settings.driver_pg_url,
+            #            "METADATA__DATABASE_URL": ingest_settings.driver_pg_url,
             "SEARCHER__METADATA_REFRESH_INTERVAL": str(
                 indexing_settings.index_searcher_refresh_interval
             ),

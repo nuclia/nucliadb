@@ -6,7 +6,6 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Final, Literal, TypeAlias, cast
 
 from nucliadb.common.datamanagers import marklogic_documents as documents
@@ -21,41 +20,90 @@ from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
 logger = logging.getLogger(__name__)
 
-KBColumn: TypeAlias = Literal["slug", "config", "shards", "deleted_at"]
+KBColumn: TypeAlias = Literal["slug", "config", "shards"]
+
 UNSET_STR: Final[str | None] = cast(str | None, UNSET)
 UNSET_CONFIG: Final[knowledgebox_pb2.KnowledgeBoxConfig | None] = cast(
     knowledgebox_pb2.KnowledgeBoxConfig | None, UNSET
 )
 UNSET_SHARDS: Final[writer_pb2.Shards | None] = cast(writer_pb2.Shards | None, UNSET)
-UNSET_DELETED_AT: Final[datetime | None] = cast(datetime | None, UNSET)
 
 
 @dataclass(slots=True)
 class KBData:
+    """
+    Data stored in the knowledgebox database.
+    """
+
     slug: str | None = UNSET_STR
     config: knowledgebox_pb2.KnowledgeBoxConfig | None = UNSET_CONFIG
     shards: writer_pb2.Shards | None = UNSET_SHARDS
-    deleted_at: datetime | None = UNSET_DELETED_AT
 
 
-def _driver_txn(txn: Transaction) -> tuple[MarkLogicDriver, MarkLogicTransaction]:
+@dataclass(slots=True)
+class KBRegistry:
+    """
+    Data stored in the system database.
+    """
+
+    kbid: str
+    slug: str
+
+
+def _driver_txn(
+    txn: Transaction, ensure_writes: bool = False
+) -> tuple[MarkLogicDriver, MarkLogicTransaction]:
     driver = get_driver()
     if not isinstance(driver, MarkLogicDriver) or not isinstance(txn, MarkLogicTransaction):
         raise TypeError("KnowledgeBox datamanager requires MarkLogicDriver")
+    if ensure_writes and txn.read_only:
+        raise RuntimeError("Cannot write in read only transaction")
     return driver, txn
 
 
-def _uri(kbid: str, column: str = "registry") -> str:
-    return f"/{kbid}/knowledgeboxes/{column}.json"
+def _registry_uri(kbid: str) -> str:
+    return f"/kb/{kbid}/registry.json"
 
 
-async def _get(driver: MarkLogicDriver, txn: MarkLogicTransaction, kbid: str) -> dict | None:
-    return await documents.read(txn, driver.system_database, _uri(kbid))
+def _kbid_from_registry_uri(uri: str) -> str:
+    # Assumes the URI is of the form "/kb/{kbid}/registry.json"
+    parts = uri.strip("/").split("/")
+    if len(parts) != 3 or parts[0] != "kb" or parts[2] != "registry.json":
+        raise ValueError(f"Invalid registry URI: {uri}")
+    return parts[1]
 
 
-async def _write(driver: MarkLogicDriver, txn: MarkLogicTransaction, kbid: str, content: dict) -> None:
+def _kb_uri() -> str:
+    return "/kb_data.json"
+
+
+@observer.wrap({"type": "kb", "op": "set_registry"})
+async def set_registry(
+    txn: Transaction,
+    *,
+    kbid: str,
+    slug: str,
+) -> None:
+    await _set_registry(
+        txn,
+        kbid=kbid,
+        slug=slug,
+    )
+
+
+async def _set_registry(
+    txn: Transaction,
+    *,
+    kbid: str,
+    slug: str,
+) -> None:
+    driver, marklogic_txn = _driver_txn(txn, ensure_writes=True)
     await documents.write(
-        txn, driver.system_database, _uri(kbid), MarkLogicCollections.KNOWLEDGEBOXES, content
+        marklogic_txn,
+        driver.system_database,
+        _registry_uri(kbid),
+        MarkLogicCollections.KB_REGISTRY_ITEM,
+        {"kbid": kbid, "slug": slug},
     )
 
 
@@ -76,7 +124,8 @@ def _deserialize(column: KBColumn, value):
         return documents.from_json(value, knowledgebox_pb2.KnowledgeBoxConfig)
     elif column == "shards":
         return documents.from_json(value, writer_pb2.Shards)
-    return value
+    else:  # Unknown column
+        raise ValueError(f"Unsupported KB column: {column}")
 
 
 @observer.wrap({"type": "kb", "op": "set"})
@@ -87,23 +136,43 @@ async def set(
     config: knowledgebox_pb2.KnowledgeBoxConfig | None | _UnsetType = UNSET,
     shards: writer_pb2.Shards | None | _UnsetType = UNSET,
 ) -> None:
-    driver, marklogic_txn = _driver_txn(txn)
+    await _set_data(
+        txn,
+        kbid=kbid,
+        config=config,
+        shards=shards,
+    )
+
+
+async def _set_data(
+    txn: Transaction,
+    *,
+    kbid: str,
+    config: knowledgebox_pb2.KnowledgeBoxConfig | None | _UnsetType = UNSET,
+    shards: writer_pb2.Shards | None | _UnsetType = UNSET,
+) -> None:
+    # TODO(Marklogic): Look into optimizing read-modify-write for KB data (optic DSL)
     if config is UNSET and shards is UNSET:
         return
-    if marklogic_txn.read_only:
-        raise RuntimeError("Cannot write in read only transaction")
-    database = await driver.ensure_kb_database(kbid)
-    if await _get(driver, marklogic_txn, kbid) is None:
-        await _write(driver, marklogic_txn, kbid, {"kbid": kbid})
+    driver, marklogic_txn = _driver_txn(txn, ensure_writes=True)
+    content = await documents.read(
+        marklogic_txn,
+        driver.kb_database(kbid),
+        _kb_uri(),
+    )
+    if content is None:
+        # Initialize content with the kbid if it doesn't exist
+        content = {"kbid": kbid}
     for name, value in (("config", config), ("shards", shards)):
         if value is not UNSET:
-            await documents.write(
-                txn,
-                database,
-                _uri(kbid, name),
-                MarkLogicCollections.KNOWLEDGEBOXES,
-                {"kbid": kbid, name: _serialize(value)},
-            )
+            content[name] = _serialize(value)
+    await documents.write(
+        marklogic_txn,
+        driver.kb_database(kbid),
+        _kb_uri(),
+        MarkLogicCollections.KNOWLEDGEBOXES,
+        content,
+    )
 
 
 @observer.wrap({"type": "kb", "op": "get"})
@@ -114,39 +183,52 @@ async def get(
     columns: tuple[KBColumn, ...],
     for_update: bool = False,
 ) -> KBData | None:
+    return await _get_data(
+        txn,
+        kbid=kbid,
+        columns=columns,
+        for_update=for_update,
+    )
+
+
+async def _get_data(
+    txn: Transaction,
+    *,
+    kbid: str,
+    columns: tuple[KBColumn, ...],
+    for_update: bool = False,
+) -> KBData | None:
     if not columns:
         raise ValueError("At least one KB column must be requested")
     driver, marklogic_txn = _driver_txn(txn)
-    content = await _get(driver, marklogic_txn, kbid)
+    content = await documents.read(
+        marklogic_txn,
+        driver.kb_database(kbid),
+        _kb_uri(),
+    )
     if content is None:
         return None
     result = KBData()
     for column in columns:
-        if column in ("config", "shards"):
-            column_content = await documents.read(txn, driver.kb_database(kbid), _uri(kbid, column))
-            value = column_content.get(column) if column_content is not None else None
-        else:
-            value = content.get(column)
-        if column == "deleted_at" and value is not None:
-            value = datetime.fromisoformat(value)
-        elif column == "slug" and value is not None:
-            value = str(value)
+        if column == "slug":
+            # Slug is fetched from the config
+            value = _deserialize("config", content["config"]).slug
         elif column in ("config", "shards"):
-            value = _deserialize(column, value)
+            value = _deserialize(column, content[column])
         setattr(result, column, value)
     return result
 
 
 async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tuple[str, str]]:
     driver, marklogic_txn = _driver_txn(txn)
-    query = f"cts.collectionQuery({json.dumps(MarkLogicCollections.KNOWLEDGEBOXES)})"
+    query = f"cts.collectionQuery({json.dumps(MarkLogicCollections.KB_REGISTRY_ITEM)})"
     if slug_prefix:
         query += f", cts.jsonPropertyValueQuery('slug', {json.dumps(slug_prefix + '*')}, ['wildcarded'])"
     javascript = f"cts.uris('', ['document', 'item-order'], cts.andQuery([{query}]))"
-    uris = await documents.evaluate(txn, driver.system_database, javascript)
+    uris = await documents.evaluate(marklogic_txn, driver.system_database, javascript)
     for uri in uris:
-        kbid = str(uri).split("/")[1]
-        content = await _get(driver, marklogic_txn, kbid)
+        kbid = _kbid_from_registry_uri(uri)
+        content = await documents.read(marklogic_txn, driver.system_database, _registry_uri(kbid))
         if content is None:
             continue
         slug = content.get("slug")
@@ -157,74 +239,65 @@ async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tupl
 @observer.wrap({"type": "kb", "op": "exists"})
 async def exists(txn: Transaction, *, kbid: str) -> bool:
     driver, marklogic_txn = _driver_txn(txn)
-    content = await _get(driver, marklogic_txn, kbid)
-    return content is not None and content.get("slug") is not None and content.get("deleted_at") is None
+    content = await documents.read(marklogic_txn, driver.system_database, _registry_uri(kbid))
+    return content is not None and content.get("slug") is not None
 
 
 @observer.wrap({"type": "kb", "op": "get_kbid"})
 async def get_kbid(txn: Transaction, *, slug: str) -> str | None:
+    return await _get_kbid_from_slug(txn, slug=slug)
+
+
+async def _get_kbid_from_slug(txn: Transaction, *, slug: str) -> str | None:
     driver, _ = _driver_txn(txn)
     javascript = (
         "cts.uris('', ['document'], cts.andQuery(["
-        f"cts.collectionQuery({json.dumps(MarkLogicCollections.KNOWLEDGEBOXES)}), "
+        f"cts.collectionQuery({json.dumps(MarkLogicCollections.KB_REGISTRY_ITEM)}), "
         f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.SLUG)}, '=', {json.dumps(slug)})]))"
     )
     uris = await documents.evaluate(txn, driver.system_database, javascript)
-    return str(uris[0]).split("/")[1] if uris else None
+    if len(uris) == 0:
+        return None
+    elif len(uris) > 1:
+        raise RuntimeError(f"Multiple KBs found for slug {slug}")
+    return _kbid_from_registry_uri(uris[0])
 
 
 @observer.wrap({"type": "kb", "op": "set_slug"})
 async def set_slug(txn: Transaction, *, slug: str, kbid: str) -> None:
-    driver, marklogic_txn = _driver_txn(txn)
-    if marklogic_txn.read_only:
-        raise RuntimeError("Cannot write in read only transaction")
-    content = await _get(driver, marklogic_txn, kbid)
-    if content is None:
-        content = {}
-    same_slug = content.get("slug") == slug
-    has_kbid = content.get("kbid") == kbid
-    content["kbid"] = kbid
-    if same_slug and has_kbid:
-        return
-
-    existing = await get_kbid(txn, slug=slug)
-    if existing is not None and existing != kbid:
+    driver, _ = _driver_txn(txn, ensure_writes=True)
+    existing = await _get_kbid_from_slug(txn, slug=slug)
+    if not existing:
+        # If the slug does not exist, make sure to create the database
+        await driver.ensure_kb_database(kbid)
+    elif existing != kbid:
         raise KnowledgeBoxConflict()
-    await driver.ensure_kb_database(kbid)
-    content["slug"] = slug
-    await _write(driver, marklogic_txn, kbid, content)
+    await _set_registry(txn, kbid=kbid, slug=slug)
 
 
 @observer.wrap({"type": "kb", "op": "delete"})
 async def delete(txn: Transaction, *, kbid: str) -> None:
-    driver, marklogic_txn = _driver_txn(txn)
-    if marklogic_txn.read_only:
-        raise RuntimeError("Cannot delete in read only transaction")
+    driver, marklogic_txn = _driver_txn(txn, ensure_writes=True)
     await driver.delete_kb_database(kbid)
-    await documents.delete(txn, driver.system_database, _uri(kbid))
+    await documents.delete(marklogic_txn, driver.system_database, _registry_uri(kbid))
 
 
 @observer.wrap({"type": "kb", "op": "soft_delete"})
 async def soft_delete(txn: Transaction, *, kbid: str) -> None:
-    driver, marklogic_txn = _driver_txn(txn)
-    content = await _get(driver, marklogic_txn, kbid)
-    if content is None:
-        return
-    content["slug"] = None
-    content["deleted_at"] = datetime.now().isoformat()
-    await _write(driver, marklogic_txn, kbid, content)
+    # TODO(Marklogic): implement soft deletion + purge
+    return
 
 
 @observer.wrap({"type": "kb", "op": "get_config"})
 async def get_config(txn: Transaction, *, kbid: str, for_update: bool = False):
-    data = await get(txn, kbid=kbid, columns=("config",), for_update=for_update)
-    return data.config if data is not None else None
+    data = await _get_data(txn, kbid=kbid, columns=("config",), for_update=for_update)
+    return data.config if isinstance(data, KBData) else None
 
 
 @observer.wrap({"type": "kb", "op": "get_shards"})
 async def get_shards(txn: Transaction, *, kbid: str, for_update: bool = False):
-    data = await get(txn, kbid=kbid, columns=("shards",), for_update=for_update)
-    return data.shards if data is not None else None
+    data = await _get_data(txn, kbid=kbid, columns=("shards",), for_update=for_update)
+    return data.shards if isinstance(data, KBData) else None
 
 
 async def get_model_metadata(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.SemanticModelMetadata:
@@ -265,4 +338,4 @@ async def set_external_index_provider_metadata(txn: Transaction, *, kbid: str, m
     if config is None:
         raise KnowledgeBoxNotFound(kbid)
     config.external_index_provider.CopyFrom(metadata)
-    await set(txn, kbid=kbid, config=config)
+    await _set_data(txn, kbid=kbid, config=config)
