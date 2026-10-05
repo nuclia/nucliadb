@@ -78,6 +78,10 @@ async def _extracted_texts(
 async def _build_requests(
     kbid: str, fields: set[FieldId], paragraphs: set[ParagraphId]
 ) -> list[ExtractedTextsRequest] | None:
+    return None
+
+    # TODO(Marklogic): reimplement this with marklogic
+
     # shard_id -> nidx gRPC request
     nidx_requests: dict[str, ExtractedTextsRequest] = {}
 

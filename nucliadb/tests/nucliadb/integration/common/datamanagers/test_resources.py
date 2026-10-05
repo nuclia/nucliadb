@@ -130,32 +130,27 @@ async def test_marklogic_resource_crud(maindb_driver: Driver) -> None:
             kbid=kbid,
             rid=rid,
             basic=Basic(title="Original"),
-            shard="shard-1",
         )
         await resources.set_slug(txn, kbid=kbid, rid=rid, slug="one")
-        await resources.set(txn, kbid=kbid, rid=rid, shard="shard-2")
         await resources.set(txn, kbid=kbid, rid=other, basic=Basic(title="Other"))
         with pytest.raises(ConflictError):
             await resources.set_slug(txn, kbid=kbid, rid=other, slug="one")
         await txn.commit()
 
     async with maindb_driver.ro_transaction() as txn:
-        resource = await resources.get(txn, kbid=kbid, rid=rid, columns=("basic", "slug", "shard"))
+        resource = await resources.get(txn, kbid=kbid, rid=rid, columns=("basic", "slug"))
         assert resource is not None and resource.basic is not None
         assert resource.basic.title == "Original"
-        assert (resource.slug, resource.shard) == ("one", "shard-2")
-        assert await resources.get_shards(txn, kbid=kbid, rids=[rid, other]) == {rid: "shard-2"}
+        assert resource.slug == "one"
         assert await resources.exists(txn, kbid=kbid, rid=rid)
         assert not await resources.exists(txn, kbid=kbid, rid="not-a-uuid")
         assert await resources.count(txn, kbid=kbid) == 2
     assert {value async for value in resources.iter(kbid=kbid)} == {rid, other}
 
     async with maindb_driver.rw_transaction() as txn:
-        await resources.set(txn, kbid=kbid, rid=rid, shard=None)
         await resources.delete(txn, kbid=kbid, rid=other)
         await txn.commit()
     async with maindb_driver.ro_transaction() as txn:
-        assert await resources.get_shard(txn, kbid=kbid, rid=rid) is None
         assert await resources.get_rid(txn, kbid=kbid, slug="one") == rid
         assert await resources.count(txn, kbid=kbid) == 1
 

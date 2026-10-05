@@ -500,11 +500,6 @@ def knowledgebox_config(message: knowledgebox_pb2.KnowledgeBoxConfig) -> Knowled
         preserving_proto_field_name=True,
         always_print_fields_with_no_presence=True,
     )
-    # Calculate external index provider metadata
-    # that is shown on read requests
-    eip = as_dict.pop("external_index_provider", None)
-    if eip:
-        as_dict["configured_external_index_provider"] = {"type": eip["type"].lower()}
     return KnowledgeBoxConfig(**as_dict)
 
 

@@ -215,15 +215,14 @@ async def test_exists_kb_false_for_missing_kb(maindb_driver: Driver) -> None:
         assert await kb.exists(txn, kbid=new_kbid()) is False
 
 
-# TODO(Marklogic): Implement kb soft deletion
-# @pytest.mark.asyncio
-# async def test_exists_kb_false_after_soft_delete(maindb_driver: Driver, kbid: str) -> None:
-#     async with maindb_driver.rw_transaction() as txn:
-#         await kb.soft_delete(txn, kbid=kbid)
-#         await txn.commit()
+@pytest.mark.asyncio
+async def test_exists_kb_false_after_soft_delete(maindb_driver: Driver, kbid: str) -> None:
+    async with maindb_driver.rw_transaction() as txn:
+        await kb.soft_delete(txn, kbid=kbid)
+        await txn.commit()
 
-#     async with maindb_driver.ro_transaction() as txn:
-#         assert await kb.exists(txn, kbid=kbid) is False
+    async with maindb_driver.ro_transaction() as txn:
+        assert await kb.exists(txn, kbid=kbid) is False
 
 
 @pytest.mark.asyncio
@@ -240,17 +239,23 @@ async def test_exists_kb_false_after_hard_delete(maindb_driver: Driver, kbid: st
 # soft_delete
 # ---------------------------------------------------------------------------
 
-# TODO(Marklogic): Implement kb soft deletion
-# @pytest.mark.asyncio
-# async def test_soft_delete_clears_slug(maindb_driver: Driver, kbid: str) -> None:
-#     async with maindb_driver.rw_transaction() as txn:
-#         await kb.soft_delete(txn, kbid=kbid)
-#         await txn.commit()
 
-#     # The row still exists but slug is NULL, so get_kbid returns None for the old slug
-#     async with maindb_driver.ro_transaction() as txn:
-#         result = await kb.get_kbid(txn, slug=f"slug-{kbid}")
-#     assert result is None
+@pytest.mark.asyncio
+async def test_soft_delete_marks_registry_and_frees_slug(maindb_driver: Driver, kbid: str) -> None:
+    async with maindb_driver.ro_transaction() as txn:
+        assert await kb.exists(txn, kbid=kbid) is True
+        assert await kb.get_kbid(txn, slug=f"slug-{kbid}") == kbid
+
+    async with maindb_driver.rw_transaction() as txn:
+        await kb.soft_delete(txn, kbid=kbid)
+        await txn.commit()
+
+    async with maindb_driver.ro_transaction() as txn:
+        assert await kb.get_kbid(txn, slug=f"slug-{kbid}") is None
+        registry = await kb._get_registry(txn, kbid=kbid)
+    assert registry is not None
+    assert registry.slug == ""
+    assert registry.deleted_at is not None
 
 
 @pytest.mark.asyncio

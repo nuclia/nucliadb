@@ -141,7 +141,6 @@ def safe_global_config():
     import nucliadb.backups.settings
     import nucliadb.common.back_pressure.settings
     import nucliadb.common.cluster.settings
-    import nucliadb.common.external_index_providers.settings
     import nucliadb.ingest.settings
     import nucliadb.migrator.settings
     import nucliadb.search.settings
@@ -158,7 +157,6 @@ def safe_global_config():
         nucliadb.backups.settings.settings,
         nucliadb.common.back_pressure.settings.settings,
         nucliadb.common.cluster.settings.settings,
-        nucliadb.common.external_index_providers.settings.settings,
         nucliadb.ingest.settings.settings,
         nucliadb.migrator.settings.settings,
         nucliadb.search.settings.settings,

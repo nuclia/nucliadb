@@ -16,7 +16,6 @@ import logging
 from .common import *  # noqa
 from .conversation import *  # noqa
 from .export_import import *  # noqa
-from .external_index_providers import *  # noqa
 from .extracted import *  # noqa
 from .file import *  # noqa
 from .link import *  # noqa

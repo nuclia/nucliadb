@@ -17,15 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import json
 import logging
 from collections.abc import AsyncIterator
 
 import pytest
 
-from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
+from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb_utils.utilities import Utility
 from tests.ndbfixtures.utils import global_utility
 
@@ -55,39 +53,13 @@ async def cleanup_maindb(driver: Driver):
         assert await txn.count("/") == 0
 
     if isinstance(driver, MarkLogicDriver):
-        await cleanup_marklogic_collections(driver)
-        await cleanup_kb_databases(driver)
+        await cleanup_marklogic_databases(driver)
 
 
-async def cleanup_marklogic_collections(driver: MarkLogicDriver) -> None:
-    """Clear the KnowledgeBox registry left in the system database."""
-    async with driver.rw_transaction() as txn:
-        assert isinstance(txn, MarkLogicTransaction)
-        database = driver.database
-        transaction = await txn.sdk_transaction(database)
-        assert transaction is not None
-        uris = (
-            await driver.client.eval(
-                javascript=(
-                    "cts.uris('', ['document'], cts.collectionQuery("
-                    f"{json.dumps(MarkLogicCollections.KNOWLEDGEBOXES)}))"
-                ),
-                tx=transaction,
-                params=await txn.params(database),
-            )
-            or []
-        )
-        assert isinstance(uris, list)
-        for uri in uris:
-            response = await driver.client.documents.delete(str(uri), params=await txn.params(database))
-            response.raise_for_status()
-        await txn.commit()
-
-
-async def cleanup_kb_databases(driver: MarkLogicDriver) -> None:
+async def cleanup_marklogic_databases(driver: MarkLogicDriver) -> None:
     """Drop every per-KnowledgeBox database created by the test."""
     async with driver.admin_client() as client:
         for name in await client.list_databases():
-            if name.startswith(driver.kb_database_prefix):
+            if name.startswith(driver.kb_database_prefix) or name == driver.system_database:
                 await client.delete_database(name)
     driver._provisioned.clear()

@@ -17,14 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from unittest.mock import Mock
 
 import pytest
 
 from nucliadb.common.datamanagers import kb, resources
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError
-from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import resources_pb2
@@ -151,7 +149,6 @@ async def test_resource_set_get(
         assert data.origin is None
         assert data.security is None
         assert data.extra is None
-        assert await resources.get_shard(txn, kbid=kbid, rid=rid) is None
         assert await resources.get_rid(txn, kbid=kbid, slug="test-slug") == rid
 
     async with maindb_driver.rw_transaction(kbid=kbid) as txn:
@@ -164,7 +161,6 @@ async def test_resource_set_get(
         await resources.set(
             txn, kbid=kbid, rid=rid, security=resources_pb2.Security(access_groups=["group1", "group2"])
         )
-        await resources.set(txn, kbid=kbid, rid=rid, shard="shard-1")
         await resources.set(
             txn, kbid=kbid, rid=rid, basic=resources_pb2.Basic(slug="test-slug", title="Test Title")
         )
@@ -176,7 +172,7 @@ async def test_resource_set_get(
         assert basic.slug == "test-slug"
         assert basic.title == "Test Title"
         data = await resources.get(
-            txn, kbid=kbid, rid=rid, columns=("basic", "origin", "security", "extra", "shard", "slug")
+            txn, kbid=kbid, rid=rid, columns=("basic", "origin", "security", "extra", "slug")
         )
         assert data is not None
         assert data.basic is not None
@@ -193,9 +189,6 @@ async def test_resource_set_get(
         extra_ = data.extra
         assert extra_ is not None
         assert extra_.metadata["key"] == "value"
-
-        assert data.shard is not None
-        assert data.shard == "shard-1"
 
     async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await resources.delete(txn, kbid=kbid, rid=rid)
@@ -215,24 +208,3 @@ async def test_exists_returns_false_for_invalid_uuid(
     async with maindb_driver.ro_transaction(kbid="not-a-valid-uuid") as txn:
         result = await resources.exists(txn, kbid="not-a-valid-uuid", rid="also-not-valid")
     assert result is False
-
-
-@pytest.mark.parametrize(
-    ("ok", "message"),
-    [
-        (False, "Failed to read document: 503"),
-        (True, "Unexpected response when reading document"),
-    ],
-)
-async def test_get_shards_rejects_non_document_response(
-    maindb_driver: Driver, mocker, ok: bool, message: str
-) -> None:
-    assert isinstance(maindb_driver, MarkLogicDriver)
-    mocker.patch.object(
-        maindb_driver.client.documents,
-        "read",
-        return_value=Mock(is_success=ok, status_code=503, text="unavailable"),
-    )
-    async with maindb_driver.ro_transaction(kbid="kb") as txn:
-        with pytest.raises(RuntimeError, match=message):
-            await resources.get_shards(txn, kbid="kb", rids=["rid"])

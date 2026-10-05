@@ -24,8 +24,8 @@ from fastapi import Header, HTTPException, Request
 from fastapi_versioning import version
 
 from nucliadb.common.exceptions import InvalidQueryError
-from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.models_utils import to_proto
+from nucliadb.common.retrieval import TextBlockMatch
 from nucliadb.models.internal.augment import Paragraph, ParagraphText
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import get_injected_security_groups

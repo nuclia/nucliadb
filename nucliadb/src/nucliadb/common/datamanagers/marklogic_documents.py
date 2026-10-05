@@ -54,14 +54,17 @@ async def read(txn: Transaction, database: str, uri: str) -> dict | None:
         tx=await marklogic_txn.sdk_transaction(database),
         params=await marklogic_txn.params(database),
     )
-    if isinstance(result, httpx.Response):
+    if not isinstance(result, list):
         if missing_database(result):
             return None
         driver.data._check(result, "read document")
         raise RuntimeError("Unexpected response when reading document")
     if not result:
         return None
-    content = result[0].content
+    document = result[0]
+    if not isinstance(document, Document):
+        raise RuntimeError(f"Invalid document response: {uri}")
+    content = document.content
     if not isinstance(content, dict):
         raise RuntimeError(f"Invalid document content: {uri}")
     return dict(content)

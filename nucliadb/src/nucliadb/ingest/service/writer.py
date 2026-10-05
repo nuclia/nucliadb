@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import uuid
 from collections.abc import AsyncIterator
 
 from nucliadb.backups import tasks as backup_tasks
@@ -25,8 +24,6 @@ from nucliadb.backups import utils as backup_utils
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.external_index_providers.exceptions import ExternalIndexCreationError
-from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.entities import EntitiesManager
@@ -124,7 +121,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                     vs.vectorset_id: semantic_model_to_metadata(vs)
                     for vs in request.graph_edge_vectorsets
                 },
-                external_index_provider=request.external_index_provider,
                 hidden_resources_enabled=request.hidden_resources_enabled,
                 hidden_resources_hide_on_creation=request.hidden_resources_hide_on_creation,
                 prewarm_enabled=request.prewarm_enabled,
@@ -133,16 +129,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         except KnowledgeBoxConflict:
             logger.info("KB already exists", extra={"slug": request.slug})
             return writer_pb2.NewKnowledgeBoxV2Response(status=KnowledgeBoxResponseStatus.CONFLICT)
-
-        except ExternalIndexCreationError as exc:
-            logger.exception(
-                "Error creating external index",
-                extra={"slug": request.slug, "error": str(exc)},
-            )
-            return writer_pb2.NewKnowledgeBoxV2Response(
-                status=KnowledgeBoxResponseStatus.EXTERNAL_INDEX_PROVIDER_ERROR,
-                error_message=exc.message,
-            )
 
         except Exception as exc:
             errors.capture_exception(exc)
@@ -175,7 +161,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 slug=request.slug,
                 title=request.config.title or None,
                 description=request.config.description or None,
-                external_index_provider=request.config.external_index_provider or None,
                 hidden_resources_enabled=request.config.hidden_resources_enabled,
                 hidden_resources_hide_on_creation=request.config.hidden_resources_hide_on_creation,
                 prewarm_enabled=request.config.prewarm_enabled,
@@ -314,27 +299,11 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=rid)),
                 self.driver.rw_transaction(kbid=kbid) as txn,
             ):
-                kbobj = KnowledgeBoxORM(txn, self.storage, kbid)
+                _ = KnowledgeBoxORM(txn, self.storage, kbid)
                 resobj = ResourceORM(txn, self.storage, kbid, rid)
                 resobj.disable_vectors = not request.reindex_vectors
-                index_message = await get_resource_index_message(resobj, reindex=True)
-                shard = await self.proc.get_or_assign_resource_shard(txn, kbobj, rid)
-                external_index_manager = await get_external_index_manager(kbid=kbid)
-                if external_index_manager is not None:
-                    await self.proc.external_index_add_resource(
-                        external_index_manager,
-                        rid,
-                        index_message,
-                    )
-                else:
-                    await self.shards_manager.add_resource(
-                        shard,
-                        index_message,
-                        0,
-                        partition=self.partitions[0],
-                        kb=kbid,
-                        reindex_id=uuid.uuid4().hex,
-                    )
+                _ = await get_resource_index_message(resobj, reindex=True)
+                # TODO(Marklogic): implement the actual indexing logic with Marklogic
                 response = IndexStatus()
                 return response
         except Exception as e:

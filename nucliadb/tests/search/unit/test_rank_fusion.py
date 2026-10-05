@@ -32,9 +32,9 @@ from nidx_protos.nodereader_pb2 import DocumentScored, GraphSearchResponse, Para
 
 import nucliadb_models.search as search_models
 from nucliadb.common import datamanagers
-from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.retrieval import TextBlockMatch
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search.query_parser.parsers import parse_find

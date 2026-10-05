@@ -78,7 +78,6 @@ def rw_txn_wrap(fun: Callable[Concatenate[Transaction, P], Awaitable[T]]) -> Cal
 class kb:
     exists = ro_txn_wrap(kb_dm.exists)
     get_config = ro_txn_wrap(kb_dm.get_config)
-    get_external_index_provider_metadata = ro_txn_wrap(kb_dm.get_external_index_provider_metadata)
     get_shards = ro_txn_wrap(kb_dm.get_shards)
 
 

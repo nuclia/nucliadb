@@ -21,15 +21,11 @@ import asyncio
 import unittest
 import unittest.mock
 import uuid
-from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
-from nidx_protos import nodewriter_pb2
 from nidx_protos.noderesources_pb2 import EmptyQuery, ShardId
 
-import nucliadb.common.nidx
-from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest.orm.knowledgebox import (
@@ -43,8 +39,6 @@ from nucliadb.purge import (
     purge_kbs,
     purge_kbs_storage,
 )
-from nucliadb.purge.orphan_shards import detect_orphan_shards, purge_orphan_shards
-from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_utils.storages.storage import Storage
 from tests.utils.dirty_index import wait_for_sync
 
@@ -118,109 +112,6 @@ async def test_purge_deletes_everything_from_maindb(
 async def list_shards() -> list[ShardId]:
     nidx = get_nidx_api_client()
     return list((await nidx.ListShards(EmptyQuery())).ids)
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_purge_orphan_shards(
-    maindb_driver: Driver,
-    storage: Storage,
-    nucliadb_writer_manager: AsyncClient,
-    nucliadb_writer: AsyncClient,
-):
-    """Create a KB with some resource (hence a shard) and delete it. Simulate an
-    index node is down and validate orphan shards purge works as expected.
-
-    """
-    kb_slug = str(uuid.uuid4())
-    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": kb_slug})
-    assert resp.status_code == 201
-    kbid = resp.json().get("uuid")
-
-    resp = await nucliadb_writer.post(
-        f"/kb/{kbid}/resources",
-        json={
-            "title": "My title",
-            "slug": "myresource",
-            "texts": {"text1": {"body": "My text"}},
-        },
-    )
-    assert resp.status_code == 201
-
-    shards = await list_shards()
-    assert len(shards) > 0
-
-    with unittest.mock.patch.object(nucliadb.common.nidx.get_nidx(), "api_client"):
-        nucliadb.common.nidx.get_nidx().api_client.DeleteShard = AsyncMock()
-        resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
-        assert resp.status_code == 200, resp.text
-        await purge_kbs(maindb_driver)
-
-    # We have removed the shards in maindb but left them orphan in the index
-    # nodes
-    async with maindb_driver.ro_transaction() as txn:
-        maindb_shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
-        assert maindb_shards is None
-
-    shards = await list_shards()
-    assert len(shards) > 0
-
-    orphan_shards = await detect_orphan_shards(maindb_driver)
-    assert len(orphan_shards) == len(shards)
-
-    # Purge orphans and validate
-    await purge_orphan_shards(maindb_driver)
-
-    shards = await list_shards()
-    assert len(shards) == 0
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_purge_orphan_shard_detection(
-    maindb_driver: Driver,
-    storage: Storage,
-    nucliadb_writer_manager: AsyncClient,
-    nucliadb_writer: AsyncClient,
-):
-    """Prepare a situation where there are:
-    - a regular KB
-    - an orphan shard
-    - a shard from a rollover
-
-    Then, validate orphan shard detection find only the true orphan shard.
-    """
-    # Regular KB
-    kb_slug = str(uuid.uuid4())
-    resp = await nucliadb_writer_manager.post("/kbs", json={"slug": kb_slug})
-    assert resp.status_code == 201
-    kbid = resp.json().get("uuid")
-
-    # Orphan shard
-    orphan_shard = await get_nidx_api_client().NewShard(
-        nodewriter_pb2.NewShardRequest(
-            kbid=str(uuid.uuid4()),
-            vectorsets_configs={
-                "some": nodewriter_pb2.VectorIndexConfig(
-                    similarity=utils_pb2.VectorSimilarity.COSINE,
-                    normalize_vectors=False,
-                    vector_type=nodewriter_pb2.VectorType.DENSE_F32,
-                    vector_dimension=128,
-                )
-            },
-        )
-    )
-    orphan_shard_id = orphan_shard.id
-
-    # Rollover shard
-    async with maindb_driver.rw_transaction() as txn:
-        rollover_shards = writer_pb2.Shards(
-            shards=[writer_pb2.ShardObject(shard="rollover-shard")],
-            kbid=kbid,
-        )
-        await datamanagers.rollover.update_kb_rollover_shards(txn, kbid=kbid, kb_shards=rollover_shards)
-
-    orphan_shards = await detect_orphan_shards(maindb_driver)
-    assert len(orphan_shards) == 1
-    assert orphan_shard_id in orphan_shards
 
 
 async def list_all_keys(driver: Driver) -> list[str]:

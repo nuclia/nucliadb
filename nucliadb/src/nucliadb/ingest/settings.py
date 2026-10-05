@@ -42,7 +42,7 @@ class DriverSettings(BaseSettings):
     driver_marklogic_uri: str = "http://127.0.0.1"
     driver_marklogic_username: str = "admin"
     driver_marklogic_password: str = "admin"
-    driver_marklogic_database: str = "nucliadb:system"
+    driver_marklogic_database: str = "nucliadb-system"
     driver_marklogic_port: int = 8000
     driver_marklogic_admin_port: int = 8002
 

@@ -20,13 +20,9 @@
 import logging
 from time import time
 
-from nucliadb.common.external_index_providers.base import ExternalIndexManager
-from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.common.models_utils import to_proto
 from nucliadb.search.search.find_merge import (
     build_find_response,
-    compose_find_resources,
-    hydrate_and_rerank,
 )
 from nucliadb.search.search.hydrator import (
     ResourceHydrationOptions,
@@ -38,12 +34,10 @@ from nucliadb.search.search.metrics import (
 from nucliadb.search.search.query_parser.models import ParsedQuery
 from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import (
-    convert_retrieval_to_proto,
     get_rephrased_query,
     is_incomplete,
 )
 from nucliadb.search.search.rerankers import (
-    RerankingOptions,
     get_reranker,
 )
 from nucliadb.search.search.retrieval import text_block_search
@@ -53,7 +47,6 @@ from nucliadb_models.search import (
     FindOptions,
     FindRequest,
     KnowledgeboxFindResults,
-    MinScore,
     NucliaDBClientType,
     RerankerName,
 )
@@ -70,15 +63,7 @@ async def find(
     x_forwarded_for: str,
     metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
-    external_index_manager = await get_external_index_manager(kbid=kbid)
-    if external_index_manager is not None:
-        return await _external_index_find(
-            kbid,
-            item,
-            external_index_manager,
-        )
-    else:
-        return await _ndb_index_find(kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, metrics)
+    return await _ndb_index_find(kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, metrics)
 
 
 async def _ndb_index_find(
@@ -200,70 +185,3 @@ async def _ndb_index_find(
         )
 
     return search_results, incomplete_results, parsed
-
-
-async def _external_index_find(
-    kbid: str,
-    item: FindRequest,
-    external_index_manager: ExternalIndexManager,
-) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
-    """
-    Parse the query, query the external index, and hydrate the results.
-    """
-    # Parse query
-    parsed = await parse_find(kbid, item)
-    assert parsed.retrieval.reranker is not None, "find parser must provide a reranking algorithm"
-    reranker = get_reranker(parsed.retrieval.reranker)
-    incomplete_results = is_incomplete(parsed.retrieval)
-    rephrased_query = get_rephrased_query(parsed)
-    search_request = convert_retrieval_to_proto(parsed.retrieval)
-
-    # Query index
-    query_results = await external_index_manager.query(search_request)
-
-    # Hydrate and rerank results
-    text_blocks, resources, best_matches = await hydrate_and_rerank(
-        query_results.iter_matching_text_blocks(),
-        kbid,
-        resource_hydration_options=ResourceHydrationOptions(
-            show=item.show,
-            extracted=item.extracted,
-            field_type_filter=item.field_type_filter,
-            # Although we may have the true "default" vectorset (as /query may
-            # have returned it), we want to maintain the same behavior as in
-            # resource serialization. Thus, we pass the user vectorset and let
-            # the serializer decide the meaning of None
-            vectorset=item.vectorset,
-        ),
-        text_block_hydration_options=TextBlockHydrationOptions(),
-        reranker=reranker,
-        reranking_options=RerankingOptions(
-            kbid=kbid,
-            query=search_request.body,
-        ),
-        top_k=parsed.retrieval.top_k,
-    )
-    find_resources = compose_find_resources(text_blocks, resources)
-
-    results_min_score = MinScore(
-        bm25=0,
-        semantic=parsed.retrieval.query.semantic.min_score
-        if parsed.retrieval.query.semantic is not None
-        else 0.0,
-    )
-    retrieval_results = KnowledgeboxFindResults(
-        resources=find_resources,
-        query=item.query,
-        rephrased_query=rephrased_query,
-        total=0,
-        page_number=0,
-        page_size=item.top_k,
-        relations=None,  # Not implemented for external indexes yet
-        min_score=results_min_score,
-        best_matches=best_matches,
-        # These are not used for external indexes
-        shards=None,
-        nodes=None,
-    )
-
-    return retrieval_results, incomplete_results, parsed

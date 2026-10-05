@@ -28,7 +28,6 @@ from nidx_protos import nidx_pb2, noderesources_pb2
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -43,10 +42,8 @@ from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_parag
 from nucliadb.migrator.utils import get_latest_version
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
-    CreateExternalIndexProviderMetadata,
     KnowledgeBoxConfig,
     SemanticModelMetadata,
-    StoredExternalIndexProviderMetadata,
     VectorSetPurge,
 )
 from nucliadb_protos.resources_pb2 import Basic
@@ -112,7 +109,6 @@ class KnowledgeBox:
         semantic_models: dict[str, SemanticModelMetadata],
         title: str = "",
         description: str = "",
-        external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
         hidden_resources_enabled: bool = False,
         hidden_resources_hide_on_creation: bool = False,
         prewarm_enabled: bool = False,
@@ -155,8 +151,6 @@ class KnowledgeBox:
                 # B/c with Shards.actual
                 kb_shards.actual = -1
 
-                vs_external_indexes = []
-
                 for vectorset_id, semantic_model in semantic_models.items():
                     # if this KB uses a matryoshka model, we can choose a different
                     # dimension
@@ -164,14 +158,6 @@ class KnowledgeBox:
                         dimension = choose_matryoshka_dimension(semantic_model.matryoshka_dimensions)
                     else:
                         dimension = semantic_model.vector_dimension
-
-                    vs_external_indexes.append(
-                        VectorsetExternalIndex(
-                            vectorset_id=vectorset_id,
-                            dimension=dimension,
-                            similarity=semantic_model.similarity_function,
-                        )
-                    )
 
                     vectorset_config = semantic_model_to_vectorset(
                         vectorset_id, semantic_model, dimension
@@ -199,17 +185,6 @@ class KnowledgeBox:
                             ],
                         )
 
-                stored_external_index_provider = await cls._maybe_create_external_indexes(
-                    kbid, request=external_index_provider, indexes=vs_external_indexes
-                )
-                rollback_ops.append(
-                    partial(
-                        cls._maybe_delete_external_indexes,
-                        kbid,
-                        stored_external_index_provider,
-                    )
-                )
-
                 config = KnowledgeBoxConfig(
                     title=title,
                     description=description,
@@ -220,7 +195,6 @@ class KnowledgeBox:
                     enforce_security=enforce_security if enforce_security is not None else False,
                     prewarm_enabled=prewarm_enabled,
                 )
-                config.external_index_provider.CopyFrom(stored_external_index_provider)
                 await datamanagers.kb.set(
                     txn,
                     kbid=kbid,
@@ -282,7 +256,6 @@ class KnowledgeBox:
         title: str | None = None,
         description: str | None = None,
         migration_version: int | None = None,
-        external_index_provider: StoredExternalIndexProviderMetadata | None = None,
         hidden_resources_enabled: bool | None = None,
         hidden_resources_hide_on_creation: bool | None = None,
         prewarm_enabled: bool | None = None,
@@ -307,9 +280,6 @@ class KnowledgeBox:
 
             if migration_version is not None:
                 stored.migration_version = migration_version
-
-            if external_index_provider is not None:
-                stored.external_index_provider.MergeFrom(external_index_provider)
 
             if hidden_resources_enabled is not None:
                 stored.hidden_resources_enabled = hidden_resources_enabled
@@ -394,8 +364,6 @@ class KnowledgeBox:
                 # Already deleted, or never existed.
                 return
 
-            kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
-
             await cls.mark_for_purge(txn, kbid=kbid)
 
             shards_obj = await datamanagers.kb.get_shards(txn, kbid=kbid)
@@ -414,9 +382,6 @@ class KnowledgeBox:
                 for shard in shards_obj.shards:
                     if shard.nidx_shard_id:
                         await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
-
-        if kb_config is not None:
-            await cls._maybe_delete_external_indexes(kbid, kb_config.external_index_provider)
 
         audit = get_audit()
         if audit is not None:
@@ -577,23 +542,6 @@ class KnowledgeBox:
 
         shard_manager = get_shard_manager()
         await shard_manager.delete_vectorset(self.kbid, vectorset_id)
-
-    @classmethod
-    async def _maybe_create_external_indexes(
-        cls,
-        kbid: str,
-        request: CreateExternalIndexProviderMetadata,
-        indexes: list[VectorsetExternalIndex],
-    ) -> StoredExternalIndexProviderMetadata:
-        return StoredExternalIndexProviderMetadata(type=request.type)
-
-    @classmethod
-    async def _maybe_delete_external_indexes(
-        cls,
-        kbid: str,
-        stored: StoredExternalIndexProviderMetadata,
-    ) -> None:
-        return
 
 
 def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:

@@ -21,7 +21,6 @@ import asyncio
 import logging
 
 from nucliadb.common import locking
-from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.marklogic import run_marklogic_schema_migrations
@@ -154,65 +153,10 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
     await context.data_manager.update_global_info(target_version=None)
 
 
-async def run_rollover_in_parallel(
-    context: ExecutionContext,
-    kbid: str,
-    max_concurrent: asyncio.Semaphore,
-) -> None:
-    async with max_concurrent:
-        try:
-            await rollover_kb_index(context, kbid)
-            await context.data_manager.delete_kb_rollover(kbid=kbid)
-        except Exception as exc:
-            errors.capture_exception(exc)
-            logger.exception(
-                "Failed to rollover KB",
-                extra={"kbid": kbid},
-            )
-            raise
-
-
-async def run_rollovers(context: ExecutionContext) -> None:
-    kbs_to_rollover = await context.data_manager.get_kbs_to_rollover()
-
-    if len(kbs_to_rollover) == 0:
-        return
-
-    max_concurrent = context.settings.max_concurrent_migrations
-    semaphore = asyncio.Semaphore(max_concurrent)
-
-    logger.info(
-        f"Scheduling KB rollovers.",
-        extra={"max_concurrent": max_concurrent, "kbs": len(kbs_to_rollover)},
-    )
-
-    tasks = [
-        asyncio.create_task(
-            run_rollover_in_parallel(context, kbid, semaphore),
-            name=f"rollover_kb_{kbid}",
-        )
-        for kbid in kbs_to_rollover
-    ]
-
-    failures = 0
-    for future in asyncio.as_completed(tasks):
-        try:
-            await future
-        except Exception:
-            failures += 1
-
-    if failures > 0:
-        raise Exception(f"Failed to migrate KBs. Failures: {failures}")
-
-
 async def run(context: ExecutionContext, target_version: int | None = None) -> None:
     await run_marklogic_schema_migrations(context.kv_driver)
 
     async with locking.distributed_lock(locking.MIGRATIONS_LOCK):
-        # before we move to managed migrations, see if there are any rollovers
-        # scheduled and run them
-        await run_rollovers(context)
-
         # everything should be in a global lock
         # only 1 migration should be running at a time
         global_info = await context.data_manager.get_global_info()

@@ -39,10 +39,9 @@ from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
 from nucliadb_protos import resources_pb2
 
-ResourceColumn: TypeAlias = Literal["slug", "shard", "basic", "origin", "security", "extra"]
+ResourceColumn: TypeAlias = Literal["slug", "basic", "origin", "security", "extra"]
 ALL_COLUMNS: tuple[ResourceColumn, ...] = (
     "slug",
-    "shard",
     "basic",
     "origin",
     "security",
@@ -59,7 +58,6 @@ UNSET_EXTRA: Final[resources_pb2.Extra | None] = cast(resources_pb2.Extra | None
 @dataclass(slots=True)
 class ResourceData:
     slug: str | None = UNSET_STR
-    shard: str | None = UNSET_STR
     basic: resources_pb2.Basic | None = UNSET_BASIC
     origin: resources_pb2.Origin | None = UNSET_ORIGIN
     security: resources_pb2.Security | None = UNSET_SECURITY
@@ -102,8 +100,6 @@ def _deserialize_resource_column(
         return None
     if column == "slug":
         return str(value)
-    elif column == "shard":
-        return str(value)
     elif column == "basic":
         assert isinstance(value, dict)
         return documents.from_json(value, resources_pb2.Basic)
@@ -131,7 +127,6 @@ async def set(
     *,
     kbid: str,
     rid: str,
-    shard: str | None | _UnsetType = UNSET,
     basic: resources_pb2.Basic | None | _UnsetType = UNSET,
     origin: resources_pb2.Origin | None | _UnsetType = UNSET,
     security: resources_pb2.Security | None | _UnsetType = UNSET,
@@ -141,7 +136,6 @@ async def set(
         txn,
         kbid=kbid,
         rid=rid,
-        shard=shard,
         basic=basic,
         origin=origin,
         security=security,
@@ -155,7 +149,6 @@ async def _set(
     kbid: str,
     rid: str,
     slug: str | None | _UnsetType = UNSET,
-    shard: str | None | _UnsetType = UNSET,
     basic: resources_pb2.Basic | None | _UnsetType = UNSET,
     origin: resources_pb2.Origin | None | _UnsetType = UNSET,
     security: resources_pb2.Security | None | _UnsetType = UNSET,
@@ -165,7 +158,6 @@ async def _set(
     driver, _ = documents.driver_txn(txn)
     values = {
         "slug": _serialize_resource_column(slug),
-        "shard": _serialize_resource_column(shard),
         "basic": _serialize_resource_column(basic),
         "origin": _serialize_resource_column(origin),
         "security": _serialize_resource_column(security),
@@ -173,7 +165,7 @@ async def _set(
     }
     columns_to_set = [
         column_name
-        for column_name in ("slug", "shard", "basic", "origin", "security", "extra")
+        for column_name in ("slug", "basic", "origin", "security", "extra")
         if values[column_name] is not UNSET
     ]
     if not columns_to_set:
@@ -350,60 +342,11 @@ async def count(txn: Transaction, *, kbid: str) -> int:
     return int(result[0] if result else 0)
 
 
-def _shard_query(shard_id: str) -> list[str]:
-    return [
-        *_resources_query(),
-        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.SHARD)}, '=', {json.dumps(shard_id)})",
-    ]
-
-
-@observer.wrap({"type": "resources", "op": "get_resources_from_shard"})
-async def get_resources_from_shard(
-    txn: Transaction, *, kbid: str, shard_id: str, limit: int
-) -> list[str]:
-    if limit <= 0:
-        return []
-    javascript = (
-        f"cts.uris('', {json.dumps(['document', 'item-order', f'limit={limit}'])}, "
-        f"cts.andQuery([{', '.join(_shard_query(shard_id))}]))"
-    )
-    uris = await documents.evaluate(txn, await _database(txn, kbid), javascript)
-    return [_rid_from_uri(uri) for uri in uris]
-
-
-@observer.wrap({"type": "resources", "op": "count_resources_in_shard"})
-async def count_resources_in_shard(txn: Transaction, *, kbid: str, shard_id: str) -> int:
-    javascript = f"cts.estimate(cts.andQuery([{', '.join(_shard_query(shard_id))}]))"
-    result = await documents.evaluate(txn, await _database(txn, kbid), javascript)
-    return int(result[0] if result else 0)
-
-
 async def _resource_uris(txn: Transaction, kbid: str) -> list[str]:
     javascript = (
         f"cts.uris('', ['document', 'item-order'], cts.andQuery([{', '.join(_resources_query())}]))"
     )
     return await documents.evaluate(txn, await _database(txn, kbid), javascript)
-
-
-@observer.wrap({"type": "resources", "op": "get_shard"})
-async def get_shard(txn: Transaction, *, kbid: str, rid: str, for_update: bool = False) -> str | None:
-    resource = await _get(txn, kbid=kbid, rid=rid, columns=("shard",), for_update=for_update)
-    if resource is None:
-        return None
-    assert resource.shard is not UNSET
-    return resource.shard
-
-
-@observer.wrap({"type": "resources", "op": "get_shards"})
-async def get_shards(txn: Transaction, *, kbid: str, rids: list[str]) -> dict[str, str]:
-    if not rids:
-        return {}
-    shards: dict[str, str] = {}
-    for rid in rids:
-        content = await _read(txn, kbid, rid)
-        if content is not None and content.get("shard") is not None:
-            shards[rid] = content["shard"]
-    return shards
 
 
 @observer.wrap({"type": "resources", "op": "get"})
@@ -415,10 +358,6 @@ async def get(
     columns: tuple[ResourceColumn, ...],
     for_update: bool = False,
 ) -> ResourceData | None:
-    """Return the selected resource columns for a row, or None if the row does not exist.
-
-    Non-requested fields are left as UNSET. Requested null values are returned as None.
-    """
     return await _get(txn, kbid=kbid, rid=rid, columns=columns, for_update=for_update)
 
 
@@ -430,13 +369,9 @@ async def _get(
     columns: tuple[ResourceColumn, ...],
     for_update: bool = False,
 ) -> ResourceData | None:
-    """Return the selected resource columns for a row, or None if the row does not exist.
-
-    Non-requested fields are left as UNSET. Requested null values are returned as None.
-    """
+    # TODO(Marklogic): Use optic to select only the requested columns instead of reading the entire document
     if not columns:
         raise ValueError("At least one resource column must be requested")
-
     content = await _read(txn, kbid, rid)
     if content is None:
         return None

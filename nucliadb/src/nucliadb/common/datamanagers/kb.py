@@ -6,6 +6,7 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Final, Literal, TypeAlias, cast
 
 from nucliadb.common.datamanagers import marklogic_documents as documents
@@ -48,6 +49,7 @@ class KBRegistry:
 
     kbid: str
     slug: str
+    deleted_at: str | None = None
 
 
 def _driver_txn(
@@ -96,6 +98,7 @@ async def _set_registry(
     *,
     kbid: str,
     slug: str,
+    deleted_at: str | None = None,
 ) -> None:
     driver, marklogic_txn = _driver_txn(txn, ensure_writes=True)
     await documents.write(
@@ -103,7 +106,27 @@ async def _set_registry(
         driver.system_database,
         _registry_uri(kbid),
         MarkLogicCollections.KB_REGISTRY_ITEM,
-        {"kbid": kbid, "slug": slug},
+        {"kbid": kbid, "slug": slug, "deleted_at": deleted_at},
+    )
+
+
+async def _get_registry(
+    txn: Transaction,
+    *,
+    kbid: str,
+) -> KBRegistry | None:
+    driver, marklogic_txn = _driver_txn(txn)
+    content = await documents.read(
+        marklogic_txn,
+        driver.system_database,
+        _registry_uri(kbid),
+    )
+    if content is None:
+        return None
+    return KBRegistry(
+        kbid=content["kbid"],
+        slug=content["slug"],
+        deleted_at=content.get("deleted_at"),
     )
 
 
@@ -220,6 +243,7 @@ async def _get_data(
 
 
 async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tuple[str, str]]:
+    # TODO(Marklogic): Can't we already filter in optic those registry items that are deleted or don't have a slug?
     driver, marklogic_txn = _driver_txn(txn)
     query = f"cts.collectionQuery({json.dumps(MarkLogicCollections.KB_REGISTRY_ITEM)})"
     if slug_prefix:
@@ -228,11 +252,11 @@ async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tupl
     uris = await documents.evaluate(marklogic_txn, driver.system_database, javascript)
     for uri in uris:
         kbid = _kbid_from_registry_uri(uri)
-        content = await documents.read(marklogic_txn, driver.system_database, _registry_uri(kbid))
-        if content is None:
+        registry = await _get_registry(txn, kbid=kbid)
+        if registry is None:
             continue
-        slug = content.get("slug")
-        if slug is not None:
+        slug = registry.slug
+        if slug is not None and registry.deleted_at is None:
             yield kbid, slug
 
 
@@ -240,7 +264,7 @@ async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tupl
 async def exists(txn: Transaction, *, kbid: str) -> bool:
     driver, marklogic_txn = _driver_txn(txn)
     content = await documents.read(marklogic_txn, driver.system_database, _registry_uri(kbid))
-    return content is not None and content.get("slug") is not None
+    return content is not None and content.get("slug") is not None and content.get("deleted_at") is None
 
 
 @observer.wrap({"type": "kb", "op": "get_kbid"})
@@ -249,6 +273,7 @@ async def get_kbid(txn: Transaction, *, slug: str) -> str | None:
 
 
 async def _get_kbid_from_slug(txn: Transaction, *, slug: str) -> str | None:
+    # TODO(Marklogic): Can't we already filter in optic those registry items that are deleted or don't have a slug?
     driver, _ = _driver_txn(txn)
     javascript = (
         "cts.uris('', ['document'], cts.andQuery(["
@@ -256,11 +281,17 @@ async def _get_kbid_from_slug(txn: Transaction, *, slug: str) -> str | None:
         f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.SLUG)}, '=', {json.dumps(slug)})]))"
     )
     uris = await documents.evaluate(txn, driver.system_database, javascript)
-    if len(uris) == 0:
+    active_kbids = []
+    for uri in uris:
+        kbid = _kbid_from_registry_uri(uri)
+        registry = await _get_registry(txn, kbid=kbid)
+        if registry is not None and registry.deleted_at is None:
+            active_kbids.append(kbid)
+    if len(active_kbids) == 0:
         return None
-    elif len(uris) > 1:
+    elif len(active_kbids) > 1:
         raise RuntimeError(f"Multiple KBs found for slug {slug}")
-    return _kbid_from_registry_uri(uris[0])
+    return active_kbids[0]
 
 
 @observer.wrap({"type": "kb", "op": "set_slug"})
@@ -284,8 +315,11 @@ async def delete(txn: Transaction, *, kbid: str) -> None:
 
 @observer.wrap({"type": "kb", "op": "soft_delete"})
 async def soft_delete(txn: Transaction, *, kbid: str) -> None:
-    # TODO(Marklogic): implement soft deletion + purge
-    return
+    # TODO(Marklogic): Implement patch behaviour with logic to avoid read-modify-write race conditions.
+    registry = await _get_registry(txn, kbid=kbid)
+    if registry is None:
+        return
+    await _set_registry(txn, kbid=kbid, slug="", deleted_at=datetime.now(timezone.utc).isoformat())
 
 
 @observer.wrap({"type": "kb", "op": "get_config"})
@@ -326,16 +360,3 @@ async def get_matryoshka_vector_dimension(
         if configured_dimension is not None and configured_dimension in model.matryoshka_dimensions
         else None
     )
-
-
-async def get_external_index_provider_metadata(txn: Transaction, *, kbid: str):
-    config = await get_config(txn, kbid=kbid)
-    return config.external_index_provider if config is not None else None
-
-
-async def set_external_index_provider_metadata(txn: Transaction, *, kbid: str, metadata):
-    config = await get_config(txn, kbid=kbid)
-    if config is None:
-        raise KnowledgeBoxNotFound(kbid)
-    config.external_index_provider.CopyFrom(metadata)
-    await _set_data(txn, kbid=kbid, config=config)

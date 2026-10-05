@@ -22,8 +22,8 @@ from collections.abc import Iterable
 
 from nidx_protos.nodereader_pb2 import GraphSearchResponse, SearchResponse
 
-from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId
+from nucliadb.common.retrieval import TextBlockMatch
 from nucliadb.models.internal.augment import AugmentedParagraph, Paragraph, ParagraphText
 from nucliadb.search.augmentor import augment_paragraphs
 from nucliadb.search.augmentor.resources import augment_resources_deep

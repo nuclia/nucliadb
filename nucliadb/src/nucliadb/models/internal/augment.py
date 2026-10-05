@@ -30,8 +30,8 @@ from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 from typing_extensions import Self
 
 import nucliadb_models
-from nucliadb.common.external_index_providers.base import _INCEPTION_LABEL, _OCR_LABEL, TextBlockMatch
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.retrieval import _INCEPTION_LABEL, _OCR_LABEL, TextBlockMatch
 from nucliadb_models import filters
 from nucliadb_models.augment import ResourceId
 from nucliadb_models.common import FieldTypeName

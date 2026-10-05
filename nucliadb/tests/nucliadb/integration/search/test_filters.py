@@ -22,7 +22,6 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.common.cluster import rollover
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
@@ -45,7 +44,6 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
-from tests.utils.dirty_index import mark_dirty
 
 
 class ClassificationLabels:
@@ -287,9 +285,7 @@ async def kbid(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_filtering_before_and_after_reindexing(
-    app_context, nucliadb_reader: AsyncClient, kbid: str
-):
+async def test_filtering(app_context, nucliadb_reader: AsyncClient, kbid: str):
     FILTERS = [
         # Filter with unexisting labels and entities
         [entity_filter("unexisting/entity")],
@@ -325,12 +321,6 @@ async def test_filtering_before_and_after_reindexing(
             label_filter(ClassificationLabels.PARAGRAPH_DETECTED),
         ],
     ]
-
-    for f in FILTERS:
-        await _test_filtering(nucliadb_reader, kbid, f)
-
-    await rollover.rollover_kb_index(app_context, kbid)
-    await mark_dirty()
 
     for f in FILTERS:
         await _test_filtering(nucliadb_reader, kbid, f)

@@ -27,8 +27,8 @@ from nidx_protos.nodereader_pb2 import (
     SearchResponse,
 )
 
-from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
+from nucliadb.common.retrieval import TextBlockMatch
 from nucliadb.search import logger
 from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.metrics import search_observer, searched_shards_histogram

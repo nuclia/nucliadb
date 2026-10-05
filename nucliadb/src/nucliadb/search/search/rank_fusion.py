@@ -22,8 +22,8 @@ from abc import ABC, abstractmethod
 from enum import Enum, auto
 from typing import TypeVar
 
-from nucliadb.common.external_index_providers.base import ScoredTextBlock
 from nucliadb.common.ids import ParagraphId
+from nucliadb.common.retrieval import ScoredTextBlock
 from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb_models.retrieval import RrfScore, Score, WeightedCombSumScore
 from nucliadb_models.search import SCORE_TYPE
