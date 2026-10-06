@@ -233,7 +233,6 @@ async def update_slug(
 
 @observer.wrap({"type": "resources", "op": "delete"})
 async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
-    # TODO(Marklogic): Implement directory delete here
     db = database(txn, kbid)
     await documents.delete_resource_children(txn, db, rid)
     await documents.delete(txn, db, _uri(rid))
