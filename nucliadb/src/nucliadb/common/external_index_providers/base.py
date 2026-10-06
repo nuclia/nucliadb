@@ -51,9 +51,7 @@ _OCR_LABEL = (
     f"/k/{resources_pb2.Paragraph.TypeParagraph.Name(resources_pb2.Paragraph.TypeParagraph.OCR).lower()}"
 )
 # /k/inception
-_INCEPTION_LABEL = (
-    f"/k/{resources_pb2.Paragraph.TypeParagraph.Name(resources_pb2.Paragraph.TypeParagraph.INCEPTION).lower()}"
-)
+_INCEPTION_LABEL = f"/k/{resources_pb2.Paragraph.TypeParagraph.Name(resources_pb2.Paragraph.TypeParagraph.INCEPTION).lower()}"
 
 
 @dataclass
