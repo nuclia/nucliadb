@@ -43,9 +43,7 @@
         "nucliadb_utils/**",
         "proposals/**",
         "scripts/**",
-        ".github/workflows/blackduck-sca.yaml",
         ".github/workflows/polaris.yaml",
-        ".github/workflows/wf-dispatch-bd-sca-dispatch.yaml"
     ],
     "packageRules": [
         {
