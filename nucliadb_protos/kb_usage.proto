@@ -46,6 +46,7 @@ enum PredictType {
     LLM_SPLITTING = 18;
     INTERNET_SEARCH = 20;
     GUARDRAIL = 21;
+    DECISION = 22;
 }
 
 enum ClientType {
