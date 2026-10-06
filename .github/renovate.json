@@ -48,7 +48,12 @@
     "packageRules": [
         {
             "matchDepTypes": ["action"],
-            "matchPackageNames": ["actions/setup-python"],
+            "matchPackageNames": [
+                "actions/setup-python",
+                "actions/python-versions",
+                "setup-python",
+                "python-versions"
+            ],
             "matchCurrentVersion": "<3.11",
             "allowedVersions": "<3.11"
         },
