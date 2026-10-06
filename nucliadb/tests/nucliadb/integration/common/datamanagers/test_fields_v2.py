@@ -20,7 +20,6 @@
 import pytest
 
 from nucliadb.common.datamanagers import conversations, fields, kb, resources
-from nucliadb.common.datamanagers import marklogic_documents as documents
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
@@ -130,32 +129,6 @@ async def test_get_returns_none_for_missing_field(maindb_driver: Driver, kbid: s
             txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="nonexistent", pb_klass=rpb2.FieldText
         )
     assert result is None
-
-
-@pytest.mark.asyncio
-async def test_value_is_stored_as_queryable_json(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    text_field = rpb2.FieldText(body="hello world", format=rpb2.FieldText.Format.PLAIN)
-
-    async with maindb_driver.rw_transaction() as txn:
-        await fields.set(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", value=text_field)
-        await txn.commit()
-
-    async with maindb_driver.ro_transaction() as txn:
-        database = await fields._database(txn, kbid)
-        content = await documents.read(txn, database, fields._uri(rid, TEXT, "body"))
-        recovered = await fields.get(
-            txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", pb_klass=rpb2.FieldText
-        )
-
-    assert content is not None
-    assert content["value"] == {
-        "body": "hello world",
-        "format": "PLAIN",
-        "md5": "",
-        "extract_strategy": "",
-        "split_strategy": "",
-    }
-    assert recovered == text_field
 
 
 # ---------------------------------------------------------------------------

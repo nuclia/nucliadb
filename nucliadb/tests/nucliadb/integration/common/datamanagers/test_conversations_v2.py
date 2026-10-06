@@ -45,6 +45,10 @@ from nucliadb_protos.resources_pb2 import (
 
 @pytest.fixture()
 async def kbid(maindb_driver: Driver) -> str:
+    return await create_kb(maindb_driver)
+
+
+async def create_kb(maindb_driver: Driver) -> str:
     kbid = KnowledgeBox.new_unique_kbid()
     async with maindb_driver.rw_transaction() as txn:
         await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
@@ -391,7 +395,7 @@ async def test_resource_delete_cascades_to_fields_and_pages(
 
 
 async def test_kb_delete_preserves_other_kb_documents(maindb_driver: Driver, kbid: str) -> None:
-    other_kbid = KnowledgeBox.new_unique_kbid()
+    other_kbid = await create_kb(maindb_driver)
     rid = Resource.new_unique_rid()
     async with maindb_driver.rw_transaction() as txn:
         await kb.set_slug(txn, kbid=other_kbid, slug=f"slug-{other_kbid}")

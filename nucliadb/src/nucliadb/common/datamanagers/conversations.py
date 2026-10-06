@@ -8,6 +8,7 @@ from google.protobuf.message import Message
 
 from nucliadb.common.datamanagers import fields
 from nucliadb.common.datamanagers import marklogic_documents as documents
+from nucliadb.common.datamanagers.marklogic_documents import database
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
@@ -26,15 +27,10 @@ def _page_uri(rid: str, field_id: str, page: int) -> str:
     return f"{_directory(rid, field_id)}{page}.json"
 
 
-async def _database(txn: Transaction, kbid: str) -> str:
-    driver, _ = documents.driver_txn(txn)
-    return driver.kb_database(kbid)
-
-
 async def _read(
     txn: Transaction, kbid: str, rid: str, field_id: str, page: int, pb_klass: type[PB]
 ) -> PB | None:
-    content = await documents.read(txn, await _database(txn, kbid), _page_uri(rid, field_id, page))
+    content = await documents.read(txn, database(txn, kbid), _page_uri(rid, field_id, page))
     if content is None or content.get("value") is None:
         return None
     return documents.from_json(content["value"], pb_klass)
@@ -43,11 +39,9 @@ async def _read(
 async def _write(
     txn: Transaction, kbid: str, rid: str, field_id: str, page: int, value: Message
 ) -> None:
-    driver, _ = documents.driver_txn(txn)
-    database = await driver.ensure_kb_database(kbid)
     await documents.write(
         txn,
-        database,
+        database(txn, kbid),
         _page_uri(rid, field_id, page),
         MarkLogicCollections.CONVERSATIONS,
         {
@@ -102,19 +96,16 @@ async def set_splits_metadata(
 
 
 async def delete_pages(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None:
-    driver, marklogic_txn = documents.driver_txn(txn)
-    database = await _database(txn, kbid)
-    if await marklogic_txn.sdk_transaction(database) is None:
-        raise RuntimeError("Cannot delete in read only transaction")
+    driver, marklogic_txn = documents.driver_txn(txn, ensure_writes=True)
+    db = driver.kb_database(kbid)
     dsl = (
         "op.fromDocUris(cts.andQuery(["
         f"cts.collectionQuery({json.dumps(MarkLogicCollections.CONVERSATIONS)}), "
         f"cts.directoryQuery({json.dumps(_directory(rid, field_id))}, 'infinity')"
         "])).remove()"
     )
-    response = await driver.client.rows.update(dsl=dsl, params=await marklogic_txn.params(database))
-    if not documents.missing_database(response):
-        driver.data._check(response, "delete conversation pages")
+    response = await driver.client.rows.update(dsl=dsl, params=await marklogic_txn.params(db))
+    driver.data._check(response, "delete conversation pages")
 
 
 async def delete_field(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None:

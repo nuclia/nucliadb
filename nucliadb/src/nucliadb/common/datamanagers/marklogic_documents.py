@@ -7,13 +7,14 @@ import httpx
 from google.protobuf.json_format import MessageToDict, ParseDict
 from google.protobuf.message import Message
 
+from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
 from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.marklogic.client import Document
 
 PB = TypeVar("PB", bound=Message)
+RESOURCE_CHILD_COLLECTIONS = (MarkLogicCollections.FIELDS, MarkLogicCollections.CONVERSATIONS)
 
 
 def to_json(message: Message) -> dict:
@@ -85,6 +86,9 @@ async def exists(txn: Transaction, database: str, uri: str) -> bool:
         return True
     if result.status_code == 404:
         return False
+    if result.status_code == 400:
+        # The database does not exist
+        return False
     driver.data._check(result, "check document existence")
     return False
 
@@ -127,15 +131,18 @@ async def evaluate(txn: Transaction, database: str, javascript: str) -> list:
 
 async def delete_resource_children(txn: Transaction, database: str, rid: str) -> None:
     """Remove the field and conversation documents belonging to a resource."""
-    driver, marklogic_txn = driver_txn(txn)
-    if await marklogic_txn.sdk_transaction(database) is None:
-        raise RuntimeError("Cannot delete in read only transaction")
+    driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
     dsl = (
         "op.fromDocUris(cts.andQuery(["
-        "cts.collectionQuery(['fields', 'conversations']), "
-        f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.RID)}, '=', {json.dumps(rid)})"
+        f"cts.collectionQuery({json.dumps(RESOURCE_CHILD_COLLECTIONS)}), "
+        f"cts.directoryQuery({json.dumps(f'/resources/{rid}/')}, 'infinity')"
         "])).remove()"
     )
     response = await driver.client.rows.update(dsl=dsl, params=await marklogic_txn.params(database))
     if not missing_database(response):
         driver.data._check(response, "delete resource children")
+
+
+def database(txn: Transaction, kbid: str) -> str:
+    driver, _ = driver_txn(txn)
+    return driver.kb_database(kbid)

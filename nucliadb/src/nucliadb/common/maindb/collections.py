@@ -1,4 +1,7 @@
-class MarkLogicCollections:
+from enum import Enum
+
+
+class MarkLogicCollections(str, Enum):
     KB_REGISTRY_ITEM = "kb_registry_item"
     KNOWLEDGEBOXES = "knowledgeboxes"
     RESOURCES = "resources"
