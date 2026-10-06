@@ -33,10 +33,14 @@ def from_json(value: dict, pb_klass: type[PB]) -> PB:
     return ParseDict(value, pb_klass(), ignore_unknown_fields=True)
 
 
-def driver_txn(txn: Transaction) -> tuple[MarkLogicDriver, MarkLogicTransaction]:
+def driver_txn(
+    txn: Transaction, ensure_writes: bool = False
+) -> tuple[MarkLogicDriver, MarkLogicTransaction]:
     driver = get_driver()
     if not isinstance(driver, MarkLogicDriver) or not isinstance(txn, MarkLogicTransaction):
-        raise TypeError("Datamanager requires MarkLogicDriver")
+        raise TypeError("KnowledgeBox datamanager requires MarkLogicDriver")
+    if ensure_writes and txn.read_only:
+        raise RuntimeError("Cannot write in read only transaction")
     return driver, txn
 
 
@@ -68,6 +72,21 @@ async def read(txn: Transaction, database: str, uri: str) -> dict | None:
     if not isinstance(content, dict):
         raise RuntimeError(f"Invalid document content: {uri}")
     return dict(content)
+
+
+async def exists(txn: Transaction, database: str, uri: str) -> bool:
+    driver, marklogic_txn = driver_txn(txn)
+    result = await driver.client.documents.exists(
+        uri,
+        tx=await marklogic_txn.sdk_transaction(database),
+        params=await marklogic_txn.params(database),
+    )
+    if result.status_code == 200:
+        return True
+    if result.status_code == 404:
+        return False
+    driver.data._check(result, "check document existence")
+    return False
 
 
 async def write(txn: Transaction, database: str, uri: str, collection: str, content: dict) -> None:

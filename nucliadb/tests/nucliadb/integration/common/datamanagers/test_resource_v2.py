@@ -204,7 +204,8 @@ async def test_resource_set_get(
 @pytest.mark.asyncio
 async def test_exists_returns_false_for_invalid_uuid(
     maindb_driver: Driver,
+    kbid: str,
 ) -> None:
-    async with maindb_driver.ro_transaction(kbid="not-a-valid-uuid") as txn:
-        result = await resources.exists(txn, kbid="not-a-valid-uuid", rid="also-not-valid")
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
+        result = await resources.exists(txn, kbid=kbid, rid="also-not-valid")
     assert result is False

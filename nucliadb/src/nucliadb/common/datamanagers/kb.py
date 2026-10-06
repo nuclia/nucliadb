@@ -11,12 +11,11 @@ from typing import Final, Literal, TypeAlias, cast
 
 from nucliadb.common.datamanagers import marklogic_documents as documents
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
+from nucliadb.common.datamanagers.marklogic_documents import driver_txn
 from nucliadb.common.datamanagers.utils import UNSET, _UnsetType, observer
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
-from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
 logger = logging.getLogger(__name__)
@@ -50,17 +49,6 @@ class KBRegistry:
     kbid: str
     slug: str
     deleted_at: str | None = None
-
-
-def _driver_txn(
-    txn: Transaction, ensure_writes: bool = False
-) -> tuple[MarkLogicDriver, MarkLogicTransaction]:
-    driver = get_driver()
-    if not isinstance(driver, MarkLogicDriver) or not isinstance(txn, MarkLogicTransaction):
-        raise TypeError("KnowledgeBox datamanager requires MarkLogicDriver")
-    if ensure_writes and txn.read_only:
-        raise RuntimeError("Cannot write in read only transaction")
-    return driver, txn
 
 
 def _registry_uri(kbid: str) -> str:
@@ -100,7 +88,7 @@ async def _set_registry(
     slug: str,
     deleted_at: str | None = None,
 ) -> None:
-    driver, marklogic_txn = _driver_txn(txn, ensure_writes=True)
+    driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
     await documents.write(
         marklogic_txn,
         driver.system_database,
@@ -115,7 +103,7 @@ async def _get_registry(
     *,
     kbid: str,
 ) -> KBRegistry | None:
-    driver, marklogic_txn = _driver_txn(txn)
+    driver, marklogic_txn = driver_txn(txn)
     content = await documents.read(
         marklogic_txn,
         driver.system_database,
@@ -177,7 +165,7 @@ async def _set_data(
     # TODO(Marklogic): Look into optimizing read-modify-write for KB data (optic DSL)
     if config is UNSET and shards is UNSET:
         return
-    driver, marklogic_txn = _driver_txn(txn, ensure_writes=True)
+    driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
     content = await documents.read(
         marklogic_txn,
         driver.kb_database(kbid),
@@ -223,7 +211,7 @@ async def _get_data(
 ) -> KBData | None:
     if not columns:
         raise ValueError("At least one KB column must be requested")
-    driver, marklogic_txn = _driver_txn(txn)
+    driver, marklogic_txn = driver_txn(txn)
     content = await documents.read(
         marklogic_txn,
         driver.kb_database(kbid),
@@ -244,7 +232,7 @@ async def _get_data(
 
 async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tuple[str, str]]:
     # TODO(Marklogic): Can't we already filter in optic those registry items that are deleted or don't have a slug?
-    driver, marklogic_txn = _driver_txn(txn)
+    driver, marklogic_txn = driver_txn(txn)
     query = f"cts.collectionQuery({json.dumps(MarkLogicCollections.KB_REGISTRY_ITEM)})"
     if slug_prefix:
         query += f", cts.jsonPropertyValueQuery('slug', {json.dumps(slug_prefix + '*')}, ['wildcarded'])"
@@ -262,7 +250,7 @@ async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tupl
 
 @observer.wrap({"type": "kb", "op": "exists"})
 async def exists(txn: Transaction, *, kbid: str) -> bool:
-    driver, marklogic_txn = _driver_txn(txn)
+    driver, marklogic_txn = driver_txn(txn)
     content = await documents.read(marklogic_txn, driver.system_database, _registry_uri(kbid))
     return content is not None and content.get("slug") is not None and content.get("deleted_at") is None
 
@@ -274,7 +262,7 @@ async def get_kbid(txn: Transaction, *, slug: str) -> str | None:
 
 async def _get_kbid_from_slug(txn: Transaction, *, slug: str) -> str | None:
     # TODO(Marklogic): Can't we already filter in optic those registry items that are deleted or don't have a slug?
-    driver, _ = _driver_txn(txn)
+    driver, _ = driver_txn(txn)
     javascript = (
         "cts.uris('', ['document'], cts.andQuery(["
         f"cts.collectionQuery({json.dumps(MarkLogicCollections.KB_REGISTRY_ITEM)}), "
@@ -296,7 +284,11 @@ async def _get_kbid_from_slug(txn: Transaction, *, slug: str) -> str | None:
 
 @observer.wrap({"type": "kb", "op": "set_slug"})
 async def set_slug(txn: Transaction, *, slug: str, kbid: str) -> None:
-    driver, _ = _driver_txn(txn, ensure_writes=True)
+    """
+    This is the first step in creating or updating the slug for a knowledge box.
+    It ensures that the slug is unique and that the corresponding knowledge box database exists.
+    """
+    driver, _ = driver_txn(txn, ensure_writes=True)
     existing = await _get_kbid_from_slug(txn, slug=slug)
     if not existing:
         # If the slug does not exist, make sure to create the database
@@ -308,7 +300,7 @@ async def set_slug(txn: Transaction, *, slug: str, kbid: str) -> None:
 
 @observer.wrap({"type": "kb", "op": "delete"})
 async def delete(txn: Transaction, *, kbid: str) -> None:
-    driver, marklogic_txn = _driver_txn(txn, ensure_writes=True)
+    driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
     await driver.delete_kb_database(kbid)
     await documents.delete(marklogic_txn, driver.system_database, _registry_uri(kbid))
 

@@ -40,6 +40,7 @@ from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
 from nucliadb_protos import resources_pb2
 
 ResourceColumn: TypeAlias = Literal["slug", "basic", "origin", "security", "extra"]
+RESOURCE_URI_PAGE_SIZE = 1000
 ALL_COLUMNS: tuple[ResourceColumn, ...] = (
     "slug",
     "basic",
@@ -154,7 +155,7 @@ async def _set(
     security: resources_pb2.Security | None | _UnsetType = UNSET,
     extra: resources_pb2.Extra | None | _UnsetType = UNSET,
 ) -> None:
-    """Upsert only explicitly provided resource fields."""
+    # TODO(Marklogic): Implement proper upsert logic for MarkLogic, avoiding read-modify-write cycles.
     driver, _ = documents.driver_txn(txn)
     values = {
         "slug": _serialize_resource_column(slug),
@@ -170,27 +171,23 @@ async def _set(
     ]
     if not columns_to_set:
         return
-
-    database = await driver.ensure_kb_database(kbid)
-    content = await documents.read(txn, database, _uri(rid)) or {"rid": rid}
+    database = driver.kb_database(kbid)
+    uri = _uri(rid)
+    content = await documents.read(txn, database, uri)
+    if content is None:
+        content = {}
     for column in columns_to_set:
         content[column] = values[column]
-    if "basic" in columns_to_set:
-        content["title"] = basic.title if isinstance(basic, resources_pb2.Basic) else None
-    await documents.write(txn, database, _uri(rid), MarkLogicCollections.RESOURCES, content)
+    await documents.write(txn, database, uri, MarkLogicCollections.RESOURCES, content)
 
 
 def _uri(rid: str) -> str:
     return f"/resources/{rid}.json"
 
 
-async def _database(txn: Transaction, kbid: str) -> str:
+def _database(txn: Transaction, kbid: str) -> str:
     driver, _ = documents.driver_txn(txn)
     return driver.kb_database(kbid)
-
-
-async def _read(txn: Transaction, kbid: str, rid: str) -> dict | None:
-    return await documents.read(txn, await _database(txn, kbid), _uri(rid))
 
 
 @observer.wrap({"type": "resources", "op": "set_slug"})
@@ -201,7 +198,7 @@ async def set_slug(
     rid: str,
     slug: str,
 ) -> None:
-    existing = await _find_rid(txn, kbid, slug)
+    existing = await _get_rid_by_slug(txn, kbid, slug)
     if existing is not None and existing != rid:
         raise ConflictError(f"Slug '{slug}' already exists")
     await _set(txn, kbid=kbid, rid=rid, slug=slug)
@@ -232,7 +229,7 @@ async def update_slug(
     old_slug = data.slug
     basic = data.basic
     basic.slug = new_slug
-    existing = await _find_rid(txn, kbid, new_slug)
+    existing = await _get_rid_by_slug(txn, kbid, new_slug)
     if existing is not None and existing != rid:
         raise ConflictError(f"Slug '{new_slug}' already exists")
     await _set(txn, kbid=kbid, rid=rid, slug=new_slug, basic=basic)
@@ -241,7 +238,8 @@ async def update_slug(
 
 @observer.wrap({"type": "resources", "op": "delete"})
 async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
-    database = await _database(txn, kbid)
+    # TODO(Marklogic): Implement directory delete here
+    database = _database(txn, kbid)
     await documents.delete_resource_children(txn, database, rid)
     await documents.delete(txn, database, _uri(rid))
 
@@ -253,70 +251,41 @@ async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
 
 @observer.wrap({"type": "resources", "op": "exists"})
 async def exists(txn: Transaction, *, kbid: str, rid: str) -> bool:
-    return await _read(txn, kbid, rid) is not None
+    return await documents.exists(txn, _database(txn, kbid), _uri(rid))
 
 
 @observer.wrap({"type": "resources", "op": "get_rid"})
 async def get_rid(txn: Transaction, *, kbid: str, slug: str) -> str | None:
-    return await _find_rid(txn, kbid, slug)
+    return await _get_rid_by_slug(txn, kbid, slug)
 
 
-async def _find_rid(txn: Transaction, kbid: str, slug: str) -> str | None:
+async def _get_rid_by_slug(txn: Transaction, kbid: str, slug: str) -> str | None:
     javascript = (
         "cts.uris('', ['document'], cts.andQuery(["
         f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)}), "
         f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.SLUG)}, '=', {json.dumps(slug)})]))"
     )
-    uris = await documents.evaluate(txn, await _database(txn, kbid), javascript)
+    uris = await documents.evaluate(txn, _database(txn, kbid), javascript)
     return _rid_from_uri(uris[0]) if uris else None
 
 
 def _rid_from_uri(uri: object) -> str:
+    """
+    Converts a document URI to a resource ID (rid).
+
+    >>> _rid_from_uri("/resources/123.json")
+    '123'
+    """
     return str(uri).rsplit("/", 1)[-1].removesuffix(".json")
-
-
-@observer.wrap({"type": "resources", "op": "get_by_slug"})
-async def get_by_slug(txn: Transaction, *, kbid: str, slug: str) -> ResourceData | None:
-    rid = await _find_rid(txn, kbid, slug)
-    return await _get(txn, kbid=kbid, rid=rid, columns=ALL_COLUMNS) if rid is not None else None
 
 
 def _resources_query() -> list[str]:
     return [f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)})"]
 
 
-@observer.wrap({"type": "resources", "op": "search"})
-async def search(
-    txn: Transaction,
-    *,
-    kbid: str,
-    title: str | None = None,
-    slug: str | None = None,
-) -> list[tuple[str, ResourceData]]:
-    clauses = _resources_query()
-    for path, value in (
-        (MarkLogicIndexPaths.TITLE, title),
-        (MarkLogicIndexPaths.SLUG, slug),
-    ):
-        if value is not None:
-            clauses.append(
-                f"cts.jsonPropertyValueQuery({json.dumps(path.lstrip('/'))}, "
-                f"{json.dumps('*' + value + '*')}, ['wildcarded'])"
-            )
-    javascript = f"cts.uris('', ['document', 'item-order'], cts.andQuery([{', '.join(clauses)}]))"
-    uris = await documents.evaluate(txn, await _database(txn, kbid), javascript)
-    results: list[tuple[str, ResourceData]] = []
-    for uri in uris:
-        rid = _rid_from_uri(uri)
-        resource = await _get(txn, kbid=kbid, rid=rid, columns=ALL_COLUMNS)
-        if resource is not None:
-            results.append((rid, resource))
-    return results
-
-
 @observer.wrap({"type": "resources", "op": "slug_exists"})
 async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
-    return await _find_rid(txn, kbid, slug) is not None
+    return await _get_rid_by_slug(txn, kbid, slug) is not None
 
 
 @observer.wrap({"type": "resources", "op": "get_basic"})
@@ -330,23 +299,40 @@ async def get_basic(
 @observer.wrap({"type": "resources", "op": "iter"})
 async def iter(*, kbid: str) -> AsyncIterator[str]:
     async with with_ro_transaction(kbid=kbid) as txn:
-        uris = await _resource_uris(txn, kbid)
-        for uri in sorted(str(uri) for uri in uris):
-            yield _rid_from_uri(uri)
+        start_uri: str | None = None
+        while True:
+            page_limit = RESOURCE_URI_PAGE_SIZE + (start_uri is not None)
+            uris = await _resource_uris(txn, kbid, start_uri=start_uri, limit=page_limit)
+            has_more = len(uris) == page_limit
+            if start_uri is not None and uris and uris[0] == start_uri:
+                # Avoid yielding the start_uri again
+                uris = uris[1:]
+            if not uris:
+                return
+            for uri in uris:
+                yield _rid_from_uri(uri)
+            if not has_more:
+                return
+            start_uri = uris[-1]
 
 
 @observer.wrap({"type": "resources", "op": "count"})
 async def count(txn: Transaction, *, kbid: str) -> int:
+    # TODO(Marklogic): Validate that this is the right way to count docs of a particular collection (or uri scheme)
     javascript = f"cts.estimate(cts.andQuery([{', '.join(_resources_query())}]))"
-    result = await documents.evaluate(txn, await _database(txn, kbid), javascript)
+    result = await documents.evaluate(txn, _database(txn, kbid), javascript)
     return int(result[0] if result else 0)
 
 
-async def _resource_uris(txn: Transaction, kbid: str) -> list[str]:
+async def _resource_uris(
+    txn: Transaction, kbid: str, *, start_uri: str | None = None, limit: int = RESOURCE_URI_PAGE_SIZE
+) -> list[str]:
+    start = json.dumps(start_uri or "")
     javascript = (
-        f"cts.uris('', ['document', 'item-order'], cts.andQuery([{', '.join(_resources_query())}]))"
+        f"fn.subsequence(cts.uris({start}, ['document', 'item-order'], "
+        f"cts.andQuery([{', '.join(_resources_query())}])), 1, {limit})"
     )
-    return await documents.evaluate(txn, await _database(txn, kbid), javascript)
+    return [str(uri) for uri in await documents.evaluate(txn, _database(txn, kbid), javascript)]
 
 
 @observer.wrap({"type": "resources", "op": "get"})
@@ -372,7 +358,7 @@ async def _get(
     # TODO(Marklogic): Use optic to select only the requested columns instead of reading the entire document
     if not columns:
         raise ValueError("At least one resource column must be requested")
-    content = await _read(txn, kbid, rid)
+    content = await documents.read(txn, _database(txn, kbid), _uri(rid))
     if content is None:
         return None
     resource = ResourceData()

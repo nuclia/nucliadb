@@ -229,6 +229,16 @@ class DocumentManager:
         params["uri"] = uris if isinstance(uris, list) else [uris]
         return await self._http.delete("/v1/documents", params=params)
 
+    async def exists(
+        self,
+        uri: str,
+        tx: Transaction | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> httpx.Response:
+        params = _with_txid(params, tx)
+        params["uri"] = [uri]
+        return await self._http.head("/v1/documents", params=params)
+
 
 class RowManager:
     def __init__(self, http: httpx.AsyncClient):
