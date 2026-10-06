@@ -49,6 +49,7 @@
         {
             "matchDepTypes": ["action"],
             "matchPackageNames": ["actions/setup-python"],
+            "matchCurrentVersion": "<3.11",
             "allowedVersions": "<3.11"
         },
         {
