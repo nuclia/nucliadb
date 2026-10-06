@@ -50,7 +50,7 @@
     "packageRules": [
         {
             "matchPackageNames": ["python"],
-            "matchCurrentVersion": "3.10.19",
+            "matchCurrentVersion": "<3.11",
             "allowedVersions": "<3.11"
         },
         {
