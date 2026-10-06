@@ -43,11 +43,12 @@
         "nucliadb_utils/**",
         "proposals/**",
         "scripts/**",
-        ".github/workflows/polaris.yaml",
+        ".github/workflows/polaris.yaml"
     ],
     "packageRules": [
         {
-            "matchPackageNames": ["python"],
+            "matchDepTypes": ["action"],
+            "matchPackageNames": ["actions/setup-python"],
             "matchCurrentVersion": "<3.11",
             "allowedVersions": "<3.11"
         },
