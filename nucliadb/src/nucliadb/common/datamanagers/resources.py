@@ -273,10 +273,6 @@ def _rid_from_uri(uri: object) -> str:
     return str(uri).rsplit("/", 1)[-1].removesuffix(".json")
 
 
-def _resources_query() -> list[str]:
-    return [f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)})"]
-
-
 @observer.wrap({"type": "resources", "op": "slug_exists"})
 async def slug_exists(txn: Transaction, *, kbid: str, slug: str) -> bool:
     return await _get_rid_by_slug(txn, kbid, slug) is not None
@@ -313,7 +309,7 @@ async def iter(*, kbid: str) -> AsyncIterator[str]:
 @observer.wrap({"type": "resources", "op": "count"})
 async def count(txn: Transaction, *, kbid: str) -> int:
     # TODO(Marklogic): Validate that this is the right way to count docs of a particular collection (or uri scheme)
-    javascript = f"cts.estimate(cts.andQuery([{', '.join(_resources_query())}]))"
+    javascript = f"cts.estimate(cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)}))"
     result = await documents.evaluate(txn, database(txn, kbid), javascript)
     return int(result[0] if result else 0)
 
@@ -324,7 +320,8 @@ async def _resource_uris(
     start = json.dumps(start_uri or "")
     javascript = (
         f"fn.subsequence(cts.uris({start}, ['document', 'item-order'], "
-        f"cts.andQuery([{', '.join(_resources_query())}])), 1, {limit})"
+        f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)})"
+        f"), 1, {limit})"
     )
     return [str(uri) for uri in await documents.evaluate(txn, database(txn, kbid), javascript)]
 
