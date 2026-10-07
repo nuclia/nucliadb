@@ -47,7 +47,12 @@ def get_kb_visibility_headers() -> dict[str, str]:
 
 
 class KbVisibilityMiddleware:
-    """Pure ASGI middleware storing the incoming `x-kb-visibility` header in a context var."""
+    """Pure ASGI middleware storing the incoming `x-kb-visibility` header in a context var.
+
+    The value is propagated to learning services so they know whether the KB making the
+    request is public or private, for security purposes, e.g. to disable modifying the
+    system prompt for public KBs.
+    """
 
     def __init__(self, app: ASGIApp):
         self.app = app
