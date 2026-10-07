@@ -32,6 +32,7 @@ from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
+from nucliadb.middleware import get_kb_visibility_headers
 from nucliadb_protos import knowledgebox_pb2, utils_pb2
 from nucliadb_telemetry import errors
 from nucliadb_utils.settings import is_onprem_nucliadb, nuclia_settings
@@ -275,6 +276,7 @@ async def proxy(
     Returns: Response. The response from the learning API. If the response is chunked, a StreamingResponse is returned.
     """
     proxied_headers = {k.lower(): v for k, v in request.headers.items() if is_white_listed_header(k)}
+    proxied_headers.update(get_kb_visibility_headers())
     proxied_headers.update(**headers)
 
     async with service_client(
@@ -488,7 +490,7 @@ class ProxiedLearningConfig(LearningConfigService):
     async def _client(self) -> AsyncIterator[httpx.AsyncClient]:
         async with httpx.AsyncClient(
             base_url=get_base_url(LearningService.CONFIG),
-            headers=get_auth_headers(),
+            headers={**get_auth_headers(), **get_kb_visibility_headers()},
         ) as client:
             yield client
 

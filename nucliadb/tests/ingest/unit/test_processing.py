@@ -28,6 +28,7 @@ from nucliadb.ingest.processing import (
     ProcessingEngine,
     PushPayload,
 )
+from nucliadb.middleware import _kb_visibility
 from nucliadb.models.internal.processing import ClassificationLabel
 from nucliadb_models import File, FileField
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -138,6 +139,20 @@ async def test_send_to_process_200(engine):
     assert processing_info.seqid == 11
     assert processing_info.account_seq == 22
     assert processing_info.queue == "private"
+
+
+async def test_send_to_process_forwards_kb_visibility(engine):
+    json_data = {"seqid": 11, "account_seq": 22, "queue": "private"}
+    engine.session = get_mocked_session("POST", 200, json=json_data, context_manager=False)
+
+    token = _kb_visibility.set("private")
+    try:
+        await engine.send_to_process(TEST_ITEM, 1)
+    finally:
+        _kb_visibility.reset(token)
+
+    _, kwargs = engine.session.post.call_args
+    assert kwargs["headers"]["x-kb-visibility"] == "private"
 
 
 @pytest.mark.parametrize("status", [402, 413])

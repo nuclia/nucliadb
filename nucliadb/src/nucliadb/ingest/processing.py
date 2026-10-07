@@ -32,6 +32,7 @@ import backoff
 import jwt
 
 import nucliadb_models as models
+from nucliadb.middleware import get_kb_visibility_headers
 from nucliadb.models.internal.processing import ClassificationLabel, ProcessingInfo, PushPayload
 from nucliadb_models.resource import QueueType
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -260,6 +261,7 @@ class ProcessingEngine:
         else:
             headers["CONTENT-LENGTH"] = str(0)
         headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
+        headers.update(get_kb_visibility_headers())
         async with self.session.post(
             self.nuclia_upload_url, data=file.file.payload, headers=headers
         ) as resp:
@@ -343,6 +345,7 @@ class ProcessingEngine:
             if classif_labels:
                 headers["X-CLASSIFICATION-LABELS"] = self.encode_classif_labels(classif_labels)
             headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
+            headers.update(get_kb_visibility_headers())
 
             iterator = storage.downloadbytescf_iterator(file.file)
             async with self.session.post(self.nuclia_upload_url, data=iterator, headers=headers) as resp:
@@ -377,6 +380,7 @@ class ProcessingEngine:
             if cf.size:
                 headers["CONTENT-LENGTH"] = str(cf.size)
             headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
+            headers.update(get_kb_visibility_headers())
 
             iterator = storage.downloadbytescf_iterator(cf)
             async with self.session.post(self.nuclia_upload_url, data=iterator, headers=headers) as resp:
@@ -402,7 +406,7 @@ class ProcessingEngine:
     async def send_to_process(self, item: PushPayload, partition: int) -> ProcessingInfo:
         op_type = "process_external" if self.onprem else "process_internal"
         with processing_observer({"type": op_type}):
-            headers = {"CONTENT-TYPE": "application/json"}
+            headers = {"CONTENT-TYPE": "application/json", **get_kb_visibility_headers()}
             if self.onprem is False:
                 # Upload the payload
                 item.partition = partition
@@ -479,7 +483,7 @@ class ProcessingEngine:
         Long term, if we want to publish object events out to a NATS stream, we can implement
         that instead of this method.
         """
-        headers = {"CONTENT-TYPE": "application/json"}
+        headers = {"CONTENT-TYPE": "application/json", **get_kb_visibility_headers()}
         data = {"kbid": kbid, "resource_id": resource_id}
         if self.onprem is False:
             # Upload the payload

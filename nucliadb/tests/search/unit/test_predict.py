@@ -351,6 +351,24 @@ async def test_get_predict_headers_hosterd():
     assert pe.get_predict_headers("kbid") == {"X-STF-KBID": "kbid"}
 
 
+@pytest.mark.parametrize("onprem", [True, False])
+async def test_get_predict_headers_forwards_kb_visibility(onprem):
+    from nucliadb.middleware import _kb_visibility
+
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=onprem,
+        nuclia_service_account="nua-service-account",
+    )
+    token = _kb_visibility.set("private")
+    try:
+        assert pe.get_predict_headers("kbid")["x-kb-visibility"] == "private"
+    finally:
+        _kb_visibility.reset(token)
+
+
 async def test_get_answer_generator():
     async def _iter_chunks():
         await asyncio.sleep(0.1)

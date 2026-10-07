@@ -34,6 +34,7 @@ from nuclia_models.predict.generative_responses import GenerativeChunk
 from pydantic import ValidationError
 
 from nucliadb.common import datamanagers
+from nucliadb.middleware import get_kb_visibility_headers
 from nucliadb.search import logger
 from nucliadb.search.predict_models import (
     AppliedDataAugmentation,
@@ -238,9 +239,10 @@ class PredictEngine:
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             if self.local_predict_headers is not None:
                 headers.update(self.local_predict_headers)
-            return headers
         else:
-            return {"X-STF-KBID": kbid}
+            headers = {"X-STF-KBID": kbid}
+        headers.update(get_kb_visibility_headers())
+        return headers
 
     async def check_response(
         self, kbid: str, resp: aiohttp.ClientResponse, expected_status: int = 200

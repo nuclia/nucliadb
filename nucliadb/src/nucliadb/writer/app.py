@@ -27,7 +27,11 @@ from starlette.middleware.authentication import AuthenticationMiddleware
 from starlette.requests import ClientDisconnect
 from starlette.responses import HTMLResponse
 
-from nucliadb.middleware import ClientErrorPayloadLoggerMiddleware, UUIDPathParamsValidationMiddleware
+from nucliadb.middleware import (
+    ClientErrorPayloadLoggerMiddleware,
+    KbVisibilityMiddleware,
+    UUIDPathParamsValidationMiddleware,
+)
 from nucliadb.writer import API_PREFIX
 from nucliadb.writer.api.v1.router import api as api_v1
 from nucliadb.writer.lifecycle import lifespan
@@ -45,6 +49,7 @@ middleware = []
 
 middleware.extend(
     [
+        Middleware(KbVisibilityMiddleware),
         Middleware(UUIDPathParamsValidationMiddleware),
         Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
         Middleware(ClientErrorPayloadLoggerMiddleware),

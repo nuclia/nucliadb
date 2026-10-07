@@ -21,19 +21,58 @@ import logging
 import time
 import uuid
 from collections import deque
+from contextvars import ContextVar
 from typing import Callable, ClassVar
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import BaseRoute, Match, Mount
-from starlette.types import Scope
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 PROCESS_TIME_HEADER = "X-PROCESS-TIME"
 ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
+KB_VISIBILITY_HEADER = "x-kb-visibility"
 
 
 logger = logging.getLogger("nucliadb.middleware")
+
+_kb_visibility: ContextVar[str | None] = ContextVar("kb_visibility", default=None)
+
+
+def get_kb_visibility_headers() -> dict[str, str]:
+    """Headers to propagate the incoming request's KB visibility to downstream learning services."""
+    value = _kb_visibility.get()
+    return {KB_VISIBILITY_HEADER: value} if value is not None else {}
+
+
+class KbVisibilityMiddleware:
+    """Pure ASGI middleware storing the incoming `x-kb-visibility` header in a context var.
+
+    The value is propagated to learning services so they know whether the KB making the
+    request is public or private, for security purposes, e.g. to disable modifying the
+    system prompt for public KBs.
+    """
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        value = None
+        for name, raw_value in scope.get("headers", []):
+            if name.decode("latin-1").lower() == KB_VISIBILITY_HEADER:
+                value = raw_value.decode("latin-1")
+                break
+
+        token = _kb_visibility.set(value)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            _kb_visibility.reset(token)
 
 
 class ProcessTimeHeaderMiddleware(BaseHTTPMiddleware):
