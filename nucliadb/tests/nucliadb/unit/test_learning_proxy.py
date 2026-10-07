@@ -207,6 +207,7 @@ async def test_proxy_stream_response(async_client, config_stream_response):
         headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
     )
 
+
 async def test_proxy_forwards_kb_visibility(async_client):
     request = mock.Mock(
         query_params={"some": "data"},
@@ -220,6 +221,7 @@ async def test_proxy_forwards_kb_visibility(async_client):
         _kb_visibility.reset(token)
 
     assert async_client.request.call_args.kwargs["headers"]["x-kb-visibility"] == "public"
+
 
 async def test_proxy_error(async_client):
     async_client.request.side_effect = Exception("some error")
