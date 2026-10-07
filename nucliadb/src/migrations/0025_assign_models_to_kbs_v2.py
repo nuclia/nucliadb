@@ -65,7 +65,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     learning_matryoshka_dimensions = learning_model_metadata.matryoshka_dimensions
     learning_normalize_vectors = len(learning_matryoshka_dimensions) > 0
 
-    async with context.kv_driver.ro_transaction() as txn:
+    async with context.kv_driver.ro_transaction(kbid=kbid) as txn:
         semantic_model = await datamanagers.kb.get_model_metadata(txn, kbid=kbid)
 
         maindb_similarity = semantic_model.similarity_function
@@ -103,7 +103,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
         matryoshka_dimensions=maindb_matryoshka_dimensions,
     )
 
-    async with context.kv_driver.rw_transaction() as txn:
+    async with context.kv_driver.rw_transaction(kbid=kbid) as txn:
         # Populate KB vectorsets with data from learning. We are skipping KBs
         # with this key already set, so we can set here safely
         await datamanagers.vectorsets.set(txn, kbid=kbid, config=default_vectorset)

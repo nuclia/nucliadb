@@ -28,7 +28,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
 
 PLATFORM_GROUP = "platform"
 DEVELOPERS_GROUP = "developers"
@@ -73,7 +72,6 @@ async def _create_resource(
 
     bm = bmb.build()
     await inject_message(nucliadb_ingest_grpc, bm)
-    await wait_for_sync()
 
     return rid
 

@@ -42,7 +42,7 @@ from nucliadb_utils.authentication import requires_one
 @version(1)
 async def list_vectorsets(request: Request, kbid: str) -> VectorSetList:
     vectorsets = []
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         async for vid, _ in datamanagers.vectorsets.iter(txn, kbid=kbid):
             vectorsets.append(VectorSetListItem(id=vid))
     return VectorSetList(vectorsets=vectorsets)

@@ -24,7 +24,6 @@ from functools import partial
 from typing import Any
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb_protos import writer_pb2
 from nucliadb_utils import const
@@ -61,7 +60,6 @@ class MaterializerHandler:
         check_delay: float = 30.0,
     ):
         self.pubsub = pubsub
-        self.shard_manager = get_shard_manager()
         self.task_handler = DelayedTaskHandler(check_delay)
 
     async def initialize(self) -> None:

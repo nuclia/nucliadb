@@ -34,7 +34,6 @@ from nucliadb_utils.settings import (
     nucliadb_settings,
 )
 from nucliadb_utils.storages.storage import Storage
-from tests.utils.dirty_index import mark_dirty
 
 from .utils import create_api_client_factory
 
@@ -61,7 +60,6 @@ async def standalone_nucliadb_writer(
             "X-NUCLIADB-USER": "ndbtests",
         },
         timeout=None,
-        event_hooks={"request": [mark_dirty]},
     ) as client:
         yield client
 

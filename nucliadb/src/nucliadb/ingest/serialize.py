@@ -706,7 +706,7 @@ async def serialize_extracted_large_metadata(field: Field) -> LargeComputedMetad
 async def serialize_extracted_vectors(field: Field, vectorset: str | None = None) -> VectorObject | None:
     vectorset_id = None
     vs = None
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=field.kbid) as txn:
         if vectorset is None:
             # Get the first vectorset for this field's KB, if any
             async for vectorset_id, vs in datamanagers.vectorsets.iter(txn=txn, kbid=field.kbid):

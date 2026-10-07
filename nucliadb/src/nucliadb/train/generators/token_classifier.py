@@ -20,12 +20,10 @@
 
 from collections import OrderedDict
 from collections.abc import AsyncGenerator
-from typing import cast
 
 from nidx_protos.nodereader_pb2 import StreamFilter, StreamRequest
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_models.filters import FilterExpression
@@ -61,30 +59,10 @@ async def generate_token_classification_payloads(
     for entitygroup in trainset.filter.labels:
         request.filter.labels.append(f"/e/{entitygroup}")
         request.filter.conjunction = StreamFilter.Conjunction.OR
-    async for field_item in get_nidx_searcher_client().Documents(request):
-        _, field_type, field = field_item.field.split("/")
-        (
-            split_text,
-            ordered_positions,
-            split_paragaphs,
-        ) = await get_field_text(
-            kbid,
-            field_item.uuid,
-            field,
-            field_type,
-            cast(list[str], trainset.filter.labels),
-        )
-        for split, text in split_text.items():
-            ners: POSITION_DICT = ordered_positions.get(split, OrderedDict())
-            paragraphs = split_paragaphs.get(split, [])
 
-            for segments in process_entities(text, ners, paragraphs):
-                tc = TokensClassification()
-                for segment in segments:
-                    tc.token.append(segment[0])
-                    tc.label.append(segment[1])
-
-                yield tc
+    # TODO(Marklogic): Implement iterating documents (fields)
+    if False:
+        yield
 
 
 async def get_field_text(

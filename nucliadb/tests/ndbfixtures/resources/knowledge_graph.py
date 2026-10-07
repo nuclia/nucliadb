@@ -28,7 +28,6 @@ from nucliadb_protos.utils_pb2 import Relation, RelationMetadata, RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldComputedMetadataWrapper
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
-from tests.utils.dirty_index import wait_for_sync
 
 
 # Only supported for standalone (as it depends on standalone_knowledgebox fixture)
@@ -197,7 +196,6 @@ async def knowledge_graph(
     bm.kbid = standalone_knowledgebox
     bm.user_relations.relations.extend(edges)
     await inject_message(nucliadb_ingest_grpc, bm)
-    await wait_for_sync()
 
     return (nodes, edges, rid)
 
@@ -394,5 +392,5 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
     fcmw.metadata.metadata.relations.add(relations=edges)
     bm.field_metadata.append(fcmw)
     await inject_message(nucliadb_ingest_grpc, bm)
-    await wait_for_sync()
+
     yield rid

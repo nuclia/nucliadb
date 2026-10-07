@@ -68,7 +68,7 @@ async def iterate_sentences(
             # XXX: Given that nobody requested any particular vectorset, we'll
             # return any
             vectorset_id = None
-            async with datamanagers.with_ro_transaction() as txn:
+            async with datamanagers.with_ro_transaction(kbid=resource.kbid) as txn:
                 async for vectorset_id, vs in datamanagers.vectorsets.iter(txn=txn, kbid=resource.kbid):
                     break
             assert vectorset_id is not None, "All KBs must have at least a vectorset"

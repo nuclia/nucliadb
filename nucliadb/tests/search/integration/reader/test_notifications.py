@@ -19,14 +19,12 @@
 #
 
 import asyncio
-from unittest.mock import patch
 
 import httpx
 import pytest
 import uvicorn
 from httpx import AsyncClient
 
-from nucliadb.common.nidx import NidxServiceUtility
 from nucliadb.reader.api.v1.router import KB_PREFIX
 from nucliadb_models.notifications import (
     Notification,
@@ -35,24 +33,7 @@ from nucliadb_models.notifications import (
     ResourceWrittenNotification,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
-from nucliadb_utils.utilities import MAIN, Utility
 from tests.ndbfixtures.ingest import broker_resource
-
-
-# `reader_api_server` depends on the dummy_nidx_utility fixture
-# This fixture overrides that with actual nidx running on docker
-@pytest.fixture(scope="function")
-async def nidx_reader_api_server(
-    reader_api_server,
-    nidx,
-):
-    nidx_util = NidxServiceUtility("nucliadb.tests")
-    await nidx_util.initialize()
-
-    with patch.dict(MAIN, values={Utility.NIDX: nidx_util}, clear=False):
-        yield reader_api_server
-
-    await nidx_util.finalize()
 
 
 @pytest.fixture(scope="function")

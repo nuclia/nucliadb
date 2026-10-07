@@ -18,43 +18,22 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import uuid
-from unittest.mock import AsyncMock
 
 import pytest
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxCreationError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import knowledgebox_pb2, utils_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_utils.storages.storage import Storage
-from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
 from tests.ndbfixtures.ingest import broker_resource
-
-
-@pytest.fixture(scope="function")
-async def shard_manager(
-    storage: Storage,
-    maindb_driver: Driver,
-):
-    manager = AsyncMock()
-    original = get_utility(Utility.SHARD_MANAGER)
-    set_utility(Utility.SHARD_MANAGER, manager)
-
-    yield manager
-
-    if original is None:
-        clean_utility(Utility.SHARD_MANAGER)
-    else:
-        set_utility(Utility.SHARD_MANAGER, original)
 
 
 async def test_create_knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
 ):
     kbid = KnowledgeBox.new_unique_kbid()
     slug = f"slug-{kbid}"
@@ -89,7 +68,6 @@ async def test_create_knowledgebox(
 async def test_create_knowledgebox_with_multiple_vectorsets(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
 ):
     kbid = KnowledgeBox.new_unique_kbid()
     slug = f"slug-{kbid}"
@@ -140,7 +118,6 @@ async def test_create_knowledgebox_with_multiple_vectorsets(
 async def test_create_knowledgebox_without_vectorsets_is_not_allowed(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
 ):
     with pytest.raises(KnowledgeBoxCreationError):
         await KnowledgeBox.create(maindb_driver, kbid="kbid", slug="slug", semantic_models={})
@@ -149,7 +126,6 @@ async def test_create_knowledgebox_without_vectorsets_is_not_allowed(
 async def test_create_knowledgebox_with_same_kbid(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
 ):
     kbid = KnowledgeBox.new_unique_kbid()
 
@@ -173,7 +149,6 @@ async def test_create_knowledgebox_with_same_kbid(
 async def test_create_knowledgebox_with_same_slug(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
 ):
     slug = "my-kb-slug"
 
@@ -197,8 +172,6 @@ async def test_create_knowledgebox_with_same_slug(
 async def test_delete_knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
-    dummy_nidx_utility,
 ):
     kbid, _ = await KnowledgeBox.create(
         maindb_driver,
@@ -232,7 +205,6 @@ async def test_knowledgebox_purge_handles_unexisting_shard_payload(
 async def test_knowledgebox_delete_all_kb_keys(
     storage,
     cache,
-    dummy_nidx_utility,
     maindb_driver: Driver,
     knowledgebox: str,
 ):

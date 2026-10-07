@@ -1,5 +1,20 @@
+import httpx
+
+
 class MarkLogicError(Exception):
     pass
+
+
+class MarkLogicResponseError(MarkLogicError):
+    def __init__(self, message: str, *, response: httpx.Response | None = None, code: str | None = None):
+        super().__init__(message)
+        self.response = response
+        self.status_code = response.status_code if response is not None else None
+        self.code = code
+
+
+class MarkLogicProtocolError(MarkLogicError):
+    """The server response does not match the expected REST protocol."""
 
 
 class NoHealthyUpstreamError(MarkLogicError):
@@ -11,7 +26,7 @@ class NoHealthyUpstreamError(MarkLogicError):
     pass
 
 
-class DatabaseDoesNotExist(MarkLogicError):
+class DatabaseDoesNotExist(MarkLogicResponseError):
     """Raised when MarkLogic reports that the target database no longer exists."""
 
     pass

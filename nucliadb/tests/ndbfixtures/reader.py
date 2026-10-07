@@ -35,7 +35,6 @@ from nucliadb_utils.settings import (
     transaction_settings,
 )
 from nucliadb_utils.storages.storage import Storage
-from tests.utils.dirty_index import wait_for_sync
 
 from .utils import create_api_client_factory
 
@@ -59,7 +58,6 @@ async def standalone_nucliadb_reader(standalone_nucliadb: Settings) -> AsyncIter
             "X-NUCLIADB-USER": "ndbtests",
         },
         timeout=None,
-        event_hooks={"request": [wait_for_sync]},
     ) as client:
         yield client
 

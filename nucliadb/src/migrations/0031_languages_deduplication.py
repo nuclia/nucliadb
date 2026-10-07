@@ -37,7 +37,7 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    async with datamanagers.with_ro_transaction() as rs_txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as rs_txn:
         async for rid in datamanagers.resources.iter(kbid=kbid):
             basic = await datamanagers.resources.get_basic(rs_txn, kbid=kbid, rid=rid)
             if basic is None:
@@ -48,7 +48,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
 
 
 async def fix_resource(kbid: str, rid: str):
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
         if basic is None:
             return

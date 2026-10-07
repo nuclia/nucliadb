@@ -35,7 +35,6 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.utilities import get_storage
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
 
 
 async def cookie_tale_resource(
@@ -274,6 +273,5 @@ async def cookie_tale_resource(
 
     # ingest the processed BM
     await inject_message(nucliadb_ingest_grpc, bm)
-    await wait_for_sync()
 
     return rid

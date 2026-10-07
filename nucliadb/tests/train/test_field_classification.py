@@ -31,7 +31,6 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.train.utils import get_batches_from_train_response_stream
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -124,7 +123,6 @@ async def knowledgebox_with_labels(
     bmb.with_resource_labels("labelset_resources", ["label_machine"])
     bm = bmb.build()
     await inject_message(nucliadb_ingest_grpc, bm)
-    await wait_for_sync()
 
     await asyncio.sleep(0.1)
     yield knowledgebox

@@ -3,15 +3,14 @@
 import json
 from typing import Any, TypeVar
 
-import httpx
 from google.protobuf.json_format import MessageToDict, ParseDict
 from google.protobuf.message import Message
 
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.marklogic.client import Document
+from nucliadb.common.marklogic.exceptions import DatabaseDoesNotExist
 
 PB = TypeVar("PB", bound=Message)
 RESOURCE_CHILD_COLLECTIONS = (MarkLogicCollections.FIELDS, MarkLogicCollections.CONVERSATIONS)
@@ -37,33 +36,28 @@ def from_json(value: dict, pb_klass: type[PB]) -> PB:
 def driver_txn(
     txn: Transaction, ensure_writes: bool = False
 ) -> tuple[MarkLogicDriver, MarkLogicTransaction]:
-    driver = get_driver()
-    if not isinstance(driver, MarkLogicDriver) or not isinstance(txn, MarkLogicTransaction):
+    if not isinstance(txn, MarkLogicTransaction) or not isinstance(txn.driver, MarkLogicDriver):
         raise TypeError("KnowledgeBox datamanager requires MarkLogicDriver")
+    driver = txn.driver
+    if not txn.open:
+        raise RuntimeError("Transaction is closed")
     if ensure_writes and txn.read_only:
         raise RuntimeError("Cannot write in read only transaction")
     return driver, txn
 
 
-def missing_database(response: Any) -> bool:
-    """A KnowledgeBox database only exists once the KnowledgeBox has been created."""
-    return getattr(response, "status_code", None) in (400, 404) and "No such database" in getattr(
-        response, "text", ""
-    )
-
-
-async def read(txn: Transaction, database: str, uri: str) -> dict | None:
+async def read(txn: Transaction, uri: str) -> dict | None:
     driver, marklogic_txn = driver_txn(txn)
-    result = await driver.client.documents.read(
-        uri,
-        tx=await marklogic_txn.sdk_transaction(database),
-        params=await marklogic_txn.params(database),
-    )
-    if not isinstance(result, list):
-        if missing_database(result):
-            return None
-        driver.data._check(result, "read document")
-        raise RuntimeError("Unexpected response when reading document")
+    try:
+        result = await driver.client.documents.read(
+            uri,
+            tx=await marklogic_txn.sdk_transaction(),
+            params=await marklogic_txn.params(),
+        )
+    except DatabaseDoesNotExist:
+        if marklogic_txn.database == driver.system_database:
+            raise
+        return None
     if not result:
         return None
     document = result[0]
@@ -75,74 +69,79 @@ async def read(txn: Transaction, database: str, uri: str) -> dict | None:
     return dict(content)
 
 
-async def exists(txn: Transaction, database: str, uri: str) -> bool:
+async def exists(txn: Transaction, uri: str) -> bool:
     driver, marklogic_txn = driver_txn(txn)
-    result = await driver.client.documents.exists(
-        uri,
-        tx=await marklogic_txn.sdk_transaction(database),
-        params=await marklogic_txn.params(database),
-    )
-    if result.status_code == 200:
-        return True
-    if result.status_code == 404:
+    try:
+        return await driver.client.documents.exists(
+            uri,
+            tx=await marklogic_txn.sdk_transaction(),
+            params=await marklogic_txn.params(),
+        )
+    except DatabaseDoesNotExist:
+        if marklogic_txn.database == driver.system_database:
+            raise
         return False
-    if result.status_code == 400:
-        # The database does not exist
-        return False
-    driver.data._check(result, "check document existence")
-    return False
 
 
-async def write(txn: Transaction, database: str, uri: str, collection: str, content: dict) -> None:
-    driver, marklogic_txn = driver_txn(txn)
-    transaction = await marklogic_txn.sdk_transaction(database)
+async def write(txn: Transaction, uri: str, collection: str, content: dict) -> None:
+    driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
+    transaction = await marklogic_txn.sdk_transaction()
     if transaction is None:
         raise RuntimeError("Cannot write in read only transaction")
-    response = await driver.client.documents.write(
+    await driver.client.documents.write(
         Document(uri=uri, content=content, collections=[collection], content_type="application/json"),
         tx=transaction,
-        params={"database": database},
+        params=await marklogic_txn.params(),
     )
-    driver.data._check(response, "write document")
 
 
-async def delete(txn: Transaction, database: str, uri: str) -> None:
-    driver, marklogic_txn = driver_txn(txn)
-    if await marklogic_txn.sdk_transaction(database) is None:
-        raise RuntimeError("Cannot delete in read only transaction")
-    response = await driver.client.documents.delete(uri, params=await marklogic_txn.params(database))
-    if missing_database(response):
-        return
-    driver.data._check(response, "delete document")
-
-
-async def evaluate(txn: Transaction, database: str, javascript: str) -> list:
-    driver, marklogic_txn = driver_txn(txn)
-    result = await driver.client.eval(javascript=javascript, params=await marklogic_txn.params(database))
-    if result is None:
-        return []
-    if isinstance(result, httpx.Response):
-        if missing_database(result):
-            return []
-        driver.data._check(result, "evaluate query")
-        raise RuntimeError("Unexpected response when evaluating query")
-    return result
-
-
-async def delete_resource_children(txn: Transaction, database: str, rid: str) -> None:
-    """Remove the field and conversation documents belonging to a resource."""
+async def delete(txn: Transaction, uri: str) -> None:
     driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
+    try:
+        await driver.client.documents.delete(uri, params=await marklogic_txn.params())
+    except DatabaseDoesNotExist:
+        if marklogic_txn.database == driver.system_database:
+            raise
+
+
+async def evaluate(txn: Transaction, javascript: str) -> list[Any]:
+    """Evaluate unrestricted JavaScript; callers must keep read-only queries non-mutating."""
+    driver, marklogic_txn = driver_txn(txn)
+    try:
+        return await driver.client.eval(javascript=javascript, params=await marklogic_txn.params())
+    except DatabaseDoesNotExist:
+        if marklogic_txn.database == driver.system_database:
+            raise
+        return []
+
+
+async def update_rows(txn: Transaction, dsl: str) -> None:
+    driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
+    try:
+        await driver.client.rows.update(dsl=dsl, params=await marklogic_txn.params())
+    except DatabaseDoesNotExist:
+        if marklogic_txn.database == driver.system_database:
+            raise
+
+
+async def delete_resource_children(txn: Transaction, rid: str) -> None:
+    """Remove the field and conversation documents belonging to a resource."""
     dsl = (
         "op.fromDocUris(cts.andQuery(["
         f"cts.collectionQuery({json.dumps(RESOURCE_CHILD_COLLECTIONS)}), "
         f"cts.directoryQuery({json.dumps(f'/resources/{rid}/')}, 'infinity')"
         "])).remove()"
     )
-    response = await driver.client.rows.update(dsl=dsl, params=await marklogic_txn.params(database))
-    if not missing_database(response):
-        driver.data._check(response, "delete resource children")
+    await update_rows(txn, dsl)
 
 
-def database(txn: Transaction, kbid: str) -> str:
-    driver, _ = driver_txn(txn)
-    return driver.kb_database(kbid)
+def require_kb_scope(txn: Transaction, kbid: str) -> None:
+    driver, marklogic_txn = driver_txn(txn)
+    if marklogic_txn.database != driver.kb_database(kbid):
+        raise ValueError("Transaction database does not match KnowledgeBox scope")
+
+
+def require_system_scope(txn: Transaction) -> None:
+    driver, marklogic_txn = driver_txn(txn)
+    if marklogic_txn.database != driver.system_database:
+        raise ValueError("Registry operations require a system database transaction")

@@ -325,7 +325,7 @@ async def parse_key_value_field(
     if txn is not None:
         schema = await datamanagers.kv_schemas.get(txn, kbid=kbid, id=key)
     else:
-        async with datamanagers.with_ro_transaction() as ro_txn:
+        async with datamanagers.with_ro_transaction(kbid=kbid) as ro_txn:
             schema = await datamanagers.kv_schemas.get(ro_txn, kbid=kbid, id=key)
 
     if schema is None:
@@ -694,7 +694,7 @@ def is_generated_conversation_field(
 
 
 async def _get_resource(kbid: str, rid: str, storage: Storage) -> ORMResource | None:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         kb = KnowledgeBox(txn, storage, kbid)
         return await kb.get(rid)
 
@@ -703,7 +703,7 @@ async def atomic_get_stored_resource_classifications(
     kbid: str,
     rid: str,
 ) -> ResourceClassifications:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         return await get_stored_resource_classifications(txn, kbid=kbid, rid=rid)
 
 
@@ -736,7 +736,7 @@ async def get_stored_resource_classifications(
 async def _conversation_append_checks(
     kbid: str, rid: str, field_id: str, input: models.InputConversationField
 ):
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         resource_obj = await ORMResource.get(txn, kbid=kbid, rid=rid)
         if resource_obj is None:
             return

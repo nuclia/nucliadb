@@ -381,7 +381,7 @@ async def update_resource_slug(
     rid: str,
     new_slug: str,
 ):
-    async with driver.rw_transaction() as txn:
+    async with driver.rw_transaction(kbid=kbid) as txn:
         old_slug = await datamanagers.resources.update_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
         await txn.commit()
         return old_slug
@@ -479,7 +479,7 @@ async def _reprocess_resource(
 
     # First pass: collect all reprocessable field ids and prepare writer message
     all_reprocessable_fields: list[tuple[int, str]] = []
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         kb = KnowledgeBox(txn, storage, kbid)
         resource = await kb.get(rid)
         if resource is None:
@@ -520,7 +520,7 @@ async def _reprocess_resource(
         if basic is not None:
             toprocess.title = basic.title
             toprocess.slug = basic.slug
-        async with driver.ro_transaction() as txn:
+        async with driver.ro_transaction(kbid=kbid) as txn:
             resource.txn = txn
             await collect_fields_for_reprocessing(
                 resource=resource,

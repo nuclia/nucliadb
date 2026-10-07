@@ -22,13 +22,13 @@ from typing import cast
 
 from fastapi import Header, Request, Response
 from fastapi_versioning import version
+from nidx_protos.nodereader_pb2 import SearchResponse
 from pydantic import ValidationError
 
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
-from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
@@ -86,7 +86,7 @@ async def resource_search(
         try:
             expr = FilterExpression.model_validate_json(filter_expression) if filter_expression else None
 
-            pb_query = await paragraph_query_to_pb(
+            _ = await paragraph_query_to_pb(
                 kbid,
                 rid,
                 query,
@@ -108,10 +108,9 @@ async def resource_search(
             detail = json.loads(exc.json())
             return HTTPClientError(status_code=422, detail=detail)
 
-        results = await nidx_query(kbid, Method.SEARCH, pb_query)
-        queried_shards = list(results.shard_ids)
+        # TODO(Marklogic): Implement
+        results = SearchResponse()
 
-        # We need to merge
         search_results = await merge_paragraphs_results(
             results,
             top_k=top_k,
@@ -119,5 +118,5 @@ async def resource_search(
             highlight_split=highlight,
             min_score=0.0,
         )
-        search_results.shards = queried_shards
+        search_results.shards = []
         return search_results

@@ -35,7 +35,6 @@ from tests.ndbfixtures.resources._vectors import (
     datafusion_vector_6724_6784,
 )
 from tests.utils import inject_message
-from tests.utils.dirty_index import wait_for_sync
 
 
 async def datafusion_resource(
@@ -514,6 +513,5 @@ async def datafusion_resource(
 
     # ingest the processed BM
     await inject_message(nucliadb_ingest_grpc, processor_bm)
-    await wait_for_sync()
 
     return rid

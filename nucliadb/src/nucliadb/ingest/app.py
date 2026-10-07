@@ -23,9 +23,7 @@ from collections.abc import Awaitable, Callable
 
 from nucliadb import health
 from nucliadb.backups.tasks import initialize_consumers as initialize_backup_consumers
-from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.nidx import start_nidx_utility
 from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consumer
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.consumer import service as consumer_service
@@ -56,12 +54,9 @@ from nucliadb_utils.utilities import (
 async def initialize() -> list[Callable[[], Awaitable[None]]]:
     await setup_telemetry(SERVICE_NAME)
 
-    await setup_cluster()
     await start_transaction_utility(SERVICE_NAME)
 
     start_partitioning_utility()
-
-    await start_nidx_utility(SERVICE_NAME)
 
     await start_audit_utility(SERVICE_NAME)
 
@@ -69,7 +64,6 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
         stop_partitioning_utility,
         stop_transaction_utility,
         stop_audit_utility,
-        teardown_cluster,
     ]
 
     if not transaction_settings.transaction_local:
@@ -147,7 +141,6 @@ async def main_subscriber_workers():  # pragma: no cover
     metrics_server = await serve_metrics()
     grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
     auditor_closer = await consumer_service.start_auditor()
-    shard_creator_closer = await consumer_service.start_shard_creator()
     materializer_closer = await consumer_service.start_materializer()
 
     await start_ingest_utility()
@@ -164,7 +157,6 @@ async def main_subscriber_workers():  # pragma: no cover
             exports_consumer.finalize,
             stop_ingest_utility,
             materializer_closer,
-            shard_creator_closer,
             auditor_closer,
             grpc_health_finalizer,
             metrics_server.shutdown,

@@ -22,10 +22,7 @@ from collections.abc import AsyncGenerator
 
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
-from nucliadb.common.nidx import get_nidx_searcher_client
-from nucliadb.train import logger
-from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+from nucliadb.train.generators.utils import batchify
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
     ParagraphStreamingBatch,
@@ -57,41 +54,6 @@ async def generate_paragraph_streaming_payloads(
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
 
-    async for document_item in get_nidx_searcher_client().Documents(request):
-        field_id = f"{document_item.uuid}{document_item.field}"
-        rid, field_type, field = field_id.split("/")
-
-        orm_resource = await get_resource_from_cache_or_db(kbid, rid)
-        if orm_resource is None:
-            logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
-            continue
-
-        field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
-        field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-
-        extracted_text = await field_obj.get_extracted_text()
-        field_metadata = await field_obj.get_field_metadata()
-        if field_metadata is None:
-            logger.warning(
-                "Field metadata not found on DB",
-                extra={"kbid": kbid, "rid": rid, "field": field, "field_type": field_type},
-            )
-            continue
-
-        for paragraph in field_metadata.metadata.paragraphs:
-            item = ParagraphStreamItem()
-            item.id = f"{rid}/{field_type}/{field}/{paragraph.start}-{paragraph.end}"
-            item.text = extracted_text.text[paragraph.start : paragraph.end]
-
-            yield item
-
-        for split, metadata in field_metadata.split_metadata.items():
-            # REVIEW: do we have to care about ExtractedText.deleted_splits?
-            split_text = extracted_text.split_text[split]
-
-            for paragraph in metadata.paragraphs:
-                item = ParagraphStreamItem()
-                item.id = f"{rid}/{field_type}/{field}/{split}/{paragraph.start}-{paragraph.end}"
-                item.text = split_text[paragraph.start : paragraph.end]
-
-                yield item
+    # TODO(Marklogic): Implement iterating documents (fields)
+    if False:
+        yield

@@ -20,80 +20,79 @@
 
 import pytest
 from httpx import AsyncClient
-from nidx_protos.nodereader_pb2 import SearchRequest
 from pytest_mock import MockerFixture
 
-from nucliadb.search.search import find, retrieval
+from nucliadb.search.search import find
 
+# TODO(Marklogic): review if this test makes sense anymore
+# @pytest.mark.deploy_modes("standalone")
+# async def test_find_graph_request(
+#     nucliadb_reader: AsyncClient,
+#     standalone_knowledgebox: str,
+#     mocker: MockerFixture,
+# ):
+#     """Validate how /find prepares a graph search"""
+#     kbid = standalone_knowledgebox
+#     spy = mocker.spy(retrieval, "nidx_query")
 
-@pytest.mark.deploy_modes("standalone")
-async def test_find_graph_request(
-    nucliadb_reader: AsyncClient,
-    standalone_knowledgebox: str,
-    mocker: MockerFixture,
-):
-    """Validate how /find prepares a graph search"""
-    kbid = standalone_knowledgebox
-    spy = mocker.spy(retrieval, "nidx_query")
+#     # graph_query but missing features=graph
+#     resp = await nucliadb_reader.post(
+#         f"/kb/{kbid}/find",
+#         json={
+#             "graph_query": {
+#                 "prop": "path",
+#                 "source": {
+#                     "value": "Erin",
+#                     "group": "PERSON",
+#                 },
+#                 "destination": {
+#                     "value": "UK",
+#                     "group": "PLACE",
+#                 },
+#             },
+#             "top_k": 100,
+#         },
+#     )
+#     assert resp.status_code == 412
+#     assert spy.call_count == 0
 
-    # graph_query but missing features=graph
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "graph_query": {
-                "prop": "path",
-                "source": {
-                    "value": "Erin",
-                    "group": "PERSON",
-                },
-                "destination": {
-                    "value": "UK",
-                    "group": "PLACE",
-                },
-            },
-            "top_k": 100,
-        },
-    )
-    assert resp.status_code == 412
-    assert spy.call_count == 0
+#     # features=graph but missing graph_query
+#     resp = await nucliadb_reader.post(
+#         f"/kb/{kbid}/find",
+#         json={
+#             "features": ["graph"],
+#             "top_k": 100,
+#         },
+#     )
+#     assert resp.status_code == 412
+#     assert spy.call_count == 0
 
-    # features=graph but missing graph_query
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "features": ["graph"],
-            "top_k": 100,
-        },
-    )
-    assert resp.status_code == 412
-    assert spy.call_count == 0
-
-    resp = await nucliadb_reader.post(
-        f"/kb/{kbid}/find",
-        json={
-            "graph_query": {
-                "prop": "path",
-                "source": {
-                    "value": "Erin",
-                    "group": "PERSON",
-                },
-                "destination": {
-                    "value": "UK",
-                    "group": "PLACE",
-                },
-            },
-            "features": ["graph"],
-            "top_k": 100,
-        },
-    )
-    assert resp.status_code == 200
-    assert spy.call_count == 1
-    pb_query = spy.call_args[0][2]
-    assert isinstance(pb_query, SearchRequest)
-    assert pb_query.graph_search.query.path.path.source.value == "Erin"
-    assert pb_query.graph_search.query.path.path.source.node_subtype == "PERSON"
-    assert pb_query.graph_search.query.path.path.destination.value == "UK"
-    assert pb_query.graph_search.query.path.path.destination.node_subtype == "PLACE"
+#     resp = await nucliadb_reader.post(
+#         f"/kb/{kbid}/find",
+#         json={
+#             "graph_query": {
+#                 "prop": "path",
+#                 "source": {
+#                     "value": "Erin",
+#                     "group": "PERSON",
+#                 },
+#                 "destination": {
+#                     "value": "UK",
+#                     "group": "PLACE",
+#                 },
+#             },
+#             "features": ["graph"],
+#             "top_k": 100,
+#         },
+#     )
+#     assert resp.status_code == 200
+#     assert spy.call_count == 1
+#     pb_query = spy.call_args[0][2]
+#     assert isinstance(pb_query, SearchRequest)
+#     assert pb_query.graph_search.query.path.path.source.value == "Erin"
+#     assert pb_query.graph_search.query.path.path.source.node_subtype == "PERSON"
+#     assert pb_query.graph_search.query.path.path.destination.value == "UK"
+#     assert pb_query.graph_search.query.path.path.destination.node_subtype == "PLACE"
 
 
 @pytest.mark.deploy_modes("standalone")

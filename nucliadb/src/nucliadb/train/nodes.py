@@ -20,7 +20,6 @@
 from collections.abc import AsyncIterator
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster import manager
 
 # XXX: this keys shouldn't be exposed outside datamanagers
 from nucliadb.common.maindb.driver import Driver, Transaction
@@ -42,31 +41,22 @@ from nucliadb_protos.train_pb2 import (
     TrainResource,
     TrainSentence,
 )
-from nucliadb_protos.writer_pb2 import ShardObject
 from nucliadb_utils.storages.storage import Storage
 
 
-class TrainShardManager(manager.KBShardManager):
+class TrainShardManager:
     def __init__(self, driver: Driver, storage: Storage):
         super().__init__()
         self.driver = driver
         self.storage = storage
 
-    async def get_shard_id(self, kbid: str, shard: str) -> str:
-        shards = await self.get_shards_by_kbid_inner(kbid)
-        try:
-            shard_object: ShardObject = next(filter(lambda x: x.shard == shard, shards.shards))
-        except StopIteration:
-            raise KeyError("Shard not found")
-
-        return shard_object.nidx_shard_id
-
     async def get_kb_obj(self, txn: Transaction, kbid: str) -> KnowledgeBox | None:
         if kbid is None:
             return None
 
-        if not (await datamanagers.kb.exists(txn, kbid=kbid)):
-            return None
+        async with self.driver.ro_transaction(system=True) as system_txn:
+            if not (await datamanagers.kb.exists(system_txn, kbid=kbid)):
+                return None
 
         kbobj = KnowledgeBox(txn, self.storage, kbid)
         return kbobj
@@ -80,7 +70,7 @@ class TrainShardManager(manager.KBShardManager):
         return manager
 
     async def kb_sentences(self, request: GetSentencesRequest) -> AsyncIterator[TrainSentence]:
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             if request.uuid != "":
                 # Filter by uuid
@@ -94,7 +84,7 @@ class TrainShardManager(manager.KBShardManager):
                         yield sentence
 
     async def kb_paragraphs(self, request: GetParagraphsRequest) -> AsyncIterator[TrainParagraph]:
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             if request.uuid != "":
                 # Filter by uuid
@@ -108,7 +98,7 @@ class TrainShardManager(manager.KBShardManager):
                         yield paragraph
 
     async def kb_fields(self, request: GetFieldsRequest) -> AsyncIterator[TrainField]:
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             if request.uuid != "":
                 # Filter by uuid
@@ -122,7 +112,7 @@ class TrainShardManager(manager.KBShardManager):
                         yield field
 
     async def kb_resources(self, request: GetResourcesRequest) -> AsyncIterator[TrainResource]:
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             async for rid in datamanagers.resources.iter(kbid=request.kb.uuid):
                 resource = await kb.get(rid)

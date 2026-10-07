@@ -24,7 +24,6 @@ from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos.writer_pb2 import BrokerMessage, OpStatusWriter
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import mark_dirty
 
 
 def broker_resource(
@@ -79,6 +78,5 @@ async def inject_message(
     #     assert ev.vectorset_id, "Vectorset ID must be set in ExtractedVectorsWrapper!"
     #     assert len(ev.vectorset_id) > 0, "Vectorset ID must be set in ExtractedVectorsWrapper!"
 
-    await mark_dirty()
     resp = await writer.ProcessMessage([message], timeout=timeout, wait_for_ready=wait_for_ready)  # type: ignore
     assert resp.status == OpStatusWriter.Status.OK

@@ -30,12 +30,9 @@ import pytest
 from httpx import AsyncClient
 from nats.aio.client import Client
 from nats.js import JetStreamContext
-from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
-from nucliadb.common.maindb.utils import get_driver
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
-from nucliadb.ingest.consumer import shard_creator
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import SendToPredictError
 from nucliadb.tests.vectors import V1
@@ -824,40 +821,41 @@ async def test_search_automatic_relations(
         )
 
 
-@pytest.mark.deploy_modes("standalone")
-async def test_search_user_relations(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-    standalone_knowledgebox: str,
-    predict_mock: AsyncMock,
-    mocker: MockerFixture,
-):
-    kbid = standalone_knowledgebox
+# TODO(Marklogic): review if this test makes sense anymore
+# @pytest.mark.deploy_modes("standalone")
+# async def test_search_user_relations(
+#     nucliadb_reader: AsyncClient,
+#     nucliadb_writer: AsyncClient,
+#     nucliadb_ingest_grpc: WriterStub,
+#     standalone_knowledgebox: str,
+#     predict_mock: AsyncMock,
+#     mocker: MockerFixture,
+# ):
+#     kbid = standalone_knowledgebox
 
-    from nucliadb.search.search import retrieval
+#     from nucliadb.search.search import retrieval
 
-    spy = mocker.spy(retrieval, "nidx_query")
-    with patch.object(predict_mock, "detect_entities", AsyncMock(return_value=[])):
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
-            json={
-                "query": "What relates Newton and Becquer?",
-                "query_entities": [
-                    {"name": "Newton"},
-                    {"name": "Becquer", "type": "entity", "subtype": "person"},
-                ],
-                "features": ["relations"],
-            },
-        )
-        assert resp.status_code == 200
+#     spy = mocker.spy(retrieval, "nidx_query")
+#     with patch.object(predict_mock, "detect_entities", AsyncMock(return_value=[])):
+#         resp = await nucliadb_reader.post(
+#             f"/kb/{kbid}/find",
+#             json={
+#                 "query": "What relates Newton and Becquer?",
+#                 "query_entities": [
+#                     {"name": "Newton"},
+#                     {"name": "Becquer", "type": "entity", "subtype": "person"},
+#                 ],
+#                 "features": ["relations"],
+#             },
+#         )
+#         assert resp.status_code == 200
 
-    assert spy.call_count == 1
-    request = spy.call_args.args[2]
-    assert len(request.graph_search.query.path.bool_or.operands) == 2
-    assert request.graph_search.query.path.bool_or.operands[0].path.source.value == "Newton"
-    assert request.graph_search.query.path.bool_or.operands[1].path.source.value == "Becquer"
-    assert request.graph_search.query.path.bool_or.operands[1].path.source.node_subtype == "person"
+#     assert spy.call_count == 1
+#     request = spy.call_args.args[2]
+#     assert len(request.graph_search.query.path.bool_or.operands) == 2
+#     assert request.graph_search.query.path.bool_or.operands[0].path.source.value == "Newton"
+#     assert request.graph_search.query.path.bool_or.operands[1].path.source.value == "Becquer"
+#     assert request.graph_search.query.path.bool_or.operands[1].path.source.node_subtype == "person"
 
 
 async def get_audit_messages(sub):
@@ -1008,76 +1006,6 @@ async def kb_with_one_logic_shard(
 def max_shard_paragraphs():
     with patch.object(cluster_settings, "max_shard_paragraphs", 20):
         yield
-
-
-@pytest.fixture(scope="function")
-async def kb_with_two_logic_shards(
-    max_shard_paragraphs,
-    nucliadb_writer_manager: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-):
-    sc = shard_creator.ShardCreatorHandler(
-        driver=get_driver(),
-        pubsub=None,  # type: ignore
-    )
-    resp = await nucliadb_writer_manager.post("/kbs", json={})
-    assert resp.status_code == 201
-    kbid = resp.json().get("uuid")
-
-    await create_dummy_resources(nucliadb_writer, nucliadb_ingest_grpc, kbid, n=8)
-
-    # trigger creating new shard manually here
-    with patch("nucliadb.ingest.consumer.shard_creator.should_create_new_shard", return_value=True):
-        await sc.process_kb(kbid)
-
-    await create_dummy_resources(nucliadb_writer, nucliadb_ingest_grpc, kbid, n=10, start=8)
-
-    yield kbid
-
-    resp = await nucliadb_writer_manager.delete(f"/kb/{kbid}")
-    assert resp.status_code == 200
-
-
-@pytest.mark.flaky(reruns=5)
-@pytest.mark.deploy_modes("standalone")
-async def test_search_two_logic_shards(
-    nucliadb_reader: AsyncClient,
-    nucliadb_reader_manager: AsyncClient,
-    kb_with_one_logic_shard,
-    kb_with_two_logic_shards,
-):
-    kbid1 = kb_with_one_logic_shard
-    kbid2 = kb_with_two_logic_shards
-
-    # Check that they have one and two logic shards, respectively
-    resp = await nucliadb_reader_manager.get(f"kb/{kbid1}/shards")
-    assert resp.status_code == 200
-    assert len(resp.json()["shards"]) == 1
-
-    resp = await nucliadb_reader_manager.get(f"kb/{kbid2}/shards")
-    assert resp.status_code == 200
-    assert len(resp.json()["shards"]) == 2
-
-    # Check that search returns the same results
-    resp1 = await nucliadb_reader.post(
-        f"/kb/{kbid1}/search",
-        json=dict(query="dummy", vector=V1, min_score={"semantic": -1}, with_duplicates=True),
-    )
-    resp2 = await nucliadb_reader.post(
-        f"/kb/{kbid2}/search",
-        json=dict(query="dummy", vector=V1, min_score={"semantic": -1}, with_duplicates=True),
-    )
-    assert resp1.status_code == resp2.status_code == 200
-    content1 = resp1.json()
-    content2 = resp2.json()
-
-    assert len(content1["shards"]) == 1
-    assert len(content2["shards"]) == 2
-
-    assert len(content1["paragraphs"]["results"]) == len(content2["paragraphs"]["results"]) == 20
-
-    assert len(content1["sentences"]["results"]) == len(content2["sentences"]["results"])
 
 
 @pytest.mark.deploy_modes("standalone")

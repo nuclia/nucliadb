@@ -32,7 +32,6 @@ from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
 
 PAD = [0.0] * 508
 VECTORS = {
@@ -160,7 +159,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
     bm = bmb.build()
 
     await inject_message(nucliadb_ingest_grpc, bm)
-    await wait_for_sync()
+
     yield rid
 
 

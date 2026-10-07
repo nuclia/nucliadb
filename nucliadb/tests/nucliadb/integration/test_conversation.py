@@ -69,7 +69,6 @@ from tests.ndbfixtures.resources.lambs import (
 )
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import mark_dirty, wait_for_sync
 
 
 @pytest.fixture(scope="function")
@@ -503,8 +502,6 @@ async def test_conversation_field_indexing(
     await inject_message(
         nucliadb_ingest_grpc, _broker_message(split="1", text=question, vector=vectors[question])
     )
-    await mark_dirty()
-    await wait_for_sync()
 
     # Check counters
     counters = await get_counters()
@@ -535,9 +532,6 @@ async def test_conversation_field_indexing(
         nucliadb_ingest_grpc, _broker_message(split="2", text=answer, vector=vectors[answer])
     )
 
-    await mark_dirty()
-    await wait_for_sync()
-
     # Check counters after appending the message
     counters = await get_counters()
     assert counters.sentences == 2  # One for each message (the title does not have a vector)
@@ -559,9 +553,6 @@ async def test_conversation_field_indexing(
     # Remove the field
     resp = await nucliadb_writer.delete(f"/kb/{kbid}/resource/{rid}/conversation/faq")
     resp.raise_for_status()
-
-    await mark_dirty()
-    await wait_for_sync()
 
     # Make sure the messages are not searchable anymore
     counters = await get_counters()
@@ -935,8 +926,6 @@ async def test_conversation_search(
     )
     bm = bmb.build()
     await inject_message(nucliadb_ingest_grpc, bm)
-    await mark_dirty()
-    await wait_for_sync()
 
     # Previous searches still work
     await _test_keyword_search(nucliadb_reader, kbid, message_text, message_id)
@@ -1110,9 +1099,6 @@ async def test_delete_conversation_message_lambs_resource(
     )
     assert resp.status_code == 204
 
-    await mark_dirty()
-    await wait_for_sync()
-
     # Verify 7 is gone but 6 and 9 remain
     resp = await nucliadb_reader.get(
         f"/kb/{kbid}/resource/{rid}/conversation/lambs",
@@ -1145,9 +1131,6 @@ async def test_delete_conversation_message_lambs_resource(
         f"/kb/{kbid}/slug/lambs/conversation/lambs/messages/9",
     )
     assert resp.status_code == 204
-
-    await mark_dirty()
-    await wait_for_sync()
 
     # Verify only split 6 remains
     resp = await nucliadb_reader.get(

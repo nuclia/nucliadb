@@ -76,11 +76,11 @@ async def get_extracted_texts(kbid: str, resource_uuids_or_slugs: list[str]) -> 
     max_tasks = asyncio.Semaphore(MAX_GET_EXTRACTED_TEXT_OPS)
     tasks = []
 
-    # Schedule getting extracted text for each field of each resource
-    async with driver.ro_transaction() as txn:
-        if not await datamanagers.kb.exists(txn, kbid=kbid):
-            raise datamanagers.exceptions.KnowledgeBoxNotFound(kbid)
+    if not await datamanagers.atomic.kb.exists(kbid=kbid):
+        raise datamanagers.exceptions.KnowledgeBoxNotFound(kbid)
 
+    # Schedule getting extracted text for each field of each resource
+    async with driver.ro_transaction(kbid=kbid) as txn:
         kb_orm = KnowledgeBox(txn, storage, kbid)
         for uuid_or_slug in set(resource_uuids_or_slugs):
             uuid = await get_resource_uuid(kb_orm, uuid_or_slug)

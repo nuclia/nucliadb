@@ -31,7 +31,6 @@ from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.standalone.settings import Settings
@@ -100,7 +99,6 @@ async def standalone_nucliadb_train(standalone_nucliadb: Settings):
 @pytest.fixture(scope="function")
 async def train_grpc_server(
     storage_settings,
-    dummy_nidx_utility: NidxUtility,
     maindb_driver: Driver,
 ) -> AsyncIterator[TrainGrpcServer]:
     with (

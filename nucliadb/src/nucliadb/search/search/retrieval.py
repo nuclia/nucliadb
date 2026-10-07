@@ -30,7 +30,6 @@ from nidx_protos.nodereader_pb2 import (
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.common.retrieval import TextBlockMatch
 from nucliadb.search import logger
-from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.metrics import search_observer, searched_shards_histogram
 from nucliadb.search.search.query_parser.models import UnitRetrieval
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
@@ -56,7 +55,8 @@ async def text_block_search(
     assert retrieval.rank_fusion is not None, "text block search requries a rank fusion algorithm"
 
     pb_query = convert_retrieval_to_proto(retrieval)
-    shards_response = await nidx_query(kbid, Method.SEARCH, pb_query)
+    # TODO(Marklogic): Implement actual search against the backend
+    shards_response = SearchResponse()
     queried_shards = list(shards_response.shard_ids)
     searched_shards_histogram.observe(len(queried_shards), {"type": "search"})
 

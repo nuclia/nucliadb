@@ -46,7 +46,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     if kbid not in AFFECTED_KBS:
         return
     async for rid in datamanagers.resources.iter(kbid=kbid):
-        async with datamanagers.with_rw_transaction() as txn:
+        async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
             basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
             if not basic or not basic.icon:
                 continue

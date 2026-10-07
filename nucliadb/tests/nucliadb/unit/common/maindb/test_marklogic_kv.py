@@ -1,8 +1,8 @@
+import asyncio
 from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
-import httpx
 import pytest
 
 from nucliadb.common.maindb.marklogic import MarkLogicDriver
@@ -19,9 +19,9 @@ async def driver():
         )
     )
     client.documents.read = AsyncMock(return_value=[])
-    client.documents.write = AsyncMock(return_value=httpx.Response(204))
-    client.documents.delete = AsyncMock(return_value=httpx.Response(204))
-    client.rows.update = AsyncMock(return_value=httpx.Response(204))
+    client.documents.write = AsyncMock(return_value=None)
+    client.documents.delete = AsyncMock(return_value=None)
+    client.rows.update = AsyncMock(return_value=None)
     client.eval = AsyncMock(return_value=[])
     original_client = driver.client
     driver._client = client
@@ -84,7 +84,7 @@ async def test_readonly_does_not_create_sdk_transaction(driver, kbid):
         assert await txn.get("same-key") is None
         assert await txn.batch_get(["same-key"]) == [None]
         assert client.documents.read.call_args.kwargs["params"] == {"database": database}
-        assert client.documents.read.call_args.kwargs["tx"] is None
+        assert "txid" not in client.documents.read.call_args.kwargs["params"]
         assert [key async for key in txn.keys("same")] == []
         assert client.eval.call_args.kwargs["params"] == {"database": database}
         assert await txn.count("same") == 0
@@ -108,7 +108,7 @@ async def test_sdk_transaction_lifecycle(driver, outcome):
         async with driver.rw_transaction(kbid="one") as txn:
             await txn.set("same-key", b"value")
             await txn.get("same-key")
-            sdk_txn = txn._transactions[driver.kb_database("one")]
+            sdk_txn = txn._sdk_transaction
             if outcome in ("commit", "abort"):
                 await getattr(txn, outcome)()
                 await getattr(txn, outcome)()
@@ -116,10 +116,40 @@ async def test_sdk_transaction_lifecycle(driver, outcome):
                 raise ValueError("failure")
     driver.client.transactions.create.assert_awaited_once_with(database="nucliadb-kb-one")
     assert not txn.open
-    assert txn._transactions == {}
+    assert txn._sdk_transaction is None
     if outcome == "commit":
         sdk_txn.commit.assert_awaited_once_with()
         sdk_txn.rollback.assert_not_awaited()
     else:
         sdk_txn.rollback.assert_awaited_once_with()
         sdk_txn.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_sdk_transaction_is_created_once_concurrently(driver):
+    async with driver.rw_transaction(kbid="one") as txn:
+        transactions = await asyncio.gather(*(txn.sdk_transaction() for _ in range(10)))
+        assert all(transaction is transactions[0] for transaction in transactions)
+    driver.client.transactions.create.assert_awaited_once_with(database="nucliadb-kb-one")
+
+
+@pytest.mark.asyncio
+async def test_transaction_rejects_another_database(driver):
+    async with driver.rw_transaction(kbid="one") as txn:
+        with pytest.raises(TypeError):
+            await txn.params("nucliadb-kb-two")
+        with pytest.raises(AttributeError):
+            txn.database = "nucliadb-kb-two"
+    driver.client.transactions.create.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("read_only", [False, True])
+async def test_closed_transaction_rejects_operations(driver, read_only):
+    context = driver.ro_transaction() if read_only else driver.rw_transaction()
+    async with context as txn:
+        pass
+    assert not txn.open
+    with pytest.raises(RuntimeError, match="closed"):
+        await txn.get("key")
+    driver.client.transactions.create.assert_not_awaited()

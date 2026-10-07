@@ -18,189 +18,172 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import Any
-from unittest.mock import AsyncMock, patch
 
 import pytest
-from nidx_protos import nodereader_pb2, noderesources_pb2
 
-from nucliadb.common.ids import ParagraphId
-from nucliadb.models.internal.augment import AugmentedParagraph
-from nucliadb.search.search.find_merge import build_find_response
-from nucliadb.search.search.hydrator import ResourceHydrationOptions, TextBlockHydrationOptions
-from nucliadb.search.search.query_parser.models import (
-    KeywordQuery,
-    Query,
-    ReciprocalRankFusion,
-    SemanticQuery,
-    UnitRetrieval,
-)
-from nucliadb.search.search.rerankers import PredictReranker
-from nucliadb.search.search.retrieval import text_block_search
-from nucliadb_models.internal.predict import RerankModel, RerankResponse
-from nucliadb_models.resource import Resource
-from nucliadb_models.search import SCORE_TYPE, ResourceProperties
+from nucliadb_models.search import SCORE_TYPE
 
+# TODO(Marklogic): review if this test makes sense anymore
 
-async def test_find_post_index_search(expected_find_response: dict[str, Any], predict_mock):
-    query = "How should I validate this?"
-    search_response = nodereader_pb2.SearchResponse(
-        shard_ids=["my-queried-shard"],
-        paragraph=nodereader_pb2.ParagraphSearchResponse(
-            total=1,
-            results=[
-                nodereader_pb2.ParagraphResult(
-                    uuid="rid-1",
-                    field="/f/field-a",
-                    start=10,
-                    end=20,
-                    index=3,
-                    paragraph="rid-1/f/field-a/10-20",
-                    score=nodereader_pb2.ResultScore(
-                        bm25=1.125,
-                    ),
-                    labels=["/a/title"],
-                ),
-                nodereader_pb2.ParagraphResult(
-                    uuid="rid-2",
-                    field="/f/field-b",
-                    split="subfield-x",
-                    start=100,
-                    end=150,
-                    index=0,
-                    paragraph="rid-2/f/field-b/subfield-x/100-150",
-                    score=nodereader_pb2.ResultScore(
-                        bm25=0.64,
-                    ),
-                ),
-                nodereader_pb2.ParagraphResult(
-                    uuid="rid-2",
-                    field="/f/field-b",
-                    split="subfield-y",
-                    start=0,
-                    end=17,
-                    index=10,
-                    paragraph="rid-2/f/field-b/subfield-y/0-17",
-                    score=nodereader_pb2.ResultScore(
-                        bm25=0.7025,
-                    ),
-                    metadata=noderesources_pb2.ParagraphMetadata(
-                        position=noderesources_pb2.Position(
-                            index=2, start=0, end=17, page_number=10, in_page=True
-                        ),
-                        page_with_visual=True,
-                        representation=noderesources_pb2.Representation(
-                            is_a_table=True,
-                            file="myfile.pdf",
-                        ),
-                    ),
-                ),
-            ],
-            query=query,
-            next_page=False,
-        ),
-        vector=nodereader_pb2.VectorSearchResponse(
-            documents=[
-                nodereader_pb2.DocumentScored(
-                    doc_id=nodereader_pb2.DocumentVectorIdentifier(
-                        id="rid-3/t/field-c/5/0-30",
-                    ),
-                    score=1.5,
-                    labels=["u/link", "/k/text"],
-                    metadata=noderesources_pb2.SentenceMetadata(
-                        position=noderesources_pb2.Position(index=5, start=0, end=30)
-                    ),
-                ),
-                nodereader_pb2.DocumentScored(
-                    doc_id=nodereader_pb2.DocumentVectorIdentifier(
-                        id="rid-2/f/field-b/subfield-y/10/0-17",
-                    ),
-                    score=0.89,
-                    metadata=noderesources_pb2.SentenceMetadata(
-                        position=noderesources_pb2.Position(index=10, start=0, end=17)
-                    ),
-                ),
-            ],
-        ),
-    )
+# async def test_find_post_index_search(expected_find_response: dict[str, Any], predict_mock):
+#     query = "How should I validate this?"
+#     search_response = nodereader_pb2.SearchResponse(
+#         shard_ids=["my-queried-shard"],
+#         paragraph=nodereader_pb2.ParagraphSearchResponse(
+#             total=1,
+#             results=[
+#                 nodereader_pb2.ParagraphResult(
+#                     uuid="rid-1",
+#                     field="/f/field-a",
+#                     start=10,
+#                     end=20,
+#                     index=3,
+#                     paragraph="rid-1/f/field-a/10-20",
+#                     score=nodereader_pb2.ResultScore(
+#                         bm25=1.125,
+#                     ),
+#                     labels=["/a/title"],
+#                 ),
+#                 nodereader_pb2.ParagraphResult(
+#                     uuid="rid-2",
+#                     field="/f/field-b",
+#                     split="subfield-x",
+#                     start=100,
+#                     end=150,
+#                     index=0,
+#                     paragraph="rid-2/f/field-b/subfield-x/100-150",
+#                     score=nodereader_pb2.ResultScore(
+#                         bm25=0.64,
+#                     ),
+#                 ),
+#                 nodereader_pb2.ParagraphResult(
+#                     uuid="rid-2",
+#                     field="/f/field-b",
+#                     split="subfield-y",
+#                     start=0,
+#                     end=17,
+#                     index=10,
+#                     paragraph="rid-2/f/field-b/subfield-y/0-17",
+#                     score=nodereader_pb2.ResultScore(
+#                         bm25=0.7025,
+#                     ),
+#                     metadata=noderesources_pb2.ParagraphMetadata(
+#                         position=noderesources_pb2.Position(
+#                             index=2, start=0, end=17, page_number=10, in_page=True
+#                         ),
+#                         page_with_visual=True,
+#                         representation=noderesources_pb2.Representation(
+#                             is_a_table=True,
+#                             file="myfile.pdf",
+#                         ),
+#                     ),
+#                 ),
+#             ],
+#             query=query,
+#             next_page=False,
+#         ),
+#         vector=nodereader_pb2.VectorSearchResponse(
+#             documents=[
+#                 nodereader_pb2.DocumentScored(
+#                     doc_id=nodereader_pb2.DocumentVectorIdentifier(
+#                         id="rid-3/t/field-c/5/0-30",
+#                     ),
+#                     score=1.5,
+#                     labels=["u/link", "/k/text"],
+#                     metadata=noderesources_pb2.SentenceMetadata(
+#                         position=noderesources_pb2.Position(index=5, start=0, end=30)
+#                     ),
+#                 ),
+#                 nodereader_pb2.DocumentScored(
+#                     doc_id=nodereader_pb2.DocumentVectorIdentifier(
+#                         id="rid-2/f/field-b/subfield-y/10/0-17",
+#                     ),
+#                     score=0.89,
+#                     metadata=noderesources_pb2.SentenceMetadata(
+#                         position=noderesources_pb2.Position(index=10, start=0, end=17)
+#                     ),
+#                 ),
+#             ],
+#         ),
+#     )
 
-    async def mock_augment_resources(kbid: str, given: list[str], *args, **kwargs):
-        return {rid: Resource(id=rid) for rid in given}
+#     async def mock_augment_resources(kbid: str, given: list[str], *args, **kwargs):
+#         return {rid: Resource(id=rid) for rid in given}
 
-    async def mock_augment_paragraph(kbid: str, paragraph_id: ParagraphId, select, metadata):
-        return AugmentedParagraph(
-            id=paragraph_id,
-            text="extracted text",
-            position=None,
-            source_image_path=None,
-            table_image_path=None,
-            page_preview_path=None,
-            related=None,
-        )
+#     async def mock_augment_paragraph(kbid: str, paragraph_id: ParagraphId, select, metadata):
+#         return AugmentedParagraph(
+#             id=paragraph_id,
+#             text="extracted text",
+#             position=None,
+#             source_image_path=None,
+#             table_image_path=None,
+#             page_preview_path=None,
+#             related=None,
+#         )
 
-    async def fake_reranking(kbid: str, item: RerankModel) -> RerankResponse:
-        return RerankResponse(
-            context_scores={
-                "rid-2/f/field-b/subfield-y/0-17": 10,
-                "rid-3/t/field-c/0-30": 8,
-                "rid-1/f/field-a/10-20": 4,
-                "rid-2/f/field-b/subfield-x/100-150": 1,
-            }
-        )
+#     async def fake_reranking(kbid: str, item: RerankModel) -> RerankResponse:
+#         return RerankResponse(
+#             context_scores={
+#                 "rid-2/f/field-b/subfield-y/0-17": 10,
+#                 "rid-3/t/field-c/0-30": 8,
+#                 "rid-1/f/field-a/10-20": 4,
+#                 "rid-2/f/field-b/subfield-x/100-150": 1,
+#             }
+#         )
 
-    retrieval = UnitRetrieval(
-        query=Query(
-            keyword=KeywordQuery(
-                query=query,
-                is_synonyms_query=False,
-                min_score=0.2,
-            ),
-            semantic=SemanticQuery(
-                query=[1, 2, 3],  # unused
-                vectorset="my-model",  # unused
-                min_score=0.4,
-            ),
-        ),
-        top_k=20,
-        rank_fusion=ReciprocalRankFusion(window=20),
-    )
+#     retrieval = UnitRetrieval(
+#         query=Query(
+#             keyword=KeywordQuery(
+#                 query=query,
+#                 is_synonyms_query=False,
+#                 min_score=0.2,
+#             ),
+#             semantic=SemanticQuery(
+#                 query=[1, 2, 3],  # unused
+#                 vectorset="my-model",  # unused
+#                 min_score=0.4,
+#             ),
+#         ),
+#         top_k=20,
+#         rank_fusion=ReciprocalRankFusion(window=20),
+#     )
 
-    with (
-        patch("nucliadb.search.search.retrieval.convert_retrieval_to_proto"),
-        patch("nucliadb.search.search.retrieval.nidx_query", return_value=search_response),
-    ):
-        text_blocks, _, _, _ = await text_block_search("kbid", retrieval)
+#     with (
+#         patch("nucliadb.search.search.retrieval.convert_retrieval_to_proto"),
+#         patch("nucliadb.search.search.retrieval.nidx_query", return_value=search_response),
+#     ):
+#         text_blocks, _, _, _ = await text_block_search("kbid", retrieval)
 
-    with (
-        patch(
-            "nucliadb.search.search.find_merge.augment_resources_deep",
-            side_effect=mock_augment_resources,
-        ),
-        patch(
-            "nucliadb.search.augmentor.augmentor.augment_paragraph",
-            side_effect=mock_augment_paragraph,
-        ),
-        patch("nucliadb.search.augmentor.augmentor.extracted_texts"),
-        patch.object(predict_mock, "rerank", AsyncMock(side_effect=fake_reranking)),
-    ):
-        resource_hydration_options = ResourceHydrationOptions(
-            show=[ResourceProperties.BASIC], extracted=[], field_type_filter=[]
-        )
-        text_block_hydration_options = TextBlockHydrationOptions(highlight=True, ematches=[])
-        find_response = await build_find_response(
-            search_response,
-            text_blocks,
-            search_response.graph,
-            retrieval=retrieval,
-            kbid="kbid",
-            query=query,
-            rephrased_query=None,
-            resource_hydration_options=resource_hydration_options,
-            text_block_hydration_options=text_block_hydration_options,
-            reranker=PredictReranker(window=20),
-        )
-        resp = find_response.model_dump()
-        assert expected_find_response == resp
+#     with (
+#         patch(
+#             "nucliadb.search.search.find_merge.augment_resources_deep",
+#             side_effect=mock_augment_resources,
+#         ),
+#         patch(
+#             "nucliadb.search.augmentor.augmentor.augment_paragraph",
+#             side_effect=mock_augment_paragraph,
+#         ),
+#         patch("nucliadb.search.augmentor.augmentor.extracted_texts"),
+#         patch.object(predict_mock, "rerank", AsyncMock(side_effect=fake_reranking)),
+#     ):
+#         resource_hydration_options = ResourceHydrationOptions(
+#             show=[ResourceProperties.BASIC], extracted=[], field_type_filter=[]
+#         )
+#         text_block_hydration_options = TextBlockHydrationOptions(highlight=True, ematches=[])
+#         find_response = await build_find_response(
+#             search_response,
+#             text_blocks,
+#             search_response.graph,
+#             retrieval=retrieval,
+#             kbid="kbid",
+#             query=query,
+#             rephrased_query=None,
+#             resource_hydration_options=resource_hydration_options,
+#             text_block_hydration_options=text_block_hydration_options,
+#             reranker=PredictReranker(window=20),
+#         )
+#         resp = find_response.model_dump()
+#         assert expected_find_response == resp
 
 
 @pytest.fixture

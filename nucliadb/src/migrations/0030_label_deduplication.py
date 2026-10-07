@@ -37,7 +37,7 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         kb_labels = await datamanagers.labels.get_labels(txn, kbid=kbid)
         changed = False
 

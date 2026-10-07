@@ -45,7 +45,7 @@ async def get_resource(kbid: str, uuid: str) -> ResourceORM | None:
     resource_cache = get_resource_cache()
     if resource_cache is None:
         logger.warning("Resource cache not set")
-        async with get_driver().ro_transaction() as txn:
+        async with get_driver().ro_transaction(kbid=kbid) as txn:
             storage = await get_storage(service_name=SERVICE_NAME)
             kb = KnowledgeBoxORM(txn, storage, kbid)
             return await kb.get(uuid)

@@ -23,6 +23,7 @@ from time import time
 from fastapi import Body, Header, Query, Request, Response
 from fastapi.openapi.models import Example
 from fastapi_versioning import version
+from nidx_protos.nodereader_pb2 import SearchResponse
 from pydantic import ValidationError
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -32,7 +33,6 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query, get_injected_security_groups
-from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.merge import merge_results
@@ -267,10 +267,8 @@ async def search(
     incomplete_results = is_incomplete(parsed.retrieval)
     pb_query = convert_retrieval_to_proto(parsed.retrieval)
 
-    # We need to query all nodes
-    results = await nidx_query(kbid, Method.SEARCH, pb_query)
-    queried_shards = list(results.shard_ids)
-
+    # TODO(Marklogic): implement search
+    results = SearchResponse()
     # We need to merge
     search_results = await merge_results(
         results,
@@ -301,5 +299,5 @@ async def search(
             len(search_results.resources),
         )
 
-    search_results.shards = queried_shards
+    search_results.shards = []
     return search_results, incomplete_results

@@ -206,7 +206,7 @@ class Processor:
                 extra={"kbid": kbid, "slug": message.slug, "uuid": uuid},
             )
             if transaction_check:
-                async with datamanagers.with_rw_transaction() as txn:
+                async with datamanagers.with_rw_transaction(system=True) as txn:
                     await sequence_manager.set_last_seqid(txn, partition, seqid)
                     await txn.commit()
             return
@@ -235,7 +235,7 @@ class Processor:
                 if txn.open:
                     await txn.commit()
                     if transaction_check:
-                        async with self.driver.rw_transaction() as system_txn:
+                        async with self.driver.rw_transaction(system=True) as system_txn:
                             await sequence_manager.set_last_seqid(system_txn, partition, seqid)
                             await system_txn.commit()
         await self.notify_commit(
@@ -292,7 +292,7 @@ class Processor:
                 )
         if not kb_exists or not uuid:
             if transaction_check:
-                async with datamanagers.with_rw_transaction() as txn:
+                async with datamanagers.with_rw_transaction(system=True) as txn:
                     await sequence_manager.set_last_seqid(txn, partition, seqid)
                     await txn.commit()
             return None
@@ -382,7 +382,7 @@ class Processor:
                     await catalog_update(txn, kbid, resource, index_message)
                     await txn.commit()
                     if transaction_check:
-                        async with self.driver.rw_transaction() as system_txn:
+                        async with self.driver.rw_transaction(system=True) as system_txn:
                             await sequence_manager.set_last_seqid(system_txn, partition, seqid)
                             await system_txn.commit()
 
@@ -628,7 +628,7 @@ class Processor:
             logger.info(f"Skip when resource does not even have basic metadata: {resource}")
             return
         try:
-            async with self.driver.rw_transaction() as txn:
+            async with self.driver.rw_transaction(kbid=kb.kbid) as txn:
                 kb.txn = resource.txn = txn
                 resource.basic.metadata.status = resources_pb2.Metadata.Status.ERROR
                 await resource.set_data(basic=resource.basic)
@@ -642,14 +642,15 @@ class Processor:
         self, txn: Transaction, kbid: knowledgebox_pb2.KnowledgeBoxID
     ) -> KnowledgeBox | None:
         uuid: str | None = kbid.uuid
-        if uuid == "":
-            uuid = await datamanagers.kb.get_kbid(txn, slug=kbid.slug)
+        async with self.driver.ro_transaction(system=True) as system_txn:
+            if uuid == "":
+                uuid = await datamanagers.kb.get_kbid(system_txn, slug=kbid.slug)
 
-        if uuid is None:
-            return None
+            if uuid is None:
+                return None
 
-        if not (await datamanagers.kb.exists(txn, kbid=uuid)):
-            return None
+            if not (await datamanagers.kb.exists(system_txn, kbid=uuid)):
+                return None
 
         storage = await get_storage()
         kbobj = KnowledgeBox(txn, storage, uuid)

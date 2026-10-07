@@ -17,34 +17,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
-from typing import Awaitable
 
 from fastapi import HTTPException, Request
 from fastapi_versioning import version
-from grpc import StatusCode as GrpcStatusCode
-from grpc.aio import AioRpcError
-from nidx_protos.noderesources_pb2 import Shard
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
-from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.counters import IndexCounts
-from nucliadb.common.models_utils import from_proto
-from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
-from nucliadb.search.search.shards import get_shard
-from nucliadb.search.settings import settings
 from nucliadb_models.internal.shards import KnowledgeboxShards
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.search import (
     KnowledgeboxCounters,
     SearchParamDefaults,
 )
-from nucliadb_protos.writer_pb2 import ShardObject as PBShardObject
-from nucliadb_protos.writer_pb2 import Shards
-from nucliadb_telemetry import errors
 from nucliadb_utils.authentication import requires, requires_one
 
 MAX_PARAGRAPHS_FOR_SMALL_KB = 250_000
@@ -61,15 +47,7 @@ MAX_PARAGRAPHS_FOR_SMALL_KB = 250_000
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
 async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards:
-    shard_manager = get_shard_manager()
-    try:
-        shards: Shards = await shard_manager.get_shards_by_kbid_inner(kbid)
-    except ShardsNotFound:
-        raise HTTPException(
-            status_code=404,
-            detail="The knowledgebox or its shards configuration is missing",
-        )
-    return from_proto.kb_shards(shards)
+    return KnowledgeboxShards(kbid=kbid, shards=[])
 
 
 @api.get(
@@ -100,12 +78,7 @@ async def _kb_counters(
     kbid: str,
     debug: bool = False,
 ) -> KnowledgeboxCounters:
-    """
-    Resources count is calculated from maindb and cached
-    Field count is calculated from the index node cluster
-    Paragraphs and Sentences count is calculated from the index node cluster or the external index provider.
-    Index size is estimated from the paragraphs count.
-    """
+    # TODO(Marklogic): Implement counters
     counters = KnowledgeboxCounters(
         resources=await datamanagers.atomic.resources.count(kbid=kbid),
         paragraphs=0,
@@ -113,65 +86,10 @@ async def _kb_counters(
         sentences=0,
         index_size=0,
     )
-    node_index_counts, queried_shards = await get_node_index_counts(kbid)
-    counters.fields = node_index_counts.fields
-    counters.paragraphs = node_index_counts.paragraphs
-    counters.sentences = node_index_counts.sentences
-    counters.index_size = node_index_counts.size_bytes
-    if debug and queried_shards is not None:
-        counters.shards = queried_shards
+    counters.fields = 0
+    counters.paragraphs = 0
+    counters.sentences = 0
+    counters.index_size = 0
+    if debug:
+        counters.shards = []
     return counters
-
-
-async def get_node_index_counts(kbid: str) -> tuple[IndexCounts, list[str]]:
-    """
-    Get the index counts for a knowledgebox that has an index in the index node cluster.
-    """
-    shard_manager = get_shard_manager()
-    shard_groups: list[PBShardObject] = await shard_manager.get_shards_by_kbid(kbid)
-    ops: list[Awaitable[Shard]] = []
-    queried_shards = []
-    for shard_object in shard_groups:
-        shard_id = shard_object.nidx_shard_id
-        if shard_id is not None:
-            # At least one node is alive for this shard group
-            # let's add it ot the query list if has a valid value
-            ops.append(get_shard(shard_id))
-            queried_shards.append(shard_id)
-
-    if not ops:
-        logger.info(f"No node found for any of this resources shards {kbid}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"No node found for any of this resources shards {kbid}",
-        )
-
-    try:
-        results: list[Shard | BaseException] | None = await asyncio.wait_for(
-            asyncio.gather(*ops, return_exceptions=True),
-            timeout=settings.search_timeout,
-        )
-    except asyncio.TimeoutError as exc:
-        logger.exception("Timeout querying shards")
-        errors.capture_exception(exc)
-        raise HTTPException(status_code=503, detail=f"Data query took too long")
-    except AioRpcError as exc:
-        if exc.code() is GrpcStatusCode.UNAVAILABLE:
-            raise HTTPException(status_code=503, detail=f"Search backend not available")
-        else:
-            raise exc
-
-    if results is None:
-        raise HTTPException(status_code=503, detail=f"No shards found")
-
-    counts = IndexCounts(fields=0, paragraphs=0, sentences=0, size_bytes=0)
-    for shard in results:
-        if isinstance(shard, BaseException):
-            logger.error("Error getting shard info", exc_info=shard)
-            errors.capture_exception(shard)
-            raise HTTPException(status_code=500, detail=f"Error while geting shard data")
-        counts.fields += shard.fields
-        counts.paragraphs += shard.paragraphs
-        counts.sentences += shard.sentences
-        counts.size_bytes += shard.size_bytes
-    return counts, queried_shards

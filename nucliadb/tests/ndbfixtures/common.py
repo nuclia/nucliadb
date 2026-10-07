@@ -24,8 +24,6 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from pytest_mock import MockerFixture
 
-from nucliadb.common.cluster.manager import KBShardManager
-from nucliadb.common.maindb.driver import Driver
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb_utils.audit.audit import AuditStorage
 from nucliadb_utils.audit.basic import BasicAuditStorage
@@ -38,7 +36,6 @@ from nucliadb_utils.settings import (
     transaction_settings,
 )
 from nucliadb_utils.storages.settings import settings as storage_settings
-from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.transaction import LocalTransactionUtility, TransactionUtility
 from nucliadb_utils.utilities import (
     Utility,
@@ -165,16 +162,6 @@ async def pubsub(nats_server: str) -> AsyncIterator[PubSubDriver]:
     with global_utility(Utility.PUBSUB, pubsub):
         yield pubsub
     await pubsub.finalize()
-
-
-# Shard manager
-
-
-@pytest.fixture(scope="function")
-async def shard_manager(storage: Storage, maindb_driver: Driver) -> AsyncIterator[KBShardManager]:
-    sm = KBShardManager()
-    with global_utility(Utility.SHARD_MANAGER, sm):
-        yield sm
 
 
 # Transaction

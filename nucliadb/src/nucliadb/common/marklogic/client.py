@@ -10,9 +10,17 @@ import secrets
 from dataclasses import dataclass
 from decimal import Decimal
 from email.message import Message
+from email.parser import BytesParser
+from email.policy import default
 from typing import Any
 
 import httpx
+
+from nucliadb.common.marklogic.exceptions import (
+    DatabaseDoesNotExist,
+    MarkLogicProtocolError,
+    MarkLogicResponseError,
+)
 
 DEFAULT_TIMEOUT = 60.0
 
@@ -46,22 +54,38 @@ def _has_no_content(response: httpx.Response) -> bool:
     return response.headers.get("content-length") == "0" or not response.content
 
 
+def _check(response: httpx.Response, operation: str) -> None:
+    if response.is_success:
+        return
+    code = None
+    try:
+        error = response.json().get("errorResponse", {})
+        code = error.get("messageCode")
+    except (ValueError, AttributeError, TypeError):
+        pass
+    error_type = MarkLogicResponseError
+    if response.status_code in (400, 404) and (
+        code == "XDMP-NOSUCHDB" or "No such database" in response.text
+    ):
+        error_type = DatabaseDoesNotExist
+    raise error_type(
+        f"Failed to {operation}: {response.status_code} {response.text}", response=response, code=code
+    )
+
+
 def _parse_multipart(response: httpx.Response) -> list[_Part]:
-    message = Message()
-    message["content-type"] = response.headers.get("content-type", "")
-    boundary = message.get_param("boundary")
-    if not isinstance(boundary, str):
-        raise ValueError("Multipart response without boundary")
-    parts = []
-    for chunk in response.content.split(b"--" + boundary.encode())[1:]:
-        if chunk.startswith(b"--"):
-            break
-        raw_headers, _, body = chunk.removeprefix(b"\r\n").partition(b"\r\n\r\n")
-        headers = {}
-        for line in raw_headers.decode("utf-8").split("\r\n"):
-            name, _, value = line.partition(":")
-            headers[name.strip().lower()] = value.strip()
-        parts.append(_Part(headers, body.removesuffix(b"\r\n")))
+    content_type = response.headers.get("content-type", "")
+    message = BytesParser(policy=default).parsebytes(
+        f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode() + response.content
+    )
+    if not message.is_multipart() or message.defects:
+        raise MarkLogicProtocolError("Invalid multipart response")
+    parts: list[_Part] = []
+    for part in message.iter_parts():
+        content = part.get_payload(decode=True)
+        if part.defects or not isinstance(content, bytes):
+            raise MarkLogicProtocolError("Invalid multipart part")
+        parts.append(_Part({name.lower(): str(value) for name, value in part.items()}, content))
     return parts
 
 
@@ -72,26 +96,26 @@ def _part_disposition(part: _Part) -> tuple[str | None, str | None]:
     uri = message.get_filename()
     if uri is None:
         return None, None
-    # URIs are not always quoted, so strip it before splitting the remaining parameters
-    category = None
-    for item in disposition.replace(uri, "").split(";"):
-        key, _, value = item.partition("=")
-        if key.strip() == "category":
-            category = value.strip()
-    return uri, category
+    category = message.get_param("category", header="content-disposition")
+    return uri, category if isinstance(category, str) else None
 
 
 def _parse_documents(response: httpx.Response) -> list[Document]:
     documents = []
     for part in _parse_multipart(response):
         uri, category = _part_disposition(part)
-        if uri is None or category != "content":
+        if category == "metadata":
             continue
+        if uri is None or category != "content":
+            raise MarkLogicProtocolError("Document part without URI or content category")
         content_type = part.headers.get("content-type")
+        message = Message()
+        message["content-type"] = content_type or "application/octet-stream"
+        media_type = message.get_content_type()
         content: Any = part.content
-        if content_type == "application/json":
+        if media_type == "application/json":
             content = json.loads(part.content)
-        elif content_type in ("application/xml", "text/xml", "text/plain"):
+        elif media_type in ("application/xml", "text/xml", "text/plain"):
             content = part.text
         documents.append(Document(uri=uri, content=content, content_type=content_type))
     return documents
@@ -155,15 +179,31 @@ def _encode_multipart(documents: list[Document]) -> tuple[bytes, str]:
 
 
 class Transaction:
-    def __init__(self, id: str, http: httpx.AsyncClient):
+    def __init__(self, id: str, http: httpx.AsyncClient, database: str | None = None):
+        """
+        Initialize a Transaction instance.
+
+        Args:
+            id: The transaction ID.
+            http: The HTTP client to use for requests.
+            database: The database associated with the transaction, if any. Otherwise, the default database is used by the server.
+        """
         self.id = id
         self._http = http
+        self.database = database
 
-    async def commit(self) -> httpx.Response:
-        return await self._http.post(f"/v1/transactions/{self.id}", params={"result": "commit"})
+    async def _finish(self, result: str) -> None:
+        params = {"result": result}
+        if self.database is not None:
+            params["database"] = self.database
+        response = await self._http.post(f"/v1/transactions/{self.id}", params=params)
+        _check(response, f"{result} transaction")
 
-    async def rollback(self) -> httpx.Response:
-        return await self._http.post(f"/v1/transactions/{self.id}", params={"result": "rollback"})
+    async def commit(self) -> None:
+        await self._finish("commit")
+
+    async def rollback(self) -> None:
+        await self._finish("rollback")
 
 
 class TransactionManager:
@@ -176,10 +216,15 @@ class TransactionManager:
             "/v1/transactions", params=params, headers={"Accept": "application/json"}
         )
         if response.status_code == 303 and "location" in response.headers:
-            return Transaction(response.headers["location"].rstrip("/").rsplit("/", 1)[-1], self._http)
-        if not response.is_success:
-            raise RuntimeError(f"Failed to create transaction: {response.status_code} {response.text}")
-        return Transaction(response.json()["transaction-status"]["transaction-id"], self._http)
+            return Transaction(
+                response.headers["location"].rstrip("/").rsplit("/", 1)[-1], self._http, database
+            )
+        _check(response, "create transaction")
+        try:
+            transaction_id = response.json()["transaction-status"]["transaction-id"]
+        except (ValueError, KeyError, TypeError) as error:
+            raise MarkLogicProtocolError("Transaction response without transaction ID") from error
+        return Transaction(str(transaction_id), self._http, database)
 
 
 class DocumentManager:
@@ -191,16 +236,23 @@ class DocumentManager:
         uris: str | list[str],
         tx: Transaction | None = None,
         params: dict[str, Any] | None = None,
-    ) -> list[Document] | httpx.Response:
-        """Returns the documents found, or the raw response if MarkLogic did not answer 200."""
+    ) -> list[Document]:
+        """Return found documents; missing URIs are omitted from the result."""
+        if not uris:
+            return []
         params = _with_txid(params, tx)
         params["uri"] = uris if isinstance(uris, list) else [uris]
         params["format"] = "json"
         response = await self._http.get(
             "/v1/documents", params=params, headers={"Accept": "multipart/mixed"}
         )
-        if response.status_code != 200:
-            return response
+        if response.status_code == 404:
+            if "No such database" in response.text or "XDMP-NOSUCHDB" in response.text:
+                _check(response, "read documents")
+            return []
+        _check(response, "read documents")
+        if _has_no_content(response):
+            return []
         return _parse_documents(response)
 
     async def write(
@@ -208,36 +260,52 @@ class DocumentManager:
         documents: Document | list[Document],
         tx: Transaction | None = None,
         params: dict[str, Any] | None = None,
-    ) -> httpx.Response:
+    ) -> None:
         if isinstance(documents, Document):
             documents = [documents]
+        if not documents:
+            return
         data, content_type = _encode_multipart(documents)
-        return await self._http.post(
+        response = await self._http.post(
             "/v1/documents",
             content=data,
             params=_with_txid(params, tx),
             headers={"Content-Type": content_type, "Accept": "application/json"},
         )
+        _check(response, "write documents")
 
     async def delete(
         self,
         uris: str | list[str],
         tx: Transaction | None = None,
         params: dict[str, Any] | None = None,
-    ) -> httpx.Response:
+    ) -> None:
+        if not uris:
+            return
         params = _with_txid(params, tx)
         params["uri"] = uris if isinstance(uris, list) else [uris]
-        return await self._http.delete("/v1/documents", params=params)
+        response = await self._http.delete("/v1/documents", params=params)
+        _check(response, "delete documents")
 
     async def exists(
         self,
         uri: str,
         tx: Transaction | None = None,
         params: dict[str, Any] | None = None,
-    ) -> httpx.Response:
+    ) -> bool:
         params = _with_txid(params, tx)
         params["uri"] = [uri]
-        return await self._http.head("/v1/documents", params=params)
+        response = await self._http.head("/v1/documents", params=params)
+        if not response.is_success:
+            response = await self._http.get(
+                "/v1/documents", params=params, headers={"Accept": "application/json"}
+            )
+        if response.status_code == 404:
+            if "No such database" in response.text or "XDMP-NOSUCHDB" in response.text:
+                _check(response, "check document existence")
+            return False
+        _check(response, "check document existence")
+        return True
 
 
 class RowManager:
@@ -249,8 +317,8 @@ class RowManager:
         dsl: str,
         tx: Transaction | None = None,
         params: dict[str, Any] | None = None,
-    ) -> httpx.Response:
-        return await self._http.post(
+    ) -> None:
+        response = await self._http.post(
             "/v1/rows/update",
             content=dsl.encode("utf-8"),
             params=_with_txid(params, tx),
@@ -259,6 +327,7 @@ class RowManager:
                 "Accept": "application/json",
             },
         )
+        _check(response, "update rows")
 
 
 class Client:
@@ -284,16 +353,15 @@ class Client:
         vars: dict[str, Any] | None = None,
         tx: Transaction | None = None,
         params: dict[str, Any] | None = None,
-    ) -> list[Any] | httpx.Response | None:
-        """Returns the evaluated values, None when there are none, or the raw response on error."""
+    ) -> list[Any]:
+        """Return evaluated values, or an empty list for an empty sequence."""
         data = {"javascript": javascript}
         if vars:
             data["vars"] = json.dumps(vars)
         response = await self._http.post("/v1/eval", data=data, params=_with_txid(params, tx))
-        if response.status_code != 200:
-            return response
+        _check(response, "evaluate query")
         if _has_no_content(response):
-            return None
+            return []
         return [_parse_eval_part(part) for part in _parse_multipart(response)]
 
     async def aclose(self) -> None:

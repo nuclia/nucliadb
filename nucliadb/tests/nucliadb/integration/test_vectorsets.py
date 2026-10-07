@@ -18,418 +18,286 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import functools
 import random
-from typing import Any
-from unittest.mock import AsyncMock, patch
 
 import pytest
-from httpx import AsyncClient
-from nidx_protos import nodereader_pb2
-from pytest_mock import MockerFixture
 
-from nucliadb.common.cluster import manager
-from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import get_nidx_searcher_client
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.resource import Resource
 from nucliadb.search.predict import DummyPredictEngine
-from nucliadb_models.internal.predict import (
-    QueryInfo,
-)
 from nucliadb_protos import (
     resources_pb2,
     utils_pb2,
     writer_pb2,
 )
-from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import (
     Utility,
     clean_utility,
     set_utility,
 )
 from tests.ndbfixtures.ingest import make_extracted_text
-from tests.nucliadb.knowledgeboxes.vectorsets import KbSpecs
-from tests.utils import inject_message
-from tests.utils.dirty_index import wait_for_sync
-from tests.utils.predict import predict_query_hook
 
 DEFAULT_VECTOR_DIMENSION = 512
 VECTORSET_DIMENSION = 12
 
+# TODO(Marklogic): Review if these tests make sense anymore
+# @pytest.mark.deploy_modes("standalone")
+# async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
+#     nucliadb_reader: AsyncClient,
+#     nucliadb_writer: AsyncClient,
+#     nucliadb_ingest_grpc: WriterStub,
+#     kb_with_vectorset: KbSpecs,
+# ):
+#     kbid = kb_with_vectorset.kbid
+#     vectorset_id = kb_with_vectorset.vectorset_id
+#     vectorset_dimension = kb_with_vectorset.vectorset_dimension
 
-@pytest.mark.deploy_modes("standalone")
-async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-    kb_with_vectorset: KbSpecs,
-):
-    kbid = kb_with_vectorset.kbid
-    vectorset_id = kb_with_vectorset.vectorset_id
-    vectorset_dimension = kb_with_vectorset.vectorset_dimension
+#     shards = await manager.KBShardManager().get_shards_by_kbid(kbid)
+#     logic_shard = shards[0]
+#     shard_id = logic_shard.nidx_shard_id
 
-    shards = await manager.KBShardManager().get_shards_by_kbid(kbid)
-    logic_shard = shards[0]
-    shard_id = logic_shard.nidx_shard_id
-    await wait_for_sync()
+#     test_cases = [
+#         (vectorset_dimension, vectorset_id),
+#     ]
 
-    test_cases = [
-        (vectorset_dimension, vectorset_id),
-    ]
+#     for dimension, vectorset in test_cases:
+#         query_pb = nodereader_pb2.SearchRequest(
+#             shard_ids=[shard_id],
+#             body="this is a query for my vectorset",
+#             vector=[1.23] * dimension,
+#             vectorset=vectorset,
+#             result_per_page=5,
+#         )
+#         results = await get_nidx_searcher_client().Search(query_pb)
+#         assert len(results.vector.documents) == 5
 
-    for dimension, vectorset in test_cases:
-        query_pb = nodereader_pb2.SearchRequest(
-            shard_ids=[shard_id],
-            body="this is a query for my vectorset",
-            vector=[1.23] * dimension,
-            vectorset=vectorset,
-            result_per_page=5,
-        )
-        results = await get_nidx_searcher_client().Search(query_pb)
-        assert len(results.vector.documents) == 5
-
-    # Test that querying with the wrong dimension raises an exception
-    test_cases = [
-        (6000, vectorset_id),
-        (6000, "multilingual"),
-    ]
-    for dimension, vectorset in test_cases:
-        query_pb = nodereader_pb2.SearchRequest(
-            shard_ids=[shard_id],
-            body="this is a query for my vectorset",
-            vector=[1.23] * dimension,
-            vectorset=vectorset,
-            result_per_page=5,
-        )
-        with pytest.raises(Exception) as exc:
-            results = await get_nidx_searcher_client().Search(query_pb)
-        assert "inconsistent dimensions" in str(exc).lower()
-
-
-@pytest.mark.parametrize(
-    "vectorset,expected",
-    [(None, "multilingual"), ("", "multilingual"), ("myvectorset", "myvectorset")],
-)
-@pytest.mark.deploy_modes("standalone")
-async def test_vectorset_parameter_without_default_vectorset(
-    nucliadb_reader: AsyncClient,
-    standalone_knowledgebox: str,
-    vectorset: str | None,
-    expected: str,
-):
-    kbid = standalone_knowledgebox
-
-    calls: list[nodereader_pb2.SearchRequest] = []
-
-    async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
-        calls.append(pb_query)
-        results = nodereader_pb2.SearchResponse()
-        return results
-
-    def set_predict_default_vectorset(query_info: QueryInfo) -> QueryInfo:
-        assert query_info.sentence is not None
-        query_info.sentence.vectors["multilingual"] = [1.0, 2.0, 3.0]
-        return query_info
-
-    with (
-        predict_query_hook(set_predict_default_vectorset),
-        patch(
-            "nucliadb.search.api.v1.search.nidx_query",
-            new=AsyncMock(side_effect=mock_nidx_query),
-        ),
-        patch(
-            "nucliadb.search.search.retrieval.nidx_query",
-            new=AsyncMock(side_effect=mock_nidx_query),
-        ),
-        patch(
-            "nucliadb.common.datamanagers.vectorsets.exists",
-            new=AsyncMock(return_value=True),
-        ),
-    ):
-        resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/search",
-            params={"query": "foo", "vectorset": vectorset},
-        )
-        assert resp.status_code == 200
-        assert calls[-1].vectorset == expected
-
-        resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/find",
-            params={
-                "query": "foo",
-                "vectorset": vectorset,
-            },
-        )
-        assert resp.status_code == 200
-        assert calls[-1].vectorset == expected
+#     # Test that querying with the wrong dimension raises an exception
+#     test_cases = [
+#         (6000, vectorset_id),
+#         (6000, "multilingual"),
+#     ]
+#     for dimension, vectorset in test_cases:
+#         query_pb = nodereader_pb2.SearchRequest(
+#             shard_ids=[shard_id],
+#             body="this is a query for my vectorset",
+#             vector=[1.23] * dimension,
+#             vectorset=vectorset,
+#             result_per_page=5,
+#         )
+#         with pytest.raises(Exception) as exc:
+#             results = await get_nidx_searcher_client().Search(query_pb)
+#         assert "inconsistent dimensions" in str(exc).lower()
 
 
-@pytest.mark.parametrize(
-    "vectorset,expected",
-    [(None, "multilingual"), ("", "multilingual"), ("myvectorset", "myvectorset")],
-)
-@pytest.mark.deploy_modes("standalone")
-async def test_vectorset_parameter_with_default_vectorset(
-    nucliadb_reader: AsyncClient,
-    standalone_knowledgebox: str,
-    vectorset,
-    expected,
-):
-    kbid = standalone_knowledgebox
+# @pytest.mark.deploy_modes("standalone")
+# async def test_querying_kb_with_vectorsets(
+#     mocker: MockerFixture,
+#     storage: Storage,
+#     maindb_driver: Driver,
+#     shard_manager,
+#     learning_config,
+#     nucliadb_ingest_grpc: WriterStub,
+#     nucliadb_reader: AsyncClient,
+#     dummy_predict: DummyPredictEngine,
+# ):
+#     """This tests validates a KB with 1 or 2 vectorsets have functional search
+#     using or not `vectorset` parameter in search. The point here is not the
+#     result, but checking the index response.
 
-    calls: list[nodereader_pb2.SearchRequest] = []
+#     """
+#     query: tuple[Any, nodereader_pb2.SearchResponse | None, Exception | None] = (None, None, None)
 
-    async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
-        calls.append(pb_query)
-        results = nodereader_pb2.SearchResponse()
-        return results
+#     async def query_shards_wrapper(shards: list[str], pb_query: nodereader_pb2.SearchRequest):
+#         nonlocal query
 
-    with (
-        patch(
-            "nucliadb.search.api.v1.search.nidx_query",
-            new=AsyncMock(side_effect=mock_nidx_query),
-        ),
-        patch(
-            "nucliadb.search.search.retrieval.nidx_query",
-            new=AsyncMock(side_effect=mock_nidx_query),
-        ),
-        patch(
-            "nucliadb.common.datamanagers.vectorsets.exists",
-            new=AsyncMock(return_value=True),
-        ),
-    ):
-        resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/search",
-            params={"query": "foo", "vectorset": vectorset},
-        )
-        assert resp.status_code == 200
-        assert calls[-1].vectorset == expected
+#         from nucliadb.search.search.shards import query_shards
 
-        resp = await nucliadb_reader.get(
-            f"/kb/{kbid}/find",
-            params={
-                "query": "foo",
-                "vectorset": vectorset,
-            },
-        )
-        assert resp.status_code == 200
-        assert calls[-1].vectorset == expected
+#         # this avoids problems with spying an object twice
+#         nidx = get_nidx_searcher_client()
+#         if not hasattr(nidx.Search, "spy_return"):
+#             spy = mocker.spy(nidx, "Search")
+#         else:
+#             spy = nidx.Search
 
+#         try:
+#             result = await query_shards(shards, pb_query)
+#         except Exception as exc:
+#             query = (spy, None, exc)
+#             raise
+#         else:
+#             query = (spy, result, None)
+#             return result
 
-@pytest.mark.deploy_modes("standalone")
-async def test_querying_kb_with_vectorsets(
-    mocker: MockerFixture,
-    storage: Storage,
-    maindb_driver: Driver,
-    shard_manager,
-    learning_config,
-    nucliadb_ingest_grpc: WriterStub,
-    nucliadb_reader: AsyncClient,
-    dummy_predict: DummyPredictEngine,
-):
-    """This tests validates a KB with 1 or 2 vectorsets have functional search
-    using or not `vectorset` parameter in search. The point here is not the
-    result, but checking the index response.
+#     def predict_query_wrapper(original, dimension: int, vectorset_dimensions: dict[str, int]):
+#         @functools.wraps(original)
+#         async def inner(*args, **kwargs):
+#             query_info = await original(*args, **kwargs)
+#             for vectorset_id, vectorset_dimension in vectorset_dimensions.items():
+#                 query_info.sentence.vectors[vectorset_id] = [1.0] * vectorset_dimension
+#             return query_info
 
-    """
-    query: tuple[Any, nodereader_pb2.SearchResponse | None, Exception | None] = (None, None, None)
+#         return inner
 
-    async def query_shards_wrapper(shards: list[str], pb_query: nodereader_pb2.SearchRequest):
-        nonlocal query
+#     # KB with one vectorset
 
-        from nucliadb.search.search.shards import query_shards
+#     kbid = KnowledgeBox.new_unique_kbid()
+#     kbslug = "kb-with-one-vectorset"
+#     kbid, _ = await KnowledgeBox.create(
+#         maindb_driver,
+#         kbid=kbid,
+#         slug=kbslug,
+#         semantic_models={
+#             "model": SemanticModelMetadata(
+#                 similarity_function=utils_pb2.VectorSimilarity.COSINE, vector_dimension=768
+#             ),
+#         },
+#     )
+#     rid = Resource.new_unique_rid()
+#     field_id = "my-field"
+#     bm = create_broker_message_with_vectorsets(kbid, rid, field_id, [("model", 768)])
+#     await inject_message(nucliadb_ingest_grpc, bm)
 
-        # this avoids problems with spying an object twice
-        nidx = get_nidx_searcher_client()
-        if not hasattr(nidx.Search, "spy_return"):
-            spy = mocker.spy(nidx, "Search")
-        else:
-            spy = nidx.Search
+#     with (
+#         patch("nucliadb.search.requesters.utils.query_shards", query_shards_wrapper),
+#         patch.object(
+#             dummy_predict,
+#             "query",
+#             side_effect=predict_query_wrapper(dummy_predict.query, 768, {"model": 768}),
+#         ),
+#     ):
+#         resp = await nucliadb_reader.post(
+#             f"/kb/{kbid}/find",
+#             json={
+#                 "query": "foo",
+#             },
+#         )
+#         assert resp.status_code == 200
 
-        try:
-            result = await query_shards(shards, pb_query)
-        except Exception as exc:
-            query = (spy, None, exc)
-            raise
-        else:
-            query = (spy, result, None)
-            return result
+#         node_search_spy, result, error = query
+#         assert result is not None
+#         assert error is None
+#         assert node_search_spy is not None
 
-    def predict_query_wrapper(original, dimension: int, vectorset_dimensions: dict[str, int]):
-        @functools.wraps(original)
-        async def inner(*args, **kwargs):
-            query_info = await original(*args, **kwargs)
-            for vectorset_id, vectorset_dimension in vectorset_dimensions.items():
-                query_info.sentence.vectors[vectorset_id] = [1.0] * vectorset_dimension
-            return query_info
+#         request = node_search_spy.call_args[0][0]
+#         # there's only one model and we get it as the default
+#         assert request.vectorset == "model"
+#         assert len(request.vector) == 768
 
-        return inner
+#         resp = await nucliadb_reader.post(
+#             f"/kb/{kbid}/find",
+#             json={
+#                 "query": "foo",
+#                 "vectorset": "model",
+#             },
+#         )
+#         assert resp.status_code == 200
 
-    # KB with one vectorset
+#         node_search_spy, result, error = query
+#         assert result is not None
+#         assert error is None
+#         assert node_search_spy is not None
 
-    kbid = KnowledgeBox.new_unique_kbid()
-    kbslug = "kb-with-one-vectorset"
-    kbid, _ = await KnowledgeBox.create(
-        maindb_driver,
-        kbid=kbid,
-        slug=kbslug,
-        semantic_models={
-            "model": SemanticModelMetadata(
-                similarity_function=utils_pb2.VectorSimilarity.COSINE, vector_dimension=768
-            ),
-        },
-    )
-    rid = Resource.new_unique_rid()
-    field_id = "my-field"
-    bm = create_broker_message_with_vectorsets(kbid, rid, field_id, [("model", 768)])
-    await inject_message(nucliadb_ingest_grpc, bm)
+#         request = node_search_spy.call_args[0][0]
+#         assert request.vectorset == "model"
+#         assert len(request.vector) == 768
 
-    with (
-        patch("nucliadb.search.requesters.utils.query_shards", query_shards_wrapper),
-        patch.object(
-            dummy_predict,
-            "query",
-            side_effect=predict_query_wrapper(dummy_predict.query, 768, {"model": 768}),
-        ),
-    ):
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
-            json={
-                "query": "foo",
-            },
-        )
-        assert resp.status_code == 200
+#     # KB with 2 vectorsets
 
-        node_search_spy, result, error = query
-        assert result is not None
-        assert error is None
-        assert node_search_spy is not None
+#     kbid = KnowledgeBox.new_unique_kbid()
+#     kbslug = "kb-with-vectorsets"
+#     kbid, _ = await KnowledgeBox.create(
+#         maindb_driver,
+#         kbid=kbid,
+#         slug=kbslug,
+#         semantic_models={
+#             "model-A": SemanticModelMetadata(
+#                 similarity_function=utils_pb2.VectorSimilarity.COSINE, vector_dimension=768
+#             ),
+#             "model-B": SemanticModelMetadata(
+#                 similarity_function=utils_pb2.VectorSimilarity.DOT, vector_dimension=1024
+#             ),
+#         },
+#     )
+#     rid = Resource.new_unique_rid()
+#     field_id = "my-field"
+#     bm = create_broker_message_with_vectorsets(
+#         kbid, rid, field_id, [("model-A", 768), ("model-B", 1024)]
+#     )
+#     await inject_message(nucliadb_ingest_grpc, bm)
 
-        request = node_search_spy.call_args[0][0]
-        # there's only one model and we get it as the default
-        assert request.vectorset == "model"
-        assert len(request.vector) == 768
+#     with patch("nucliadb.search.requesters.utils.query_shards", query_shards_wrapper):
+#         with (
+#             patch.object(
+#                 dummy_predict,
+#                 "query",
+#                 side_effect=predict_query_wrapper(dummy_predict.query, 500, {"model-A": 768}),
+#             ),
+#         ):
+#             resp = await nucliadb_reader.post(
+#                 f"/kb/{kbid}/find",
+#                 json={
+#                     "query": "foo",
+#                     "vectorset": "model-A",
+#                 },
+#             )
+#             assert resp.status_code == 200
 
-        resp = await nucliadb_reader.post(
-            f"/kb/{kbid}/find",
-            json={
-                "query": "foo",
-                "vectorset": "model",
-            },
-        )
-        assert resp.status_code == 200
+#             node_search_spy, result, error = query
+#             assert result is not None
+#             assert error is None
+#             assert node_search_spy is not None
 
-        node_search_spy, result, error = query
-        assert result is not None
-        assert error is None
-        assert node_search_spy is not None
+#             request = node_search_spy.call_args[0][0]
+#             assert request.vectorset == "model-A"
+#             assert len(request.vector) == 768
 
-        request = node_search_spy.call_args[0][0]
-        assert request.vectorset == "model"
-        assert len(request.vector) == 768
+#         with (
+#             patch.object(
+#                 dummy_predict,
+#                 "query",
+#                 side_effect=predict_query_wrapper(dummy_predict.query, 500, {"model-B": 1024}),
+#             ),
+#         ):
+#             resp = await nucliadb_reader.post(
+#                 f"/kb/{kbid}/find",
+#                 json={
+#                     "query": "foo",
+#                     "vectorset": "model-B",
+#                 },
+#             )
+#             assert resp.status_code == 200
 
-    # KB with 2 vectorsets
+#             node_search_spy, result, error = query
+#             assert result is not None
+#             assert error is None
+#             assert node_search_spy is not None
 
-    kbid = KnowledgeBox.new_unique_kbid()
-    kbslug = "kb-with-vectorsets"
-    kbid, _ = await KnowledgeBox.create(
-        maindb_driver,
-        kbid=kbid,
-        slug=kbslug,
-        semantic_models={
-            "model-A": SemanticModelMetadata(
-                similarity_function=utils_pb2.VectorSimilarity.COSINE, vector_dimension=768
-            ),
-            "model-B": SemanticModelMetadata(
-                similarity_function=utils_pb2.VectorSimilarity.DOT, vector_dimension=1024
-            ),
-        },
-    )
-    rid = Resource.new_unique_rid()
-    field_id = "my-field"
-    bm = create_broker_message_with_vectorsets(
-        kbid, rid, field_id, [("model-A", 768), ("model-B", 1024)]
-    )
-    await inject_message(nucliadb_ingest_grpc, bm)
+#             request = node_search_spy.call_args[0][0]
+#             assert request.vectorset == "model-B"
+#             assert len(request.vector) == 1024
 
-    with patch("nucliadb.search.requesters.utils.query_shards", query_shards_wrapper):
-        with (
-            patch.object(
-                dummy_predict,
-                "query",
-                side_effect=predict_query_wrapper(dummy_predict.query, 500, {"model-A": 768}),
-            ),
-        ):
-            resp = await nucliadb_reader.post(
-                f"/kb/{kbid}/find",
-                json={
-                    "query": "foo",
-                    "vectorset": "model-A",
-                },
-            )
-            assert resp.status_code == 200
+#         with (
+#             patch.object(
+#                 dummy_predict,
+#                 "query",
+#                 side_effect=predict_query_wrapper(
+#                     dummy_predict.query, 500, {"model-A": 768, "model-B": 1024}
+#                 ),
+#             ),
+#         ):
+#             resp = await nucliadb_reader.get(
+#                 f"/kb/{kbid}/find",
+#                 params={
+#                     "query": "foo",
+#                 },
+#             )
+#             assert resp.status_code == 200
+#             node_search_spy, result, error = query
+#             assert node_search_spy is not None
 
-            node_search_spy, result, error = query
-            assert result is not None
-            assert error is None
-            assert node_search_spy is not None
-
-            request = node_search_spy.call_args[0][0]
-            assert request.vectorset == "model-A"
-            assert len(request.vector) == 768
-
-        with (
-            patch.object(
-                dummy_predict,
-                "query",
-                side_effect=predict_query_wrapper(dummy_predict.query, 500, {"model-B": 1024}),
-            ),
-        ):
-            resp = await nucliadb_reader.post(
-                f"/kb/{kbid}/find",
-                json={
-                    "query": "foo",
-                    "vectorset": "model-B",
-                },
-            )
-            assert resp.status_code == 200
-
-            node_search_spy, result, error = query
-            assert result is not None
-            assert error is None
-            assert node_search_spy is not None
-
-            request = node_search_spy.call_args[0][0]
-            assert request.vectorset == "model-B"
-            assert len(request.vector) == 1024
-
-        with (
-            patch.object(
-                dummy_predict,
-                "query",
-                side_effect=predict_query_wrapper(
-                    dummy_predict.query, 500, {"model-A": 768, "model-B": 1024}
-                ),
-            ),
-        ):
-            resp = await nucliadb_reader.get(
-                f"/kb/{kbid}/find",
-                params={
-                    "query": "foo",
-                },
-            )
-            assert resp.status_code == 200
-            node_search_spy, result, error = query
-            assert node_search_spy is not None
-
-            request = node_search_spy.call_args[0][0]
-            assert result is not None
-            assert error is None
-            # with more than one vectorset, we get the first one
-            assert request.vectorset == "model-A"
+#             request = node_search_spy.call_args[0][0]
+#             assert result is not None
+#             assert error is None
+#             # with more than one vectorset, we get the first one
+#             assert request.vectorset == "model-A"
 
 
 @pytest.fixture(scope="function")

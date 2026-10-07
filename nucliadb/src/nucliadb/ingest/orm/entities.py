@@ -24,12 +24,11 @@ from nidx_protos.nodereader_pb2 import (
     Faceted,
     GraphSearchRequest,
     SearchRequest,
+    SearchResponse,
 )
 
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.settings import settings
-from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroup,
     EntitiesGroupSummary,
@@ -89,13 +88,8 @@ class EntitiesManager:
         request.query.path.path.source.node_subtype = group
         request.query.path.path.undirected = True
 
-        result = await nidx_query(
-            self.kbid, Method.GRAPH, request, timeout=settings.relation_search_timeout
-        )
-
-        entities = {}
-        entities.update({node.value: Entity(value=node.value) for node in result.nodes})
-
+        # TODO(Marklogic): implement graph query
+        entities: dict[str, Entity] = {}
         if not entities:
             return None
         eg = EntitiesGroup(entities=entities)
@@ -126,16 +120,15 @@ class EntitiesManager:
         self,
     ) -> set[str]:
         # search all relation types
-        request = SearchRequest(
+        _ = SearchRequest(
             result_per_page=0,
             body="",
             document=True,
             paragraph=False,
             faceted=Faceted(labels=["/e"]),
         )
-        response = await nidx_query(
-            self.kbid, Method.SEARCH, request, timeout=settings.relation_types_timeout
-        )
+        # TODO(Marklogic): Implement actual search against the backend
+        response = SearchResponse()
         try:
             facetresults = response.document.facets["/e"].facetresults
         except KeyError:

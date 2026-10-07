@@ -22,17 +22,6 @@ from fastapi_versioning import version
 
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import get_injected_security_groups
-from nucliadb.search.requesters.utils import Method, nidx_query
-from nucliadb.search.search.graph_merge import (
-    build_graph_nodes_response,
-    build_graph_relations_response,
-    build_graph_response,
-)
-from nucliadb.search.search.query_parser.parsers import (
-    parse_graph_node_search,
-    parse_graph_relation_search,
-    parse_graph_search,
-)
 from nucliadb_models.graph.requests import (
     GraphNodesSearchRequest,
     GraphRelationsSearchRequest,
@@ -80,11 +69,8 @@ async def graph_search_knowledgebox(
 
 
 async def graph_path_search(kbid: str, item: GraphSearchRequest) -> GraphSearchResponse:
-    pb_query = await parse_graph_search(kbid, item)
-
-    result = await nidx_query(kbid, Method.GRAPH, pb_query)
-
-    return build_graph_response(result)
+    # TODO(Marklogic): implement graph
+    return GraphSearchResponse(paths=[])
 
 
 @api.post(
@@ -116,11 +102,8 @@ async def graph_nodes_search_knowledgebox(
 
 
 async def graph_nodes_search(kbid: str, item: GraphNodesSearchRequest) -> GraphNodesSearchResponse:
-    pb_query = await parse_graph_node_search(kbid, item)
-
-    result = await nidx_query(kbid, Method.GRAPH, pb_query)
-
-    return build_graph_nodes_response(result)
+    # TODO(Marklogic): implement graph
+    return GraphNodesSearchResponse(nodes=[])
 
 
 @api.post(
@@ -154,8 +137,5 @@ async def graph_relations_search_knowledgebox(
 async def graph_relations_search(
     kbid: str, item: GraphRelationsSearchRequest
 ) -> GraphRelationsSearchResponse:
-    pb_query = await parse_graph_relation_search(kbid, item)
-
-    result = await nidx_query(kbid, Method.GRAPH, pb_query)
-
-    return build_graph_relations_response(result)
+    # TODO(Marklogic): implement graph
+    return GraphRelationsSearchResponse(relations=[])

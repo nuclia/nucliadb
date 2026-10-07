@@ -8,7 +8,6 @@ from google.protobuf.message import Message
 
 from nucliadb.common.datamanagers import fields
 from nucliadb.common.datamanagers import marklogic_documents as documents
-from nucliadb.common.datamanagers.marklogic_documents import database
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
@@ -30,7 +29,8 @@ def _page_uri(rid: str, field_id: str, page: int) -> str:
 async def _read(
     txn: Transaction, kbid: str, rid: str, field_id: str, page: int, pb_klass: type[PB]
 ) -> PB | None:
-    content = await documents.read(txn, database(txn, kbid), _page_uri(rid, field_id, page))
+    documents.require_kb_scope(txn, kbid)
+    content = await documents.read(txn, _page_uri(rid, field_id, page))
     if content is None or content.get("value") is None:
         return None
     return documents.from_json(content["value"], pb_klass)
@@ -39,9 +39,9 @@ async def _read(
 async def _write(
     txn: Transaction, kbid: str, rid: str, field_id: str, page: int, value: Message
 ) -> None:
+    documents.require_kb_scope(txn, kbid)
     await documents.write(
         txn,
-        database(txn, kbid),
         _page_uri(rid, field_id, page),
         MarkLogicCollections.CONVERSATIONS,
         {
@@ -96,16 +96,14 @@ async def set_splits_metadata(
 
 
 async def delete_pages(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None:
-    driver, marklogic_txn = documents.driver_txn(txn, ensure_writes=True)
-    db = driver.kb_database(kbid)
+    documents.require_kb_scope(txn, kbid)
     dsl = (
         "op.fromDocUris(cts.andQuery(["
         f"cts.collectionQuery({json.dumps(MarkLogicCollections.CONVERSATIONS)}), "
         f"cts.directoryQuery({json.dumps(_directory(rid, field_id))}, 'infinity')"
         "])).remove()"
     )
-    response = await driver.client.rows.update(dsl=dsl, params=await marklogic_txn.params(db))
-    driver.data._check(response, "delete conversation pages")
+    await documents.update_rows(txn, dsl)
 
 
 async def delete_field(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None:

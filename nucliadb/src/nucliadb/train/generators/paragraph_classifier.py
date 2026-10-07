@@ -23,11 +23,9 @@ from collections.abc import AsyncGenerator
 from fastapi import HTTPException
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.nidx import get_nidx_searcher_client
-from nucliadb.train.generators.utils import batchify, get_paragraph
+from nucliadb.train.generators.utils import batchify
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
-    Label,
     ParagraphClassificationBatch,
     TextLabel,
     TrainSet,
@@ -63,18 +61,6 @@ async def generate_paragraph_classification_payloads(
     request.shard_id.id = shard_replica_id
     request.filter.labels.append(labelset)
 
-    async for paragraph_item in get_nidx_searcher_client().Paragraphs(request):
-        text_labels = []
-        for label in paragraph_item.labels:
-            if label.startswith(labelset):
-                text_labels.append(label)
-
-        tl = TextLabel()
-        paragraph_text = await get_paragraph(kbid, paragraph_item.id)
-
-        tl.text = paragraph_text
-        for label in text_labels:
-            _, _, label_labelset, label_title = label.split("/")
-            tl.labels.append(Label(labelset=label_labelset, label=label_title))
-
-        yield tl
+    # TODO(Marklogic): Implement proper handling of paragraph classification
+    if False:
+        yield

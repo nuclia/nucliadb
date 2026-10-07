@@ -22,13 +22,11 @@ from collections.abc import AsyncGenerator
 
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB
-from nucliadb.common.nidx import get_nidx_searcher_client
+from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import (
     batchify,
     get_paragraph,
-    get_resource_from_cache_or_db,
 )
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
@@ -39,7 +37,6 @@ from nucliadb_protos.dataset_pb2 import (
 from nucliadb_protos.resources_pb2 import (
     FieldID,
     QuestionAnswer,
-    QuestionAnswerAnnotation,
 )
 
 
@@ -62,42 +59,9 @@ async def generate_question_answer_streaming_payloads(
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
 
-    async for document_item in get_nidx_searcher_client().Documents(request):
-        field_id = f"{document_item.uuid}{document_item.field}"
-        rid, field_type, field = field_id.split("/")
-
-        orm_resource = await get_resource_from_cache_or_db(kbid, rid)
-        if orm_resource is None:
-            logger.warning("Resource does not exist on DB", extra={"kbid": kbid, "rid": rid})
-            continue
-
-        basic = await orm_resource.get_basic()
-        if basic is not None:
-            for field_metadata in basic.fieldmetadata:
-                if not is_same_field(field_metadata.field, field, field_type):
-                    continue
-                qa_annotation_pb: QuestionAnswerAnnotation
-                for qa_annotation_pb in field_metadata.question_answers:
-                    async for item in iter_stream_items(
-                        kbid,
-                        qa_annotation_pb.question_answer,
-                    ):
-                        # QA annotations may be cancelled by user
-                        item.cancelled_by_user = qa_annotation_pb.cancelled_by_user
-                        yield item
-
-        field_type_int = FIELD_TYPE_STR_TO_PB[field_type]
-        field_obj = await orm_resource.get_field(field, field_type_int, load=False)
-
-        question_answers_pb = await field_obj.get_question_answers()
-        if question_answers_pb is not None:
-            for question_answer_pb in question_answers_pb.question_answers.question_answer:
-                async for item in iter_stream_items(kbid, question_answer_pb):
-                    yield item
-            for question_answer_pb in question_answers_pb.split_question_answers.values():
-                for split_question_answer_pb in question_answer_pb.question_answer:
-                    async for item in iter_stream_items(kbid, split_question_answer_pb):
-                        yield item
+    # TODO(Marklogic): Implement iterating documents (fields)
+    if False:
+        yield
 
 
 async def iter_stream_items(

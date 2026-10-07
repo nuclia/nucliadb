@@ -8,8 +8,6 @@ import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-import httpx
-
 from nucliadb.common.maindb import marklogic_schema
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
@@ -56,11 +54,6 @@ class MarkLogicDataLayer:
                 return "".join([*codepoints[:index], chr(ord(codepoints[index]) + 1)])
         return None
 
-    @staticmethod
-    def _check(response: httpx.Response, operation: str) -> None:
-        if not response.is_success:
-            raise RuntimeError(f"Failed to {operation}: {response.status_code} {response.text}")
-
 
 class MarkLogicTransaction(Transaction):
     driver: MarkLogicDriver
@@ -69,53 +62,57 @@ class MarkLogicTransaction(Transaction):
         self.driver = driver
         self.read_only = read_only
         self.kbid = kbid
-        self.database = driver.system_database if kbid is None else driver.kb_database(kbid)
-        self._transactions: dict[str, SDKTransaction] = {}
+        self._database = driver.system_database if kbid is None else driver.kb_database(kbid)
+        self._sdk_transaction: SDKTransaction | None = None
+        self._transaction_lock = asyncio.Lock()
         self.open = True
 
-    async def sdk_transaction(self, database: str) -> SDKTransaction | None:
-        """A MarkLogic transaction cannot span databases, so keep one per touched database."""
-        if self.read_only:
-            return None
-        transaction = self._transactions.get(database)
-        if transaction is None:
-            transaction = await self.driver.client.transactions.create(database=database)
-            self._transactions[database] = transaction
-        return transaction
+    @property
+    def database(self) -> str:
+        return self._database
 
-    async def params(self, database: str) -> dict[str, str]:
-        transaction = await self.sdk_transaction(database)
-        params = {"database": database}
+    async def sdk_transaction(self) -> SDKTransaction | None:
+        async with self._transaction_lock:
+            if not self.open:
+                raise RuntimeError("Transaction is closed")
+            if self.read_only:
+                return None
+            if self._sdk_transaction is None:
+                self._sdk_transaction = await self.driver.client.transactions.create(
+                    database=self.database
+                )
+            return self._sdk_transaction
+
+    async def params(self) -> dict[str, str]:
+        transaction = await self.sdk_transaction()
+        params = {"database": self.database}
         if transaction is not None:
             params["txid"] = transaction.id
         return params
 
     async def abort(self) -> None:
-        if self.open:
-            transactions = list(self._transactions.values())
-            self._transactions.clear()
-            self.open = False
-            for transaction in transactions:
-                await transaction.rollback()
+        async with self._transaction_lock:
+            if self.open:
+                self.open = False
+                if self._sdk_transaction is not None:
+                    await self._sdk_transaction.rollback()
+                    self._sdk_transaction = None
 
     async def commit(self) -> None:
-        if self.open:
-            transactions = list(self._transactions.values())
-            self._transactions.clear()
-            self.open = False
-            for transaction in transactions:
-                await transaction.commit()
+        if self.read_only:
+            raise RuntimeError("Cannot commit transaction in read only mode")
+        async with self._transaction_lock:
+            if self.open:
+                self.open = False
+                if self._sdk_transaction is not None:
+                    await self._sdk_transaction.commit()
+                    self._sdk_transaction = None
 
     async def batch_get(self, keys: list[str], for_update: bool = False) -> list[bytes | None]:
-        database = self.database
         result = await self.driver.client.documents.read(
             [self.driver.data._uri(key) for key in keys],
-            tx=await self.sdk_transaction(database),
-            params=await self.params(database),
+            params=await self.params(),
         )
-        if isinstance(result, httpx.Response):
-            self.driver.data._check(result, "read documents")
-            return [None for _ in keys]
         documents = {document.uri: document for document in result}
         values: list[bytes | None] = []
         for key in keys:
@@ -129,10 +126,10 @@ class MarkLogicTransaction(Transaction):
 
     async def set(self, key: str, value: bytes) -> None:
         database = self.database
-        transaction = await self.sdk_transaction(database)
+        transaction = await self.sdk_transaction()
         if transaction is None:
             raise RuntimeError("Cannot set in read only transaction")
-        response = await self.driver.client.documents.write(
+        await self.driver.client.documents.write(
             Document(
                 uri=self.driver.data._uri(key),
                 content=self.driver.data._encode(key, value),
@@ -142,7 +139,6 @@ class MarkLogicTransaction(Transaction):
             tx=transaction,
             params={"database": database},
         )
-        self.driver.data._check(response, "set key")
 
     async def insert(self, key: str, value: bytes) -> None:
         if await self.get(key) is not None:
@@ -150,15 +146,12 @@ class MarkLogicTransaction(Transaction):
         await self.set(key, value)
 
     async def delete(self, key: str) -> None:
-        database = self.database
-        response = await self.driver.client.documents.delete(
-            self.driver.data._uri(key), params=await self.params(database)
-        )
-        self.driver.data._check(response, "delete key")
+        if self.read_only:
+            raise RuntimeError("Cannot delete in read only transaction")
+        await self.driver.client.documents.delete(self.driver.data._uri(key), params=await self.params())
 
     async def delete_by_prefix(self, prefix: str) -> None:
-        database = self.database
-        if await self.sdk_transaction(database) is None:
+        if await self.sdk_transaction() is None:
             raise RuntimeError("Cannot delete in read only transaction")
         upper = self.driver.data._prefix_upper_bound(prefix)
         clauses = [
@@ -170,8 +163,7 @@ class MarkLogicTransaction(Transaction):
                 f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.MAINDB_KEY)}, '<', {json.dumps(upper)})"
             )
         dsl = f"op.fromDocUris(cts.andQuery([{', '.join(clauses)}])).remove()"
-        response = await self.driver.client.rows.update(dsl=dsl, params=await self.params(database))
-        self.driver.data._check(response, "delete keys by prefix")
+        await self.driver.client.rows.update(dsl=dsl, params=await self.params())
 
     async def keys(
         self,
@@ -192,13 +184,7 @@ class MarkLogicTransaction(Transaction):
         if count > 0:
             options.append(f"limit={count + (0 if include_start else 1)}")
         javascript = f"cts.uris('', {json.dumps(options)}, cts.andQuery([{', '.join(clauses)}]))"
-        uris = (
-            await self.driver.client.eval(javascript=javascript, params=await self.params(self.database))
-            or []
-        )
-        if isinstance(uris, httpx.Response):
-            self.driver.data._check(uris, "fetch keys by prefix")
-            return
+        uris = await self.driver.client.eval(javascript=javascript, params=await self.params())
         yielded = 0
         for uri in uris:
             key = self.driver.data._key(str(uri))
@@ -221,21 +207,11 @@ class MarkLogicTransaction(Transaction):
                 f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.MAINDB_KEY)}, '<', {json.dumps(upper)})"
             )
         javascript = f"fn.count(cts.uris('', ['document'], cts.andQuery([{', '.join(clauses)}])))"
-        result = await self.driver.client.eval(
-            javascript=javascript, params=await self.params(self.database)
-        )
-        if result is None:
-            return 0
-        if isinstance(result, httpx.Response):
-            self.driver.data._check(result, "count keys by prefix")
-            return 0
+        result = await self.driver.client.eval(javascript=javascript, params=await self.params())
         return int(result[0] if len(result) > 0 else 0)
 
 
 class ReadOnlyMarkLogicTransaction(MarkLogicTransaction):
-    async def abort(self) -> None:
-        self.open = False
-
     async def commit(self) -> None:
         raise RuntimeError("Cannot commit transaction in read only mode")
 
@@ -351,10 +327,11 @@ class MarkLogicDriver(Driver):
     ) -> AsyncGenerator[Transaction]:
         if not self.initialized or self._client is None or self._data is None:
             raise RuntimeError("MarkLogic driver is not initialized")
-        if read_only:
-            yield ReadOnlyMarkLogicTransaction(self, read_only=True, kbid=kbid)
-            return
-        txn = MarkLogicTransaction(self, kbid=kbid)
+        txn = (
+            ReadOnlyMarkLogicTransaction(self, read_only=True, kbid=kbid)
+            if read_only
+            else MarkLogicTransaction(self, kbid=kbid)
+        )
         try:
             yield txn
         finally:

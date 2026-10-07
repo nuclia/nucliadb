@@ -49,7 +49,6 @@ from tests.ndbfixtures.resources._vectors import (
 )
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
 
 lambs_split_1_text = "Starling."
 lambs_split_2_text = "Well, Clarice, have the lambs stopped screaming...?"
@@ -748,7 +747,6 @@ async def lambs_resource(
 
     # ingest the processed BM
     await inject_message(nucliadb_ingest_grpc, processor_bm)
-    await wait_for_sync()
 
     # now, we'll patch the resource, add the attachments and generate a broker
     # message from processor to add extracted data.
@@ -818,6 +816,5 @@ async def lambs_resource(
 
     attachments_bm = bmb.build()
     await inject_message(nucliadb_ingest_grpc, attachments_bm)
-    await wait_for_sync()
 
     return rid

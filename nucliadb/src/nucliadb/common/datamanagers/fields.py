@@ -9,7 +9,6 @@ from urllib.parse import quote, unquote
 from google.protobuf.message import Message
 
 from nucliadb.common.datamanagers import marklogic_documents as documents
-from nucliadb.common.datamanagers.marklogic_documents import database
 from nucliadb.common.datamanagers.utils import UNSET, observer
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
@@ -39,14 +38,15 @@ def _uri(rid: str, field_type: str, field_id: str) -> str:
 async def _update(
     txn: Transaction, kbid: str, rid: str, field_type: str, field_id: str, **values: Any
 ) -> None:
+    documents.require_kb_scope(txn, kbid)
     uri = _uri(rid, field_type, field_id)
-    content = await documents.read(txn, database(txn, kbid), uri) or {
+    content = await documents.read(txn, uri) or {
         "rid": rid,
         "field_type": field_type,
         "field_id": field_id,
     }
     content.update(values)
-    await documents.write(txn, database(txn, kbid), uri, MarkLogicCollections.FIELDS, content)
+    await documents.write(txn, uri, MarkLogicCollections.FIELDS, content)
 
 
 @observer.wrap({"type": "field", "op": "set_status"})
@@ -65,11 +65,12 @@ async def set(
 
 @observer.wrap({"type": "field", "op": "delete"})
 async def delete(txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str) -> None:
+    documents.require_kb_scope(txn, kbid)
     if field_type == "c":
         from nucliadb.common.datamanagers import conversations
 
         await conversations.delete_pages(txn, kbid=kbid, rid=rid, field_id=field_id)
-    await documents.delete(txn, database(txn, kbid), _uri(rid, field_type, field_id))
+    await documents.delete(txn, _uri(rid, field_type, field_id))
 
 
 async def _get(
@@ -82,11 +83,12 @@ async def _get(
     columns: tuple[FieldColumn, ...],
     pb_klass: type[PB] | None = None,
 ) -> FieldData | None:
+    documents.require_kb_scope(txn, kbid)
     if not columns:
         raise ValueError("At least one field column must be requested")
     if "value" in columns and pb_klass is None:
         raise ValueError("pb_klass is required when requesting the value column")
-    content = await documents.read(txn, database(txn, kbid), _uri(rid, field_type, field_id))
+    content = await documents.read(txn, _uri(rid, field_type, field_id))
     if content is None:
         return None
     result = FieldData()
@@ -137,6 +139,7 @@ async def get_status(
 async def get_statuses(
     txn: Transaction, *, kbid: str, rid: str, fields: Sequence[rpb2.FieldID]
 ) -> list[wpb2.FieldStatus]:
+    documents.require_kb_scope(txn, kbid)
     result = []
     for field in fields:
         status = await get_status(
@@ -151,10 +154,11 @@ def _to_abbr(field_type: rpb2.FieldType.ValueType) -> str:
 
 
 async def _field_uris(txn: Transaction, kbid: str, rid: str) -> list[str]:
+    documents.require_kb_scope(txn, kbid)
     clauses = [f"cts.collectionQuery({json.dumps(MarkLogicCollections.FIELDS)})"]
     clauses.append(f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.RID)}, '=', {json.dumps(rid)})")
     javascript = f"cts.uris('', ['document', 'item-order'], cts.andQuery([{', '.join(clauses)}]))"
-    return [str(uri) for uri in await documents.evaluate(txn, database(txn, kbid), javascript)]
+    return [str(uri) for uri in await documents.evaluate(txn, javascript)]
 
 
 def field_from_uri(uri: str) -> tuple[str, str]:
@@ -185,12 +189,14 @@ async def get_all_field_ids(txn: Transaction, *, kbid: str, rid: str) -> rpb2.Al
 
 @observer.wrap({"type": "field", "op": "exists"})
 async def exists(txn: Transaction, *, kbid: str, rid: str, field_id: rpb2.FieldID) -> bool:
+    documents.require_kb_scope(txn, kbid)
     uri = _uri(rid, _to_abbr(field_id.field_type), field_id.field)
-    return await documents.exists(txn, database(txn, kbid), uri)
+    return await documents.exists(txn, uri)
 
 
 @observer.wrap({"type": "field", "op": "exists_md5"})
 async def exists_md5(txn: Transaction, *, kbid: str, md5: str, field_type: str) -> bool:
+    documents.require_kb_scope(txn, kbid)
     javascript = (
         "const op = require('/MarkLogic/optic');"
         "op.fromDocUris(cts.andQuery(["
@@ -199,7 +205,7 @@ async def exists_md5(txn: Transaction, *, kbid: str, md5: str, field_type: str) 
         f"cts.jsonPropertyValueQuery('md5', {json.dumps(md5)}, ['exact'])"
         "])).limit(1).result()"
     )
-    return bool(await documents.evaluate(txn, database(txn, kbid), javascript))
+    return bool(await documents.evaluate(txn, javascript))
 
 
 @observer.wrap({"type": "field", "op": "set_md5"})

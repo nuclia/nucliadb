@@ -20,8 +20,8 @@
 
 import pytest
 from httpx import AsyncClient
+from nidx_protos.nodereader_pb2 import SearchResponse
 
-from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search.query_parser.parsers.search import parse_search
 from nucliadb.search.search.query_parser.parsers.unit_retrieval import convert_retrieval_to_proto
 from nucliadb_models.search import (
@@ -53,8 +53,10 @@ async def test_vector_result_metadata(nucliadb_search: AsyncClient, test_search_
             ),
         ),
     )
-    pb_query = convert_retrieval_to_proto(parsed.retrieval)
+    _ = convert_retrieval_to_proto(parsed.retrieval)
 
-    result = await nidx_query(kbid, Method.SEARCH, pb_query)
+    # TODO(Marklogic): Implement actual search against the backend
+    result = SearchResponse()
+
     assert len(result.vector.documents) > 0
     assert result.vector.documents[0].HasField("metadata")

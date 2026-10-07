@@ -742,7 +742,7 @@ async def _reprocess_resource_field(
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
 
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         kb = KnowledgeBox(txn, storage, kbid)
 
         resource = await kb.get(rid)
@@ -860,7 +860,7 @@ async def validate_message_idents(kbid: str, rid: str, field_id: str, idents: li
     only the valid idents that can be deleted (i.e. that exist and haven't been previously deleted).
     This is to avoid sending to process invalid delete messages that would cause unnecessary load.
     """
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         resource_obj = await ORMResource.get(txn, kbid=kbid, rid=rid)
         if resource_obj is None:
             # Resource not found, nothing to delete

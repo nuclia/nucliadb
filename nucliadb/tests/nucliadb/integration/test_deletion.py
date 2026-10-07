@@ -33,7 +33,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
 
 
 @dataclasses.dataclass
@@ -129,7 +128,7 @@ async def test_paragraph_index_deletions(
     )
     bm = prepare_broker_message(bmb, title_field, summary_field, text_field)
     await inject_message(nucliadb_ingest_grpc, bm)
-    await wait_for_sync()  # wait until changes are searchable
+    # wait until changes are searchable
 
     # Check that searching for original texts does not return any results
     resp = await nucliadb_reader.post(
@@ -188,7 +187,7 @@ async def test_paragraph_index_deletions(
     )
     bm = prepare_broker_message(bmb, title_field, summary_field, text_field)
     await inject_message(nucliadb_ingest_grpc, bm)
-    await wait_for_sync()  # wait until changes are searchable
+    # wait until changes are searchable
 
     # Check that searching for the first extracted text now doesn't return the
     # text field (as it has been modified)

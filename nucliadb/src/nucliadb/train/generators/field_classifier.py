@@ -23,13 +23,11 @@ from collections.abc import AsyncGenerator
 from nidx_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
-    Label,
     TextLabel,
     TrainSet,
 )
@@ -57,26 +55,9 @@ async def generate_field_classification_payloads(
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
     request.filter.labels.append(labelset)
-    total = 0
-
-    async for document_item in get_nidx_searcher_client().Documents(request):
-        text_labels = []
-        for label in document_item.labels:
-            if label.startswith(labelset):
-                text_labels.append(label)
-
-        field_id = f"{document_item.uuid}{document_item.field}"
-        total += 1
-
-        tl = TextLabel()
-        rid, field_type, field = field_id.split("/")
-        tl.text = await get_field_text(kbid, rid, field, field_type)
-
-        for label in text_labels:
-            _, _, labelset_title, label_title = label.split("/")
-            tl.labels.append(Label(labelset=labelset_title, label=label_title))
-
-        yield tl
+    # TODO(Marklogic): Implement proper handling of field classification
+    if False:
+        yield
 
 
 async def get_field_text(kbid: str, rid: str, field: str, field_type: str) -> str:

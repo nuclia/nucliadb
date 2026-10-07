@@ -34,7 +34,6 @@ import pytest
 from grpc import aio
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
@@ -106,7 +105,6 @@ async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[W
 async def ingest_grpc_server(
     maindb_driver: Driver,
     storage: Storage,
-    shard_manager: KBShardManager,
 ) -> AsyncIterator[IngestGrpcServer]:
     """Ingest ORM gRPC server with dummy/mocked index."""
     servicer = WriterServicer()
@@ -181,9 +179,7 @@ def learning_config():
 
 
 @pytest.fixture(scope="function")
-async def knowledgebox_with_vectorsets(
-    storage: Storage, maindb_driver: Driver, shard_manager, learning_config
-):
+async def knowledgebox_with_vectorsets(storage: Storage, maindb_driver: Driver, learning_config):
     kbid = KnowledgeBox.new_unique_kbid()
     kbslug = "slug-" + str(uuid.uuid4())
     await KnowledgeBox.create(
@@ -694,8 +690,4 @@ async def entities_manager_mock():
     """
     klass = "nucliadb.ingest.service.writer.EntitiesManager"
     with patch(f"{klass}.get_indexed_entities_group", AsyncMock(return_value=None)):
-        with patch(
-            "nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
-            AsyncMock(return_value=[]),
-        ):
-            yield
+        yield

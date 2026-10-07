@@ -22,7 +22,6 @@ from collections.abc import AsyncIterator
 from nucliadb.backups import tasks as backup_tasks
 from nucliadb.backups import utils as backup_utils
 from nucliadb.common import datamanagers, locking
-from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -80,7 +79,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self.storage = await get_storage(service_name=SERVICE_NAME)
         self.driver = await setup_driver()
         self.proc = Processor(driver=self.driver, storage=self.storage, pubsub=await get_pubsub())
-        self.shards_manager = get_shard_manager()
 
     async def finalize(self): ...
 
@@ -220,10 +218,20 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             logger.info("Processed message", extra={"kbid": message.kbid, "rid": message.uuid})
         return response
 
+    async def _resolve_kbid(self, kb: KnowledgeBoxID) -> str | None:
+        if kb.uuid:
+            return kb.uuid
+        async with self.driver.ro_transaction(system=True) as txn:
+            return await datamanagers.kb.get_kbid(txn, slug=kb.slug)
+
     async def GetEntities(self, request: GetEntitiesRequest, context=None) -> GetEntitiesResponse:
         response = GetEntitiesResponse()
-        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        kbid = await self._resolve_kbid(request.kb)
+        if kbid is None:
+            response.status = GetEntitiesResponse.Status.NOTFOUND
+            return response
+        async with self.driver.ro_transaction(kbid=kbid) as txn:
+            kbobj = await self.proc.get_kb_obj(txn, KnowledgeBoxID(uuid=kbid))
             if kbobj is None:
                 response.status = GetEntitiesResponse.Status.NOTFOUND
                 return response
@@ -244,8 +252,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: ListEntitiesGroupsRequest, context=None
     ) -> ListEntitiesGroupsResponse:
         response = ListEntitiesGroupsResponse()
-        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        kbid = await self._resolve_kbid(request.kb)
+        if kbid is None:
+            response.status = ListEntitiesGroupsResponse.Status.NOTFOUND
+            return response
+        async with self.driver.ro_transaction(kbid=kbid) as txn:
+            kbobj = await self.proc.get_kb_obj(txn, KnowledgeBoxID(uuid=kbid))
             if kbobj is None:
                 response.status = ListEntitiesGroupsResponse.Status.NOTFOUND
                 return response
@@ -268,8 +280,12 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: GetEntitiesGroupRequest, context=None
     ) -> GetEntitiesGroupResponse:
         response = GetEntitiesGroupResponse()
-        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        kbid = await self._resolve_kbid(request.kb)
+        if kbid is None:
+            response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
+            return response
+        async with self.driver.ro_transaction(kbid=kbid) as txn:
+            kbobj = await self.proc.get_kb_obj(txn, KnowledgeBoxID(uuid=kbid))
             if kbobj is None:
                 response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response

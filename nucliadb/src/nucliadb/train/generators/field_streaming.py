@@ -25,7 +25,6 @@ from nidx_protos.nodereader_pb2 import DocumentItem, StreamRequest
 
 from nucliadb.common.filter_expression import parse_expression
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb.train.settings import settings
@@ -129,19 +128,9 @@ def parse_legacy_filters(request: StreamRequest, trainset: TrainSet):
 async def iter_field_split_data(
     request: StreamRequest, kbid: str, trainset: TrainSet, max_parallel: int = 5
 ) -> AsyncIterable[FieldSplitData]:
-    tasks: list[asyncio.Task] = []
-    async for document_item in get_nidx_searcher_client().Documents(request):
-        if len(tasks) >= max_parallel:
-            results = await asyncio.gather(*tasks)
-            for fsd in results:
-                yield fsd
-            tasks.clear()
-        tasks.append(asyncio.create_task(fetch_field_split_data(document_item, kbid, trainset)))
-    if len(tasks):
-        results = await asyncio.gather(*tasks)
-        for fsd in results:
-            yield fsd
-        tasks.clear()
+    # TODO(Marklogic): Implement proper handling of field streaming with respect to max_parallel tasks
+    if False:
+        yield
 
 
 async def fetch_field_split_data(

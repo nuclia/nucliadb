@@ -71,7 +71,6 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.storages.storage import Storage
 from tests.utils import broker_resource, inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import mark_dirty, wait_for_sync
 from tests.utils.vectorsets import add_vectorset
 from tests.writer.test_fields import (
     TEST_CONVERSATION_PAYLOAD,
@@ -1957,8 +1956,6 @@ async def test_deletions_on_text_index(
     )
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
-    await mark_dirty()
-    await wait_for_sync()
 
     results = await kb_search(query="Alfredo")
     assert results.resources[rid].data.texts["alfredo"] is not None
@@ -1973,8 +1970,6 @@ async def test_deletions_on_text_index(
         f"kb/{kbid}/resource/{rid}/text/alfredo",
     )
     assert resp.status_code == 204, resp.text
-    await mark_dirty()
-    await wait_for_sync()
 
     results = await kb_search(query="My name is")
     assert results.fulltext.total == 1
@@ -1996,8 +1991,6 @@ async def test_deletions_on_text_index(
         },
     )
     assert resp.status_code == 200
-    await mark_dirty()
-    await wait_for_sync()
 
     results = await kb_search(query="My name is")
     assert results.fulltext.total == 2
@@ -2015,8 +2008,6 @@ async def test_deletions_on_text_index(
         json={"usermetadata": {"classifications": [{"labelset": "foo", "label": "bar"}]}},
     )
     assert resp.status_code == 200, resp.text
-    await mark_dirty()
-    await wait_for_sync()
 
     results = await kb_search(query="My name is", filters=["/classification.labels/foo/bar"])
     assert len(results.resources[rid].data.texts) == 2
@@ -2032,8 +2023,6 @@ async def test_deletions_on_text_index(
         json={"title": "My new title is about Songoku"},
     )
     assert resp.status_code == 200, resp.text
-    await mark_dirty()
-    await wait_for_sync()
 
     results = await kb_search(query="Songoku")
     assert len(results.resources) == 1
@@ -2048,8 +2037,7 @@ async def test_deletions_on_text_index(
         json={"slug": "my-new-slug"},
     )
     assert resp.status_code == 200, resp.text
-    await mark_dirty()
-    await wait_for_sync()
+
     counters = await kb_counters(kbid)
     assert counters.resources == 1
     assert counters.fields == 3
@@ -2064,9 +2052,6 @@ async def test_deletions_on_text_index(
     bm = bmb.build()
     await inject_message(nucliadb_ingest_grpc, bm)
 
-    await mark_dirty()
-    await wait_for_sync()
-
     counters = await kb_counters(kbid)
     assert counters.resources == 1
     assert counters.fields == 3  # the two fields plus the title
@@ -2074,8 +2059,6 @@ async def test_deletions_on_text_index(
     # Now delete the resource
     resp = await nucliadb_writer.delete(f"kb/{kbid}/resource/{rid}")
     assert resp.status_code == 204, resp.text
-    await mark_dirty()
-    await wait_for_sync()
 
     # Check that the resource is gone
     results = await kb_search(query="My name is")
@@ -2393,8 +2376,6 @@ async def test_resource_creation_with_data_augmentation_searchability(
     da_generated_text.generated_by.data_augmentation.SetInParent()
 
     await inject_message(nucliadb_ingest_grpc, bm1)
-    await mark_dirty()
-    await wait_for_sync()
 
     for feature in ["semantic", "keyword"]:
         resp = await nucliadb_reader.post(

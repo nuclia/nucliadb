@@ -24,7 +24,6 @@ from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import wait_for_sync
 
 SCHEMA = {
     "id": "product",
@@ -101,6 +100,5 @@ async def clothing_store_resources(
         bmb.with_title(description)
         bm = bmb.build()
         await inject_message(nucliadb_ingest_grpc, bm)
-        await wait_for_sync()
 
     return resources

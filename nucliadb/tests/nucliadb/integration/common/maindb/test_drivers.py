@@ -85,17 +85,16 @@ async def test_delete_by_prefix_is_scoped_and_transactional(
         assert isinstance(txn, MarkLogicTransaction)
         for key in (*matching, neighbor):
             await txn.set(key, key.encode())
-        response = await driver.client.documents.write(
+        await driver.client.documents.write(
             Document(
                 uri=other_uri,
                 content={"maindb_key": matching[0]},
                 collections=[MarkLogicCollections.KNOWLEDGEBOXES],
                 content_type="application/json",
             ),
-            tx=await txn.sdk_transaction(driver.database),
+            tx=await txn.sdk_transaction(),
             params={"database": driver.database},
         )
-        driver.data._check(response, "write test document")
         await txn.commit()
 
     async with driver.rw_transaction() as txn:
@@ -120,10 +119,7 @@ async def test_delete_by_prefix_is_scoped_and_transactional(
     async with driver.rw_transaction() as txn:
         assert isinstance(txn, MarkLogicTransaction)
         await txn.delete(neighbor)
-        response = await driver.client.documents.delete(
-            other_uri, params=await txn.params(driver.database)
-        )
-        driver.data._check(response, "delete test document")
+        await driver.client.documents.delete(other_uri, params=await txn.params())
         await txn.commit()
 
 

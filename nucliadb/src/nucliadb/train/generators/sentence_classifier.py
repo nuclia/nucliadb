@@ -24,12 +24,10 @@ from fastapi import HTTPException
 from nidx_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
-    Label,
     MultipleTextSameLabels,
     SentenceClassificationBatch,
     TrainSet,
@@ -67,26 +65,9 @@ async def generate_sentence_classification_payloads(
         labelsets.append(labelset)
         request.filter.labels.append(labelset)
 
-    async for paragraph_item in get_nidx_searcher_client().Paragraphs(request):
-        text_labels: list[str] = []
-        for label in paragraph_item.labels:
-            for labelset in labelsets:
-                if label.startswith(labelset):
-                    text_labels.append(label)
-
-        tl = MultipleTextSameLabels()
-        sentences_text = await get_sentences(kbid, paragraph_item.id)
-
-        if len(sentences_text) == 0:
-            continue
-        for sentence_text in sentences_text:
-            tl.text.append(sentence_text)
-        if len(tl.text):
-            for label in text_labels:
-                _, _, labelset, label_title = label.split("/")
-                tl.labels.append(Label(labelset=labelset, label=label_title))
-
-        yield tl
+    # TODO(Marklogic): Implement iterating paragraphs
+    if False:
+        yield
 
 
 async def get_sentences(kbid: str, result: str) -> list[str]:

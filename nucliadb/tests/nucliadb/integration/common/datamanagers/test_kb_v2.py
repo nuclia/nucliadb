@@ -22,7 +22,7 @@ Integration tests for nucliadb.common.datamanagers.kb
 
 Covers every public function in the module:
   set_config, delete, soft_delete, set_slug, update_kb_shards,
-  exists_kb, get_config, get_kbid, get_kbs, get_kb_shards.
+  exists_kb, get_config, get_kbid, get_kbs.
 """
 
 import pytest
@@ -94,7 +94,7 @@ async def test_kb_lifecycle_manages_its_marklogic_database(maindb_driver: Driver
     async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await resources.exists(txn, kbid=kbid, rid=rid) is True
 
-    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
+    async with maindb_driver.rw_transaction() as txn:
         await KnowledgeBox.delete_all_kb_keys(txn, kbid)
         await txn.commit()
 
@@ -115,10 +115,13 @@ async def test_set_config_creates_row_and_is_readable(maindb_driver: Driver) -> 
 
     async with maindb_driver.rw_transaction() as txn:
         await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
+        await txn.commit()
+
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await kb.set(txn, kbid=kbid, config=cfg)
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await kb.get_config(txn, kbid=kbid)
 
     assert result is not None
@@ -131,14 +134,17 @@ async def test_set_config_overwrites_existing(maindb_driver: Driver) -> None:
 
     async with maindb_driver.rw_transaction() as txn:
         await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
+        await txn.commit()
+
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await kb.set(txn, kbid=kbid, config=make_config("First"))
         await txn.commit()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await kb.set(txn, kbid=kbid, config=make_config("Second"))
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await kb.get_config(txn, kbid=kbid)
 
     assert result is not None
@@ -147,8 +153,9 @@ async def test_set_config_overwrites_existing(maindb_driver: Driver) -> None:
 
 @pytest.mark.asyncio
 async def test_get_config_returns_none_for_missing_kb(maindb_driver: Driver) -> None:
-    async with maindb_driver.ro_transaction() as txn:
-        result = await kb.get_config(txn, kbid=new_kbid())
+    kbid = new_kbid()
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
+        result = await kb.get_config(txn, kbid=kbid)
     assert result is None
 
 
@@ -211,8 +218,9 @@ async def test_exists_kb_true_for_active_kb(maindb_driver: Driver, kbid: str) ->
 
 @pytest.mark.asyncio
 async def test_exists_kb_false_for_missing_kb(maindb_driver: Driver) -> None:
+    kbid = new_kbid()
     async with maindb_driver.ro_transaction() as txn:
-        assert await kb.exists(txn, kbid=new_kbid()) is False
+        assert await kb.exists(txn, kbid=kbid) is False
 
 
 @pytest.mark.asyncio
@@ -261,8 +269,9 @@ async def test_soft_delete_marks_registry_and_frees_slug(maindb_driver: Driver, 
 @pytest.mark.asyncio
 async def test_soft_delete_on_nonexistent_kb_is_noop(maindb_driver: Driver) -> None:
     """soft_delete must not raise when the KB does not exist."""
+    kbid = new_kbid()
     async with maindb_driver.rw_transaction() as txn:
-        await kb.soft_delete(txn, kbid=new_kbid())  # must not raise
+        await kb.soft_delete(txn, kbid=kbid)  # must not raise
         await txn.commit()
 
 
@@ -277,59 +286,19 @@ async def test_delete_removes_kb_row(maindb_driver: Driver, kbid: str) -> None:
         await kb.delete(txn, kbid=kbid)
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await kb.get_config(txn, kbid=kbid) is None
+
+    async with maindb_driver.ro_transaction() as txn:
         assert await kb.exists(txn, kbid=kbid) is False
 
 
 @pytest.mark.asyncio
 async def test_delete_on_nonexistent_kb_is_noop(maindb_driver: Driver) -> None:
+    kbid = new_kbid()
     async with maindb_driver.rw_transaction() as txn:
-        await kb.delete(txn, kbid=new_kbid())  # must not raise
+        await kb.delete(txn, kbid=kbid)  # must not raise
         await txn.commit()
-
-
-# ---------------------------------------------------------------------------
-# update_kb_shards / get_kb_shards
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_update_and_get_kb_shards(maindb_driver: Driver, kbid: str) -> None:
-    shards = make_shards(kbid)
-
-    async with maindb_driver.rw_transaction() as txn:
-        await kb.set(txn, kbid=kbid, shards=shards)
-        await txn.commit()
-
-    async with maindb_driver.ro_transaction() as txn:
-        result = await kb.get_shards(txn, kbid=kbid)
-
-    assert result is not None
-    assert result.kbid == kbid
-
-
-@pytest.mark.asyncio
-async def test_get_kb_shards_returns_none_for_missing_kb(maindb_driver: Driver) -> None:
-    async with maindb_driver.ro_transaction() as txn:
-        result = await kb.get_shards(txn, kbid=new_kbid())
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_get_kb_shards_for_update(maindb_driver: Driver, kbid: str) -> None:
-    shards = make_shards(kbid)
-
-    async with maindb_driver.rw_transaction() as txn:
-        await kb.set(txn, kbid=kbid, shards=shards)
-        await txn.commit()
-
-    # for_update=True is a SELECT … FOR UPDATE; verify it returns the same data
-    async with maindb_driver.rw_transaction() as txn:
-        result = await kb.get_shards(txn, kbid=kbid, for_update=True)
-
-    assert result is not None
-    assert result.kbid == kbid
 
 
 # ---------------------------------------------------------------------------
@@ -342,12 +311,12 @@ async def test_get_kbs_yields_active_kbs(maindb_driver: Driver) -> None:
     kbid_a = new_kbid()
     kbid_b = new_kbid()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(system=True) as txn:
         await kb.set_slug(txn, kbid=kbid_a, slug="prefix-alpha")
         await kb.set_slug(txn, kbid=kbid_b, slug="prefix-beta")
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(system=True) as txn:
         all_kbs = {kbid async for kbid, _ in kb.iter(txn)}
 
     assert kbid_a in all_kbs
@@ -379,15 +348,15 @@ async def test_get_kbs_with_slug_prefix(maindb_driver: Driver) -> None:
 async def test_get_kbs_does_not_yield_soft_deleted(maindb_driver: Driver) -> None:
     kbid = new_kbid()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(system=True) as txn:
         await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(system=True) as txn:
         await kb.soft_delete(txn, kbid=kbid)
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(system=True) as txn:
         all_kbs = {kbid async for kbid, _ in kb.iter(txn)}
 
     assert kbid not in all_kbs

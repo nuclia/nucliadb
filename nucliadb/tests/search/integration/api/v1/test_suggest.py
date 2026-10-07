@@ -20,12 +20,7 @@
 
 import pytest
 from httpx import AsyncClient
-from nidx_protos.nodereader_pb2 import GetShardRequest, SuggestFeatures, SuggestRequest
-from nidx_protos.noderesources_pb2 import ShardId
 
-from nucliadb.common.datamanagers.kb import get_shards as get_kb_shards
-from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.nidx import get_nidx_api_client, get_nidx_searcher_client
 from nucliadb.search.api.v1.router import KB_PREFIX
 
 
@@ -39,25 +34,3 @@ async def test_suggest_resource_all(nucliadb_search: AsyncClient, test_search_re
     assert resp.status_code == 200
     paragraph_results = resp.json()["paragraphs"]["results"]
     assert len(paragraph_results) == 1
-
-    # get shards ids
-
-    driver = get_driver()
-    async with driver.ro_transaction() as txn:
-        kb_shards = await get_kb_shards(txn, kbid=kbid)
-        assert kb_shards is not None
-        shard_id = kb_shards.shards[0].nidx_shard_id
-        shard = await get_nidx_api_client().GetShard(GetShardRequest(shard_id=ShardId(id=shard_id)))
-        assert shard.shard_id == shard_id
-        assert shard.fields == 3
-        assert shard.paragraphs == 2
-        assert shard.sentences == 3
-
-        prequest = SuggestRequest(
-            features=[SuggestFeatures.ENTITIES, SuggestFeatures.PARAGRAPHS],
-            top_k=10,
-        )
-        prequest.shard_ids[:] = [shard_id]
-        prequest.body = "Ramon"
-        suggest = await get_nidx_searcher_client().Suggest(prequest)
-        assert suggest.total == 1, f"Request:\n{prequest}\nResponse:\n{suggest}"

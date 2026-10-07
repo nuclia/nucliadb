@@ -524,7 +524,7 @@ class DummyPredictEngine(PredictEngine):
             base_vector = Q
 
         # populate data with existing vectorsets
-        async with datamanagers.with_ro_transaction() as txn:
+        async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
             semantic_thresholds = {}
             vectors = {}
             timings = {}

@@ -105,8 +105,6 @@ def kbid(
     storage: Storage,
     txn,
     cache,
-    shard_manager,
-    dummy_nidx_utility,
     processor,
     knowledgebox,
 ):
@@ -488,8 +486,6 @@ async def test_qa(
     local_files,
     storage: Storage,
     cache,
-    dummy_nidx_utility,
-    shard_manager,
     processor,
     stream_audit: StreamAuditStorage,
     test_resource: Resource,

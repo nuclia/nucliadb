@@ -50,7 +50,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
     if not affected:
         return
 
-    async with datamanagers.with_rw_transaction() as txn:
+    async with datamanagers.with_rw_transaction(kbid=kbid) as txn:
         for name, config in affected.items():
             logger.info(
                 "Migrating search config for kb",
@@ -67,7 +67,7 @@ async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
 
 async def get_affected_search_configurations(kbid: str) -> dict[str, SearchConfiguration]:
     result: dict[str, SearchConfiguration] = {}
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         search_configs = await datamanagers.search_configurations.list(txn, kbid=kbid)
         for name, config in search_configs.items():
             if config.kind == "find":

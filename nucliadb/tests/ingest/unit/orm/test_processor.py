@@ -25,7 +25,9 @@ from nidx_protos import noderesources_pb2
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.ingest.orm.exceptions import ResourceNotIndexable
 from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor import processor as processor_module
 from nucliadb.ingest.orm.processor.processor import validate_indexable_resource
+from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
 
 @pytest.fixture()
@@ -73,8 +75,11 @@ async def test_commit_slug(processor: Processor, txn, resource):
     assert resource.txn is another_txn
 
 
-async def test_mark_resource_error(processor: Processor, txn, resource, kb):
+async def test_mark_resource_error(processor: Processor, driver, txn, resource, kb):
     await processor._mark_resource_error(kb, resource)
+    driver.rw_transaction.assert_called_once_with(kbid=kb.kbid)
+    assert kb.txn is txn
+    assert resource.txn is txn
     txn.commit.assert_called_once()
     resource.set_data.assert_awaited_once()
 
@@ -87,7 +92,73 @@ async def test_mark_resource_error_handle_error(processor: Processor, kb, resour
 
 async def test_mark_resource_error_skip_no_resource(processor: Processor, kb, driver, txn):
     await processor._mark_resource_error(kb, None)
+    driver.rw_transaction.assert_not_called()
     txn.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("use_slug", [False, True])
+@pytest.mark.parametrize("exists", [False, True])
+async def test_get_kb_obj_registry_uses_system_transaction(processor, driver, mocker, use_slug, exists):
+    kb_txn = MagicMock()
+    system_txn = driver.ro_transaction.return_value.__aenter__.return_value
+    identifier = knowledgebox_pb2.KnowledgeBoxID(uuid="" if use_slug else "kbid", slug="slug")
+    get_kbid = mocker.patch.object(processor_module.datamanagers.kb, "get_kbid", return_value="kbid")
+    exists_mock = mocker.patch.object(processor_module.datamanagers.kb, "exists", return_value=exists)
+    storage = mocker.patch.object(processor_module, "get_storage")
+    kb_class = mocker.patch.object(processor_module, "KnowledgeBox")
+
+    kb_obj = await processor.get_kb_obj(kb_txn, identifier)
+
+    driver.ro_transaction.assert_called_once_with(system=True)
+    exists_mock.assert_awaited_once_with(system_txn, kbid="kbid")
+    if use_slug:
+        get_kbid.assert_awaited_once_with(system_txn, slug="slug")
+    else:
+        get_kbid.assert_not_awaited()
+    if exists:
+        kb_class.assert_called_once_with(kb_txn, storage.return_value, "kbid")
+        assert kb_obj is kb_class.return_value
+    else:
+        storage.assert_not_awaited()
+        kb_class.assert_not_called()
+        assert kb_obj is None
+
+
+async def test_get_kb_obj_missing_slug_only_reads_system_registry(processor, driver, mocker):
+    system_txn = driver.ro_transaction.return_value.__aenter__.return_value
+    get_kbid = mocker.patch.object(processor_module.datamanagers.kb, "get_kbid", return_value=None)
+    exists = mocker.patch.object(processor_module.datamanagers.kb, "exists")
+    kb_class = mocker.patch.object(processor_module, "KnowledgeBox")
+
+    assert (
+        await processor.get_kb_obj(MagicMock(), knowledgebox_pb2.KnowledgeBoxID(slug="missing")) is None
+    )
+
+    driver.ro_transaction.assert_called_once_with(system=True)
+    get_kbid.assert_awaited_once_with(system_txn, slug="missing")
+    exists.assert_not_awaited()
+    kb_class.assert_not_called()
+
+
+@pytest.mark.parametrize("operation", ["delete_resource", "txn"])
+async def test_skipped_message_sequence_write_uses_system_transaction(processor, mocker, operation):
+    message = writer_pb2.BrokerMessage(kbid="kbid", slug="missing")
+    mocker.patch.object(processor_module.datamanagers.atomic.resources, "get_rid", return_value=None)
+    mocker.patch.object(processor_module.datamanagers.atomic.kb, "exists", return_value=False)
+    system_txn = AsyncMock()
+    write_context = mocker.patch.object(
+        processor_module.datamanagers,
+        "with_rw_transaction",
+        return_value=AsyncMock(__aenter__=AsyncMock(return_value=system_txn)),
+    )
+    set_sequence = mocker.patch.object(processor_module.sequence_manager, "set_last_seqid")
+
+    await getattr(processor, operation)(message, 42, "1")
+
+    write_context.assert_called_once_with(system=True)
+    set_sequence.assert_awaited_once_with(system_txn, "1", 42)
+    system_txn.commit.assert_awaited_once()
+    processor.driver.rw_transaction.assert_not_called()
 
 
 def test_validate_indexable_resource():

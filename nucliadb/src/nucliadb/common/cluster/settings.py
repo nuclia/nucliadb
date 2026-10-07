@@ -34,12 +34,6 @@ class Settings(BaseSettings):
     standalone_mode: bool = False
     standalone_node_role: StandaloneNodeRole = StandaloneNodeRole.ALL
 
-    # Index limits
-    max_shard_paragraphs: int = Field(
-        default=500_000,
-        title="Max shard paragraphs",
-        description="Maximum number of paragraphs to target per shard",
-    )
     max_resource_paragraphs: int = Field(
         default=300_000,
         title="Max paragraphs per resource",
@@ -50,10 +44,6 @@ class Settings(BaseSettings):
         title="Max entity labels per field",
         description="Maximum number of entity labels (/e/) per field that are indexed (excess is not indexed)",
     )
-
-    nidx_api_address: str | None = Field(default=None, description="NIDX gRPC API address")
-    nidx_searcher_address: str | None = Field(default=None, description="NIDX gRPC searcher API address")
-    nidx_indexer_address: str | None = Field(default=None, description="NIDX gRPC indexer API address")
 
 
 settings = Settings()

@@ -24,15 +24,8 @@ import uuid
 from functools import partial
 from typing import Any
 
-from grpc import StatusCode
-from grpc.aio import AioRpcError
-from nidx_protos import nodereader_pb2, noderesources_pb2
-
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.exceptions import ShardsNotFound
-from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
-from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb_protos import audit_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
@@ -70,7 +63,6 @@ class IndexAuditHandler:
     ):
         self.audit = audit
         self.pubsub = pubsub
-        self.shard_manager = get_shard_manager()
         self.task_handler = DelayedTaskHandler(check_delay)
 
     async def initialize(self) -> None:
@@ -106,44 +98,14 @@ class IndexAuditHandler:
         if not await datamanagers.atomic.kb.exists(kbid=kbid):
             logger.warning(f"KB does not exist, skipping counter audit", extra={"kbid": kbid})
             return
-        try:
-            shard_groups: list[writer_pb2.ShardObject] = await self.shard_manager.get_shards_by_kbid(
-                kbid
-            )
-        except ShardsNotFound:
-            logger.warning(f"No shards found for kbid {kbid}, skipping")
-            return
-
         logger.info({"message": "Processing counter audit for kbid", "kbid": kbid})
-
+        # TODO(Marklogic): get counters from collections
         total_fields = 0
         total_paragraphs = 0
-
-        for shard_obj in shard_groups:
-            try:
-                shard: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
-                    nodereader_pb2.GetShardRequest(
-                        shard_id=noderesources_pb2.ShardId(id=shard_obj.nidx_shard_id)
-                    )
-                )
-            except AioRpcError as exc:  # pragma: no cover
-                if exc.code() == StatusCode.NOT_FOUND:
-                    # KB and its shards may have been deleted
-                    logger.warning(
-                        f"Shard not found in nidx",
-                        extra={"kbid": kbid, "nidx_shard_id": shard_obj.nidx_shard_id},
-                    )
-                    continue
-                raise
-
-            total_fields += shard.fields
-            total_paragraphs += shard.paragraphs
-
-        async with datamanagers.with_ro_transaction() as txn:
+        async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
             num_vectorsets = (
                 len([vs async for vs in datamanagers.vectorsets.iter(txn=txn, kbid=kbid)]) or 1
             )
-
         self.audit.report_storage(
             kbid=kbid,
             paragraphs=total_paragraphs,

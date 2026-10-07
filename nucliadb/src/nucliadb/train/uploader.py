@@ -71,7 +71,7 @@ class UploadServicer:
     async def GetEntities(self, request: GetEntitiesRequest, context=None) -> GetEntitiesResponse:
         kbid = request.kb.uuid
         response = GetEntitiesResponse()
-        async with self.manager.driver.ro_transaction() as txn:
+        async with self.manager.driver.ro_transaction(kbid=kbid) as txn:
             kbobj = await self.manager.get_kb_obj(txn, kbid)
             if kbobj is None:
                 response.status = GetEntitiesResponse.Status.NOTFOUND

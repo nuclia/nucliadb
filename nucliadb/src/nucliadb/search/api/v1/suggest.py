@@ -22,13 +22,13 @@ from datetime import datetime
 
 from fastapi import Request, Response
 from fastapi_versioning import version
+from nidx_protos.nodereader_pb2 import SuggestResponse
 from pydantic import ValidationError
 
 from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query, get_injected_security_groups
-from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb.search.search import cache
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query_parser.parsers import parse_suggest
@@ -190,17 +190,15 @@ async def suggest(
             range_modification_end,
             security_groups,
         )
-        results = await nidx_query(kbid, Method.SUGGEST, pb_query)
-        queried_shards = list(results.shard_ids)
-
-        # We need to merge
+        # TODO(Marklogic): Implement suggest
+        results = SuggestResponse()
         search_results = await merge_suggest_results(
             results,
             kbid=kbid,
             highlight=highlight,
             top_k=pb_query.top_k,
         )
-        if debug and queried_shards:
-            search_results.shards = queried_shards
+        if debug:
+            search_results.shards = []
 
         return search_results
