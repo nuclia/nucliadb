@@ -17,9 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from typing import cast
-
-from typing_extensions import assert_never
+from typing import assert_never, cast
 
 from nucliadb.common.ids import FieldId
 from nucliadb.ingest.fields.base import Field

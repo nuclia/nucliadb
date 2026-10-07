@@ -18,9 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import base64
-from typing import cast
-
-from typing_extensions import assert_never
+from typing import assert_never, cast
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_NAME, FieldId, ParagraphId
 from nucliadb.ingest.fields.base import Field

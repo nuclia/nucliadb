@@ -35,11 +35,10 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Final, Literal, TypeAlias, cast
+from typing import Final, Literal, TypeAlias, assert_never, cast
 
 import psycopg.errors
 import psycopg.sql
-from typing_extensions import assert_never
 
 from nucliadb.common.datamanagers.utils import (
     UNSET,

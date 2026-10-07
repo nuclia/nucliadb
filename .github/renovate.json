@@ -54,8 +54,8 @@
         {
             "matchManagers": ["github-actions"],
             "matchDepNames": ["python"],
-            "matchCurrentVersion": "<3.11",
-            "allowedVersions": "<3.11"
+            "matchCurrentVersion": "<3.12",
+            "allowedVersions": "<3.12"
         },
         {
             "matchDepTypes": [

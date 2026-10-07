@@ -151,10 +151,11 @@ async def test_generator_field_streaming_json(
         assert len(batches) == 1
 
     # Test that wrong payloads are validated
-    for post_kwargs in (
-        {"data": b"fppp*}", "headers": {"Content-Type": "application/json"}},
-        {"json": {"type": 50}},
-        {"data": b"foobar"},
-    ):
-        resp = await nucliadb_train.post(stream_partition_url, **post_kwargs)
-        assert resp.status == 422
+    resp = await nucliadb_train.post(
+        stream_partition_url, data=b"fppp*}", headers={"Content-Type": "application/json"}
+    )
+    assert resp.status == 422
+    resp = await nucliadb_train.post(stream_partition_url, json={"type": 50})
+    assert resp.status == 422
+    resp = await nucliadb_train.post(stream_partition_url, data=b"foobar")
+    assert resp.status == 422

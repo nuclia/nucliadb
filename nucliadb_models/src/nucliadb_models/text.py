@@ -13,9 +13,9 @@
 # limitations under the License.
 #
 from enum import Enum
+from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
-from typing_extensions import Self
 
 from nucliadb_models.utils import validate_json
 

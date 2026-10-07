@@ -15,10 +15,9 @@
 import warnings
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Self
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing_extensions import Self
 
 from nucliadb_models.utils import DateTime
 

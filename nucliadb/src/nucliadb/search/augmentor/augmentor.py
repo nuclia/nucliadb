@@ -18,9 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-from typing import cast
-
-from typing_extensions import assert_never
+from typing import assert_never, cast
 
 import nucliadb_models
 import nucliadb_models.filters

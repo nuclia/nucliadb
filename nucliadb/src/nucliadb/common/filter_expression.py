@@ -19,11 +19,10 @@
 #
 
 from datetime import datetime
-from typing import Type, cast
+from typing import Type, assert_never, cast
 
 from nidx_protos import nodereader_pb2
 from nidx_protos.nodereader_pb2 import FilterExpression as PBFilterExpression
-from typing_extensions import assert_never
 
 from nucliadb.common import datamanagers
 from nucliadb.common.exceptions import InvalidQueryError

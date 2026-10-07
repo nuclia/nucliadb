@@ -21,8 +21,7 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-
-from typing_extensions import assert_never
+from typing import assert_never
 
 from nucliadb.search.predict import ProxiedPredictAPIError, SendToPredictError
 from nucliadb.search.search.query_parser import models as parser_models

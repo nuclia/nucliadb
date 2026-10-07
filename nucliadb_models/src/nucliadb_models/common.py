@@ -16,7 +16,7 @@ import base64
 import hashlib
 import re
 from enum import Enum
-from typing import Any
+from typing import Any, Self
 
 from pydantic import (
     BaseModel,
@@ -25,7 +25,6 @@ from pydantic import (
     field_validator,
     model_validator,
 )
-from typing_extensions import Self
 
 from nucliadb_models import content_types
 

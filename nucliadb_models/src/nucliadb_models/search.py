@@ -14,14 +14,13 @@
 #
 import json
 from enum import Enum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 from uuid import UUID
 
 from nuclia_models.common.consumption import Consumption
 from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic.aliases import AliasChoices
 from pydantic.json_schema import SkipJsonSchema
-from typing_extensions import Self
 
 from nucliadb_models import RelationMetadata
 from nucliadb_models.common import FieldTypeName, ParamDefault

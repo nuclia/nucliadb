@@ -14,9 +14,9 @@
 #
 
 from enum import Enum
+from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
-from typing_extensions import Self
 
 BASE_LABELS: dict[str, set[str]] = {
     "t": set(),  # doc tags

@@ -24,11 +24,10 @@ from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Generic, TypeVar
+from typing import Generic, ParamSpec, TypeVar
 
 import backoff
 from async_lru import _LRUCacheWrapper, alru_cache
-from typing_extensions import ParamSpec
 
 from nucliadb.common.ids import FieldId
 from nucliadb.common.maindb.utils import get_driver

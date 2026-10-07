@@ -19,9 +19,7 @@
 #
 
 import asyncio
-from typing import Any
-
-from typing_extensions import assert_never
+from typing import Any, assert_never
 
 import nucliadb_models as models
 from nucliadb.common import datamanagers

@@ -241,10 +241,14 @@ class ProcessingEngine:
     ) -> str:
         # Upload file without storing on Nuclia DB
         headers = {}
-        headers["X-PASSWORD"] = file.password
-        headers["X-LANGUAGE"] = file.language
-        headers["X-FILENAME"] = base64.b64encode(file.file.filename.encode()).decode()  # type: ignore
-        headers["X-MD5"] = file.file.md5
+        if file.password is not None:
+            headers["X-PASSWORD"] = file.password
+        if file.language is not None:
+            headers["X-LANGUAGE"] = file.language
+        if file.file.filename is not None:
+            headers["X-FILENAME"] = base64.b64encode(file.file.filename.encode()).decode()
+        if file.file.md5 is not None:
+            headers["X-MD5"] = file.file.md5
         if file.extract_strategy is not None:
             headers["X-EXTRACT-STRATEGY"] = file.extract_strategy
         if file.split_strategy is not None:
@@ -252,7 +256,10 @@ class ProcessingEngine:
         if classif_labels:
             headers["X-CLASSIFICATION-LABELS"] = self.encode_classif_labels(classif_labels)
         headers["CONTENT_TYPE"] = file.file.content_type
-        headers["CONTENT-LENGTH"] = str(len(file.file.payload))  # type: ignore
+        if file.file.payload is not None:
+            headers["CONTENT-LENGTH"] = str(len(file.file.payload))
+        else:
+            headers["CONTENT-LENGTH"] = str(0)
         headers["X-STF-NUAKEY"] = f"Bearer {self.nuclia_service_account}"
         headers.update(get_kb_visibility_headers())
         async with self.session.post(

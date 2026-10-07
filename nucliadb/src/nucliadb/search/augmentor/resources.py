@@ -18,8 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-
-from typing_extensions import assert_never
+from typing import assert_never
 
 import nucliadb_models.resource
 from nucliadb.common import datamanagers

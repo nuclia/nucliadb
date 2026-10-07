@@ -24,14 +24,13 @@ import os
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from enum import Enum, IntEnum
-from typing import Any
+from typing import Any, Self
 
 import backoff
 import httpx
 from fastapi import Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, model_validator
-from typing_extensions import Self
 
 from nucliadb.middleware import get_kb_visibility_headers
 from nucliadb_protos import knowledgebox_pb2, utils_pb2

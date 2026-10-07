@@ -13,10 +13,9 @@
 # limitations under the License.
 #
 from enum import Enum
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
-from typing_extensions import Self
 
 from nucliadb_models.filters import FilterExpression
 from nucliadb_models.graph.requests import GraphPathQuery
