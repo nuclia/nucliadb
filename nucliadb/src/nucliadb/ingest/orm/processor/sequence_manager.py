@@ -30,7 +30,7 @@ async def get_last_seqid(driver: Driver, worker: str) -> int | None:
     This is oriented towards the ingest consumer and processor,
     which is the only one that should be writing to this key.
     """
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(system=True) as txn:
         key = TXNID.format(worker=worker)
         last_seq = await txn.get(key)
         if not last_seq:

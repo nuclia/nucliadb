@@ -383,10 +383,7 @@ class KnowledgeBox:
             await self.schedule_delete_resource(self.kbid, uuid)
 
     async def schedule_delete_resource(self, kbid: str, uuid: str):
-        key = RESOURCE_TO_DELETE_STORAGE.format(kbid=kbid, uuid=uuid)
-        async with self.txn.driver.rw_transaction() as system_txn:
-            await system_txn.set(key, b"")
-            await system_txn.commit()
+        await self.txn.set(RESOURCE_TO_DELETE_STORAGE.format(kbid=kbid, uuid=uuid), b"")
 
     async def delete_resource(self, uuid: str):
         with processor_observer({"type": "delete_resource_maindb"}):

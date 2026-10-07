@@ -44,7 +44,7 @@ from nucliadb_utils.utilities import get_storage
 
 
 async def _iter_keys(driver: Driver, match: str) -> AsyncGenerator[str, None]:
-    async with driver.ro_transaction() as keys_txn:
+    async with driver.ro_transaction(system=True) as keys_txn:
         async for key in keys_txn.keys(match=match):
             yield key
 
@@ -80,7 +80,7 @@ async def purge_kbs(driver: Driver):
 
         # Now delete the delete mark
         try:
-            async with driver.rw_transaction() as txn:
+            async with driver.rw_transaction(system=True) as txn:
                 await KnowledgeBox.unmark_for_purge(txn, kbid)
                 await txn.commit()
             logger.info(f"  √ Deleted {kbid}")
@@ -143,7 +143,7 @@ async def purge_kbs_storage(driver: Driver, storage: Storage):
 
         if delete_marker:
             try:
-                async with driver.rw_transaction() as txn:
+                async with driver.rw_transaction(system=True) as txn:
                     await txn.delete(key)
                     await txn.commit()
                 logger.info("Deleted KB storage deletion marker", extra={"kbid": kbid})

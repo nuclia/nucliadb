@@ -26,7 +26,7 @@ single transaction, avoiding the need of encapsulating like in this example:
 
 ```
 async def <function>(...):
-    async with datamanagers.with_transaction() as txn:
+    async with datamanagers.with_transaction(kbid=kbid) as txn:
         await datamanagers.<module>.<function>(...)
 ```
 

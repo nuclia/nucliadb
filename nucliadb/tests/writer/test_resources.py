@@ -536,7 +536,7 @@ async def test_hide_on_creation(
     data = resp.json()
     rid = data["uuid"]
 
-    async with datamanagers.utils.with_ro_transaction() as txn:
+    async with datamanagers.utils.with_ro_transaction(kbid=kbid) as txn:
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
         assert basic and basic.hidden is False
 
@@ -562,6 +562,6 @@ async def test_hide_on_creation(
     data = resp.json()
     rid = data["uuid"]
 
-    async with datamanagers.utils.with_ro_transaction() as txn:
+    async with datamanagers.utils.with_ro_transaction(kbid=kbid) as txn:
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
         assert basic and basic.hidden is True

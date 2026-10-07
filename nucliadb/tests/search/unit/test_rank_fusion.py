@@ -60,7 +60,7 @@ def disable_hidden_resources_check():
 @pytest.fixture(scope="function")
 async def kbid(maindb_driver: Driver) -> str:
     kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(system=True) as txn:
         await datamanagers.kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid

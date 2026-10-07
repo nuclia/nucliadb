@@ -152,7 +152,7 @@ class _Lock:
 
     @contextlib.asynccontextmanager
     async def transaction(self) -> AsyncGenerator[Transaction, None]:
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(system=True) as txn:
             yield txn
 
     async def _cleanup_expired_locks(self) -> None:
