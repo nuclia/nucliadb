@@ -46,7 +46,7 @@ jobs:
         run: |
           python bump.py --build=${{github.run_number}}
 
-      - run: pip install -U twine 'black>=22.3.0,<23' typing_extensions
+      - run: pip install -U twine
 
       - name: Check system deps
         run: make -C nucliadb check-system
