@@ -194,7 +194,7 @@ class GCSStorageField(StorageField):
             quote_plus(key),
         )
         async with self.storage.session.get(
-            url, headers=headers, params={"alt": "media"}, timeout=-1
+            url, headers=headers, params={"alt": "media"}, timeout=TIMEOUT
         ) as api_resp:
             if api_resp.status not in (200, 206):
                 text = await api_resp.text()

@@ -143,7 +143,7 @@ async def wait_for_nidx(
     poll_interval_seconds: int = 5,
     max_wait_seconds: int = 60,
 ):
-    async with asyncio.timeout(max_wait_seconds):  # type: ignore
+    async with asyncio.timeout(max_wait_seconds):
         while True:
             pending = await get_nats_consumer_pending_messages(
                 nats_manager, stream="nidx", consumer="nidx"
