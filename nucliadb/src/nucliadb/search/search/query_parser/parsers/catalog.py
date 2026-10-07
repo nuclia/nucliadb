@@ -18,9 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from typing import cast
-
-from typing_extensions import assert_never
+from typing import assert_never, cast
 
 from nucliadb.common import datamanagers
 from nucliadb.common.catalog.interface import CatalogExpression, CatalogQuery

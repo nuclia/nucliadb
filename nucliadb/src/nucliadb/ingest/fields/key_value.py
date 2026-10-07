@@ -20,9 +20,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
-
-from typing_extensions import assert_never
+from typing import Any, assert_never
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb_models.key_value import Range

@@ -14,7 +14,7 @@
 #
 import json
 from datetime import datetime
-from typing import Any
+from typing import Any, Self
 
 from pydantic import (
     BaseModel,
@@ -25,7 +25,6 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
-from typing_extensions import Self
 
 from nucliadb_models.utils import DateTime
 

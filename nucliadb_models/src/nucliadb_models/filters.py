@@ -15,13 +15,12 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from enum import Enum
-from typing import Annotated, Any, Generic, Literal, TypeVar
+from typing import Annotated, Any, Generic, Literal, Self, TypeVar
 from uuid import UUID
 
 import pydantic
 from pydantic import AliasChoices, BaseModel, Discriminator, Tag, field_validator, model_validator
 from pydantic.config import ConfigDict
-from typing_extensions import Self
 
 from .common import FieldTypeName, Paragraph
 from .metadata import ResourceProcessingStatus

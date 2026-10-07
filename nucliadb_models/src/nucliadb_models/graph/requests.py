@@ -13,10 +13,9 @@
 # limitations under the License.
 #
 from enum import Enum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
-from typing_extensions import Self
 
 from nucliadb_models.filters import And, FieldFilterExpression, Not, Or, filter_discriminator
 from nucliadb_models.metadata import RelationNodeType, RelationType

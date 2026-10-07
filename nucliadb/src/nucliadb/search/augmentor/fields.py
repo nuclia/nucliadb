@@ -19,9 +19,7 @@
 #
 from collections import deque
 from collections.abc import AsyncIterator, Sequence
-from typing import Deque, cast
-
-from typing_extensions import assert_never
+from typing import Deque, assert_never, cast
 
 from nucliadb.common.ids import FieldId
 from nucliadb.common.models_utils import from_proto

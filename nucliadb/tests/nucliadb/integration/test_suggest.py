@@ -19,11 +19,10 @@
 #
 
 import json
-from typing import Any, Literal
+from typing import Any, Literal, assert_never
 
 import pytest
 from httpx import AsyncClient, Response
-from typing_extensions import assert_never
 
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos.resources_pb2 import LinkExtractedData

@@ -17,9 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+from typing import assert_never
 from uuid import uuid4
-
-from typing_extensions import assert_never
 
 from nucliadb.common.ids import FieldId, ParagraphId
 from nucliadb.models.internal import augment

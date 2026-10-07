@@ -19,10 +19,9 @@
 #
 
 
-from typing import cast
+from typing import assert_never, cast
 
 from nidx_protos import nodereader_pb2
-from typing_extensions import assert_never
 
 from nucliadb.common.filter_expression import add_and_expression, parse_expression
 from nucliadb.common.models_utils.from_proto import RelationNodeTypeMap, RelationTypeMap
