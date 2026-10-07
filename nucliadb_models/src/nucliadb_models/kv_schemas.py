@@ -32,9 +32,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from enum import Enum
+from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
-from typing_extensions import Self
 
 MAX_KV_SCHEMAS = 20
 MAX_KV_SCHEMA_FIELDS = 50

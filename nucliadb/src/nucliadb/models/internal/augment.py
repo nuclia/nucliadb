@@ -20,14 +20,13 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
 from nidx_protos.nodereader_pb2 import (
     DocumentScored,
     ParagraphResult,
 )
 from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
-from typing_extensions import Self
 
 import nucliadb_models
 from nucliadb.common.external_index_providers.base import _INCEPTION_LABEL, _OCR_LABEL, TextBlockMatch

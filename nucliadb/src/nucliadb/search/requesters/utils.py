@@ -20,7 +20,7 @@
 import asyncio
 import json
 from enum import Enum, auto
-from typing import Awaitable, Callable, overload
+from typing import Awaitable, Callable, assert_never, overload
 
 from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
@@ -34,7 +34,6 @@ from nidx_protos.nodereader_pb2 import (
     SuggestRequest,
     SuggestResponse,
 )
-from typing_extensions import assert_never
 
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager

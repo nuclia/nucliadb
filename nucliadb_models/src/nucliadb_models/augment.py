@@ -14,10 +14,9 @@
 #
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Self, assert_never
 
 from pydantic import BaseModel, Field, StringConstraints, model_validator
-from typing_extensions import Self, assert_never
 
 from nucliadb_models import filters
 from nucliadb_models.common import FieldTypeName

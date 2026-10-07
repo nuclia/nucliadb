@@ -37,9 +37,7 @@ it's transaction
 
 from collections.abc import Awaitable, Callable
 from functools import wraps
-from typing import Concatenate, TypeVar
-
-from typing_extensions import ParamSpec
+from typing import Concatenate, ParamSpec, TypeVar
 
 from nucliadb.common.maindb.driver import Transaction
 

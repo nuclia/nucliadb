@@ -17,11 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from typing import Literal
+from typing import Literal, assert_never
 
 import pytest
 from httpx import AsyncClient
-from typing_extensions import assert_never
 
 PRODUCT_SCHEMA = {
     "id": "product",

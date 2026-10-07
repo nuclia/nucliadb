@@ -21,12 +21,11 @@
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Literal, cast
+from typing import Any, Literal, assert_never, cast
 
 from nidx_protos import nodereader_pb2
 from psycopg import AsyncCursor, sql
 from psycopg.rows import DictRow, dict_row
-from typing_extensions import assert_never
 
 from nucliadb.common.catalog.interface import (
     Catalog,

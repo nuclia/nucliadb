@@ -18,10 +18,9 @@ import time
 from collections.abc import Callable
 from functools import wraps
 from inspect import isasyncgenfunction, iscoroutinefunction, isgeneratorfunction
-from typing import TYPE_CHECKING, Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, assert_never
 
 import prometheus_client
-from typing_extensions import assert_never
 
 if TYPE_CHECKING:  # pragma: no cover
     from traceback import StackSummary

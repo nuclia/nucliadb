@@ -19,9 +19,7 @@
 #
 import bisect
 from collections.abc import Sequence
-from typing import cast
-
-from typing_extensions import assert_never
+from typing import assert_never, cast
 
 from nucliadb.common.ids import ParagraphId
 from nucliadb.ingest.fields.base import Field
