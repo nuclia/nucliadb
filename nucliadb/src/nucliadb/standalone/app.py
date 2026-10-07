@@ -34,6 +34,7 @@ from starlette.routing import Mount
 import nucliadb_admin_assets  # type: ignore[import-untyped]
 from nucliadb.middleware import (
     ClientErrorPayloadLoggerMiddleware,
+    KbVisibilityMiddleware,
     ProcessTimeHeaderMiddleware,
     UUIDPathParamsValidationMiddleware,
 )
@@ -99,6 +100,7 @@ def application_factory(settings: Settings) -> FastAPI:
             AuthenticationMiddleware,
             backend=get_auth_backend(settings),
         ),
+        Middleware(KbVisibilityMiddleware),
         # Keep UUID path validation in the global middleware chain so invalid
         # kbid/rid/path_rid are rejected before endpoint handlers run.
         Middleware(UUIDPathParamsValidationMiddleware),

@@ -29,9 +29,47 @@ from starlette.testclient import TestClient
 
 from nucliadb.middleware import (
     EventCounter,
+    KbVisibilityMiddleware,
     ProcessTimeHeaderMiddleware,
     UUIDPathParamsValidationMiddleware,
+    get_kb_visibility_headers,
 )
+
+
+class TestCaseKbVisibilityMiddleware:
+    @pytest.fixture(scope="class")
+    def app(self):
+        def foo(request):
+            return PlainTextResponse(str(get_kb_visibility_headers()))
+
+        app = Starlette(
+            routes=[
+                Route("/foo/", foo),
+            ],
+            middleware=[
+                Middleware(KbVisibilityMiddleware),
+            ],
+        )
+        yield app
+
+    @pytest.fixture
+    def client(self, app):
+        return TestClient(app)
+
+    def test_header_is_captured_and_forwarded(self, client):
+        response = client.get("/foo/", headers={"x-kb-visibility": "private"})
+
+        assert response.text == "{'x-kb-visibility': 'private'}"
+
+    def test_missing_header_yields_empty_headers(self, client):
+        response = client.get("/foo/")
+
+        assert response.text == "{}"
+
+    def test_context_is_reset_after_request(self, client):
+        client.get("/foo/", headers={"x-kb-visibility": "public"})
+
+        assert get_kb_visibility_headers() == {}
 
 
 class TestCaseProcessTimeHeaderMiddleware:
