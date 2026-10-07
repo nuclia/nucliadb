@@ -26,7 +26,7 @@ jobs:
 
   generate-short-sha:
     name: Generate short sha
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       SHORT_SHA: ${{ steps.env-vars.outputs.SHORT_SHA }}
     steps:
@@ -62,7 +62,7 @@ jobs:
 
   upload-chart-nucliadb-shared:
     name: Deploy nucliadb shared
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     env:
       COMPONENT_NAME: nucliadb_shared
     steps:
@@ -125,7 +125,7 @@ jobs:
 
   upload-charts-nucliadb-component:
     name: Upload NucliaDB component charts
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       version_number: ${{ steps.version_step.outputs.version_number }}
     needs:
@@ -202,7 +202,7 @@ jobs:
     name: Upload nidx chart
     env:
       COMPONENT_NAME: nidx
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs:
       - build-nidx-image
     steps:
@@ -267,7 +267,7 @@ jobs:
 
   deploy-nucliadb-components:
     name: Deploy NucliaDB components
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs:
       - upload-chart-nucliadb-shared
       - upload-charts-nucliadb-component

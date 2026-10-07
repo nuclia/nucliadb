@@ -20,7 +20,7 @@ jobs:
     # Chart configuration: e2e/conf/chart.values.yaml
     #
     name: E2E Kubernetes Cluster Tests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Checkout code

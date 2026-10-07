@@ -15,7 +15,7 @@ permissions:
 jobs:
   build_wheels:
     name: Build wheels
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       - name: Generate a token
@@ -212,7 +212,7 @@ jobs:
 
   deploy:
     name: Deploy Helm chart and trigger internal CI
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: push-docker
 
     steps:
