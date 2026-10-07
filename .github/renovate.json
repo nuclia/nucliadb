@@ -47,13 +47,13 @@
     ],
     "packageRules": [
         {
-            "matchDepTypes": ["action"],
-            "matchPackageNames": [
-                "actions/setup-python",
-                "actions/python-versions",
-                "setup-python",
-                "python-versions"
-            ],
+            "matchManagers": ["github-actions"],
+            "matchDepNames": ["python"],
+            "separateMultipleMinor": true
+        },
+        {
+            "matchManagers": ["github-actions"],
+            "matchDepNames": ["python"],
             "matchCurrentVersion": "<3.11",
             "allowedVersions": "<3.11"
         },
