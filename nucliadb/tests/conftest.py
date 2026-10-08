@@ -43,7 +43,6 @@ pytest_plugins.extend(
         "tests.ndbfixtures.common",
         "tests.ndbfixtures.maindb",
         "tests.ndbfixtures.marklogic",
-        "tests.ndbfixtures.nidx",
         "tests.ndbfixtures.processing",
         # useful resources for tests (KBs, resources, ...)
         "tests.ndbfixtures.resources",

@@ -59,7 +59,7 @@ def make_status(
 @pytest.fixture()
 async def kbid(maindb_driver: Driver) -> str:
     kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(system=True) as txn:
         await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid
@@ -87,11 +87,11 @@ def make_text(body: str) -> rpb2.FieldText:
 async def test_set_and_get(maindb_driver: Driver, kbid: str, rid: str) -> None:
     payload = make_text("raw-field-value")
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await fields.set(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", value=payload)
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await fields.get(
             txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", pb_klass=rpb2.FieldText
         )
@@ -101,19 +101,19 @@ async def test_set_and_get(maindb_driver: Driver, kbid: str, rid: str) -> None:
 
 @pytest.mark.asyncio
 async def test_set_overwrites_existing_value(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await fields.set(
             txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", value=make_text("v1")
         )
         await txn.commit()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await fields.set(
             txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", value=make_text("v2")
         )
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await fields.get(
             txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", pb_klass=rpb2.FieldText
         )
@@ -124,7 +124,7 @@ async def test_set_overwrites_existing_value(maindb_driver: Driver, kbid: str, r
 
 @pytest.mark.asyncio
 async def test_get_returns_none_for_missing_field(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await fields.get(
             txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="nonexistent", pb_klass=rpb2.FieldText
         )
@@ -138,7 +138,7 @@ async def test_get_returns_none_for_missing_field(maindb_driver: Driver, kbid: s
 
 @pytest.mark.asyncio
 async def test_set_and_get_status(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await fields.set(
             txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", value=make_text("data")
         )
@@ -152,7 +152,7 @@ async def test_set_and_get_status(maindb_driver: Driver, kbid: str, rid: str) ->
         )
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await fields.get_status(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body")
 
     assert result is not None
@@ -163,7 +163,7 @@ async def test_set_and_get_status(maindb_driver: Driver, kbid: str, rid: str) ->
 async def test_get_status_returns_none_for_missing_row(
     maindb_driver: Driver, kbid: str, rid: str
 ) -> None:
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await fields.get_status(
             txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="no-such-field"
         )
@@ -172,7 +172,7 @@ async def test_get_status_returns_none_for_missing_row(
 
 @pytest.mark.asyncio
 async def test_get_statuses_returns_in_order(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         for fid in ("f1", "f2", "f3"):
             await fields.set(
                 txn, kbid=kbid, rid=rid, field_type=TEXT, field_id=fid, value=make_text("x")
@@ -201,7 +201,7 @@ async def test_get_statuses_returns_in_order(maindb_driver: Driver, kbid: str, r
         rpb2.FieldID(field_type=rpb2.FieldType.TEXT, field="f3"),
     ]
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         statuses = await fields.get_statuses(txn, kbid=kbid, rid=rid, fields=field_ids)
 
     assert len(statuses) == 3
@@ -212,7 +212,7 @@ async def test_get_statuses_returns_in_order(maindb_driver: Driver, kbid: str, r
 
 @pytest.mark.asyncio
 async def test_get_statuses_empty_input(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await fields.get_statuses(txn, kbid=kbid, rid=rid, fields=[])
     assert result == []
 
@@ -224,19 +224,19 @@ async def test_get_statuses_empty_input(maindb_driver: Driver, kbid: str, rid: s
 
 @pytest.mark.asyncio
 async def test_has_field_true_after_set(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await fields.set(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", value=make_text("x"))
         await txn.commit()
 
     fid = rpb2.FieldID(field_type=rpb2.FieldType.TEXT, field="body")
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await fields.exists(txn, kbid=kbid, rid=rid, field_id=fid) is True
 
 
 @pytest.mark.asyncio
 async def test_has_field_false_for_missing(maindb_driver: Driver, kbid: str, rid: str) -> None:
     fid = rpb2.FieldID(field_type=rpb2.FieldType.TEXT, field="ghost")
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await fields.exists(txn, kbid=kbid, rid=rid, field_id=fid) is False
 
 
@@ -247,7 +247,7 @@ async def test_has_field_false_for_missing(maindb_driver: Driver, kbid: str, rid
 
 @pytest.mark.asyncio
 async def test_get_all_field_ids(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await fields.set(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", value=make_text("x"))
         await fields.set(
             txn, kbid=kbid, rid=rid, field_type=FILE, field_id="doc", value=rpb2.FieldFile()
@@ -259,7 +259,7 @@ async def test_get_all_field_ids(maindb_driver: Driver, kbid: str, rid: str) -> 
         )
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await fields.get_all_field_ids(txn, kbid=kbid, rid=rid)
 
     field_pairs = {(f.field_type, f.field) for f in result.fields}
@@ -272,7 +272,7 @@ async def test_get_all_field_ids(maindb_driver: Driver, kbid: str, rid: str) -> 
 
 @pytest.mark.asyncio
 async def test_get_all_field_ids_empty(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await fields.get_all_field_ids(txn, kbid=kbid, rid=rid)
     assert list(result.fields) == []
 
@@ -281,38 +281,43 @@ async def test_get_all_field_ids_empty(maindb_driver: Driver, kbid: str, rid: st
 async def test_fields_are_scoped_by_resource_and_md5(maindb_driver: Driver, kbid: str, rid: str) -> None:
     other_rid = Resource.new_unique_rid()
     other_kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await fields.set(
             txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="a/b", value=make_text("first")
         )
         await fields.set(
             txn, kbid=kbid, rid=other_rid, field_type=TEXT, field_id="a/b", value=make_text("second")
         )
-        await fields.set(
-            txn, kbid=other_kbid, rid=rid, field_type=TEXT, field_id="a/b", value=make_text("third")
-        )
         await fields.set_md5(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="a/b", md5="hash-1")
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=other_kbid) as txn:
+        await fields.set(
+            txn, kbid=other_kbid, rid=rid, field_type=TEXT, field_id="a/b", value=make_text("third")
+        )
+        await txn.commit()
+
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         first = await fields.get(
             txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="a/b", pb_klass=rpb2.FieldText
         )
         second = await fields.get(
             txn, kbid=kbid, rid=other_rid, field_type=TEXT, field_id="a/b", pb_klass=rpb2.FieldText
         )
-        third = await fields.get(
-            txn, kbid=other_kbid, rid=rid, field_type=TEXT, field_id="a/b", pb_klass=rpb2.FieldText
-        )
         assert first is not None and first.body == "first"
         assert second is not None and second.body == "second"
-        assert third is not None and third.body == "third"
         ids = await fields.get_all_field_ids(txn, kbid=kbid, rid=rid)
         assert [(field.field_type, field.field) for field in ids.fields] == [
             (rpb2.FieldType.TEXT, "a/b")
         ]
         assert await fields.exists_md5(txn, kbid=kbid, md5="hash-1", field_type=TEXT)
         assert not await fields.exists_md5(txn, kbid=kbid, md5="hash-1", field_type=FILE)
+
+    async with maindb_driver.ro_transaction(kbid=other_kbid) as txn:
+        third = await fields.get(
+            txn, kbid=other_kbid, rid=rid, field_type=TEXT, field_id="a/b", pb_klass=rpb2.FieldText
+        )
+        assert third is not None and third.body == "third"
         assert not await fields.exists_md5(txn, kbid=other_kbid, md5="hash-1", field_type=TEXT)
 
 
@@ -323,15 +328,15 @@ async def test_fields_are_scoped_by_resource_and_md5(maindb_driver: Driver, kbid
 
 @pytest.mark.asyncio
 async def test_delete_removes_field(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await fields.set(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", value=make_text("x"))
         await txn.commit()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await fields.delete(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body")
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert (
             await fields.get(
                 txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="body", pb_klass=rpb2.FieldText
@@ -344,6 +349,6 @@ async def test_delete_removes_field(maindb_driver: Driver, kbid: str, rid: str) 
 
 @pytest.mark.asyncio
 async def test_delete_nonexistent_field_is_noop(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await fields.delete(txn, kbid=kbid, rid=rid, field_type=TEXT, field_id="ghost")
         await txn.commit()  # must not raise

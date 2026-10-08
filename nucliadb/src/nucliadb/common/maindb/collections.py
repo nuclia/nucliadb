@@ -7,4 +7,4 @@ class MarkLogicCollections(str, Enum):
     RESOURCES = "resources"
     FIELDS = "fields"
     CONVERSATIONS = "conversations"
-    MAINDB = "nucliadb-maindb"
+    MAINDB = "maindb"
