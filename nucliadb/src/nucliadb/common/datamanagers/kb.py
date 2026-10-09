@@ -16,6 +16,7 @@ from nucliadb.common.datamanagers.utils import UNSET, _UnsetType, observer
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
+from nucliadb.common.marklogic.document_update import DocumentUpdate
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
 logger = logging.getLogger(__name__)
@@ -161,27 +162,14 @@ async def _set_data(
     config: knowledgebox_pb2.KnowledgeBoxConfig | None | _UnsetType = UNSET,
     shards: writer_pb2.Shards | None | _UnsetType = UNSET,
 ) -> None:
-    # TODO(Marklogic): Look into optimizing read-modify-write for KB data (optic DSL)
     documents.require_kb_scope(txn, kbid)
-    if config is UNSET and shards is UNSET:
-        return
-    _, marklogic_txn = driver_txn(txn, ensure_writes=True)
-    content = await documents.read(
-        marklogic_txn,
-        _kb_uri(),
+    update = DocumentUpdate(
+        uri=_kb_uri(), collection=MarkLogicCollections.KNOWLEDGEBOXES, defaults={"kbid": kbid}
     )
-    if content is None:
-        # Initialize content with the kbid if it doesn't exist
-        content = {"kbid": kbid}
     for name, value in (("config", config), ("shards", shards)):
         if value is not UNSET:
-            content[name] = _serialize(value)
-    await documents.write(
-        marklogic_txn,
-        _kb_uri(),
-        MarkLogicCollections.KNOWLEDGEBOXES,
-        content,
-    )
+            update[name] = _serialize(value)
+    await documents.update_document(txn, update)
 
 
 @observer.wrap({"type": "kb", "op": "get"})

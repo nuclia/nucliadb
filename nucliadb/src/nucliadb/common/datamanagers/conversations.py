@@ -1,8 +1,6 @@
 """MarkLogic datamanager for paginated conversation fields."""
 
-import json
 from typing import TypeVar
-from urllib.parse import quote
 
 from google.protobuf.message import Message
 
@@ -10,6 +8,7 @@ from nucliadb.common.datamanagers import fields
 from nucliadb.common.datamanagers import marklogic_documents as documents
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.marklogic.document_deletion import DocumentDeletion
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import FieldConversation, SplitsMetadata
 
@@ -19,7 +18,7 @@ PB = TypeVar("PB", bound=Message)
 
 
 def _directory(rid: str, field_id: str) -> str:
-    return f"/resources/{rid}/conversations/{quote(field_id, safe='')}/"
+    return f"{fields.directory(rid, 'c', field_id)}pages/"
 
 
 def _page_uri(rid: str, field_id: str, page: int) -> str:
@@ -97,13 +96,10 @@ async def set_splits_metadata(
 
 async def delete_pages(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None:
     documents.require_kb_scope(txn, kbid)
-    dsl = (
-        "op.fromDocUris(cts.andQuery(["
-        f"cts.collectionQuery({json.dumps(MarkLogicCollections.CONVERSATIONS)}), "
-        f"cts.directoryQuery({json.dumps(_directory(rid, field_id))}, 'infinity')"
-        "])).remove()"
+    await documents.delete_documents(
+        txn,
+        DocumentDeletion().directory(_directory(rid, field_id), [MarkLogicCollections.CONVERSATIONS]),
     )
-    await documents.update_rows(txn, dsl)
 
 
 async def delete_field(txn: Transaction, *, kbid: str, rid: str, field_id: str) -> None:

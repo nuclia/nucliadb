@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import uuid
 from collections import defaultdict
@@ -27,8 +28,13 @@ from collections.abc import Sequence
 from typing import Any, cast
 
 from nucliadb.common import datamanagers, file_md5
+from nucliadb.common.datamanagers import marklogic_documents as documents
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB
+from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.marklogic.client import Document
+from nucliadb.common.marklogic.document_deletion import DocumentDeletion
+from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.file import File
@@ -37,6 +43,7 @@ from nucliadb.ingest.fields.key_value import KeyValue
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
 from nucliadb.ingest.orm.brain_v2 import FilePagePositions
+from nucliadb.ingest.orm.processor.processor import DocumentOps
 from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
@@ -133,22 +140,17 @@ class Resource:
 
     async def set_data(
         self,
+        slug: str | None = None,
         basic: PBBasic | None = None,
         origin: PBOrigin | None = None,
         extra: PBExtra | None = None,
         security: utils_pb2.Security | None = None,
     ) -> None:
-        if not any([x is not None for x in [basic, origin, extra, security]]):
+        if not any([x is not None for x in [slug, basic, origin, extra, security]]):
             return
-        await datamanagers.resources.set(
-            self.txn,
-            kbid=self.kbid,
-            rid=self.uuid,
-            basic=basic if basic is not None else datamanagers.resources.UNSET,
-            origin=origin if origin is not None else datamanagers.resources.UNSET,
-            extra=extra if extra is not None else datamanagers.resources.UNSET,
-            security=security if security is not None else datamanagers.resources.UNSET,
-        )
+        if slug is not None:
+            self.slug = slug
+            self._loaded_resource_columns.add("slug")
         if basic is not None:
             self.basic = basic
             self._loaded_resource_columns.add("basic")
@@ -176,6 +178,9 @@ class Resource:
         if resource_data.extra is not datamanagers.resources.UNSET:
             self.extra = resource_data.extra
             self._loaded_resource_columns.add("extra")
+        if resource_data.slug is not datamanagers.resources.UNSET:
+            self.slug = resource_data.slug
+            self._loaded_resource_columns.add("slug")
 
     def _resource_data_from_cache(
         self, columns: tuple[datamanagers.resources.ResourceColumn, ...]
@@ -190,6 +195,8 @@ class Resource:
                 resource_data.security = self.security
             elif column == "extra":
                 resource_data.extra = self.extra
+            elif column == "slug":
+                resource_data.slug = self.slug
         return resource_data
 
     async def get_data(
@@ -338,22 +345,63 @@ class Resource:
     async def get_all_field_ids(self) -> PBAllFieldIDs | None:
         return await datamanagers.fields.get_all_field_ids(self.txn, kbid=self.kbid, rid=self.uuid)
 
-    async def apply_field_values(self, message: BrokerMessage):
+    async def apply_field_values(self, message: BrokerMessage) -> dict[str, DocumentOps]:
+        to_index: dict[str, DocumentOps] = {
+            "deletions": DocumentDeletion()
+        }
         message_updated_fields = []
         for field, text in message.texts.items():
+            to_index[f"t/{field}"] = Document(
+                uri=datamanagers.fields._uri(
+                    rid=self.uuid,
+                    field_type="t",
+                    field_id=field,
+                ),
+                content={
+                    "value": documents.to_json(text),
+                    "md5": hashlib.md5(text.body).hexdigest()
+                },
+                collections=[MarkLogicCollections.FIELDS],
+                content_type="application/json",
+            )
             fid = FieldID(field_type=FieldType.TEXT, field=field)
             await self.set_field(fid.field_type, fid.field, text)
             message_updated_fields.append(fid)
 
         for field, link in message.links.items():
+            to_index[f"u/{field}"] = Document(
+                uri=datamanagers.fields._uri(
+                    rid=self.uuid,
+                    field_type="u",
+                    field_id=field,
+                ),
+                content={
+                    "value": documents.to_json(link),
+                },
+                collections=[MarkLogicCollections.FIELDS],
+                content_type="application/json",
+            )
+
             fid = FieldID(field_type=FieldType.LINK, field=field)
             await self.set_field(fid.field_type, fid.field, link)
             message_updated_fields.append(fid)
 
         for field, file in message.files.items():
+            to_index[f"f/{field}"] = Document(
+                uri=datamanagers.fields._uri(
+                    rid=self.uuid,
+                    field_type="f",
+                    field_id=field,
+                ),
+                content={
+                    "value": documents.to_json(file),
+                    "md5": file.file.md5
+                },
+                collections=[MarkLogicCollections.FIELDS],
+                content_type="application/json",
+            )
             fid = FieldID(field_type=FieldType.FILE, field=field)
             await self.set_field(fid.field_type, fid.field, file)
-            await self.set_file_field_md5(field, file.file)
             message_updated_fields.append(fid)
 
         for field, conversation in message.conversations.items():
@@ -362,11 +410,32 @@ class Resource:
             message_updated_fields.append(fid)
 
         for field, kv in message.key_value_fields.items():
+            to_index[f"k/{field}"] = Document(
+                uri=datamanagers.fields._uri(
+                    rid=self.uuid,
+                    field_type="k",
+                    field_id=field,
+                ),
+                content={
+                    "value": documents.to_json(kv),
+                },
+                collections=[MarkLogicCollections.FIELDS],
+                content_type="application/json",
+            )
             fid = FieldID(field_type=FieldType.KEY_VALUE, field=field)
             await self.set_field(fid.field_type, fid.field, kv)
             message_updated_fields.append(fid)
 
         for fieldid in message.delete_fields:
+            ftype_abbr = from_proto.field_type_name(fieldid.field_type).abbreviation()
+            to_index["deletions"].directory(
+                datamanagers.fields.directory(
+                    rid=self.uuid,
+                    field_type=ftype_abbr,
+                    field_id=fieldid.field,
+                ),
+                collections=datamanagers.fields.FIELD_COLLECTIONS,
+            )
             await self.delete_field(fieldid.field_type, fieldid.field)
 
         for delete_splits in message.delete_splits:
@@ -375,7 +444,8 @@ class Resource:
         if len(message_updated_fields) or len(message.delete_fields) or len(message.errors):
             self.modified = True
 
-        await self.apply_fields_status(message)
+        await self.apply_fields_status(message, to_index)
+        return to_index
 
     async def set_file_field_md5(self, field_id: str, file: CloudFile):
         """
@@ -407,7 +477,7 @@ class Resource:
         )
         del status.errors[-errors_to_trim:]
 
-    async def apply_fields_status(self, message: BrokerMessage):
+    async def apply_fields_status(self, message: BrokerMessage, to_index: dict[str, Document]):
         # Update the status for fields for which the extracted text has been updated.
         updated_fields = [et.field for et in message.extracted_text]
         # And also key_value fields being modified directly
@@ -471,7 +541,10 @@ class Resource:
                 # If the field was not found and the message comes from the writer, this implicitly sets the
                 # status to the default value, which is PROCESSING. This covers the case of new field creation.
 
-            await field_obj.set_status(status)
+            ftype_abbr = from_proto.field_type_name(field_type).abbreviation()
+            doc = to_index.get(f"{ftype_abbr}/{field}")
+            if doc is not None and isinstance(doc, documents.Document):
+                doc.content["status"] = documents.to_json(status)
             self.modified = True
 
     async def add_field_error(
@@ -499,7 +572,7 @@ class Resource:
             await field.set_status(status)
         self.modified = True
 
-    async def apply_field_extracted_data(self, message: BrokerMessage) -> None:
+    async def store_field_extracted_data(self, message: BrokerMessage) -> None:
         """
         Apply extracted field data from a broker message (extracted text, vectors,
         question answers, field metadata, large metadata). Does not touch basic.

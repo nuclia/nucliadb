@@ -166,26 +166,26 @@ class Field(Generic[PbType]):
         return self.value
 
     async def db_set_value(self, payload: Any):
-        await datamanagers.fields.set(
-            self.resource.txn,
-            kbid=self.kbid,
-            rid=self.rid,
-            field_type=self.type,
-            field_id=self.id,
-            value=payload,
-        )
+        # await datamanagers.fields.set(
+        #     self.resource.txn,
+        #     kbid=self.kbid,
+        #     rid=self.rid,
+        #     field_type=self.type,
+        #     field_id=self.id,
+        #     value=payload,
+        # )
         self.value = payload
         self.resource.modified = True
 
     async def delete(self):
         # Delete from maindb
-        await datamanagers.fields.delete(
-            self.resource.txn,
-            kbid=self.kbid,
-            rid=self.rid,
-            field_type=self.type,
-            field_id=self.id,
-        )
+        # await datamanagers.fields.delete(
+        #     self.resource.txn,
+        #     kbid=self.kbid,
+        #     rid=self.rid,
+        #     field_type=self.type,
+        #     field_id=self.id,
+        # )
         # Delete from storage
         tasks = [
             self.delete_extracted_text(),

@@ -37,6 +37,8 @@ from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
+from nucliadb.common.marklogic.document_deletion import DocumentDeletion
+from nucliadb.common.marklogic.document_update import DocumentUpdate
 from nucliadb_protos import resources_pb2
 
 ResourceColumn: TypeAlias = Literal["slug", "basic", "origin", "security", "extra"]
@@ -74,6 +76,9 @@ ResourceColumnValueType = (
     | resources_pb2.Extra
 )
 SerializedResourceColumnValueType = str | None | dict
+
+
+CHILD_COLLECTIONS = (MarkLogicCollections.FIELDS, MarkLogicCollections.CONVERSATIONS)
 
 
 def _serialize_resource_column(
@@ -155,7 +160,6 @@ async def _set(
     security: resources_pb2.Security | None | _UnsetType = UNSET,
     extra: resources_pb2.Extra | None | _UnsetType = UNSET,
 ) -> None:
-    # TODO(Marklogic): Implement proper upsert logic for MarkLogic, avoiding read-modify-write cycles.
     documents.require_kb_scope(txn, kbid)
     values = {
         "slug": _serialize_resource_column(slug),
@@ -164,24 +168,17 @@ async def _set(
         "security": _serialize_resource_column(security),
         "extra": _serialize_resource_column(extra),
     }
-    columns_to_set = [
-        column_name
-        for column_name in ("slug", "basic", "origin", "security", "extra")
-        if values[column_name] is not UNSET
-    ]
-    if not columns_to_set:
-        return
-    uri = _uri(rid)
-    content = await documents.read(txn, uri)
-    if content is None:
-        content = {}
-    for column in columns_to_set:
-        content[column] = values[column]
-    await documents.write(txn, uri, MarkLogicCollections.RESOURCES, content)
+    update = DocumentUpdate(uri=_uri(rid), collection=MarkLogicCollections.RESOURCES)
+    update.set(**{column: value for column, value in values.items() if value is not UNSET})
+    await documents.update_document(txn, update)
 
 
 def _uri(rid: str) -> str:
     return f"/resources/{rid}.json"
+
+
+def _directory(rid: str) -> str:
+    return f"/resources/{rid}/"
 
 
 @observer.wrap({"type": "resources", "op": "set_slug"})
@@ -232,9 +229,15 @@ async def update_slug(
 
 @observer.wrap({"type": "resources", "op": "delete"})
 async def delete(txn: Transaction, *, kbid: str, rid: str) -> None:
+    """
+    Deletes the resource with the given resource ID (rid) from the database, as well as all related child collections,
+    like fields, chunks, embeddings, etc.
+    """
     documents.require_kb_scope(txn, kbid)
-    await documents.delete_resource_children(txn, rid)
-    await documents.delete(txn, _uri(rid))
+    deletion = DocumentDeletion()
+    deletion.uri(_uri(rid))
+    deletion.directory(_directory(rid), CHILD_COLLECTIONS)
+    await documents.delete_documents(txn, deletion)
 
 
 # ---------------------------------------------------------------------------

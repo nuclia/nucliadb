@@ -19,6 +19,7 @@
 #
 import asyncio
 import logging
+from collections import defaultdict
 
 import aiohttp.client_exceptions
 import nats.errors
@@ -26,12 +27,16 @@ import nats.js.errors
 from nidx_protos import noderesources_pb2, nodewriter_pb2
 from nidx_protos.noderesources_pb2 import Resource as PBBrainResource
 
-from nucliadb.common import datamanagers, locking
-from nucliadb.common.catalog import catalog_delete, catalog_update
+from nucliadb.common import datamanagers
 from nucliadb.common.cluster.settings import settings as cluster_settings
+from nucliadb.common.datamanagers import marklogic_documents as documents
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
+from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
+from nucliadb.common.marklogic.client import Document
+from nucliadb.common.marklogic.document_deletion import DocumentDeletion
+from nucliadb.common.marklogic.document_update import DocumentUpdate
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
     InvalidBrokerMessage,
@@ -53,6 +58,7 @@ from nucliadb.ingest.orm.resource import (
 from nucliadb_models import content_types
 from nucliadb_models.common import CloudLink
 from nucliadb_models.content_types import GENERIC_MIME_TYPE
+from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import (
     knowledgebox_pb2,
     resources_pb2,
@@ -72,6 +78,17 @@ MESSAGE_TO_NOTIFICATION_SOURCE = {
     writer_pb2.BrokerMessage.MessageSource.WRITER: writer_pb2.NotificationSource.WRITER,
     writer_pb2.BrokerMessage.MessageSource.PROCESSOR: writer_pb2.NotificationSource.PROCESSOR,
 }
+
+
+METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
+    writer_pb2.Metadata.Status.ERROR: ResourceProcessingStatus.ERROR.name,
+    writer_pb2.Metadata.Status.PROCESSED: ResourceProcessingStatus.PROCESSED.name,
+    writer_pb2.Metadata.Status.PENDING: ResourceProcessingStatus.PENDING.name,
+    writer_pb2.Metadata.Status.BLOCKED: ResourceProcessingStatus.BLOCKED.name,
+    writer_pb2.Metadata.Status.EXPIRED: ResourceProcessingStatus.EXPIRED.name,
+}
+
+DocumentOps = Document | DocumentDeletion
 
 
 def validate_indexable_resource(resource: noderesources_pb2.Resource) -> None:
@@ -156,6 +173,11 @@ class Processor:
         self.storage = storage
         self.partition = partition
         self.pubsub = pubsub
+        self._to_index = []
+
+    @property
+    def needs_indexing(self) -> bool:
+        return bool(self._to_index)
 
     async def process(
         self,
@@ -211,14 +233,10 @@ class Processor:
                     await txn.commit()
             return
 
-        async with (
-            locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)),
-            self.driver.rw_transaction(kbid=kbid) as txn,
-        ):
+        async with self.driver.rw_transaction(kbid=kbid) as txn:
             try:
                 logger.info("Deleting resource", extra={"kbid": kbid, "rid": uuid})
                 kb = KnowledgeBox(txn, self.storage, kbid)
-                await catalog_delete(txn, kbid, uuid)
                 try:
                     await kb.delete_resource(uuid)
                 except Exception as exc:
@@ -269,6 +287,11 @@ class Processor:
         if generated_fields.is_not_empty():
             await send_generated_fields_to_process(kbid, resource, generated_fields, message)
 
+    async def save_last_seqid(self, partition: str, seqid: int) -> None:
+        async with datamanagers.with_rw_transaction(system=True) as txn:
+            await sequence_manager.set_last_seqid(txn, partition, seqid)
+            await txn.commit()
+
     @processor_observer.wrap({"type": "txn"})
     async def txn(
         self,
@@ -277,55 +300,54 @@ class Processor:
         partition: str,
         transaction_check: bool = True,
     ) -> None:
+
         kbid = message.kbid
-        kb_exists = await datamanagers.atomic.kb.exists(kbid=kbid)
-        uuid: str | None = None
-        if not kb_exists:
+        if not await datamanagers.atomic.kb.exists(kbid=kbid):
             logger.info("Deleted KB: skipping txn", extra={"kbid": kbid})
-        else:
-            uuid = message.uuid or await datamanagers.atomic.resources.get_rid(
-                kbid=kbid, slug=message.slug
-            )
-            if not uuid:
+            if transaction_check:
+                await self.save_last_seqid(partition, seqid)
+            return None
+
+        resource_creation = False
+        resource_update = False
+        uuid = message.uuid
+        if not uuid:
+            # Check slug
+            uuid = await datamanagers.atomic.resources.get_rid(kbid=kbid, slug=message.slug)
+            if uuid is None:
                 logger.info(
                     "Resource slug not found: skipping txn", extra={"kbid": kbid, "slug": message.slug}
                 )
-        if not kb_exists or not uuid:
-            if transaction_check:
-                async with datamanagers.with_rw_transaction(system=True) as txn:
-                    await sequence_manager.set_last_seqid(txn, partition, seqid)
-                    await txn.commit()
-            return None
+                if transaction_check:
+                    await self.save_last_seqid(partition, seqid)
+                return None
+            else:
+                # Resource was found by slug, so this is an update
+                resource_update = True
+        elif await datamanagers.atomic.resources.exists(kbid=kbid, rid=message.uuid):
+            resource_update = True
+        else:
+            resource_creation = True
 
-        async with (
-            locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=uuid)),
-            self.driver.rw_transaction(kbid=kbid) as txn,
-        ):
+        async with self.driver.rw_transaction(kbid=kbid) as txn:
             logger.info(
                 "Processing message",
                 extra={"kbid": kbid, "rid": uuid, "seqid": seqid, "partition": partition},
             )
             try:
                 kb = KnowledgeBox(txn, self.storage, kbid)
-                resource: Resource | None = None
                 handled_exception = None
-                created = False
-
+                resource = None
                 if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
-                    resource = await kb.get(uuid)
-                    if resource is None:
-                        # It's a new resource
-                        resource = await kb.add_resource(uuid, message.slug, message.basic)
-                        created = True
+                    if resource_creation:
+                        resource = await self.create_resource(uuid, message)
                     else:
-                        # It's an update from writer for an existing resource
-                        ...
+                        resource = await self.update_resource(uuid, message)
 
                 elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
-                    resource = await kb.get(uuid)
-                    if resource is None:
+                    if not resource_update:
                         logger.info(
-                            f"Processor message for resource received but the resource does not exist, ignoring.",
+                            f"Processor message for resource received but the resource is not marked for update, ignoring.",
                             extra={
                                 "kbid": kbid,
                                 "rid": uuid,
@@ -333,9 +355,9 @@ class Processor:
                             },
                         )
                         return None
-                    else:
-                        # It's an update from processor for an existing resource
-                        ...
+
+                    # It's an update from processor for an existing resource
+                    resource = await self.update_resource(uuid, message)
 
                     await self.handle_data_augmentation_fields(message, resource, kbid)
 
@@ -343,51 +365,40 @@ class Processor:
                     raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
 
                 # apply changes from the broker message to the fields and the resource
-                await self.apply_fields(message, resource)
-                await self.apply_resource(message, resource, new_resource=created)
+                assert resource is not None, "Resource should be available before applying fields"
+                to_index = await self.apply_fields(message, resource)
 
                 # index message
-                if resource.modified:
-                    index_message = await self.generate_index_message(resource, message, created)
+                if self.needs_indexing or to_index:
                     try:
-                        warnings = await self.index_resource(
-                            index_message=index_message,
+                        await self.index_resource(
                             txn=txn,
-                            uuid=uuid,
-                            kbid=kbid,
-                            seqid=seqid,
-                            partition=partition,
-                            kb=kb,
-                            source=to_index_message_source(message),
+                            to_index=to_index,
                         )
                         # Save indexing warnings
-                        for field_id, warning in warnings:
-                            await resource.add_field_error(
-                                field_id, warning, writer_pb2.Error.Severity.WARNING
-                            )
-                    except ResourceNotIndexable as e:
-                        await resource.add_field_error(
-                            e.field_id, e.message, writer_pb2.Error.Severity.ERROR
-                        )
-                        # After an index error, recompute and persist resource status
-                        basic = await resource.get_basic()
-                        await compute_resource_status(txn, kbid, uuid, basic)
-                        await resource.set_data(basic=basic)
-                        # Catalog takes status from index message labels, override it to error
-                        current_status = [x for x in index_message.labels if x.startswith("/n/s/")]
-                        if current_status:
-                            index_message.labels.remove(current_status[0])
-                            index_message.labels.append("/n/s/ERROR")
+                        # for field_id, warning in warnings:
+                        #     await resource.add_field_error(
+                        #         field_id, warning, writer_pb2.Error.Severity.WARNING
+                        #     )
+                    except ResourceNotIndexable:
+                    #     await resource.add_field_error(
+                    #         e.field_id, e.message, writer_pb2.Error.Severity.ERROR
+                    #     )
+                    #     # After an index error, recompute and persist resource status
+                    #     basic = await resource.get_basic()
+                    #     await compute_resource_status(txn, kbid, uuid, basic)
+                    #     await resource.set_data(basic=basic)
+                    #     # Catalog takes status from index message labels, override it to error
+                    #     current_status = [x for x in index_message.labels if x.startswith("/n/s/")]
+                    #     if current_status:
+                    #         index_message.labels.remove(current_status[0])
+                    #         index_message.labels.append("/n/s/ERROR")
+                        pass
 
-                    await catalog_update(txn, kbid, resource, index_message)
+                    # await catalog_update(txn, kbid, resource, index_message)
                     await txn.commit()
                     if transaction_check:
-                        async with self.driver.rw_transaction(system=True) as system_txn:
-                            await sequence_manager.set_last_seqid(system_txn, partition, seqid)
-                            await system_txn.commit()
-
-                    if created:
-                        await self.commit_slug(resource)
+                        await self.save_last_seqid(partition, seqid)
 
                     await self.notify_commit(
                         partition=partition,
@@ -395,7 +406,7 @@ class Processor:
                         message=message,
                         write_type=(
                             writer_pb2.Notification.WriteType.CREATED
-                            if created
+                            if resource_creation
                             else writer_pb2.Notification.WriteType.MODIFIED
                         ),
                     )
@@ -447,8 +458,8 @@ class Processor:
                 )
                 handled_exception = exc
             finally:
-                if resource is not None:
-                    resource.clean()
+                # if resource is not None:
+                #     resource.clean()
                 # txn should be already commited or aborted, but in the event of an exception
                 # it could be left open. Make sure to close it if it's still open
                 if txn.open:
@@ -458,8 +469,8 @@ class Processor:
                 if seqid == -1:
                     raise handled_exception
                 else:
-                    if resource is not None:
-                        await self._mark_resource_error(kb, resource)
+                    # if resource is not None:
+                    #     await self._mark_resource_error(kb, resource)
                     raise DeadletteredError() from handled_exception
 
             return None
@@ -467,19 +478,29 @@ class Processor:
     @processor_observer.wrap({"type": "index_resource"})
     async def index_resource(
         self,
-        index_message: PBBrainResource,
         txn: Transaction,
-        uuid: str,
-        kbid: str,
-        seqid: int,
-        partition: str,
-        kb: KnowledgeBox,
-        source: nodewriter_pb2.IndexMessageSource.ValueType,
-    ) -> list[tuple[str, str]]:
-        validate_indexable_resource(index_message)
-        warnings = trim_entity_facets(index_message)
-        # TODO(Marklogic): implement indexing here
-        return warnings
+        to_index: dict[str, DocumentOps],
+    ):
+        # First off, field deletions
+        deletions = to_index.get("deletions")
+        if isinstance(deletions, DocumentDeletion):
+            await documents.delete_documents(txn, deletions)
+
+        to_write = []
+        to_update = []
+        if self._to_index:
+            if isinstance(self._to_index, Document):
+                to_write.append(self._to_index)
+            elif isinstance(self._to_index, DocumentUpdate):
+                to_update.append(self._to_index)
+
+        # Writes
+        to_write.extend(list(to_index.values()))
+        await documents.write_many(txn, to_write)
+
+        # Updates
+        await documents.update_document(txn, to_update)
+
 
     @processor_observer.wrap({"type": "generate_index_message"})
     async def generate_index_message(
@@ -499,13 +520,227 @@ class Processor:
     async def deadletter(self, message: writer_pb2.BrokerMessage, partition: str, seqid: int) -> None:
         await self.storage.deadletter(message, 0, seqid, partition)
 
-    @processor_observer.wrap({"type": "apply_resource"})
-    async def apply_resource(
+    def build_create_resource_doc(self, rid: str, message: writer_pb2.BrokerMessage) -> Document:
+
+        def processing_status_to_str(status: writer_pb2.Metadata.Status.ValueType) -> str:
+            """Convert processing status enum to string."""
+            return writer_pb2.Metadata.Status.Name(status)
+
+        def flatten_resource_facets(facets_dict: dict[str, set[str]]) -> list[str]:
+            flat_facets = []
+            for key, values in facets_dict.items():
+                for value in values:
+                    flat_facets.append(f"/{key}/{value}")
+            return flat_facets
+
+        doc = Document(
+            uri=datamanagers.resources._uri(rid),
+            collections=[MarkLogicCollections.RESOURCES],
+            content_type="application/json",
+        )
+        content = {}
+        facets: dict[str, set[str]] = defaultdict(set)
+        if message.HasField("basic"):
+            basic = message.basic
+            content["slug"] = basic.slug
+            content["basic"] = documents.to_json(basic)
+            content["processing_status"] = processing_status_to_str(basic.metadata.status)
+            if not basic.HasField("created"):
+                basic.created.GetCurrentTime()
+            content["created_at"] = basic.created.ToJsonString()
+            if not basic.HasField("modified"):
+                basic.modified.CopyFrom(basic.created)
+            content["modified_at"] = basic.modified.ToJsonString()
+
+            # Facets from basic
+            if basic.icon:
+                facets["n"].add(f"i/{basic.icon}")
+            if not basic.metadata.useful:
+                facets["n"].add(f"s/EMPTY")
+            else:
+                status_str = METADATA_STATUS_PB_TYPE_TO_NAME_MAP[basic.metadata.status]
+                facets["n"].add(f"s/{status_str}")
+            if basic.metadata.language:
+                facets["s"].add(f"p/{basic.metadata.language}")
+            for lang in basic.metadata.languages:
+                facets["s"].add(f"s/{lang}")
+            for classification in basic.usermetadata.classifications:
+                if not classification.cancelled_by_user:
+                    facets["l"].add(f"{classification.labelset}/{classification.label}")
+            if basic.hidden:
+                facets["q"] = "h"
+
+        if message.HasField("origin"):
+            origin = message.origin
+            content["origin"] = documents.to_json(origin)
+
+            # Origin creation times take precedence
+            if origin.HasField("created"):
+                content["created_at"] = origin.created.ToJsonString()
+            if origin.HasField("modified"):
+                content["modified_at"] = origin.modified.ToJsonString()
+
+            # Facets from origin
+            if origin.source_id:
+                facets["o"].add(origin.source_id)
+                facets["u"].add(f"s/{origin.source_id}")
+            for tag in origin.tags:
+                facets["t"].add(tag)
+            if origin.path:
+                facets["p"].add(origin.path.lstrip("/"))
+            for contrib in origin.colaborators:
+                facets["u"].add(f"o/{contrib}")
+            for key, value in origin.metadata.items():
+                facets["m"].add(f"{key[:255]}/{value[:255]}")
+
+            # TODO(Marklogic): origin relation triplets
+
+        if message.HasField("extra"):
+            content["extra"] = documents.to_json(message.extra)
+        if message.HasField("security"):
+            content["security"] = documents.to_json(message.security)
+
+        flat_facets = flatten_resource_facets(facets)
+        content["facets"] = flat_facets
+
+        # TODO(Marklogic): user relation triplets
+        doc.content = content
+        return doc
+
+
+    def build_update_resource_doc(self, rid: str, message: writer_pb2.BrokerMessage) -> Document:
+
+        def processing_status_to_str(status: writer_pb2.Metadata.Status.ValueType) -> str:
+            """Convert processing status enum to string."""
+            return writer_pb2.Metadata.Status.Name(status)
+
+        def flatten_resource_facets(facets_dict: dict[str, set[str]]) -> list[str]:
+            flat_facets = []
+            for key, values in facets_dict.items():
+                for value in values:
+                    flat_facets.append(f"/{key}/{value}")
+            return flat_facets
+
+        doc = DocumentUpdate(
+            uri=datamanagers.resources._uri(rid),
+            collection=MarkLogicCollections.RESOURCES,
+            upsert=False,
+        )
+        content = {}
+        facets: dict[str, set[str]] = defaultdict(set)
+        if message.HasField("basic"):
+            basic = message.basic
+            content["slug"] = basic.slug
+            content["basic"] = documents.to_json(basic)
+            content["processing_status"] = processing_status_to_str(basic.metadata.status)
+            if not basic.HasField("created"):
+                basic.created.GetCurrentTime()
+            content["created_at"] = basic.created.ToJsonString()
+            if not basic.HasField("modified"):
+                basic.modified.CopyFrom(basic.created)
+            content["modified_at"] = basic.modified.ToJsonString()
+
+            # Facets from basic
+            if basic.icon:
+                facets["n"].add(f"i/{basic.icon}")
+            if not basic.metadata.useful:
+                facets["n"].add(f"s/EMPTY")
+            else:
+                status_str = METADATA_STATUS_PB_TYPE_TO_NAME_MAP[basic.metadata.status]
+                facets["n"].add(f"s/{status_str}")
+            if basic.metadata.language:
+                facets["s"].add(f"p/{basic.metadata.language}")
+            for lang in basic.metadata.languages:
+                facets["s"].add(f"s/{lang}")
+            for classification in basic.usermetadata.classifications:
+                if not classification.cancelled_by_user:
+                    facets["l"].add(f"{classification.labelset}/{classification.label}")
+            if basic.hidden:
+                facets["q"] = "h"
+
+        if message.HasField("origin"):
+            origin = message.origin
+            content["origin"] = documents.to_json(origin)
+
+        else:
+            origin = await self
+
+            # Origin creation times take precedence
+            if origin.HasField("created"):
+                content["created_at"] = origin.created.ToJsonString()
+            if origin.HasField("modified"):
+                content["modified_at"] = origin.modified.ToJsonString()
+
+            # Facets from origin
+            if origin.source_id:
+                facets["o"].add(origin.source_id)
+                facets["u"].add(f"s/{origin.source_id}")
+            for tag in origin.tags:
+                facets["t"].add(tag)
+            if origin.path:
+                facets["p"].add(origin.path.lstrip("/"))
+            for contrib in origin.colaborators:
+                facets["u"].add(f"o/{contrib}")
+            for key, value in origin.metadata.items():
+                facets["m"].add(f"{key[:255]}/{value[:255]}")
+
+            # TODO(Marklogic): origin relation triplets
+
+        if message.HasField("extra"):
+            content["extra"] = documents.to_json(message.extra)
+        if message.HasField("security"):
+            content["security"] = documents.to_json(message.security)
+
+        # TODO(Marklogic): Upon updates, all facets need to be recalculated.
+        # So we need to fetch these anyway from marklogic
+
+        flat_facets = flatten_resource_facets(facets)
+        content["facets"] = flat_facets
+
+        # TODO(Marklogic): user relation triplets
+        doc.content = content
+        return doc
+
+    @processor_observer.wrap({"type": "create_resource"})
+    async def create_resource(
+        self,
+        kbid: str,
+        rid: str,
+        message: writer_pb2.BrokerMessage,
+    ) -> Resource:
+        if not message.HasField("basic") or not message.basic.slug:
+            # Make sure that the slug is always set!
+            message.basic.slug = rid
+
+        # Create Marklogic document
+        self._to_index.append(
+            self.build_create_resource_doc(rid, message)
+        )
+        resource = Resource(
+            storage=self.storage,
+            txn=self.txn,
+            kbid=kbid,
+            uuid=rid,
+            basic=message.basic,
+            disable_vectors=False,
+        )
+        await resource.set_data(
+            slug=message.basic.slug,
+            basic=message.basic,
+            origin=message.origin if message.HasField("origin") else None,
+            extra=message.extra if message.HasField("extra") else None,
+            security=message.security if message.HasField("security") else None,
+        )
+        if message.HasField("user_relations"):
+            await resource.set_user_relations(message.user_relations)
+        return resource
+
+    @processor_observer.wrap({"type": "update_resource"})
+    async def update_resource(
         self,
         message: writer_pb2.BrokerMessage,
         resource: Resource,
-        new_resource: bool,
-    ):
+    ) -> Resource:
         """
         Apply all resource-level metadata from the broker message: basic (including
         all mutations derived from extracted data), origin, extra, security and
@@ -519,7 +754,7 @@ class Processor:
         resource._previous_status = current_basic.metadata.status
 
         # Merge explicit basic payload for updates
-        if not new_resource and (message.HasField("basic") or len(message.delete_fields) > 0):
+        if message.HasField("basic") or len(message.delete_fields) > 0:
             current_basic = _merge_basic(current_basic, message.basic, list(message.delete_fields))
 
         # Apply all basic mutations derived from extracted data
@@ -530,7 +765,13 @@ class Processor:
         # computed resource status into basic before persisting.
         await compute_resource_status(resource.txn, resource.kbid, resource.uuid, current_basic)
 
+        # Create Marklogic document
+        self._to_index.append(
+            self.build_update_resource_doc(resource.uuid, message)
+        )
+
         await resource.set_data(
+            slug=current_basic.slug if current_basic != previous_basic else None,
             basic=current_basic if current_basic != previous_basic else None,
             origin=message.origin if message.HasField("origin") else None,
             extra=message.extra if message.HasField("extra") else None,
@@ -545,15 +786,16 @@ class Processor:
         self,
         message: writer_pb2.BrokerMessage,
         resource: Resource,
-    ):
+    ) -> dict[str, DocumentOps]:
         """
         Apply field content and extracted data from the broker message.
         """
         with processor_observer({"type": "apply_field_values"}):
-            await resource.apply_field_values(message)
+            to_index = await resource.apply_field_values(message)
 
-        with processor_observer({"type": "apply_field_extracted_data"}):
-            await resource.apply_field_extracted_data(message)
+        with processor_observer({"type": "store_field_extracted_data"}):
+            await resource.store_field_extracted_data(message)
+        return to_index
 
     async def get_extended_audit_data(self, message: writer_pb2.BrokerMessage) -> writer_pb2.Audit:
         message_audit = writer_pb2.Audit()

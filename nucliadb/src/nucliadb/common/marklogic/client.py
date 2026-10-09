@@ -317,7 +317,8 @@ class RowManager:
         dsl: str,
         tx: Transaction | None = None,
         params: dict[str, Any] | None = None,
-    ) -> None:
+    ) -> list[dict[str, Any]]:
+        """Return the rows produced by the plan, e.g. one per document written."""
         response = await self._http.post(
             "/v1/rows/update",
             content=dsl.encode("utf-8"),
@@ -328,6 +329,12 @@ class RowManager:
             },
         )
         _check(response, "update rows")
+        if _has_no_content(response):
+            return []
+        try:
+            return response.json().get("rows", [])
+        except (ValueError, AttributeError) as error:
+            raise MarkLogicProtocolError("Invalid rows update response") from error
 
 
 class Client:

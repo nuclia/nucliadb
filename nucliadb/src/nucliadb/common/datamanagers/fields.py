@@ -13,6 +13,8 @@ from nucliadb.common.datamanagers.utils import UNSET, observer
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
+from nucliadb.common.marklogic.document_deletion import DocumentDeletion
+from nucliadb.common.marklogic.document_update import DocumentUpdate
 from nucliadb.common.models_utils import from_proto, to_proto
 from nucliadb_protos import resources_pb2 as rpb2
 from nucliadb_protos import writer_pb2 as wpb2
@@ -22,6 +24,8 @@ FieldColumn: TypeAlias = Literal["value", "status", "md5"]
 UNSET_VALUE: Final[Message | None] = cast(Message | None, UNSET)
 UNSET_STATUS: Final[wpb2.FieldStatus | None] = cast(wpb2.FieldStatus | None, UNSET)
 UNSET_MD5: Final[str | None] = cast(str | None, UNSET)
+# Collections of the documents stored under a field directory (field, conversation pages, ...).
+FIELD_COLLECTIONS: Final = (MarkLogicCollections.FIELDS, MarkLogicCollections.CONVERSATIONS)
 
 
 @dataclass(slots=True)
@@ -31,22 +35,25 @@ class FieldData:
     md5: str | None = UNSET_MD5
 
 
+def directory(rid: str, field_type: str, field_id: str) -> str:
+    """Directory holding every document owned by a field."""
+    return f"/resources/{rid}/fields/{field_type}/{quote(field_id, safe='')}/"
+
+
 def _uri(rid: str, field_type: str, field_id: str) -> str:
-    return f"/resources/{rid}/fields/{field_type}/{quote(field_id, safe='')}.json"
+    return f"{directory(rid, field_type, field_id)}field.json"
 
 
 async def _update(
     txn: Transaction, kbid: str, rid: str, field_type: str, field_id: str, **values: Any
 ) -> None:
     documents.require_kb_scope(txn, kbid)
-    uri = _uri(rid, field_type, field_id)
-    content = await documents.read(txn, uri) or {
-        "rid": rid,
-        "field_type": field_type,
-        "field_id": field_id,
-    }
-    content.update(values)
-    await documents.write(txn, uri, MarkLogicCollections.FIELDS, content)
+    update = DocumentUpdate(
+        uri=_uri(rid, field_type, field_id),
+        collection=MarkLogicCollections.FIELDS,
+        defaults={"rid": rid, "field_type": field_type, "field_id": field_id},
+    )
+    await documents.update_document(txn, update.set(**values))
 
 
 @observer.wrap({"type": "field", "op": "set_status"})
@@ -66,11 +73,9 @@ async def set(
 @observer.wrap({"type": "field", "op": "delete"})
 async def delete(txn: Transaction, *, kbid: str, rid: str, field_type: str, field_id: str) -> None:
     documents.require_kb_scope(txn, kbid)
-    if field_type == "c":
-        from nucliadb.common.datamanagers import conversations
-
-        await conversations.delete_pages(txn, kbid=kbid, rid=rid, field_id=field_id)
-    await documents.delete(txn, _uri(rid, field_type, field_id))
+    await documents.delete_documents(
+        txn, DocumentDeletion().directory(directory(rid, field_type, field_id), FIELD_COLLECTIONS)
+    )
 
 
 async def _get(
@@ -165,12 +170,12 @@ def field_from_uri(uri: str) -> tuple[str, str]:
     """
     Convert from a field URI to a tuple of (field_type, field_id).
 
-    >>> uri = "/resources/rid/fields/a/title.json"
+    >>> uri = "/resources/rid/fields/a/title/field.json"
     >>> field_from_uri(uri)
     ('a', 'title')
     """
-    field_type, encoded_field_id = uri.rsplit("/", 2)[-2:]
-    field_id = unquote(encoded_field_id.removesuffix(".json"))
+    field_type, encoded_field_id = uri.rsplit("/", 3)[-3:-1]
+    field_id = unquote(encoded_field_id)
     return field_type, field_id
 
 

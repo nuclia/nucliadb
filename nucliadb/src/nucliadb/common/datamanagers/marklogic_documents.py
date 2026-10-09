@@ -1,19 +1,18 @@
 """Transaction-scoped MarkLogic document operations for datamanagers."""
 
-import json
 from typing import Any, TypeVar
 
 from google.protobuf.json_format import MessageToDict, ParseDict
 from google.protobuf.message import Message
 
-from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
 from nucliadb.common.marklogic.client import Document
+from nucliadb.common.marklogic.document_deletion import DocumentDeletion
+from nucliadb.common.marklogic.document_update import DocumentUpdate
 from nucliadb.common.marklogic.exceptions import DatabaseDoesNotExist
 
 PB = TypeVar("PB", bound=Message)
-RESOURCE_CHILD_COLLECTIONS = (MarkLogicCollections.FIELDS, MarkLogicCollections.CONVERSATIONS)
 
 
 def to_json(message: Message) -> dict:
@@ -95,6 +94,21 @@ async def write(txn: Transaction, uri: str, collection: str, content: dict) -> N
     )
 
 
+async def write_many(
+    txn: Transaction,
+    documents_to_write: list[Document],
+) -> None:
+    driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
+    transaction = await marklogic_txn.sdk_transaction()
+    if transaction is None:
+        raise RuntimeError("Cannot write in read only transaction")
+    await driver.client.documents.write(
+        *documents_to_write,
+        tx=transaction,
+        params=await marklogic_txn.params(),
+    )
+
+
 async def delete(txn: Transaction, uri: str) -> None:
     driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
     try:
@@ -124,15 +138,25 @@ async def update_rows(txn: Transaction, dsl: str) -> None:
             raise
 
 
-async def delete_resource_children(txn: Transaction, rid: str) -> None:
-    """Remove the field and conversation documents belonging to a resource."""
-    dsl = (
-        "op.fromDocUris(cts.andQuery(["
-        f"cts.collectionQuery({json.dumps(RESOURCE_CHILD_COLLECTIONS)}), "
-        f"cts.directoryQuery({json.dumps(f'/resources/{rid}/')}, 'infinity')"
-        "])).remove()"
-    )
-    await update_rows(txn, dsl)
+async def update_document(txn: Transaction, update: DocumentUpdate) -> bool:
+    """Apply `update` in place; returns False if the document is missing and was not created."""
+    driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
+    if not update:
+        return True
+    rows = await driver.client.rows.update(dsl=update.to_optic(), params=await marklogic_txn.params())
+    if rows:
+        return True
+    if not update.upsert:
+        return False
+    await write(txn, update.uri, update.collection, update.new_document())
+    return True
+
+
+async def delete_documents(txn: Transaction, deletion: DocumentDeletion) -> None:
+    if not deletion:
+        driver_txn(txn, ensure_writes=True)
+        return
+    await update_rows(txn, deletion.to_optic())
 
 
 def require_kb_scope(txn: Transaction, kbid: str) -> None:
