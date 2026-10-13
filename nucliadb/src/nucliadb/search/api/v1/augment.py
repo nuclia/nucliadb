@@ -93,7 +93,6 @@ from nucliadb_utils.utilities import get_audit
     f"/{KB_PREFIX}/{{kbid}}/augment",
     status_code=200,
     description="Augment data on a Knowledge Box",
-    include_in_schema=False,
     tags=["Augment"],
 )
 @requires(NucliaDBRoles.READER)
