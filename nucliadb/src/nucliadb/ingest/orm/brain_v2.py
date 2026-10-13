@@ -56,8 +56,6 @@ from nucliadb_protos.resources_pb2 import (
 )
 from nucliadb_protos.utils_pb2 import Relation, RelationNode
 
-FilePagePositions = dict[int, tuple[int, int]]
-
 METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
     Metadata.Status.ERROR: ResourceProcessingStatus.ERROR.name,
     Metadata.Status.PROCESSED: ResourceProcessingStatus.PROCESSED.name,
@@ -65,6 +63,8 @@ METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
     Metadata.Status.BLOCKED: ResourceProcessingStatus.BLOCKED.name,
     Metadata.Status.EXPIRED: ResourceProcessingStatus.EXPIRED.name,
 }
+
+FilePagePositions = dict[int, tuple[int, int]]
 
 
 @dataclass

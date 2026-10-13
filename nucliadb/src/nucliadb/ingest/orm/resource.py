@@ -36,7 +36,6 @@ from nucliadb.ingest.fields.generic import VALID_GENERIC_FIELDS, Generic
 from nucliadb.ingest.fields.key_value import KeyValue
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.fields.text import Text
-from nucliadb.ingest.orm.brain_v2 import FilePagePositions
 from nucliadb_protos import utils_pb2, writer_pb2
 from nucliadb_protos.resources_pb2 import AllFieldIDs as PBAllFieldIDs
 from nucliadb_protos.resources_pb2 import Basic as PBBasic
@@ -744,13 +743,3 @@ class Resource:
         # We set a type-checker exception here rather than asserting
         # that transaction is set all through the code
         self.txn = None  # type: ignore[ty:invalid-assignment]
-
-
-async def get_file_page_positions(field: File) -> FilePagePositions:
-    positions: FilePagePositions = {}
-    file_extracted_data = await field.get_file_extracted_data()
-    if file_extracted_data is None:
-        return positions
-    for index, position in enumerate(file_extracted_data.file_pages_previews.positions):
-        positions[index] = (position.start, position.end)
-    return positions
