@@ -103,6 +103,26 @@ async def send_generated_fields_to_process(
         )
 
 
+async def send_generated_fields_to_process_v2(
+    kbid: str,
+    rid: str,
+    generated_fields: GeneratedFields,
+    bm: writer_pb2.BrokerMessage,
+):
+    partitioning = get_partitioning()
+    partition = partitioning.generate_partition(kbid, rid)
+
+    processing: ProcessingEngine = get_utility(Utility.PROCESSING)
+
+    payload = _generate_processing_payload_for_fields(kbid, rid, generated_fields, bm)
+    if payload is not None:
+        processing_info = await processing.send_to_process(payload, partition)
+        logger.info(
+            "Sent generated fields to process",
+            extra={"processing_info": processing_info},
+        )
+
+
 def _generate_processing_payload_for_fields(
     kbid: str,
     rid: str,
