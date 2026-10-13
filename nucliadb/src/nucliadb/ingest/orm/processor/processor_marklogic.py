@@ -3,12 +3,13 @@ import hashlib
 import json
 import logging
 from collections import defaultdict
-from typing import Any
+from typing import Any, Iterator
 from uuid import uuid4
 
 import aiohttp.client_exceptions
 import nats.errors
 import nats.js.errors
+from nidx_protos import noderesources_pb2 as brain
 from pydantic import BaseModel
 
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
@@ -18,6 +19,7 @@ from nucliadb.common.maindb.marklogic import (
     MarkLogicIndexPaths,
     MarkLogicTransaction,
 )
+from nucliadb.common.marklogic.client import Document
 from nucliadb.common.marklogic.document_deletion import DocumentDeletion
 from nucliadb.ingest.fields.conversation import PAGE_SIZE
 from nucliadb.ingest.orm.exceptions import (
@@ -25,6 +27,7 @@ from nucliadb.ingest.orm.exceptions import (
     InvalidBrokerMessage,
     SequenceOrderViolation,
 )
+from nucliadb.ingest.orm.index_message import IndexMessageBuilder
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.processor.auditing import collect_audit_fields
@@ -85,8 +88,9 @@ class ResourceCreateContent(BaseModel):
 
 
 class FieldContent(BaseModel):
-    id: str
-    type: str
+    resource_id: str
+    field_id: str
+    field_type: str
 
     # The actual protobuf content serialized to json
     value: dict[str, Any]
@@ -96,10 +100,39 @@ class FieldContent(BaseModel):
 
 
 class ConversationPageContent(BaseModel):
-    id: str
-    type: str
-    page: int
+    resource_id: str
+    field_id: str
+    conversation_page: int
     value: dict[str, Any]
+
+
+class ChunkEmbeddingContent(BaseModel):
+    resource_id: str
+    field_id: str
+    field_type: str
+    chunk_id: str
+    model_id: str
+    chunk_embedding_index: int
+    vector: list[float]
+    data: dict[str, Any]
+
+
+class ChunkContent(BaseModel):
+    resource_id: str
+    field_id: str
+    field_type: str
+    chunk_id: str
+    text: str
+    facets: list[str]
+    data: dict[str, Any]
+
+
+class FieldProcessedContent(BaseModel):
+    resource_id: str
+    field_id: str
+    field_type: str
+    extracted_text: str
+    facets: list[str]
 
 
 logger = logging.getLogger("ingest-processor")
@@ -455,11 +488,12 @@ class ProcessorMarkLogic:
 
             return documents.to_json(status)
 
-        # Marklogic
+        # Field values (orm)
         for field, text in message.texts.items():
             field_content = FieldContent(
-                id=field,
-                type="t",
+                resource_id=uuid,
+                field_id=field,
+                field_type="t",
                 value=documents.to_json(text),
                 md5=get_text_md5(text),
                 status=get_field_status(resources_pb2.FieldType.TEXT, field),
@@ -468,8 +502,9 @@ class ProcessorMarkLogic:
 
         for field, link in message.links.items():
             field_content = FieldContent(
-                id=field,
-                type="u",
+                resource_id=uuid,
+                field_id=field,
+                field_type="u",
                 value=documents.to_json(link),
                 md5=None,
                 status=get_field_status(resources_pb2.FieldType.LINK, field),
@@ -478,8 +513,9 @@ class ProcessorMarkLogic:
 
         for field, file in message.files.items():
             field_content = FieldContent(
-                id=field,
-                type="f",
+                resource_id=uuid,
+                field_id=field,
+                field_type="f",
                 value=documents.to_json(file),
                 md5=file.file.md5 or None,
                 status=get_field_status(resources_pb2.FieldType.FILE, field),
@@ -488,8 +524,9 @@ class ProcessorMarkLogic:
 
         for field, kv in message.key_value_fields.items():
             field_content = FieldContent(
-                id=field,
-                type="k",
+                resource_id=uuid,
+                field_id=field,
+                field_type="k",
                 value=documents.to_json(kv),
                 md5=None,
                 status=get_field_status(resources_pb2.FieldType.KEY_VALUE, field),
@@ -509,6 +546,86 @@ class ProcessorMarkLogic:
             disable_vectors=False,
         )
         await orm_resource.apply_field_extracted_data(message)
+
+    async def create_processed_data(
+        self,
+        txn: MarkLogicTransaction,
+        message: writer_pb2.BrokerMessage,
+        kbid: str,
+        uuid: str,
+    ) -> None:
+        orm_resource = Resource(
+            txn=txn,
+            storage=await get_storage(),
+            kbid=kbid,
+            uuid=uuid,
+            disable_vectors=False,
+        )
+        im = await self.generate_index_message(
+            resource=orm_resource,
+            message=message,
+            resource_created=True,
+        )
+        for field, chunks, embeddings in self.get_field_processed_contents(im, message):
+            await fields_processed_create(
+                txn=txn,
+                kbid=kbid,
+                field=field,
+                chunks=chunks,
+                embeddings=embeddings,
+                skip_field_texts=im.skip_texts,
+                skip_chunks=im.skip_paragraphs,
+            )
+
+    def get_field_processed_contents(
+        self,
+        im: brain.Resource,
+        message: writer_pb2.BrokerMessage,
+    ) -> Iterator[tuple[FieldProcessedContent, list[ChunkContent], list[ChunkEmbeddingContent]]]:
+        resource_id = im.resource.uuid
+        for fid, text_data in im.texts.items():
+            field_type, field_id = fid.split("/")
+            field_text = text_data.text
+            field = FieldProcessedContent(
+                resource_id=resource_id,
+                field_id=field_id,
+                field_type=field_type,
+                extracted_text=field_text,
+                facets=list(text_data.labels),
+            )
+            chunks = []
+            embeddings = []
+            field_paragraphs = im.paragraphs.get(fid) or brain.IndexParagraphs()
+            for paragraph_id, paragraph_data in field_paragraphs.paragraphs.items():
+                paragaph_text = field_text[paragraph_data.start : paragraph_data.end]
+                chunks.append(
+                    ChunkContent(
+                        resource_id=resource_id,
+                        field_id=field_id,
+                        field_type=field_type,
+                        chunk_id=paragraph_id,
+                        text=paragaph_text,
+                        facets=list(paragraph_data.labels),
+                        data=documents.to_json(paragraph_data.metadata),
+                    ),
+                )
+                for vectorset_id, embeddings_data in paragraph_data.vectorsets_sentences.items():
+                    for embedding_index, (embedding_key, embedding_data) in enumerate(
+                        embeddings_data.sentences.items()
+                    ):
+                        embeddings.append(
+                            ChunkEmbeddingContent(
+                                resource_id=resource_id,
+                                field_id=field_id,
+                                field_type=field_type,
+                                chunk_id=embedding_key,
+                                model_id=vectorset_id,
+                                chunk_embedding_index=embedding_index,
+                                vector=list(embedding_data.vector),
+                                data=documents.to_json(embedding_data.metadata),
+                            )
+                        )
+            yield field, chunks, embeddings
 
     async def create_conversation(
         self,
@@ -548,9 +665,9 @@ class ProcessorMarkLogic:
             for message in page_messages:
                 splits_metadata.metadata.get_or_create(message.ident).page = page_number
             page_content = ConversationPageContent(
-                id=field_id,
-                type="c",
-                page=page_number,
+                resource_id=uuid,
+                field_id=field_id,
+                conversation_page=page_number,
                 value=documents.to_json(resources_pb2.Conversation(messages=page_messages)),
             )
             await conversation_page_create(txn, kbid, uuid, page_content)
@@ -560,9 +677,9 @@ class ProcessorMarkLogic:
             kbid,
             uuid,
             ConversationPageContent(
-                id=field_id,
-                type="c",
-                page=0,
+                resource_id=uuid,
+                field_id=field_id,
+                conversation_page=0,
                 value=documents.to_json(splits_metadata),
             ),
         )
@@ -571,8 +688,9 @@ class ProcessorMarkLogic:
             kbid,
             uuid,
             FieldContent(
-                id=field_id,
-                type="c",
+                resource_id=uuid,
+                field_id=field_id,
+                field_type="c",
                 value=documents.to_json(metadata),
                 md5=None,
                 status=status,
@@ -595,6 +713,21 @@ class ProcessorMarkLogic:
         kbid: str,
         uuid: str,
     ) -> None: ...
+
+    @processor_observer.wrap({"type": "generate_index_message"})
+    async def generate_index_message(
+        self,
+        resource: Resource,
+        message: writer_pb2.BrokerMessage,
+        resource_created: bool,
+    ) -> brain.Resource:
+        builder = IndexMessageBuilder(resource)
+        if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
+            return await builder.for_writer_bm(message, resource_created)
+        elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+            return await builder.for_processor_bm(message)
+        else:  # pragma: no cover
+            raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
 
     @processor_observer.wrap({"type": "txn"})
     async def txn(
@@ -642,6 +775,7 @@ class ProcessorMarkLogic:
                 if resource is None:
                     await self.create_fields(txn, message, kbid, uuid)
                     await self.create_resource(txn, message, kbid, uuid)
+                    await self.create_processed_data(txn, message, kbid, uuid)
                 else:
                     await self.update_fields(txn, message, kbid, uuid)
                     await self.update_resource(txn, message, resource, kbid, uuid)
@@ -754,6 +888,33 @@ class MarkLogicURIs:
     def conversation_page(cls, rid: str, field_id: str, page: int) -> str:
         return f"{cls.conversation_directory(rid, field_id)}{page}.json"
 
+    @classmethod
+    def field_processed(
+        cls,
+        rid: str,
+        field_id: str,
+        field_type: str,
+    ) -> str:
+        return f"{cls.field_directory(rid, field_type, field_id)}processed.json"
+
+    @classmethod
+    def embedding(
+        cls,
+        rid: str,
+        field_id: str,
+        embedding_id: str,
+    ) -> str:
+        return f"{cls.field_directory(rid, 'e', field_id)}embeddings/{embedding_id}/data.json"
+
+    @classmethod
+    def chunk(
+        cls,
+        rid: str,
+        field_id: str,
+        chunk_id: str,
+    ) -> str:
+        return f"{cls.field_directory(rid, 'c', field_id)}chunks/{chunk_id}/data.json"
+
 
 async def kb_exists(
     driver: MarkLogicDriver,
@@ -829,7 +990,7 @@ async def conversation_page_create(
 ) -> None:
     await documents.write(
         txn,
-        uri=MarkLogicURIs.conversation_page(uuid, data.id, data.page),
+        uri=MarkLogicURIs.conversation_page(uuid, data.field_id, data.conversation_page),
         collection=MarkLogicCollections.CONVERSATIONS,
         content=data.model_dump(mode="json"),
     )
@@ -843,7 +1004,100 @@ async def fields_create(
 ) -> None:
     await documents.write(
         txn,
-        uri=MarkLogicURIs.field(uuid, data.type, data.id),
+        uri=MarkLogicURIs.field(data.resource_id, data.field_type, data.field_id),
         collection=MarkLogicCollections.FIELDS,
         content=data.model_dump(mode="json"),
     )
+
+
+async def fields_processed_create(
+    txn: MarkLogicTransaction,
+    kbid: str,
+    field: FieldProcessedContent,
+    chunks: list[ChunkContent],
+    embeddings: list[ChunkEmbeddingContent],
+    skip_field_texts: bool = False,
+    skip_chunks: bool = False,
+) -> None:
+    if not skip_field_texts:
+        await documents.write(
+            txn,
+            uri=MarkLogicURIs.field_processed(field.resource_id, field.field_id, field.field_type),
+            collection=MarkLogicCollections.FIELDS_PROCESSED,
+            content=field.model_dump(mode="json"),
+        )
+    if not skip_chunks and len(chunks) > 0:
+        await documents.write_many(
+            txn,
+            documents_to_write=[
+                Document(
+                    uri=MarkLogicURIs.chunk(chunk.resource_id, chunk.field_id, chunk.chunk_id),
+                    collections=[
+                        MarkLogicCollections.CHUNKS,
+                    ],
+                    content=chunk.model_dump(mode="json"),
+                    content_type="application/json",
+                )
+                for chunk in chunks
+            ],
+        )
+    if len(embeddings) > 0:
+        await documents.write_many(
+            txn,
+            documents_to_write=[
+                Document(
+                    uri=MarkLogicURIs.embedding(
+                        embedding.resource_id, embedding.field_id, embedding.chunk_id
+                    ),
+                    collections=[
+                        MarkLogicCollections.EMBEDDINGS,
+                    ],
+                    content=embedding.model_dump(mode="json"),
+                    content_type="application/json",
+                )
+                for embedding in embeddings
+            ],
+        )
+
+
+def get_bm_modified_fields(message: writer_pb2.BrokerMessage) -> list[writer_pb2.FieldID]:
+    modified = set()
+    # Added or modified fields need indexing
+    for link in message.links:
+        modified.add((link, writer_pb2.FieldType.LINK))
+    for file in message.files:
+        modified.add((file, writer_pb2.FieldType.FILE))
+    for conv in message.conversations:
+        modified.add((conv, writer_pb2.FieldType.CONVERSATION))
+    for text in message.texts:
+        modified.add((text, writer_pb2.FieldType.TEXT))
+    for kv in message.key_value_fields:
+        modified.add((kv, writer_pb2.FieldType.KEY_VALUE))
+    if message.HasField("basic"):
+        # Add title and summary only if they have changed
+        if message.basic.title != "":
+            modified.add(("title", writer_pb2.FieldType.GENERIC))
+        if message.basic.summary != "":
+            modified.add(("summary", writer_pb2.FieldType.GENERIC))
+
+    # Deleted splits also need reindexing of the field
+    for ds in message.delete_splits:
+        modified.add((ds.field.field, ds.field.field_type))
+
+    if message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+        # Messages with field metadata, extracted text or field vectors need indexing
+        for fm in message.field_metadata:
+            modified.add((fm.field.field, fm.field.field_type))
+        for et in message.extracted_text:
+            modified.add((et.field.field, et.field.field_type))
+        for fv in message.field_vectors:
+            modified.add((fv.field.field, fv.field.field_type))
+
+    if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
+        # Any field that has fieldmetadata annotations should be considered as modified
+        # and needs to be reindexed
+        if message.HasField("basic"):
+            for ufm in message.basic.fieldmetadata:
+                modified.add((ufm.field.field, ufm.field.field_type))
+
+    return [writer_pb2.FieldID(field=field, field_type=field_type) for field, field_type in modified]

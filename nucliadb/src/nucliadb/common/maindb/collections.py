@@ -6,6 +6,7 @@ class MarkLogicCollections(str, Enum):
     KNOWLEDGEBOXES = "knowledgeboxes"
     RESOURCES = "resources"
     FIELDS = "fields"
+    FIELDS_PROCESSED = "fields_processed"
     CONVERSATIONS = "conversations"
     CHUNKS = "chunks"
     EMBEDDINGS = "embeddings"
