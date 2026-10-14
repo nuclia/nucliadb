@@ -2,7 +2,6 @@ import asyncio
 import hashlib
 import json
 import logging
-from collections import defaultdict
 from typing import Any, Iterator, cast
 from uuid import uuid4
 
@@ -69,6 +68,7 @@ class ResourceContent(BaseModel):
     security: dict[str, Any]
 
     # Other metadata sections
+    title: str | None = None
     processing_status: str
     created_at: str
     modified_at: str
@@ -83,6 +83,7 @@ class ResourceCreateContent(BaseModel):
     extra: dict[str, Any] | None = None
     security: dict[str, Any] | None = None
 
+    title: str | None = None
     processing_status: str
     created_at: str
     modified_at: str
@@ -235,7 +236,7 @@ class ProcessorMarkLogic:
                 raise SequenceOrderViolation(last_seqid)
 
         if message.type == writer_pb2.BrokerMessage.MessageType.DELETE:
-            await self.resource_delete(message, seqid, partition, transaction_check)
+            await self.delete(message, seqid, partition, transaction_check)
         elif message.type == writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT:
             await self.txn(message, seqid, partition, transaction_check)
         else:  # pragma: no cover
@@ -244,8 +245,8 @@ class ProcessorMarkLogic:
                 extra={"seqid": seqid, "partition": partition},
             )
 
-    @processor_observer.wrap({"type": "resource_delete"})
-    async def resource_delete(
+    @processor_observer.wrap({"type": "delete"})
+    async def delete(
         self,
         message: writer_pb2.BrokerMessage,
         seqid: int,
@@ -253,32 +254,29 @@ class ProcessorMarkLogic:
         transaction_check: bool = True,
     ) -> None:
         try:
-            kbid, uuid = await self.ensure_kb_and_slug(message.kbid, message.uuid, message.slug)
+            kbid, uuid = await self.ensure_kb_and_resource(message.kbid, message.uuid, message.slug)
         except (KnowledgeBoxDoesNotExist, ResourceDoesNotExist):
             if transaction_check:
                 await self.set_last_seqid(partition, seqid)
             return None
 
         async with self.driver.transaction(read_only=False, kbid=kbid) as txn:
+            logger.info("Deleting resource", extra={"kbid": kbid, "rid": uuid})
             try:
-                logger.info("Deleting resource", extra={"kbid": kbid, "rid": uuid})
-                try:
-                    await resource_delete(txn, kbid, uuid)
-                except Exception as exc:
-                    await txn.abort()
-                    await self.notify_abort(
-                        partition=partition,
-                        seqid=seqid,
-                        kbid=kbid,
-                        rid=uuid,
-                        source=message.source,
-                    )
-                    raise exc
-            finally:
-                if txn.open:
-                    await txn.commit()
-                    if transaction_check:
-                        await self.set_last_seqid(partition, seqid)
+                await resource_delete(txn, kbid, uuid)
+                await txn.commit()
+                if transaction_check:
+                    await self.set_last_seqid(partition, seqid)
+            except Exception as exc:
+                await txn.abort()
+                await self.notify_abort(
+                    partition=partition,
+                    seqid=seqid,
+                    kbid=kbid,
+                    rid=uuid,
+                    source=message.source,
+                )
+                raise exc
         await self.notify_commit(
             partition=partition,
             seqid=seqid,
@@ -291,7 +289,7 @@ class ProcessorMarkLogic:
             await sequence_manager.set_last_seqid(txn, partition, seqid)
             await txn.commit()
 
-    async def ensure_kb_and_slug(
+    async def ensure_kb_and_resource(
         self,
         kbid: str,
         uuid: str,
@@ -327,111 +325,44 @@ class ProcessorMarkLogic:
     async def create_resource(
         self,
         txn: MarkLogicTransaction,
-        message: writer_pb2.BrokerMessage,
+        broker_message: writer_pb2.BrokerMessage,
         kbid: str,
         uuid: str,
+        index_message: brain.Resource,
     ) -> None:
-        assert message.HasField("basic")
-        basic = message.basic
+        assert broker_message.HasField("basic")
+        basic = broker_message.basic
 
-        def get_dates(message: writer_pb2.BrokerMessage) -> tuple[str, str]:
-            """
-            Return the created_at and modified_at dates for the resource as a tuple of strings.
+        def get_title(index_message: brain.Resource, basic: writer_pb2.Basic) -> str:
+            title_field_id = "a/title"
+            if title_field_id in index_message.texts:
+                return index_message.texts[title_field_id].text
+            return basic.title or basic.slug
 
-            Origin takes precedence over basic for the dates. If dates are not set, set them to the current time.
-            """
-            created_at = ""
-            modified_at = ""
-
-            origin = message.origin if message.HasField("origin") else None
-            basic = message.basic if message.HasField("basic") else writer_pb2.Basic()
-
-            if origin and origin.HasField("created"):
-                created_at = origin.created.ToJsonString()
-            elif basic.HasField("created"):
-                created_at = basic.created.ToJsonString()
-            else:
-                basic.created.GetCurrentTime()
-                created_at = basic.created.ToJsonString()
-            if origin and origin.HasField("modified"):
-                modified_at = origin.modified.ToJsonString()
-            elif basic.HasField("modified"):
-                modified_at = basic.modified.ToJsonString()
-            else:
-                basic.modified.GetCurrentTime()
-                modified_at = basic.modified.ToJsonString()
-
-            return created_at, modified_at
-
-        def get_processing_status(basic: writer_pb2.Basic) -> str:
-            """Get the processing status of the resource as a string."""
-            return writer_pb2.Metadata.Status.Name(basic.metadata.status)
-
-        def get_facets(message: writer_pb2.BrokerMessage) -> list[str]:
-            facets: dict[str, set[str]] = defaultdict(set)
-
-            # Facets from basic
-            if message.HasField("basic"):
-                basic = message.basic
-                if basic.icon:
-                    facets["n"].add(f"i/{basic.icon}")
-                if not basic.metadata.useful:
-                    facets["n"].add(f"s/EMPTY")
-                else:
-                    status_str = METADATA_STATUS_PB_TYPE_TO_NAME_MAP[basic.metadata.status]
-                    facets["n"].add(f"s/{status_str}")
-                if basic.metadata.language:
-                    facets["s"].add(f"p/{basic.metadata.language}")
-                for lang in basic.metadata.languages:
-                    facets["s"].add(f"s/{lang}")
-                for classification in basic.usermetadata.classifications:
-                    if not classification.cancelled_by_user:
-                        facets["l"].add(f"{classification.labelset}/{classification.label}")
-                if basic.hidden:
-                    facets["q"].add("h")
-
-            # Facets from origin
-            if message.HasField("origin"):
-                origin = message.origin
-                if origin.source_id:
-                    facets["o"].add(origin.source_id)
-                    facets["u"].add(f"s/{origin.source_id}")
-                for tag in origin.tags:
-                    facets["t"].add(tag)
-                if origin.path:
-                    facets["p"].add(origin.path.lstrip("/"))
-                for contrib in origin.colaborators:
-                    facets["u"].add(f"o/{contrib}")
-                for key, value in origin.metadata.items():
-                    facets["m"].add(f"{key[:255]}/{value[:255]}")
-
-            # Flatten facets
-            flat_facets = []
-            for key, values in facets.items():
-                for value in values:
-                    flat_facets.append(f"/{key}/{value}")
-            return flat_facets
-
-        created_at, modified_at = get_dates(message)
         content = ResourceCreateContent(
             slug=basic.slug or uuid,
             basic=documents.to_json(basic),
-            origin=documents.to_json(message.origin) if message.HasField("origin") else None,
-            extra=documents.to_json(message.extra) if message.HasField("extra") else None,
-            security=documents.to_json(message.security) if message.HasField("security") else None,
-            created_at=created_at,
-            modified_at=modified_at,
-            processing_status=get_processing_status(basic),
-            facets=get_facets(message),
+            origin=documents.to_json(broker_message.origin)
+            if broker_message.HasField("origin")
+            else None,
+            extra=documents.to_json(broker_message.extra) if broker_message.HasField("extra") else None,
+            security=documents.to_json(broker_message.security)
+            if broker_message.HasField("security")
+            else None,
+            title=get_title(index_message, basic),
+            created_at=index_message.metadata.created.ToJsonString(),
+            modified_at=index_message.metadata.modified.ToJsonString(),
+            processing_status=brain.Resource.ResourceStatus.Name(index_message.status),
+            facets=list(index_message.labels),
         )
         # TODO(Marklogic): origin relation triplets
         # TODO(Marklogic): user relation triplets
         await resource_create(txn, kbid, uuid, content)
 
         # User relations are stored in the object store
-        if message.HasField("user_relations"):
+        if broker_message.HasField("user_relations"):
             orm_resource = await self.get_orm_resource(txn, kbid, uuid)
-            await orm_resource.set_user_relations(message.user_relations)
+            await orm_resource.set_user_relations(broker_message.user_relations)
 
     async def get_orm_resource(self, txn: MarkLogicTransaction, kbid: str, uuid: str) -> Resource:
         return Resource(
@@ -444,6 +375,7 @@ class ProcessorMarkLogic:
         message: writer_pb2.BrokerMessage,
         kbid: str,
         uuid: str,
+        index_message: brain.Resource,
     ) -> None:
         def get_text_md5(text: writer_pb2.FieldText) -> str | None:
             if text.md5:
@@ -500,7 +432,7 @@ class ProcessorMarkLogic:
 
             return documents.to_json(status)
 
-        # Field values (orm)
+        # Persist field values (ORM) in Marklogic
         for field, text in message.texts.items():
             field_content = FieldContent(
                 resource_id=uuid,
@@ -549,47 +481,27 @@ class ProcessorMarkLogic:
             status = get_field_status(resources_pb2.FieldType.CONVERSATION, field)
             await self.create_conversation(txn, kbid, uuid, field, conversation, status)
 
-        # Object storage
+        # Processed data that needs to be persisted in Marklogic for search purposes
+        for fpc, chunks, embeddings in self.get_field_processed_contents(index_message):
+            await fields_processed_create(
+                txn=txn,
+                field=fpc,
+                chunks=chunks,
+                embeddings=embeddings,
+                skip_field_texts=index_message.skip_texts,
+                skip_chunks=index_message.skip_paragraphs,
+            )
+
+        # Persist processed metadata in object storage
         orm_resource = await self.get_orm_resource(txn, kbid, uuid)
         await orm_resource.apply_field_extracted_data(message)
 
-    async def create_processed_data(
-        self,
-        txn: MarkLogicTransaction,
-        message: writer_pb2.BrokerMessage,
-        kbid: str,
-        uuid: str,
-    ) -> None:
-        orm_resource = Resource(
-            txn=txn,
-            storage=await get_storage(),
-            kbid=kbid,
-            uuid=uuid,
-            disable_vectors=False,
-        )
-        im = await self.generate_index_message(
-            resource=orm_resource,
-            message=message,
-            resource_created=True,
-        )
-        for field, chunks, embeddings in self.get_field_processed_contents(im, message):
-            await fields_processed_create(
-                txn=txn,
-                kbid=kbid,
-                field=field,
-                chunks=chunks,
-                embeddings=embeddings,
-                skip_field_texts=im.skip_texts,
-                skip_chunks=im.skip_paragraphs,
-            )
-
     def get_field_processed_contents(
         self,
-        im: brain.Resource,
-        message: writer_pb2.BrokerMessage,
+        index_message: brain.Resource,
     ) -> Iterator[tuple[FieldProcessedContent, list[ChunkContent], list[ChunkEmbeddingContent]]]:
-        resource_id = im.resource.uuid
-        for fid, text_data in im.texts.items():
+        resource_id = index_message.resource.uuid
+        for fid, text_data in index_message.texts.items():
             field_type, field_id = fid.split("/")
             field_text = text_data.text
             field = FieldProcessedContent(
@@ -601,7 +513,7 @@ class ProcessorMarkLogic:
             )
             chunks = []
             embeddings = []
-            field_paragraphs = im.paragraphs.get(fid) or brain.IndexParagraphs()
+            field_paragraphs = index_message.paragraphs.get(fid) or brain.IndexParagraphs()
             for paragraph_id, paragraph_data in field_paragraphs.paragraphs.items():
                 paragaph_text = field_text[paragraph_data.start : paragraph_data.end]
                 chunks.append(
@@ -721,11 +633,20 @@ class ProcessorMarkLogic:
     @processor_observer.wrap({"type": "generate_index_message"})
     async def generate_index_message(
         self,
-        resource: Resource,
+        txn: MarkLogicTransaction,
+        resource: ResourceContent | None,
+        uuid: str,
         message: writer_pb2.BrokerMessage,
-        resource_created: bool,
     ) -> brain.Resource:
-        builder = IndexMessageBuilderV2(resource)
+        resource_created = resource is None
+        orm_resource = Resource(
+            txn=txn,
+            storage=await get_storage(),
+            kbid=message.kbid,
+            uuid=uuid,
+            disable_vectors=False,
+        )
+        builder = IndexMessageBuilderV2(orm_resource)
         if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
             return await builder.for_writer_bm(message, resource_created)
         elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
@@ -742,7 +663,7 @@ class ProcessorMarkLogic:
         transaction_check: bool = True,
     ) -> None:
         try:
-            kbid, uuid = await self.ensure_kb_and_slug(
+            kbid, uuid = await self.ensure_kb_and_resource(
                 kbid=message.kbid,
                 uuid=message.uuid,
                 slug=message.slug,
@@ -776,10 +697,10 @@ class ProcessorMarkLogic:
                     # Handle data augmentation fields for existing resources
                     await self.handle_data_augmentation_fields(message, kbid, uuid)
 
+                im = await self.generate_index_message(txn, resource, uuid, message)
                 if resource is None:
-                    await self.create_fields(txn, message, kbid, uuid)
-                    await self.create_resource(txn, message, kbid, uuid)
-                    await self.create_processed_data(txn, message, kbid, uuid)
+                    await self.create_resource(txn, message, kbid, uuid, im)
+                    await self.create_fields(txn, message, kbid, uuid, im)
                 else:
                     await self.update_fields(txn, message, kbid, uuid)
                     await self.update_resource(txn, message, resource, kbid, uuid)
@@ -1051,7 +972,6 @@ async def fields_get(
 
 async def fields_processed_create(
     txn: MarkLogicTransaction,
-    kbid: str,
     field: FieldProcessedContent,
     chunks: list[ChunkContent],
     embeddings: list[ChunkEmbeddingContent],
