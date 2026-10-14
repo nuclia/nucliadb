@@ -18,31 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import psycopg_pool
-import pytest
 
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.pg import PGDriver
 
 
-async def test_pg_driver(pg_maindb_driver):
-    await driver_basic(pg_maindb_driver)
-
-
-async def test_pg_driver_pool_timeout(pg):
-    url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-    driver = PGDriver(url, connection_pool_min_size=1, connection_pool_max_size=1)
-    await driver.initialize()
-
-    # Get one connection and hold it
-    async with driver.rw_transaction():
-        # Try to get another connection, should fail because pool is full
-        with pytest.raises(psycopg_pool.PoolTimeout):
-            await driver.rw_transaction().__aenter__()
-
-    # Should now work
-    async with driver.rw_transaction():
-        pass
+async def test_marklogic_driver(marklogic_maindb_driver):
+    await driver_basic(marklogic_maindb_driver)
 
 
 async def _clear_db(driver: Driver):

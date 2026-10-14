@@ -11,7 +11,9 @@ import nats.js.errors
 from nidx_protos import noderesources_pb2 as brain
 from pydantic import BaseModel
 
+from nucliadb.common import datamanagers
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
+from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb.common.maindb.marklogic import (
     MarkLogicCollections,
@@ -19,7 +21,6 @@ from nucliadb.common.maindb.marklogic import (
     MarkLogicIndexPaths,
     MarkLogicTransaction,
 )
-from nucliadb.common.marklogic import documents
 from nucliadb.common.marklogic.client import Document
 from nucliadb.common.marklogic.document_deletion import DocumentDeletion
 from nucliadb.common.models_utils import from_proto
@@ -30,6 +31,7 @@ from nucliadb.ingest.orm.exceptions import (
     SequenceOrderViolation,
 )
 from nucliadb.ingest.orm.index_message import FieldData, IndexMessageBuilder, ResourceData
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
 from nucliadb.ingest.orm.processor.auditing import collect_audit_fields
@@ -37,10 +39,15 @@ from nucliadb.ingest.orm.processor.data_augmentation import (
     get_generated_fields,
     send_generated_fields_to_process_v2,
 )
+from nucliadb.ingest.orm.processor.marklogic import documents
 from nucliadb.ingest.orm.processor.processor import MESSAGE_TO_NOTIFICATION_SOURCE
-from nucliadb.ingest.orm.resource import MAX_FIELD_STATUS_ERRORS, Resource
+from nucliadb.ingest.orm.resource import (
+    MAX_FIELD_STATUS_ERRORS,
+    Resource,
+)
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import (
+    knowledgebox_pb2,
     resources_pb2,
     writer_pb2,
 )
@@ -153,6 +160,23 @@ class ProcessorMarkLogic:
         self.storage = storage
         self.partition = partition
         self.pubsub = pubsub
+
+    async def get_kb_obj(
+        self, txn: Transaction, kbid: knowledgebox_pb2.KnowledgeBoxID
+    ) -> KnowledgeBox | None:
+        uuid: str | None = kbid.uuid
+        if uuid == "":
+            uuid = await datamanagers.kb.get_kbid(txn, slug=kbid.slug)
+
+        if uuid is None:
+            return None
+
+        if not (await datamanagers.kb.exists(txn, kbid=uuid)):
+            return None
+
+        storage = await get_storage()
+        kbobj = KnowledgeBox(txn, storage, uuid)
+        return kbobj
 
     async def get_extended_audit_data(self, message: writer_pb2.BrokerMessage) -> writer_pb2.Audit:
         message_audit = writer_pb2.Audit()

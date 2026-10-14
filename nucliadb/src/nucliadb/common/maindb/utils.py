@@ -19,16 +19,10 @@
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import UnsetUtility
+from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.ingest.settings import DriverConfig, settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
-
-try:
-    from nucliadb.common.maindb.pg import PGDriver
-
-    PG = True
-except ImportError:  # pragma: no cover
-    PG = False
 
 
 def get_driver() -> Driver:
@@ -43,20 +37,16 @@ async def setup_driver() -> Driver:
     if driver is not None:
         return driver
 
-    if settings.driver == DriverConfig.PG:
-        if not PG:
-            raise ConfigurationError("`psycopg` python package not installed.")
-        if settings.driver_pg_url is None:
-            raise ConfigurationError("No DRIVER_PG_URL env var defined.")
-        pg_driver = PGDriver(
-            url=settings.driver_pg_url,
-            connection_pool_min_size=settings.driver_pg_connection_pool_min_size,
-            connection_pool_max_size=settings.driver_pg_connection_pool_max_size,
-            acquire_timeout_ms=settings.driver_pg_connection_pool_acquire_timeout_ms,
-            max_idle_seconds=settings.driver_pg_connection_pool_max_idle_seconds,
-            max_lifetime_seconds=settings.driver_pg_connection_pool_max_lifetime_seconds,
+    if settings.driver == DriverConfig.MARKLOGIC:
+        marklogic_driver = MarkLogicDriver(
+            uri=settings.driver_marklogic_uri,
+            username=settings.driver_marklogic_username,
+            password=settings.driver_marklogic_password,
+            database=settings.driver_marklogic_database,
+            port=settings.driver_marklogic_port,
+            admin_port=settings.driver_marklogic_admin_port,
         )
-        set_utility(Utility.MAINDB_DRIVER, pg_driver)
+        set_utility(Utility.MAINDB_DRIVER, marklogic_driver)
     else:
         raise ConfigurationError(f"Invalid DRIVER defined configured: {settings.driver}")
 

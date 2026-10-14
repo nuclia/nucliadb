@@ -25,6 +25,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from os.path import dirname, getsize
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -36,10 +37,11 @@ from grpc import aio
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
+from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.standalone.settings import Settings
@@ -131,6 +133,7 @@ async def ingest_grpc_server(
 
 @pytest.fixture(scope="function")
 def processor(maindb_driver: Driver, storage: Storage, pubsub: PubSubDriver) -> Iterable[Processor]:
+    maindb_driver = cast(MarkLogicDriver, maindb_driver)
     proc = Processor(maindb_driver, storage, pubsub, partition="1")
     yield proc
 

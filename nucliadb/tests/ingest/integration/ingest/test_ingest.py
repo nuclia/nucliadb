@@ -42,7 +42,7 @@ from nucliadb.ingest.consumer.auditing import (
 from nucliadb.ingest.consumer.consumer import IngestConsumer
 from nucliadb.ingest.orm.exceptions import DeadletteredError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.resources_pb2 import (

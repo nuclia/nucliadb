@@ -17,7 +17,7 @@ import inspect
 import logging
 from concurrent.futures.thread import ThreadPoolExecutor
 from enum import Enum
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_telemetry.metrics import Counter
@@ -40,14 +40,12 @@ from nucliadb_utils.settings import (
     storage_settings,
     transaction_settings,
 )
+from nucliadb_utils.storages.local import LocalStorage
+from nucliadb_utils.storages.nuclia import NucliaStorage
 from nucliadb_utils.storages.settings import settings as extended_storage_settings
+from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.store import MAIN
-
-if TYPE_CHECKING:  # pragma: no cover
-    from nucliadb_utils.storages.local import LocalStorage
-    from nucliadb_utils.storages.nuclia import NucliaStorage
-    from nucliadb_utils.storages.storage import Storage
-    from nucliadb_utils.transaction import TransactionUtility
+from nucliadb_utils.transaction import TransactionUtility
 
 logger = logging.getLogger(__name__)
 

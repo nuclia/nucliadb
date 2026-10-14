@@ -19,8 +19,7 @@ http:
     - http://localhost:4200
 
 maindb:
-  driver: pg
-  driver_pg_url:
+  driver: marklogic
 
 storage:
   file_backend: gcs

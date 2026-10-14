@@ -22,13 +22,11 @@ import logging
 from collections.abc import Callable
 from datetime import datetime, timezone
 from enum import Enum
-from typing import cast
 
 from pydantic import BaseModel
 
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.pg import PGDriver, PGTransaction
 
 logger = logging.getLogger(__name__)
 
@@ -170,66 +168,15 @@ async def purge_metadata(kv_driver: Driver) -> int:
     Purges old task metadata records that are in a final state and older than 15 days.
     Returns the total number of records purged.
     """
-    if not isinstance(kv_driver, PGDriver):
-        return 0
-
-    total_purged = 0
-    start: str | None = ""
-    while True:
-        start, purged = await purge_batch(kv_driver, start)
-        total_purged += purged
-        if start is None:
-            break
-    return total_purged
+    # TODO(Marklogic): Purge expired task metadata in final states.
+    return 0
 
 
 async def purge_batch(
-    kv_driver: PGDriver, start: str | None = None, batch_size: int = 200
+    kv_driver: Driver, start: str | None = None, batch_size: int = 200
 ) -> tuple[str | None, int]:
     """
     Returns the next start key and the number of purged records. If start is None, it means there are no more records to purge.
     """
-    async with kv_driver.rw_transaction() as txn:
-        txn = cast(PGTransaction, txn)
-        async with txn.connection.cursor() as cur:
-            await cur.execute(
-                """
-                SELECT key from resources
-                WHERE key ~ '^/kbs/[^/]*/tasks/[^/]*/[^/]*$'
-                AND key > %s
-                ORDER BY key
-                LIMIT %s
-                """,
-                (start, batch_size),
-            )
-            records = await cur.fetchall()
-            keys = [r[0] for r in records]
-
-    if not keys:
-        # No more records to purge
-        return None, 0
-
-    to_delete = []
-    for key in keys:
-        metadata = await _get_metadata(kv_driver, key)
-        if metadata is None:  # pragma: no cover
-            continue
-        task_finished = metadata.status in (TaskMetadata.Status.COMPLETED, TaskMetadata.Status.FAILED)
-        old_task = (
-            metadata.last_modified is None
-            or (datetime.now(timezone.utc) - metadata.last_modified).days >= 15
-        )
-        if task_finished and old_task:
-            to_delete.append(key)
-
-    n_to_delete = len(to_delete)
-    delete_batch_size = 50
-    while len(to_delete) > 0:
-        batch = to_delete[:delete_batch_size]
-        to_delete = to_delete[delete_batch_size:]
-        async with kv_driver.rw_transaction() as txn:
-            for key in batch:
-                logger.info("Purging task metadata", extra={"key": key})
-                await txn.delete(key)
-            await txn.commit()
-    return keys[-1], n_to_delete
+    # TODO(Marklogic): List and delete a batch of expired task metadata.
+    return None, 0

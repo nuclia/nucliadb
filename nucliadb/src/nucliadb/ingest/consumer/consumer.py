@@ -20,6 +20,7 @@
 import asyncio
 import logging
 import time
+from typing import cast
 
 import backoff
 import nats
@@ -31,9 +32,11 @@ from nats.js import JetStreamContext
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError
+from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.exceptions import DeadletteredError, SequenceOrderViolation
-from nucliadb.ingest.orm.processor import Processor, sequence_manager
+from nucliadb.ingest.orm.processor import sequence_manager
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from nucliadb_telemetry import context, errors, metrics
 from nucliadb_utils import const
@@ -76,7 +79,7 @@ class IngestConsumer:
         pubsub: PubSubDriver | None = None,
         lock: asyncio.Lock | asyncio.Semaphore | None = None,
     ):
-        self.driver = driver
+        self.driver = cast(MarkLogicDriver, driver)
         self.partition = partition
         self.nats_connection_manager = nats_connection_manager
         self.storage = storage

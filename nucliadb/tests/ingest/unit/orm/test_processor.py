@@ -24,8 +24,8 @@ from nidx_protos import noderesources_pb2
 
 from nucliadb.common.cluster.settings import settings as cluster_settings
 from nucliadb.ingest.orm.exceptions import ResourceNotIndexable
-from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.processor.processor import validate_indexable_resource
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 
 
 @pytest.fixture()
@@ -86,7 +86,7 @@ async def test_mark_resource_error_handle_error(processor: Processor, kb, resour
 
 
 async def test_mark_resource_error_skip_no_resource(processor: Processor, kb, driver, txn):
-    await processor._mark_resource_error(kb, None)
+    await processor._mark_resource_error(kb, "None")
     txn.commit.assert_not_called()
 
 

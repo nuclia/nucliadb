@@ -31,7 +31,7 @@ from pytest_mock import MockerFixture
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import (
     DummyProcessingEngine,
@@ -176,7 +176,7 @@ async def test_send_to_process_generated_fields(
         )
     )
 
-    index_resource_spy = mocker.spy(processor.index_node_shard_manager, "add_resource")
+    index_resource_spy = mocker.spy(processor, "generate_index_message")
     await processor.process(bm, 4)
 
     index_message: noderesources_pb2.Resource = index_resource_spy.call_args.args[1]
@@ -459,7 +459,7 @@ async def test_send_to_process_generated_conversation_field(
     facts_conv = bmb.field_builder(user_facts_field_id, FieldType.CONVERSATION)
     facts_conv.with_extracted_text("This is the extracted text of the fact", split="msg1")
     bm = bmb.build()
-    index_resource_spy = mocker.spy(processor.index_node_shard_manager, "add_resource")
+    index_resource_spy = mocker.spy(processor, "generate_index_message")
     await processor.process(bm, 4)
 
     index_message: noderesources_pb2.Resource = index_resource_spy.call_args.args[1]

@@ -40,7 +40,7 @@ from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 
 from nucliadb.common.catalog.dummy import DummyCatalog
 from nucliadb.common.catalog.interface import Catalog, CatalogQuery
-from nucliadb.common.catalog.pg import PGCatalog
+from nucliadb.common.catalog.marklogic import MarkLogicCatalog
 from nucliadb.common.catalog.utils import build_catalog_resource_data
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.resource import Resource
@@ -52,8 +52,8 @@ from nucliadb_utils.exceptions import ConfigurationError
 def get_catalog() -> Catalog:
     if settings.catalog == CatalogConfig.UNSET:
         return DummyCatalog()
-    elif settings.catalog == CatalogConfig.PG:
-        return PGCatalog()
+    elif settings.catalog == CatalogConfig.MARKLOGIC:
+        return MarkLogicCatalog()
     else:
         raise ConfigurationError(f"Unknown catalog configuration: {settings.catalog}")
 

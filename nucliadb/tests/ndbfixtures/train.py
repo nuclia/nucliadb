@@ -32,7 +32,7 @@ from httpx import AsyncClient
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.nidx import NidxUtility
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.standalone.settings import Settings
 from nucliadb.train.settings import settings as train_settings

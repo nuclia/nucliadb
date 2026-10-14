@@ -31,7 +31,7 @@ from nats.aio.msg import Msg
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.nidx import NidxBindingUtility, NidxServiceUtility
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb.ingest.settings import settings as ingest_settings
 from nucliadb.search.app import application
 from nucliadb.standalone.settings import Settings

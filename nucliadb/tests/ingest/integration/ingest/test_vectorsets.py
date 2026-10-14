@@ -26,7 +26,7 @@ from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.ingest import SERVICE_NAME
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import (
     knowledgebox_pb2,

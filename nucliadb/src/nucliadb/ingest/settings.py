@@ -24,7 +24,7 @@ from pydantic_settings import BaseSettings
 
 
 class DriverConfig(Enum):
-    PG = "pg"
+    MARKLOGIC = "marklogic"
     NOT_SET = "notset"  # setting not provided
 
     @classmethod
@@ -38,40 +38,12 @@ class DriverConfig(Enum):
 
 
 class DriverSettings(BaseSettings):
-    driver: DriverConfig = Field(default=DriverConfig.PG, description="K/V storage driver")
-    driver_pg_url: str | None = Field(
-        default=None,
-        description="PostgreSQL DSN. The connection string to the PG server. Example: postgres://username:password@postgres:5432/nucliadb.",
-    )
-    driver_pg_connection_pool_min_size: int = Field(
-        default=2,
-        description="PostgreSQL min pool size. The minimum number of connections to the PostgreSQL server.",
-    )
-    driver_pg_connection_pool_max_size: int = Field(
-        default=20,
-        description="PostgreSQL max pool size. The maximum number of connections to the PostgreSQL server.",
-    )
-    driver_pg_connection_pool_acquire_timeout_ms: int = Field(
-        default=1000,
-        description="PostgreSQL pool acquire timeout in ms. The maximum time to wait until a connection becomes available.",
-    )
-    driver_pg_connection_pool_max_idle_seconds: float | None = Field(
-        default=None,
-        description="PostgreSQL pool max idle time in seconds. Connections idle longer than this are closed.",
-    )
-    driver_pg_connection_pool_max_lifetime_seconds: float | None = Field(
-        default=None,
-        description="PostgreSQL pool max connection lifetime in seconds. Connections older than this are recycled.",
-    )
-    driver_pg_log_on_select_for_update: bool = Field(
-        default=False,
-        description="If true, log a warning when a SELECT FOR UPDATE is executed. This is useful to detect potential deadlocks.",
-    )
+    driver: DriverConfig = Field(default=DriverConfig.MARKLOGIC, description="K/V storage driver")
 
 
 class CatalogConfig(Enum):
     UNSET = "unset"
-    PG = "pg"
+    MARKLOGIC = "marklogic"
 
 
 # For use during migration from pull v1 to pull v2
@@ -83,7 +55,7 @@ class ProcessingPullMode(Enum):
 
 class Settings(DriverSettings):
     # Catalog settings
-    catalog: CatalogConfig = Field(default=CatalogConfig.PG, description="Catalog backend")
+    catalog: CatalogConfig = Field(default=CatalogConfig.MARKLOGIC, description="Catalog backend")
 
     # Pull worker settings
     pull_time_error_backoff: int = 30

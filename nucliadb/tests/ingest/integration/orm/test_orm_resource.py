@@ -27,7 +27,7 @@ from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata

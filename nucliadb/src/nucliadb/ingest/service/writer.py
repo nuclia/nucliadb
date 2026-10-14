@@ -17,21 +17,21 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import uuid
 from collections.abc import AsyncIterator
+from typing import cast
 
 from nucliadb.backups import tasks as backup_tasks
 from nucliadb.backups import utils as backup_utils
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
+from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.entities import EntitiesManager
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
-from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox as KnowledgeBoxORM
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb.ingest.orm.resource import Resource as ResourceORM
 from nucliadb.ingest.settings import settings
 from nucliadb_protos import backups_pb2, writer_pb2, writer_pb2_grpc
@@ -79,7 +79,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
-        self.driver = await setup_driver()
+        self.driver = cast(MarkLogicDriver, await setup_driver())
         self.proc = Processor(driver=self.driver, storage=self.storage, pubsub=await get_pubsub())
         self.shards_manager = get_shard_manager()
 
@@ -295,25 +295,26 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def ReIndex(self, request: IndexResource, context=None) -> IndexStatus:
         try:
+            # TODO(Marklogic)
             kbid = request.kbid
             rid = request.rid
             async with (
                 locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=rid)),
                 self.driver.rw_transaction() as txn,
             ):
-                kbobj = KnowledgeBoxORM(txn, self.storage, kbid)
+                _ = KnowledgeBoxORM(txn, self.storage, kbid)
                 resobj = ResourceORM(txn, self.storage, kbid, rid)
                 resobj.disable_vectors = not request.reindex_vectors
-                index_message = await get_resource_index_message(resobj, reindex=True)
-                shard = await self.proc.get_or_assign_resource_shard(txn, kbobj, rid)
-                await self.shards_manager.add_resource(
-                    shard,
-                    index_message,
-                    0,
-                    partition=self.partitions[0],
-                    kb=kbid,
-                    reindex_id=uuid.uuid4().hex,
-                )
+                # index_message = await get_resource_index_message(resobj, reindex=True)
+                # shard = await self.proc.get_or_assign_resource_shard(txn, kbobj, rid)
+                # await self.shards_manager.add_resource(
+                #     shard,
+                #     index_message,
+                #     0,
+                #     partition=self.partitions[0],
+                #     kb=kbid,
+                #     reindex_id=uuid.uuid4().hex,
+                # )
                 response = IndexStatus()
                 return response
         except Exception as e:
