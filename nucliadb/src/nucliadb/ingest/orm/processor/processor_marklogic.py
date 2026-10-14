@@ -19,6 +19,7 @@ from nucliadb.common.maindb.marklogic import (
     MarkLogicIndexPaths,
     MarkLogicTransaction,
 )
+from nucliadb.common.marklogic import documents
 from nucliadb.common.marklogic.client import Document
 from nucliadb.common.marklogic.document_deletion import DocumentDeletion
 from nucliadb.common.models_utils import from_proto
@@ -36,7 +37,6 @@ from nucliadb.ingest.orm.processor.data_augmentation import (
     get_generated_fields,
     send_generated_fields_to_process_v2,
 )
-from nucliadb.ingest.orm.processor.marklogic import documents
 from nucliadb.ingest.orm.processor.processor import MESSAGE_TO_NOTIFICATION_SOURCE
 from nucliadb.ingest.orm.resource import MAX_FIELD_STATUS_ERRORS, Resource
 from nucliadb_models.metadata import ResourceProcessingStatus

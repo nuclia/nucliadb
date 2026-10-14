@@ -71,6 +71,10 @@ class MarkLogicTransaction(Transaction):
     def database(self) -> str:
         return self._database
 
+    @property
+    def is_system_scope(self) -> bool:
+        return self.kbid is None
+
     async def sdk_transaction(self) -> SDKTransaction | None:
         async with self._transaction_lock:
             if not self.open:

@@ -29,9 +29,7 @@ from nidx_protos.noderesources_pb2 import Shard
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
 from nucliadb.common.counters import IndexCounts
-from nucliadb.common.external_index_providers.manager import get_external_index_manager
 from nucliadb.common.models_utils import from_proto
 from nucliadb.search import logger
 from nucliadb.search.api.v1.router import KB_PREFIX, api
@@ -115,20 +113,11 @@ async def _kb_counters(
         sentences=0,
         index_size=0,
     )
-    external_index_manager = await get_external_index_manager(kbid)
-    if external_index_manager is not None:
-        index_counts = await external_index_manager.get_index_counts()
-        counters.paragraphs = index_counts.paragraphs
-        counters.sentences = index_counts.sentences
-        # TODO: Find a way to query the fields count and size from the external index provider or use the catalog
-        counters.fields = counters.resources
-        counters.index_size = counters.paragraphs * AVG_PARAGRAPH_SIZE_BYTES
-    else:
-        node_index_counts, queried_shards = await get_node_index_counts(kbid)
-        counters.fields = node_index_counts.fields
-        counters.paragraphs = node_index_counts.paragraphs
-        counters.sentences = node_index_counts.sentences
-        counters.index_size = node_index_counts.size_bytes
+    node_index_counts, queried_shards = await get_node_index_counts(kbid)
+    counters.fields = node_index_counts.fields
+    counters.paragraphs = node_index_counts.paragraphs
+    counters.sentences = node_index_counts.sentences
+    counters.index_size = node_index_counts.size_bytes
     if debug and queried_shards is not None:
         counters.shards = queried_shards
     return counters

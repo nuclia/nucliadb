@@ -29,10 +29,6 @@ from nidx_protos.nodewriter_pb2 import (
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.datamanagers.rollover import RolloverState, RolloverStateNotFoundError
-from nucliadb.common.external_index_providers.base import ExternalIndexManager
-from nucliadb.common.external_index_providers.manager import (
-    get_external_index_manager,
-)
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.common.vector_index_config import nucliadb_index_config_to_nidx
@@ -63,48 +59,11 @@ class UnexpectedRolloverError(Exception):
 async def create_rollover_index(
     app_context: ApplicationContext,
     kbid: str,
-    external: ExternalIndexManager | None = None,
 ) -> None:
     """
-    Creates a new index for a knowledgebox in the index node cluster (and to the external index provider if configured).
-    For the external index case, we still need the shard on the index node cluster to be created because
-    it is used to store the rollover state during the rollover. However, the actual indexing will be done
-    by the external index provider.
+    Creates a new index for a knowledgebox in the index node cluster.
     """
     await create_rollover_shards(app_context, kbid)
-    if external is not None:
-        if external.supports_rollover:
-            await create_rollover_external_index(kbid, external)
-        else:
-            logger.info(
-                "External index provider does not support rollover",
-                extra={"kbid": kbid, "external_index_provider": external.type.value},
-            )
-
-
-async def create_rollover_external_index(kbid: str, external: ExternalIndexManager) -> None:
-    extra = {"kbid": kbid, "external_index_provider": external.type.value}
-    async with datamanagers.with_ro_transaction() as txn:
-        state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
-        if state.external_index_created:
-            logger.info("Rollover external index already created, skipping", extra=extra)
-            return
-
-    logger.info("Creating rollover external index", extra=extra)
-    async with datamanagers.with_ro_transaction() as txn:
-        stored_metadata = await datamanagers.kb.get_external_index_provider_metadata(txn, kbid=kbid)
-        if stored_metadata is None:
-            raise UnexpectedRolloverError("External index metadata not found")
-
-    rollover_metadata = await external.rollover_create_indexes(stored_metadata)
-
-    async with datamanagers.with_rw_transaction() as txn:
-        await datamanagers.rollover.update_kb_rollover_external_index_metadata(
-            txn, kbid=kbid, metadata=rollover_metadata
-        )
-        state.external_index_created = True
-        await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
-        await txn.commit()
 
 
 async def create_rollover_shards(
@@ -125,7 +84,6 @@ async def create_rollover_shards(
             # State is not set yet, create it
             state = RolloverState(
                 rollover_shards_created=False,
-                external_index_created=False,
                 resources_scheduled=False,
                 resources_indexed=False,
                 cutover_shards=False,
@@ -232,14 +190,13 @@ def _to_ts(dt: datetime) -> int:
 
 
 async def index_to_rollover_index(
-    app_context: ApplicationContext, kbid: str, external: ExternalIndexManager | None = None
+    app_context: ApplicationContext,
+    kbid: str,
 ) -> None:
     """
     Indexes all data in a kb in rollover indexes. This happens before the cutover.
     """
-    extra = {"kbid": kbid, "external_index_provider": None}
-    if external is not None:
-        extra["external_index_provider"] = external.type.value
+    extra = {"kbid": kbid}
     async with datamanagers.with_ro_transaction() as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         if not all([state.rollover_shards_created, state.resources_scheduled]):
@@ -262,7 +219,7 @@ async def index_to_rollover_index(
             break
 
         batch = [
-            _index_resource_to_rollover_index(app_context, rollover_shards, kbid, rid, external)
+            _index_resource_to_rollover_index(app_context, rollover_shards, kbid, rid)
             for rid in resource_ids
         ]
         await asyncio.gather(*batch)
@@ -296,7 +253,6 @@ async def _index_resource_to_rollover_index(
     rollover_shards: writer_pb2.Shards,
     kbid: str,
     resource_id: str,
-    external: ExternalIndexManager | None = None,
 ) -> None:
     async with resource_index_semaphore:
         async with datamanagers.with_transaction() as txn:
@@ -329,12 +285,9 @@ async def _index_resource_to_rollover_index(
                 await txn.commit()
             return
 
-        if external is not None:
-            await external.index_resource(resource_id, index_message, to_rollover_indexes=True)
-        else:
-            await index_resource_to_shard(
-                app_context, kbid, resource_id, shard, resource_index_message=index_message
-            )
+        await index_resource_to_shard(
+            app_context, kbid, resource_id, shard, resource_index_message=index_message
+        )
 
         async with datamanagers.with_transaction() as txn:
             await datamanagers.rollover.add_indexed(
@@ -348,59 +301,13 @@ async def _index_resource_to_rollover_index(
 
 
 async def cutover_index(
-    app_context: ApplicationContext, kbid: str, external: ExternalIndexManager | None = None
+    app_context: ApplicationContext,
+    kbid: str,
 ) -> None:
     """
     Swaps our the current active index for a knowledgebox.
     """
     await cutover_shards(app_context, kbid)
-    if external is not None:
-        if external.supports_rollover:
-            await cutover_external_index(kbid, external)
-        else:
-            logger.info(
-                "External index provider does not support rollover",
-                extra={"kbid": kbid, "external_index_provider": external.type.value},
-            )
-
-
-async def cutover_external_index(kbid: str, external: ExternalIndexManager) -> None:
-    """
-    Cuts over to the newly creted external index for a knowledgebox.
-    The old indexes are deleted.
-    """
-    extra = {"kbid": kbid, "external_index_provider": external.type.value}
-    logger.info("Cutting over external index", extra=extra)
-    async with datamanagers.with_rw_transaction() as txn:
-        state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
-        if not all(
-            [
-                state.rollover_shards_created,
-                state.resources_scheduled,
-                state.resources_indexed,
-            ]
-        ):
-            raise UnexpectedRolloverError(f"Preconditions not met for KB {kbid}")
-        if state.cutover_external_index:
-            logger.info("External index already cut over, skipping", extra=extra)
-            return
-
-        stored_metadata = await datamanagers.kb.get_external_index_provider_metadata(txn, kbid=kbid)
-        rollover_metadata = await datamanagers.rollover.get_kb_rollover_external_index_metadata(
-            txn, kbid=kbid
-        )
-        if stored_metadata is None or rollover_metadata is None:
-            raise UnexpectedRolloverError("stored or rollover external index metadata not found")
-
-        await external.rollover_cutover_indexes()
-
-        await datamanagers.kb.set_external_index_provider_metadata(
-            txn, kbid=kbid, metadata=rollover_metadata
-        )
-        await datamanagers.rollover.delete_kb_rollover_external_index_metadata(txn, kbid=kbid)
-        state.cutover_external_index = True
-        await datamanagers.rollover.set_rollover_state(txn, kbid=kbid, state=state)
-        await txn.commit()
 
 
 async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
@@ -453,7 +360,8 @@ async def cutover_shards(app_context: ApplicationContext, kbid: str) -> None:
 
 
 async def validate_indexed_data(
-    app_context: ApplicationContext, kbid: str, external: ExternalIndexManager | None = None
+    app_context: ApplicationContext,
+    kbid: str,
 ) -> list[str]:
     """
     Goes through all the resources in a knowledgebox and validates it
@@ -463,9 +371,7 @@ async def validate_indexed_data(
 
     If a resource was removed during the rollover, it will be removed as well.
     """
-    extra = {"kbid": kbid, "external_index_provider": None}
-    if external is not None:
-        extra["external_index_provider"] = external.type.value
+    extra = {"kbid": kbid}
     async with datamanagers.with_ro_transaction() as txn:
         state = await datamanagers.rollover.get_rollover_state(txn, kbid=kbid)
         if not all(
@@ -554,16 +460,10 @@ async def validate_indexed_data(
             continue
 
         # resource was modified or added during rollover, reindex
-        if external is not None:
-            await external.index_resource(
-                resource_id,
-                index_message,
-                to_rollover_indexes=True,
-            )
-        else:
-            await index_resource_to_shard(
-                app_context, kbid, resource_id, shard, resource_index_message=index_message
-            )
+        await index_resource_to_shard(
+            app_context, kbid, resource_id, shard, resource_index_message=index_message
+        )
+
         repaired_resources.append(resource_id)
         async with datamanagers.with_transaction() as txn:
             await datamanagers.rollover.add_indexed(
@@ -630,38 +530,34 @@ async def rollover_kb_index(
 ) -> None:
     """
     Rollover a KB index is the process of creating new shard replicas for every
-    shard and indexing all existing resources into the replicas. Also includes creating new external indexes if
-    the KB is configured to use them.
+    shard and indexing all existing resources into the replicas.
 
     Once all the data is in the new indexes, cut over to the replicated index delete the old one.
 
     This is a very expensive operation and should be done with care.
 
     Process:
-    - Create new index for kb index (index node shards or external indexes if configured)
+    - Create new index for kb index (index node shards)
     - Schedule all resources to be indexed
-    - Index all resources into new kb index (index node shards or external indexes if configured)
-    - Cut over replicas to new shards (and external indexes if configured)
+    - Index all resources into new kb index (index node shards)
+    - Cut over replicas to new shards
     - Validate that all resources are in the new kb index
     - Clean up indexed data
     """
-    extra = {"kbid": kbid, "external_index_provider": None}
-    external = await get_external_index_manager(kbid, for_rollover=True)
-    if external is not None:
-        extra["external_index_provider"] = external.type.value
+    extra = {"kbid": kbid}
     logger.info("Rolling over KB index", extra=extra)
 
     async with locking.distributed_lock(locking.KB_SHARDS_LOCK.format(kbid=kbid)):
-        await create_rollover_index(app_context, kbid, external=external)
+        await create_rollover_index(app_context, kbid)
         await schedule_resource_indexing(app_context, kbid)
-        await index_to_rollover_index(app_context, kbid, external=external)
-        await cutover_index(app_context, kbid, external=external)
+        await index_to_rollover_index(app_context, kbid)
+        await cutover_index(app_context, kbid)
         # we need to cut over BEFORE we validate the data
-        await validate_indexed_data(app_context, kbid, external=external)
+        await validate_indexed_data(app_context, kbid)
         await clean_indexed_data(app_context, kbid)
         await clean_rollover_status(app_context, kbid)
 
-    logger.info("Finished rolling over KB indes", extra=extra)
+    logger.info("Finished rolling over KB index", extra=extra)
 
 
 async def _rollover_kbid_command(kbid: str) -> None:  # pragma: no cover

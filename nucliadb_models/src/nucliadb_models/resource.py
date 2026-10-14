@@ -23,7 +23,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.conversation import Conversation, FieldConversation
-from nucliadb_models.external_index_providers import ExternalIndexProvider
 from nucliadb_models.extracted import (
     ExtractedText,
     FieldComputedMetadata,
@@ -98,18 +97,6 @@ class KnowledgeBoxConfig(BaseModel):
         default=None,
         title="Learning Configuration",
         description="Learning configuration for the Knowledge Box. If provided, NucliaDB will set the learning configuration for the Knowledge Box.",
-    )
-
-    external_index_provider: ExternalIndexProvider | None = Field(
-        default=None,
-        title="External Index Provider",
-        description="External index provider for the Knowledge Box.",
-    )
-
-    configured_external_index_provider: dict[str, Any] | None = Field(
-        default=None,
-        title="Configured External Index Provider",
-        description="Metadata for the configured external index provider (if any)",
     )
 
     similarity: VectorSimilarity | None = Field(
