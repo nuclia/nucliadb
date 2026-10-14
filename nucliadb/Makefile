@@ -25,8 +25,7 @@ format:
 lint:
 	ruff check --config=../ruff.toml .
 	ruff format --check --config=../ruff.toml .
-	# Add paths to the nidx stubs to allow linting without installing the binding
-	ty check . --extra-search-path ../nidx/nidx_binding/
+	ty check .
 	MYPYPATH=../nidx mypy --config-file=../mypy.ini .
 
 # pytest doesn't support test discovery across our multiple "top-level folders"

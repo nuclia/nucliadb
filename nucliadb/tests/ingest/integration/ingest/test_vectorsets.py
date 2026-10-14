@@ -36,10 +36,10 @@ from nucliadb_protos import (
 )
 from nucliadb_utils.utilities import get_storage
 from tests.ndbfixtures.ingest import make_extracted_text
+from tests.utils.indexing import build_index_message
 
 
 async def test_ingest_broker_message_with_vectorsets(
-    dummy_nidx_utility,
     storage,
     knowledgebox: str,
     processor: Processor,
@@ -107,7 +107,7 @@ async def test_ingest_broker_message_with_vectorsets(
     await processor.process(message=bm_processor, seqid=2)
 
     # Get the index message from the processor bm
-    index_message = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[-1][1][0])
+    index_message = await build_index_message(maindb_driver, storage, bm_processor)
     validate_index_message(index_message)
 
     # Generate a reindex to validate storage.
@@ -124,7 +124,7 @@ async def test_ingest_broker_message_with_vectorsets(
     bm.basic.modified.FromDatetime(datetime.now())
 
     await processor.process(message=bm, seqid=3)
-    index_message = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[-1][1][0])
+    index_message = await build_index_message(maindb_driver, storage, bm)
     assert len(index_message.texts) == 1
     assert index_message.skip_texts is False
     assert len(index_message.paragraphs) == 0

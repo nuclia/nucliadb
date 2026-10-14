@@ -29,7 +29,6 @@ from nidx_protos.noderesources_pb2 import Resource as PBBrainResource
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.catalog import catalog_delete, catalog_update
 from nucliadb.common.cluster.settings import settings as cluster_settings
-from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
@@ -157,7 +156,6 @@ class Processor:
         self.storage = storage
         self.partition = partition
         self.pubsub = pubsub
-        self.index_node_shard_manager = get_shard_manager()
 
     async def process(
         self,
@@ -220,33 +218,19 @@ class Processor:
             try:
                 logger.info("Deleting resource", extra={"kbid": kbid, "rid": uuid})
                 kb = KnowledgeBox(txn, self.storage, kbid)
-                shard_id = await datamanagers.resources.get_shard(txn, kbid=kbid, rid=uuid)
-                if shard_id is None:
-                    logger.warning(
-                        "Resource shard not found: Skipping delete", extra={"kbid": kbid, "rid": uuid}
+                await catalog_delete(txn, kbid, uuid)
+                try:
+                    await kb.delete_resource(uuid)
+                except Exception as exc:
+                    await txn.abort()
+                    await self.notify_abort(
+                        partition=partition,
+                        seqid=seqid,
+                        kbid=kbid,
+                        rid=uuid,
+                        source=message.source,
                     )
-                else:
-                    shard = await kb.get_resource_shard(shard_id)
-                    if shard is None:
-                        raise AttributeError("Shard not available")
-
-                    await catalog_delete(txn, kbid, uuid)
-
-                    await self.index_node_shard_manager.delete_resource(
-                        shard, uuid, seqid, partition, kbid
-                    )
-                    try:
-                        await kb.delete_resource(uuid)
-                    except Exception as exc:
-                        await txn.abort()
-                        await self.notify_abort(
-                            partition=partition,
-                            seqid=seqid,
-                            kbid=kbid,
-                            rid=uuid,
-                            source=message.source,
-                        )
-                        raise exc
+                    raise exc
             finally:
                 if txn.open:
                     if transaction_check:
@@ -476,31 +460,6 @@ class Processor:
 
             return None
 
-    async def get_or_assign_resource_shard(
-        self, txn: Transaction, kb: KnowledgeBox, uuid: str
-    ) -> writer_pb2.ShardObject:
-        kbid = kb.kbid
-        shard_id = await datamanagers.resources.get_shard(txn, kbid=kbid, rid=uuid, for_update=True)
-        shard = None
-        if shard_id is not None:
-            # Resource already has a shard assigned
-            shard = await kb.get_resource_shard(shard_id)
-            if shard is None:
-                raise AttributeError("Shard not available")
-        else:
-            # It's a new resource, get KB's current active shard to place new resource on
-            shard = await self.index_node_shard_manager.get_current_active_shard(txn, kbid)
-            if shard is None:
-                # No current shard available, create a new one
-                async with locking.distributed_lock(locking.NEW_SHARD_LOCK.format(kbid=kbid)):
-                    kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
-                    prewarm = kb_config is not None and kb_config.prewarm_enabled
-                    shard = await self.index_node_shard_manager.create_shard_by_kbid(
-                        txn, kbid, prewarm_enabled=prewarm
-                    )
-            await datamanagers.resources.set(txn, kbid=kbid, rid=uuid, shard=shard.shard)
-        return shard
-
     @processor_observer.wrap({"type": "index_resource"})
     async def index_resource(
         self,
@@ -516,15 +475,7 @@ class Processor:
         validate_indexable_resource(index_message)
         warnings = trim_entity_facets(index_message)
 
-        shard = await self.get_or_assign_resource_shard(txn, kb, uuid)
-        await self.index_node_shard_manager.add_resource(
-            shard,
-            index_message,
-            seqid,
-            partition=partition,
-            kb=kbid,
-            source=source,
-        )
+        # TODO(Marklogic): Persist the generated resource index data.
         return warnings
 
     @processor_observer.wrap({"type": "generate_index_message"})

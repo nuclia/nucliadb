@@ -23,13 +23,9 @@ from functools import partial
 from typing import Any
 from uuid import uuid4
 
-from nidx_protos import nidx_pb2, noderesources_pb2
-
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver, Transaction
-from nucliadb.common.maindb.pg import PGTransaction
-from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import (
     KnowledgeBoxConflict,
@@ -278,10 +274,10 @@ class KnowledgeBox:
             if hidden_resources_hide_on_creation is not None:
                 stored.hidden_resources_hide_on_creation = hidden_resources_hide_on_creation
 
-            update_nidx_prewarm = None
+            update_prewarm = None
             if prewarm_enabled is not None:
                 if stored.prewarm_enabled != prewarm_enabled:
-                    update_nidx_prewarm = prewarm_enabled
+                    update_prewarm = prewarm_enabled
                 stored.prewarm_enabled = prewarm_enabled
 
             if stored.hidden_resources_hide_on_creation and not stored.hidden_resources_enabled:
@@ -296,30 +292,15 @@ class KnowledgeBox:
 
             await txn.commit()
 
-        if update_nidx_prewarm is not None:
-            await cls.configure_shards(driver, kbid, prewarm=update_nidx_prewarm)
+        if update_prewarm is not None:
+            await cls.configure_shards(driver, kbid, prewarm=update_prewarm)
 
         return kbid
 
     @classmethod
     async def configure_shards(cls, driver: Driver, kbid: str, *, prewarm: bool):
-        shards_obj = await datamanagers.atomic.kb.get_shards(kbid=kbid)
-        if shards_obj is None:
-            logger.warning(f"Shards not found for KB while updating pre-warm flag", extra={"kbid": kbid})
-            return
-
-        nidx_shard_ids = [shard.nidx_shard_id for shard in shards_obj.shards]
-
-        nidx_api = get_nidx_api_client()
-        if nidx_api is not None and len(nidx_shard_ids) > 0:
-            configs = [
-                nidx_pb2.ShardConfig(
-                    shard_id=shard_id,
-                    prewarm_enabled=prewarm,
-                )
-                for shard_id in nidx_shard_ids
-            ]
-            await nidx_api.ConfigureShards(nidx_pb2.ShardsConfig(configs=configs))
+        # TODO(Marklogic): Configure backend shard prewarming.
+        return None
 
     @classmethod
     async def mark_for_purge(cls, txn: Transaction, kbid: str):
@@ -346,7 +327,7 @@ class KnowledgeBox:
         In the current transaction, the KB is marked for and we only delete:
         - The KB config
         - The KB slug
-        - Mark shards to be deleted from nidx
+        - Mark backend shards for deletion
         - Mark the KB for purge, which will eventually delete all KB keys in Postgresql and objects in storage.
         """
 
@@ -367,13 +348,9 @@ class KnowledgeBox:
         if shards_obj is None:
             logger.warning(f"Shards not found for KB while deleting it", extra={"kbid": kbid})
         else:
-            nidx_api = get_nidx_api_client()
-            # Delete shards from nidx. They'll be marked for eventual deletion,
-            # so this call shouldn't be costly
-            if nidx_api is not None:
-                for shard in shards_obj.shards:
-                    if shard.nidx_shard_id:
-                        await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
+            shard_manager = get_shard_manager()
+            for shard in shards_obj.shards:
+                await shard_manager.delete_index_shard(shard)
 
         audit = get_audit()
         if audit is not None:
@@ -417,17 +394,6 @@ class KnowledgeBox:
         prefix = KB_KEYS.format(kbid=kbid)
         await txn.delete_by_prefix(prefix)
         await datamanagers.kb.delete(txn, kbid=kbid)
-
-    async def get_resource_shard(self, shard_id: str) -> writer_pb2.ShardObject | None:
-        async with datamanagers.with_ro_transaction() as txn:
-            pb = await datamanagers.kb.get_shards(txn, kbid=self.kbid)
-            if pb is None:
-                logger.warning("Shards not found for kbid", extra={"kbid": self.kbid})
-                return None
-        for shard in pb.shards:
-            if shard.shard == shard_id:
-                return shard
-        return None
 
     async def get(self, uuid: str) -> Resource | None:
         return await Resource.get(self.txn, self.kbid, uuid)
@@ -544,7 +510,4 @@ def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:
 
 @processor_observer.wrap({"type": "catalog_delete_kb"})
 async def catalog_delete_kb(txn: Transaction, kbid: str):
-    if not isinstance(txn, PGTransaction):
-        return
-    async with txn.connection.cursor() as cur:
-        await cur.execute("DELETE FROM catalog where kbid = %(kbid)s", {"kbid": kbid})
+    return

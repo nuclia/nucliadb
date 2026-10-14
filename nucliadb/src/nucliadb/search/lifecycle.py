@@ -24,7 +24,6 @@ from fastapi import FastAPI
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context.fastapi import inject_app_context
 from nucliadb.common.maindb.utils import setup_driver
-from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.ingest.utils import start_ingest, stop_ingest
 from nucliadb.search import SERVICE_NAME
 from nucliadb.search.predict import start_predict_engine, stop_predict_engine
@@ -48,7 +47,7 @@ async def lifespan(app: FastAPI):
 
     await setup_driver()
     await setup_cluster()
-    await start_nidx_utility(SERVICE_NAME)
+    # TODO(Marklogic): Initialize the indexing backend when available.
 
     await start_audit_utility(SERVICE_NAME)
 
@@ -60,7 +59,7 @@ async def lifespan(app: FastAPI):
         clean_utility(Utility.PARTITION)
 
     await stop_predict_engine()
-    await stop_nidx_utility()
+    # TODO(Marklogic): Finalize the indexing backend when available.
 
     await finalize_utilities()
     await stop_audit_utility()

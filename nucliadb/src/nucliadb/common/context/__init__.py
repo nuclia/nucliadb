@@ -24,7 +24,6 @@ from nucliadb.common.cluster.settings import in_standalone_mode
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
-from nucliadb.common.nidx import NidxUtility, start_nidx_utility, stop_nidx_utility
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.partition import PartitionUtility
 from nucliadb_utils.settings import indexing_settings
@@ -52,7 +51,6 @@ class ApplicationContext:
         partitioning: bool = True,
         nats_manager: bool = True,
         transaction: bool = True,
-        nidx: bool = True,
     ) -> None:
         self.service_name = service_name
         self._initialized: bool = False
@@ -63,14 +61,12 @@ class ApplicationContext:
         self._partitioning: PartitionUtility | None = None
         self._nats_manager: NatsConnectionManager | None = None
         self._transaction: TransactionUtility | None = None
-        self._nidx: NidxUtility | None = None
         self.enabled_kv_driver = kv_driver
         self.enabled_blob_storage = blob_storage
         self.enabled_shard_manager = shard_manager
         self.enabled_partitioning = partitioning
         self.enabled_nats_manager = nats_manager
         self.enabled_transaction = transaction
-        self.enabled_nidx = nidx
 
     async def initialize(self) -> None:
         if self._initialized:
@@ -98,8 +94,6 @@ class ApplicationContext:
             )
         if self.enabled_transaction:
             self._transaction = await start_transaction_utility(self.service_name)
-        if self.enabled_nidx:
-            self._nidx = await start_nidx_utility(self.service_name)
 
     @property
     def kv_driver(self) -> Driver:
@@ -131,16 +125,9 @@ class ApplicationContext:
         assert self._transaction is not None, "Transaction utility not initialized"
         return self._transaction
 
-    @property
-    def nidx(self) -> NidxUtility:
-        assert self._nidx is not None, "Nidx utility not initialized"
-        return self._nidx
-
     async def finalize(self) -> None:
         if not self._initialized:
             return
-        if self.enabled_nidx:
-            await stop_nidx_utility()
         if self.enabled_transaction:
             await stop_transaction_utility()
         if not in_standalone_mode() and self.enabled_nats_manager:

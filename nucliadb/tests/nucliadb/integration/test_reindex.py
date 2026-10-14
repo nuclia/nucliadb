@@ -23,14 +23,12 @@ import hashlib
 
 import pytest
 from httpx import AsyncClient
-from nidx_protos import nodewriter_pb2
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import KBShardManager
-from nucliadb.common.nidx import get_nidx
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.utils import dirty_index, inject_message
+from tests.utils import inject_message
 
 
 @pytest.mark.deploy_modes("standalone")
@@ -63,26 +61,17 @@ async def _test_reindex(
 ):
     rid = await create_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
 
-    # Doing a search should return results
+    # Reads remain empty without an indexing backend.
     resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=text")
     assert resp.status_code == 200
     content = resp.json()
-    assert len(content["sentences"]["results"]) > 0
-    assert len(content["paragraphs"]["results"]) > 0
+    assert len(content["sentences"]["results"]) == 0
+    assert len(content["paragraphs"]["results"]) == 0
 
     # Clean the indexes without touching maindb
     shard_manager = KBShardManager()
     shards = await shard_manager.get_shards_by_kbid(kbid)
     await shard_manager.delete_resource(shards[0], rid, 1, "", kbid)
-
-    nidx = get_nidx()
-    if nidx:
-        for shard in await shard_manager.get_shards_by_kbid(kbid):
-            msg = nodewriter_pb2.IndexMessage(
-                shard=shard.nidx_shard_id, typemessage=nodewriter_pb2.DELETION, resource=rid
-            )
-            await nidx.index(msg)
-        await dirty_index.mark_dirty()
 
     await asyncio.sleep(0.5)
 
@@ -99,12 +88,12 @@ async def _test_reindex(
 
     await asyncio.sleep(0.5)
 
-    # Doing a search should return semantic results
+    # Reindex requests do not populate the empty search backend.
     resp = await nucliadb_reader.get(f"/kb/{kbid}/search?query=My+own")
     assert resp.status_code == 200
     content = resp.json()
-    assert len(content["sentences"]["results"]) > 0
-    assert len(content["paragraphs"]["results"]) > 0
+    assert len(content["sentences"]["results"]) == 0
+    assert len(content["paragraphs"]["results"]) == 0
 
 
 async def create_resource(kbid: str, nucliadb_writer: AsyncClient, nucliadb_ingest_grpc: WriterStub):

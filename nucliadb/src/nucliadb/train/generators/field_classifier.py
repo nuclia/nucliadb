@@ -23,9 +23,9 @@ from collections.abc import AsyncGenerator
 from nidx_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+from nucliadb.train.index import stream_documents
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
     FieldClassificationBatch,
@@ -59,7 +59,7 @@ async def generate_field_classification_payloads(
     request.filter.labels.append(labelset)
     total = 0
 
-    async for document_item in get_nidx_searcher_client().Documents(request):
+    async for document_item in stream_documents(request):
         text_labels = []
         for label in document_item.labels:
             if label.startswith(labelset):

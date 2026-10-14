@@ -837,7 +837,7 @@ async def test_search_user_relations(
 
     from nucliadb.search.search import retrieval
 
-    spy = mocker.spy(retrieval, "nidx_query")
+    spy = mocker.spy(retrieval, "query_index")
     with patch.object(predict_mock, "detect_entities", AsyncMock(return_value=[])):
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",

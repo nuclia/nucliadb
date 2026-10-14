@@ -24,7 +24,6 @@ Rollover to update to nidx_texts v4
 
 """
 
-from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.migrator.context import ExecutionContext
 
 
@@ -32,4 +31,5 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    await rollover_kb_index(context, kbid)
+    # Index rollover is no longer needed by the MarkLogic backend.
+    return None

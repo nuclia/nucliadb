@@ -65,6 +65,32 @@ async def read(txn: MarkLogicTransaction, uri: str) -> dict | None:
     return dict(content)
 
 
+async def read_many(txn: MarkLogicTransaction, uris: list[str]) -> dict[str, dict]:
+    """Read multiple JSON documents and return the found contents keyed by URI."""
+    if not uris:
+        return {}
+    driver, marklogic_txn = driver_txn(txn)
+    try:
+        result = await driver.client.documents.read(
+            uris,
+            tx=await marklogic_txn.sdk_transaction(),
+            params=await marklogic_txn.params(),
+        )
+    except DatabaseDoesNotExist:
+        if marklogic_txn.database == driver.system_database:
+            raise
+        return {}
+
+    contents: dict[str, dict] = {}
+    for document in result:
+        if not isinstance(document, Document):
+            raise RuntimeError("Invalid document response while reading multiple documents")
+        if not isinstance(document.content, dict):
+            raise RuntimeError(f"Invalid document content: {document.uri}")
+        contents[document.uri] = dict(document.content)
+    return contents
+
+
 async def exists(txn: MarkLogicTransaction, uri: str) -> bool:
     driver, marklogic_txn = driver_txn(txn)
     try:

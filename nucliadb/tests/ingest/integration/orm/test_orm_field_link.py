@@ -29,7 +29,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_field_link(
-    storage: Storage, cache, dummy_nidx_utility, knowledgebox: str, maindb_driver: Driver
+    storage: Storage, cache, knowledgebox: str, maindb_driver: Driver
 ):
     async with maindb_driver.rw_transaction() as txn:
         uuid = str(uuid4())

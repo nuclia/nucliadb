@@ -24,15 +24,10 @@ import uuid
 from functools import partial
 from typing import Any
 
-from grpc import StatusCode
-from grpc.aio import AioRpcError
-from nidx_protos import nodereader_pb2, noderesources_pb2
-
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
-from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb_protos import audit_pb2, writer_pb2
 from nucliadb_utils import const
 from nucliadb_utils.audit.audit import AuditStorage
@@ -120,21 +115,10 @@ class IndexAuditHandler:
         total_paragraphs = 0
 
         for shard_obj in shard_groups:
-            try:
-                shard: nodereader_pb2.Shard = await get_nidx_api_client().GetShard(
-                    nodereader_pb2.GetShardRequest(
-                        shard_id=noderesources_pb2.ShardId(id=shard_obj.nidx_shard_id)
-                    )
-                )
-            except AioRpcError as exc:  # pragma: no cover
-                if exc.code() == StatusCode.NOT_FOUND:
-                    # KB and its shards may have been deleted
-                    logger.warning(
-                        f"Shard not found in nidx",
-                        extra={"kbid": kbid, "nidx_shard_id": shard_obj.nidx_shard_id},
-                    )
-                    continue
-                raise
+            shard = await self.shard_manager.get_index_shard(shard_obj)
+            if shard is None:
+                # TODO(Marklogic): Report storage once backend statistics are available.
+                return
 
             total_fields += shard.fields
             total_paragraphs += shard.paragraphs

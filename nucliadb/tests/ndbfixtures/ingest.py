@@ -151,7 +151,6 @@ async def ingest_consumers(
     maindb_driver: Driver,
     transaction_utility: TransactionUtility,
     storage: Storage,
-    dummy_nidx_utility,
     nats_manager: NatsConnectionManager,
     nats_ingest_stream,
 ):
@@ -168,7 +167,6 @@ async def ingest_processed_consumer(
     maindb_driver: Driver,
     transaction_utility: TransactionUtility,
     storage: Storage,
-    dummy_nidx_utility,
     nats_manager: NatsConnectionManager,
     nats_ingest_processed_stream,
 ):

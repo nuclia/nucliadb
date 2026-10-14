@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 NEW_SHARD_LOCK = "new-shard-{kbid}"
 RESOURCE_LOCK = "resource-{kbid}-{resource_id}"
 RESOURCE_CREATION_SLUG_LOCK = "resource-creation-{kbid}-{resource_slug}"
-KB_SHARDS_LOCK = "shards-kb-{kbid}"
 MIGRATIONS_LOCK = "migration"
 KB_MIGRATIONS_LOCK = "migration-{kbid}"
 
@@ -110,8 +109,6 @@ def _get_lock_type(key: str) -> str:
         return RESOURCE_CREATION_SLUG_LOCK
     elif key.startswith("resource-"):
         return RESOURCE_LOCK
-    elif key.startswith("shards-kb-"):
-        return KB_SHARDS_LOCK
     elif key.startswith("migration-"):
         return KB_MIGRATIONS_LOCK
     elif key == "migration":

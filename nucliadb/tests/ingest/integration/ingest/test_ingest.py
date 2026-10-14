@@ -106,14 +106,13 @@ def kbid(
     txn,
     cache,
     shard_manager,
-    dummy_nidx_utility,
     processor,
     knowledgebox,
 ):
     yield knowledgebox
 
 
-async def test_ingest_messages_autocommit(kbid: str, processor, dummy_nidx_utility):
+async def test_ingest_messages_autocommit(kbid: str, processor):
     rid = Resource.new_unique_rid()
     message1: BrokerMessage = BrokerMessage(
         kbid=kbid,
@@ -207,7 +206,9 @@ async def test_ingest_messages_autocommit(kbid: str, processor, dummy_nidx_utili
 
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
+    from tests.utils.indexing import build_index_message
+
+    pb = await build_index_message(processor.driver, storage, message1, resource_created=True)
     assert pb.texts["a/summary"].text == "My summary"
 
 
@@ -257,7 +258,6 @@ async def test_ingest_messages_origin(
     local_files,
     storage: Storage,
     shard_manager,
-    dummy_nidx_utility,
     processor,
     knowledgebox,
 ):
@@ -358,7 +358,6 @@ async def test_ingest_audit_stream_files_only(
     storage: Storage,
     txn,
     cache,
-    dummy_nidx_utility,
     knowledgebox,
     processor,
     stream_audit: StreamAuditStorage,
@@ -488,7 +487,6 @@ async def test_qa(
     local_files,
     storage: Storage,
     cache,
-    dummy_nidx_utility,
     shard_manager,
     processor,
     stream_audit: StreamAuditStorage,
@@ -544,7 +542,6 @@ async def test_ingest_audit_stream_mixed(
     storage: Storage,
     cache,
     shard_manager,
-    dummy_nidx_utility,
     processor,
     stream_audit: StreamAuditStorage,
     test_resource: Resource,
@@ -611,7 +608,6 @@ async def test_ingest_account_seq_stored(
     local_files,
     storage: Storage,
     shard_manager,
-    dummy_nidx_utility,
     processor,
     test_resource: Resource,
 ):
@@ -638,7 +634,6 @@ async def test_ingest_account_seq_stored(
 async def test_ingest_processor_handles_missing_kb(
     local_files,
     storage: Storage,
-    dummy_nidx_utility,
     processor,
     test_resource: Resource,
 ):
@@ -725,7 +720,6 @@ async def test_ingest_delete_field(
     storage: Storage,
     txn,
     cache,
-    dummy_nidx_utility,
     knowledgebox,
     processor,
     stream_audit: StreamAuditStorage,
@@ -779,7 +773,6 @@ async def test_ingest_update_labels(
     storage: Storage,
     txn,
     cache,
-    dummy_nidx_utility,
     knowledgebox,
     processor,
     stream_audit: StreamAuditStorage,

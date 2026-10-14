@@ -20,11 +20,8 @@
 from collections.abc import AsyncIterator, Callable
 
 from fastapi import HTTPException
-from grpc import StatusCode
-from grpc.aio import AioRpcError
 
 from nucliadb.common.cache import resource_cache
-from nucliadb.train import logger
 from nucliadb.train.generators.field_classifier import (
     field_classification_batch_generator,
 )
@@ -95,16 +92,7 @@ async def generate_train_data(
     # This cache size is an arbitrary number, once we have a metric in place and
     # we analyze memory consumption, we can adjust it with more knoweldge
     with resource_cache(size=settings.resource_cache_size):
-        try:
-            async for item in batch_generator(kbid, trainset, shard_replica_id, filter_expression):
-                payload = item.SerializeToString()
-                yield len(payload).to_bytes(4, byteorder="big", signed=False)
-                yield payload
-        except AioRpcError as exc:
-            if exc.code() == StatusCode.NOT_FOUND:
-                logger.warning(
-                    f"Shard not found in nidx. Halting the stream",
-                    extra={"kbid": kbid, "shard": shard, "shard_replica_id": shard_replica_id},
-                )
-                return
-            raise
+        async for item in batch_generator(kbid, trainset, shard_replica_id, filter_expression):
+            payload = item.SerializeToString()
+            yield len(payload).to_bytes(4, byteorder="big", signed=False)
+            yield payload

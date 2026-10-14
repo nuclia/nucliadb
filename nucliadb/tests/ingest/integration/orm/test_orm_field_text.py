@@ -27,9 +27,7 @@ from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_utils.storages.storage import Storage
 
 
-async def test_create_resource_orm_field_text(
-    storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
-):
+async def test_create_resource_orm_field_text(storage, txn: Transaction, cache, knowledgebox: str):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
@@ -45,7 +43,7 @@ async def test_create_resource_orm_field_text(
 
 
 async def test_create_resource_orm_field_text_file(
-    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn: Transaction, cache, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)

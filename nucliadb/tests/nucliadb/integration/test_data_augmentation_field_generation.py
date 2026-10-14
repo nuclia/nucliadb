@@ -92,7 +92,6 @@ def partition_utility() -> Iterable[PartitionUtility]:
 
 
 async def test_send_to_process_generated_fields(
-    dummy_nidx_utility,
     knowledgebox: str,
     processor: Processor,
     partition_utility: PartitionUtility,
@@ -355,7 +354,6 @@ async def test_data_augmentation_field_generation_and_search(
 
 
 async def test_send_to_process_generated_conversation_field(
-    dummy_nidx_utility,
     knowledgebox: str,
     processor: Processor,
     partition_utility: PartitionUtility,

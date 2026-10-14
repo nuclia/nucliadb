@@ -27,7 +27,7 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import writer_pb2
 
 
-async def test_shard_creation(dummy_nidx_utility, txn: Transaction):
+async def test_shard_creation(txn: Transaction):
     """Given a cluster of index nodes, validate shard creation logic.
 
     Every logic shard should create a configured amount of indexing replicas and

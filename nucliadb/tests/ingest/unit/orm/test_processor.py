@@ -57,7 +57,6 @@ def resource():
 def kb():
     mock = MagicMock(kbid="kbid")
     mock.get_shard = AsyncMock()
-    mock.get_resource_shard = AsyncMock()
     yield mock
 
 

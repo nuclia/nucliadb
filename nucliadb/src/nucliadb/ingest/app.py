@@ -27,7 +27,6 @@ from nucliadb.common.back_pressure.materializer import start_materializer, stop_
 from nucliadb.common.back_pressure.utils import is_back_pressure_enabled
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context import ApplicationContext
-from nucliadb.common.nidx import start_nidx_utility
 from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consumer
 from nucliadb.ingest import SERVICE_NAME
 from nucliadb.ingest.consumer import service as consumer_service
@@ -63,8 +62,6 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
     await start_transaction_utility(SERVICE_NAME)
 
     start_partitioning_utility()
-
-    await start_nidx_utility(SERVICE_NAME)
 
     await start_audit_utility(SERVICE_NAME)
 

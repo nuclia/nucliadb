@@ -46,7 +46,6 @@ async def lifespan(app: FastAPI):
         service_name=SERVICE_NAME,
         # skip utilities we don't use
         nats_manager=False,
-        nidx=False,
         partitioning=False,
         shard_manager=False,
         transaction=False,

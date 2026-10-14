@@ -25,9 +25,9 @@ from typing import cast
 from nidx_protos.nodereader_pb2 import StreamFilter, StreamRequest
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+from nucliadb.train.index import stream_documents
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
     TokenClassificationBatch,
@@ -61,7 +61,7 @@ async def generate_token_classification_payloads(
     for entitygroup in trainset.filter.labels:
         request.filter.labels.append(f"/e/{entitygroup}")
         request.filter.conjunction = StreamFilter.Conjunction.OR
-    async for field_item in get_nidx_searcher_client().Documents(request):
+    async for field_item in stream_documents(request):
         _, field_type, field = field_item.field.split("/")
         (
             split_text,

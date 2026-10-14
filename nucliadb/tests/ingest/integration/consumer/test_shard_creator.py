@@ -22,10 +22,11 @@ import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from nidx_protos import nodereader_pb2
 
+from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.cluster.settings import settings
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import writer_pb2
@@ -38,14 +39,14 @@ async def test_shard_auto_create(
     maindb_driver: Driver,
     pubsub: PubSubDriver,
     storage: Storage,
-    dummy_nidx_utility: NidxUtility,
     knowledgebox: str,
 ):
     with (
         patch.object(settings, "max_shard_paragraphs", 1),
+        patch.object(
+            KBShardManager, "get_index_shard", AsyncMock(return_value=nodereader_pb2.Shard(paragraphs=2))
+        ),
     ):
-        dummy_nidx_utility.api_client.GetShard.return_value.paragraphs = 2
-
         sc = shard_creator.ShardCreatorHandler(
             driver=maindb_driver,
             pubsub=pubsub,
@@ -87,7 +88,6 @@ async def test_shard_creator_uses_kb_prewarm_configuration(
     maindb_driver: Driver,
     pubsub: PubSubDriver,
     storage: Storage,
-    dummy_nidx_utility: NidxUtility,
     knowledgebox: str,
     prewarm: bool,
 ):
@@ -103,6 +103,9 @@ async def test_shard_creator_uses_kb_prewarm_configuration(
 
     with (
         patch.object(shard_creator, "should_create_new_shard", return_value=True),
+        patch.object(
+            sc.shard_manager, "get_index_shard", AsyncMock(return_value=nodereader_pb2.Shard())
+        ),
         patch.object(sc.shard_manager, "create_shard_by_kbid") as create_shard_by_kbid,
     ):
         await sc.process_kb(kbid)

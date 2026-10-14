@@ -25,8 +25,6 @@ from httpx import AsyncClient
 from nidx_protos.nodewriter_pb2 import VectorType
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.rollover import rollover_kb_index
-from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.learning_proxy import (
     LearningConfiguration,
@@ -46,7 +44,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.utilities import get_storage
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import mark_dirty, wait_for_sync
+from tests.utils.dirty_index import wait_for_sync
 from tests.utils.vectorsets import add_vectorset
 
 MODULE = "nucliadb.writer.api.v1.vectorsets"
@@ -430,37 +428,6 @@ async def test_vectorset_migration(
     )
     await _check_search(nucliadb_reader, kbid, query="football", vector=title_vector)
 
-    # Do a rollover and test again
-
-    app_context = ApplicationContext()
-    await app_context.initialize()
-
-    await rollover_kb_index(app_context, kbid)
-
-    await mark_dirty()
-    await wait_for_sync()
-
-    # Make a search with the new vectorset and check that the document is found
-    await _check_search(
-        nucliadb_reader,
-        kbid,
-        vectorset="en-2024-05-06",
-        query="football",
-        vector=link_vector_migrated,
-    )
-
-    # With the default vectorset the document should also be found
-    await _check_search(
-        nucliadb_reader,
-        kbid,
-        vectorset="multilingual-2024-05-06",
-        query="football",
-        vector=link_vector,
-    )
-    await _check_search(nucliadb_reader, kbid, query="football", vector=link_vector)
-
-    await app_context.finalize()
-
 
 async def get_counters(nucliadb_reader: AsyncClient, kbid: str) -> KnowledgeboxCounters:
     # We call counters endpoint to get the sentences count only
@@ -724,33 +691,3 @@ async def test_vectorset_migration_split_field(
         vector=vector_for_split(1),
     )
     await _check_search(nucliadb_reader, kbid, query="Python", vector=vector_for_split(1))
-
-    # Do a rollover and test again
-    app_context = ApplicationContext()
-    await app_context.initialize()
-
-    await rollover_kb_index(app_context, kbid)
-
-    await mark_dirty()
-    await wait_for_sync()
-
-    # Make a search with the new vectorset and check that the document is found
-    await _check_search(
-        nucliadb_reader,
-        kbid,
-        vectorset=new_vectorset_id,
-        query="Python",
-        vector=vector_for_split(101),
-    )
-
-    # With the default vectorset the document should also be found
-    await _check_search(
-        nucliadb_reader,
-        kbid,
-        vectorset=old_vectorset_id,
-        query="Python",
-        vector=vector_for_split(1),
-    )
-    await _check_search(nucliadb_reader, kbid, query="Python", vector=vector_for_split(1))
-
-    await app_context.finalize()

@@ -1,6 +1,5 @@
 import asyncio
 import hashlib
-import json
 import logging
 from typing import Any, Iterator, cast
 from uuid import uuid4
@@ -9,20 +8,13 @@ import aiohttp.client_exceptions
 import nats.errors
 import nats.js.errors
 from nidx_protos import noderesources_pb2 as brain
-from pydantic import BaseModel
 
 from nucliadb.common import datamanagers
-from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
+from nucliadb.common.datamanagers.resources import ResourceContent, ResourceCreateContent
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
-from nucliadb.common.maindb.marklogic import (
-    MarkLogicCollections,
-    MarkLogicDriver,
-    MarkLogicIndexPaths,
-    MarkLogicTransaction,
-)
-from nucliadb.common.marklogic.client import Document
-from nucliadb.common.marklogic.document_deletion import DocumentDeletion
+from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
+from nucliadb.common.marklogic import documents
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.conversation import PAGE_SIZE
 from nucliadb.ingest.orm.exceptions import (
@@ -39,7 +31,6 @@ from nucliadb.ingest.orm.processor.data_augmentation import (
     get_generated_fields,
     send_generated_fields_to_process_v2,
 )
-from nucliadb.ingest.orm.processor.marklogic import documents
 from nucliadb.ingest.orm.processor.processor import MESSAGE_TO_NOTIFICATION_SOURCE
 from nucliadb.ingest.orm.resource import (
     MAX_FIELD_STATUS_ERRORS,
@@ -65,84 +56,11 @@ METADATA_STATUS_PB_TYPE_TO_NAME_MAP = {
 }
 
 
-class ResourceContent(BaseModel):
-    slug: str
-
-    # Main protobuf content sections
-    basic: dict[str, Any]
-    origin: dict[str, Any]
-    extra: dict[str, Any]
-    security: dict[str, Any]
-
-    # Other metadata sections
-    title: str | None = None
-    processing_status: str
-    created_at: str
-    modified_at: str
-    facets: list[str]
-
-
-class ResourceCreateContent(BaseModel):
-    slug: str
-
-    basic: dict[str, Any]
-    origin: dict[str, Any] | None = None
-    extra: dict[str, Any] | None = None
-    security: dict[str, Any] | None = None
-
-    title: str | None = None
-    processing_status: str
-    created_at: str
-    modified_at: str
-    facets: list[str] = []
-
-
-class FieldContent(BaseModel):
-    resource_id: str
-    field_id: str
-    field_type: str
-
-    # The actual protobuf content serialized to json
-    value: dict[str, Any]
-
-    md5: str | None = None
-    status: dict[str, Any] | None = None
-
-
-class ConversationPageContent(BaseModel):
-    resource_id: str
-    field_id: str
-    conversation_page: int
-    value: dict[str, Any]
-
-
-class ChunkEmbeddingContent(BaseModel):
-    resource_id: str
-    field_id: str
-    field_type: str
-    chunk_id: str
-    model_id: str
-    chunk_embedding_index: int
-    vector: list[float]
-    data: dict[str, Any]
-
-
-class ChunkContent(BaseModel):
-    resource_id: str
-    field_id: str
-    field_type: str
-    chunk_id: str
-    text: str
-    facets: list[str]
-    data: dict[str, Any]
-
-
-class FieldProcessedContent(BaseModel):
-    resource_id: str
-    field_id: str
-    field_type: str
-    extracted_text: str
-    facets: list[str]
+FieldContent = datamanagers.fields.FieldContent
+FieldProcessedContent = datamanagers.fields.FieldProcessedContent
+ChunkContent = datamanagers.fields.ChunkContent
+ChunkEmbeddingContent = datamanagers.fields.ChunkEmbeddingContent
+ConversationPageContent = datamanagers.conversations.ConversationPageContent
 
 
 logger = logging.getLogger("ingest-processor")
@@ -287,7 +205,7 @@ class ProcessorMarkLogic:
         async with self.driver.transaction(read_only=False, kbid=kbid) as txn:
             logger.info("Deleting resource", extra={"kbid": kbid, "rid": uuid})
             try:
-                await resource_delete(txn, kbid, uuid)
+                await datamanagers.resources.delete_resource(txn, kbid=kbid, rid=uuid)
                 await txn.commit()
                 if transaction_check:
                     await self.set_last_seqid(partition, seqid)
@@ -319,10 +237,12 @@ class ProcessorMarkLogic:
         uuid: str,
         slug: str,
     ) -> tuple[str, str]:
-        if not await kb_exists(self.driver, kbid):
+        if not await datamanagers.kb.exists_by_id(self.driver, kbid=kbid):
             raise KnowledgeBoxDoesNotExist(f"Knowledge Box with ID {kbid} does not exist.")
         if not uuid:
-            uuid_from_slug = await resource_id_from_slug(self.driver, kbid, slug)
+            uuid_from_slug = await datamanagers.resources.get_resource_rid_by_slug(
+                self.driver, kbid=kbid, slug=slug
+            )
             if uuid_from_slug is None:
                 raise ResourceDoesNotExist(f"Resource with slug {slug} does not exist in KB {kbid}.")
             uuid = uuid_from_slug
@@ -363,6 +283,25 @@ class ProcessorMarkLogic:
                 return index_message.texts[title_field_id].text
             return basic.title or basic.slug
 
+        origin = broker_message.origin if broker_message.HasField("origin") else None
+        created_at = (
+            index_message.metadata.created.ToJsonString()
+            if index_message.metadata.HasField("created")
+            else origin.created.ToJsonString()
+            if origin is not None and origin.HasField("created")
+            else basic.created.ToJsonString()
+            if basic.HasField("created")
+            else ""
+        )
+        modified_at = (
+            index_message.metadata.modified.ToJsonString()
+            if index_message.metadata.HasField("modified")
+            else origin.modified.ToJsonString()
+            if origin is not None and origin.HasField("modified")
+            else basic.modified.ToJsonString()
+            if basic.HasField("modified")
+            else ""
+        )
         content = ResourceCreateContent(
             slug=basic.slug or uuid,
             basic=documents.to_json(basic),
@@ -374,14 +313,14 @@ class ProcessorMarkLogic:
             if broker_message.HasField("security")
             else None,
             title=get_title(index_message, basic),
-            created_at=index_message.metadata.created.ToJsonString(),
-            modified_at=index_message.metadata.modified.ToJsonString(),
+            created_at=created_at,
+            modified_at=modified_at,
             processing_status=brain.Resource.ResourceStatus.Name(index_message.status),
             facets=list(index_message.labels),
         )
         # TODO(Marklogic): origin relation triplets
         # TODO(Marklogic): user relation triplets
-        await resource_create(txn, kbid, uuid, content)
+        await datamanagers.resources.create_resource(txn, kbid=kbid, rid=uuid, data=content)
 
         # User relations are stored in the object store
         if broker_message.HasField("user_relations"):
@@ -466,7 +405,7 @@ class ProcessorMarkLogic:
                 md5=get_text_md5(text),
                 status=get_field_status(resources_pb2.FieldType.TEXT, field),
             )
-            await fields_create(txn, field_content)
+            await datamanagers.fields.create_document(txn, field_content)
 
         for field, link in message.links.items():
             field_content = FieldContent(
@@ -477,7 +416,7 @@ class ProcessorMarkLogic:
                 md5=None,
                 status=get_field_status(resources_pb2.FieldType.LINK, field),
             )
-            await fields_create(txn, field_content)
+            await datamanagers.fields.create_document(txn, field_content)
 
         for field, file in message.files.items():
             field_content = FieldContent(
@@ -488,7 +427,7 @@ class ProcessorMarkLogic:
                 md5=file.file.md5 or None,
                 status=get_field_status(resources_pb2.FieldType.FILE, field),
             )
-            await fields_create(txn, field_content)
+            await datamanagers.fields.create_document(txn, field_content)
 
         for field, kv in message.key_value_fields.items():
             field_content = FieldContent(
@@ -499,15 +438,15 @@ class ProcessorMarkLogic:
                 md5=None,
                 status=get_field_status(resources_pb2.FieldType.KEY_VALUE, field),
             )
-            await fields_create(txn, field_content)
+            await datamanagers.fields.create_document(txn, field_content)
 
         for field, conversation in message.conversations.items():
             status = get_field_status(resources_pb2.FieldType.CONVERSATION, field)
             await self.create_conversation(txn, kbid, uuid, field, conversation, status)
 
-        # Processed data that needs to be persisted in Marklogic for search purposes
+        # Persist processed data for search alongside the source field values.
         for fpc, chunks, embeddings in self.get_field_processed_contents(index_message):
-            await fields_processed_create(
+            await datamanagers.fields.create_processed_documents(
                 txn=txn,
                 field=fpc,
                 chunks=chunks,
@@ -612,12 +551,10 @@ class ProcessorMarkLogic:
                 conversation_page=page_number,
                 value=documents.to_json(resources_pb2.Conversation(messages=page_messages)),
             )
-            await conversation_page_create(txn, kbid, uuid, page_content)
+            await datamanagers.conversations.create_page(txn, page_content)
 
-        await conversation_page_create(
+        await datamanagers.conversations.create_page(
             txn,
-            kbid,
-            uuid,
             ConversationPageContent(
                 resource_id=uuid,
                 field_id=field_id,
@@ -625,7 +562,7 @@ class ProcessorMarkLogic:
                 value=documents.to_json(splits_metadata),
             ),
         )
-        await fields_create(
+        await datamanagers.fields.create_document(
             txn,
             FieldContent(
                 resource_id=uuid,
@@ -699,7 +636,7 @@ class ProcessorMarkLogic:
 
         async with self.driver.transaction(read_only=False, kbid=kbid) as txn:
             try:
-                resource = await resource_get(txn, kbid, uuid)
+                resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=uuid)
                 is_new_resource = resource is None
                 if message.source not in (
                     writer_pb2.BrokerMessage.MessageSource.WRITER,
@@ -721,7 +658,7 @@ class ProcessorMarkLogic:
                     # Handle data augmentation fields for existing resources
                     await self.handle_data_augmentation_fields(message, kbid, uuid)
 
-                im = await self.generate_index_message(txn, resource, uuid, message)
+                im = await self.generate_index_message(txn, None, uuid, message)
                 if resource is None:
                     await self.create_resource(txn, message, kbid, uuid, im)
                     await self.create_fields(txn, message, kbid, uuid, im)
@@ -804,245 +741,6 @@ class ResourceDoesNotExist(Exception):
     """Exception raised when a Resource does not exist."""
 
 
-class MarkLogicURIs:
-    @classmethod
-    def kb_registry(cls, kbid: str) -> str:
-        return f"/kb/{kbid}/registry.json"
-
-    @classmethod
-    def resource_directory(cls, rid: str) -> str:
-        return f"/resources/{rid}/"
-
-    @classmethod
-    def resource(cls, rid: str) -> str:
-        return f"{cls.resource_directory(rid)}data.json"
-
-    @classmethod
-    def resource_id_from_uri(cls, uri: object) -> str:
-        return str(uri).split("/")[2]
-
-    @classmethod
-    def fields_directory(cls, rid: str) -> str:
-        return f"{cls.resource_directory(rid)}fields/"
-
-    @classmethod
-    def field_directory(cls, rid: str, field_type: str, field_id: str) -> str:
-        return f"{cls.fields_directory(rid)}{field_type}/{field_id}/"
-
-    @classmethod
-    def field(cls, rid: str, field_type: str, field_id: str) -> str:
-        return f"{cls.field_directory(rid, field_type, field_id)}data.json"
-
-    @classmethod
-    def conversation_directory(cls, rid: str, field_id: str) -> str:
-        return f"{cls.field_directory(rid, 'c', field_id)}pages/"
-
-    @classmethod
-    def conversation_page(cls, rid: str, field_id: str, page: int) -> str:
-        return f"{cls.conversation_directory(rid, field_id)}{page}.json"
-
-    @classmethod
-    def field_processed(
-        cls,
-        rid: str,
-        field_id: str,
-        field_type: str,
-    ) -> str:
-        return f"{cls.field_directory(rid, field_type, field_id)}processed.json"
-
-    @classmethod
-    def embedding(
-        cls,
-        rid: str,
-        field_id: str,
-        embedding_id: str,
-    ) -> str:
-        return f"{cls.field_directory(rid, 'e', field_id)}embeddings/{embedding_id}/data.json"
-
-    @classmethod
-    def chunk(
-        cls,
-        rid: str,
-        field_id: str,
-        chunk_id: str,
-    ) -> str:
-        return f"{cls.field_directory(rid, 'c', field_id)}chunks/{chunk_id}/data.json"
-
-
-async def kb_exists(
-    driver: MarkLogicDriver,
-    kbid: str,
-) -> bool:
-    async with driver.transaction(read_only=True, system=True) as txn:
-        content = await documents.read(txn, MarkLogicURIs.kb_registry(kbid))
-        return (
-            content is not None and content.get("slug") is not None and content.get("deleted_at") is None
-        )
-
-
-async def resource_id_from_slug(driver: MarkLogicDriver, kbid: str, slug: str) -> str | None:
-    async with driver.transaction(read_only=True, kbid=kbid) as txn:
-        javascript = (
-            "cts.uris('', ['document'], cts.andQuery(["
-            f"cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)}), "
-            f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.SLUG)}, '=', {json.dumps(slug)})]))"
-        )
-        uris = await documents.evaluate(txn, javascript)
-        return MarkLogicURIs.resource_id_from_uri(uris[0]) if uris else None
-
-
-async def resource_get(
-    txn: MarkLogicTransaction,
-    kbid: str,
-    uuid: str,
-) -> ResourceContent | None:
-    content = await documents.read(txn, MarkLogicURIs.resource(uuid))
-    return ResourceContent(**content) if content is not None else None
-
-
-async def resource_delete(
-    txn: MarkLogicTransaction,
-    kbid: str,
-    uuid: str,
-) -> None:
-    """
-    Deletes the resource with the given resource ID (rid) from the database, as well as all related child collections,
-    like fields, chunks, embeddings, etc.
-    """
-    deletion = DocumentDeletion().directory(
-        MarkLogicURIs.resource_directory(uuid),
-        (
-            MarkLogicCollections.FIELDS,
-            MarkLogicCollections.CONVERSATIONS,
-            MarkLogicCollections.CHUNKS,
-            MarkLogicCollections.EMBEDDINGS,
-        ),
-    )
-    await documents.delete_documents(txn, deletion)
-
-
-async def resource_create(
-    txn: MarkLogicTransaction,
-    kbid: str,
-    uuid: str,
-    data: ResourceCreateContent,
-) -> None:
-    await documents.write(
-        txn,
-        uri=MarkLogicURIs.resource(uuid),
-        collection=MarkLogicCollections.RESOURCES,
-        content=data.model_dump(mode="json"),
-    )
-
-
-async def conversation_page_create(
-    txn: MarkLogicTransaction,
-    kbid: str,
-    uuid: str,
-    data: ConversationPageContent,
-) -> None:
-    await documents.write(
-        txn,
-        uri=MarkLogicURIs.conversation_page(uuid, data.field_id, data.conversation_page),
-        collection=MarkLogicCollections.CONVERSATIONS,
-        content=data.model_dump(mode="json"),
-    )
-
-
-async def fields_create(
-    txn: MarkLogicTransaction,
-    data: FieldContent,
-) -> None:
-    await documents.write(
-        txn,
-        uri=MarkLogicURIs.field(data.resource_id, data.field_type, data.field_id),
-        collection=MarkLogicCollections.FIELDS,
-        content=data.model_dump(mode="json"),
-    )
-
-
-async def fields_list(
-    txn: MarkLogicTransaction,
-    kbid: str,
-    uuid: str,
-) -> list[tuple[writer_pb2.FieldType.ValueType, str]]:
-    """List field identifiers using the URI lexicon without loading field documents."""
-    directory = MarkLogicURIs.fields_directory(uuid)
-    javascript = (
-        "cts.uris('', ['document', 'item-order'], cts.andQuery(["
-        f"cts.collectionQuery({json.dumps(MarkLogicCollections.FIELDS)}), "
-        f"cts.directoryQuery({json.dumps(directory)}, 'infinity')]))"
-    )
-    uris = await documents.evaluate(txn, javascript)
-    fields = []
-    for uri in uris:
-        field_type, field_id = str(uri).removeprefix(directory).removesuffix("/data.json").split("/", 1)
-        fields.append((FIELD_TYPE_STR_TO_PB[field_type], field_id))
-    return fields
-
-
-async def fields_get(
-    txn: MarkLogicTransaction,
-    uuid: str,
-    field: str,
-    field_type: str,
-) -> FieldContent | None:
-    content = await documents.read(
-        txn,
-        uri=MarkLogicURIs.field(uuid, field_type, field),
-    )
-    return FieldContent(**content) if content is not None else None
-
-
-async def fields_processed_create(
-    txn: MarkLogicTransaction,
-    field: FieldProcessedContent,
-    chunks: list[ChunkContent],
-    embeddings: list[ChunkEmbeddingContent],
-    skip_field_texts: bool = False,
-    skip_chunks: bool = False,
-) -> None:
-    if not skip_field_texts:
-        await documents.write(
-            txn,
-            uri=MarkLogicURIs.field_processed(field.resource_id, field.field_id, field.field_type),
-            collection=MarkLogicCollections.FIELDS_PROCESSED,
-            content=field.model_dump(mode="json"),
-        )
-    if not skip_chunks and len(chunks) > 0:
-        await documents.write_many(
-            txn,
-            documents_to_write=[
-                Document(
-                    uri=MarkLogicURIs.chunk(chunk.resource_id, chunk.field_id, chunk.chunk_id),
-                    collections=[
-                        MarkLogicCollections.CHUNKS,
-                    ],
-                    content=chunk.model_dump(mode="json"),
-                    content_type="application/json",
-                )
-                for chunk in chunks
-            ],
-        )
-    if len(embeddings) > 0:
-        await documents.write_many(
-            txn,
-            documents_to_write=[
-                Document(
-                    uri=MarkLogicURIs.embedding(
-                        embedding.resource_id, embedding.field_id, embedding.chunk_id
-                    ),
-                    collections=[
-                        MarkLogicCollections.EMBEDDINGS,
-                    ],
-                    content=embedding.model_dump(mode="json"),
-                    content_type="application/json",
-                )
-                for embedding in embeddings
-            ],
-        )
-
-
 def get_bm_modified_fields(message: writer_pb2.BrokerMessage) -> list[writer_pb2.FieldID]:
     modified = set()
     # Added or modified fields need indexing
@@ -1100,25 +798,21 @@ class IndexMessageBuilderV2(IndexMessageBuilder):
         return self.resource.uuid
 
     async def get_resource_data(self) -> ResourceData:
-        content = await resource_get(
-            self.txn,
-            kbid=self.kbid,
-            uuid=self.resource_id,
+        content = await datamanagers.resources.get_resource(
+            self.txn, kbid=self.kbid, rid=self.resource_id
         )
         assert content is not None
         user_relations = await self.resource.get_user_relations()
         return ResourceData(
             basic=documents.from_json(content.basic, writer_pb2.Basic),
             user_relations=user_relations,
-            origin=documents.from_json(content.origin, writer_pb2.Origin),
-            security=documents.from_json(content.security, resources_pb2.Security),
+            origin=documents.from_json(content.origin or {}, writer_pb2.Origin),
+            security=documents.from_json(content.security or {}, resources_pb2.Security),
         )
 
     async def get_resource_fields(self) -> list[tuple[writer_pb2.FieldType.ValueType, str]]:
-        fields = await fields_list(
-            self.txn,
-            kbid=self.kbid,
-            uuid=self.resource_id,
+        fields = await datamanagers.fields.list_resource_documents(
+            self.txn, resource_id=self.resource_id
         )
         return fields
 
@@ -1134,13 +828,14 @@ class IndexMessageBuilderV2(IndexMessageBuilder):
         )
 
     async def get_field_value(self, fieldid: writer_pb2.FieldID) -> Any:
-        content = await fields_get(
+        content = await datamanagers.fields.get_document(
             self.txn,
-            uuid=self.resource_id,
-            field=fieldid.field,
+            resource_id=self.resource_id,
+            field_id=fieldid.field,
             field_type=from_proto.field_type_name(fieldid.field_type).abbreviation(),
         )
         assert content is not None
+        assert content.value is not None
         pb_class = {
             writer_pb2.FieldType.TEXT: writer_pb2.FieldText,
             writer_pb2.FieldType.FILE: writer_pb2.FieldFile,

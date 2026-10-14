@@ -20,7 +20,7 @@
 import contextlib
 from time import time
 from typing import Annotated
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from fastapi import BackgroundTasks, HTTPException, Query, Response
 from fastapi_versioning import version
@@ -34,7 +34,6 @@ from nucliadb.common.filter_expression import parse_expression
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError, NotFoundError
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.models.internal.processing import ProcessingInfo, PushPayload, Source
 from nucliadb.tasks.deleter import schedule_batch_delete
@@ -545,6 +544,11 @@ async def _reprocess_resource(
     return ResourceUpdated(seqid=processing_info.seqid if processing_info else None)
 
 
+async def get_indexed_resource_ids(kbid: str, request: StreamRequest) -> set[str]:
+    # TODO(Marklogic): Read resource IDs matching the backend index filter.
+    return set()
+
+
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RESOURCES_PREFIX}",
     status_code=200,
@@ -568,14 +572,7 @@ async def delete_resource_batch(request: Request, item: BatchDeleteRequest, kbid
     stream_request = StreamRequest()
     stream_request.filter_expression.CopyFrom(filter_pb)
 
-    deletes = set()
-    for shard_obj in shards.shards:
-        if shard_obj.nidx_shard_id is not None:
-            stream_request.shard_id.id = shard_obj.nidx_shard_id
-            async for doc in get_nidx_searcher_client().Documents(stream_request):
-                # make sure resource ids are 32-char UUIDs (without "-"s)
-                rid = UUID(doc.uuid).hex
-                deletes.add(rid)
+    deletes = await get_indexed_resource_ids(kbid, stream_request)
 
     if not deletes:
         # nothing matched the filter
@@ -585,7 +582,7 @@ async def delete_resource_batch(request: Request, item: BatchDeleteRequest, kbid
         )
 
     # schedule a delete job with the delete set. We ignore out-of-sync index
-    # issues and return the set of resources got from nidx to the user.
+    # issues and return the set of resources from the index to the user.
     audit = Audit()
     parse_audit(audit, request)
     deletion_id = await schedule_batch_delete(request.app.state.context, kbid, deletes, audit)

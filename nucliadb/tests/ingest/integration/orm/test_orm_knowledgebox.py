@@ -198,7 +198,6 @@ async def test_delete_knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
     shard_manager: cluster_manager.KBShardManager,
-    dummy_nidx_utility,
 ):
     kbid, _ = await KnowledgeBox.create(
         maindb_driver,
@@ -223,7 +222,7 @@ async def test_delete_knowledgebox_handles_unexisting_kb(storage: Storage, maind
 
 
 async def test_knowledgebox_purge_handles_unexisting_shard_payload(
-    storage: Storage, maindb_driver: Driver, dummy_nidx_utility
+    storage: Storage, maindb_driver: Driver
 ):
     idonotexist = KnowledgeBox.new_unique_kbid()
     await KnowledgeBox.purge(maindb_driver, kbid=idonotexist)
@@ -232,7 +231,6 @@ async def test_knowledgebox_purge_handles_unexisting_shard_payload(
 async def test_knowledgebox_delete_all_kb_keys(
     storage,
     cache,
-    dummy_nidx_utility,
     maindb_driver: Driver,
     knowledgebox: str,
 ):

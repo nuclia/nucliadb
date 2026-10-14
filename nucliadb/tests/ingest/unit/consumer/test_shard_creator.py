@@ -26,7 +26,6 @@ from nidx_protos import nodereader_pb2
 from pytest_mock import MockerFixture
 
 from nucliadb.common.cluster.settings import settings
-from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.consumer import shard_creator
 from nucliadb_protos.writer_pb2 import Notification, ShardObject, Shards
 
@@ -51,10 +50,11 @@ def kbdm():
 
 
 @pytest.fixture()
-def shard_manager(dummy_nidx_utility: NidxUtility):
+def shard_manager():
     sm = MagicMock()
     shards = Shards(shards=[ShardObject(read_only=False)], actual=0)
     sm.get_current_active_shard = AsyncMock(return_value=shards.shards[0])
+    sm.get_index_shard = AsyncMock()
     sm.maybe_create_new_shard = AsyncMock()
     with (
         patch("nucliadb.ingest.consumer.shard_creator.get_shard_manager", return_value=sm),
@@ -83,10 +83,9 @@ async def test_handle_message_create_new_shard(
     shard_creator_handler: shard_creator.ShardCreatorHandler,
     kbdm,
     shard_manager,
-    dummy_nidx_utility: NidxUtility,
     mocker: MockerFixture,
 ):
-    dummy_nidx_utility.api_client.GetShard.return_value = nodereader_pb2.Shard(
+    shard_manager.get_index_shard.return_value = nodereader_pb2.Shard(
         paragraphs=settings.max_shard_paragraphs + 1
     )
     spy = mocker.spy(shard_creator, "should_create_new_shard")
@@ -104,10 +103,9 @@ async def test_handle_message_create_new_shard(
 async def test_handle_message_do_not_create(
     kbdm,
     shard_creator_handler: shard_creator.ShardCreatorHandler,
-    dummy_nidx_utility: NidxUtility,
     shard_manager,
 ):
-    dummy_nidx_utility.api_client.GetShard.return_value = nodereader_pb2.Shard(
+    shard_manager.get_index_shard.return_value = nodereader_pb2.Shard(
         paragraphs=settings.max_shard_paragraphs - 1
     )
 
@@ -125,7 +123,6 @@ async def test_handle_message_do_not_create(
 async def test_handle_message_do_not_create_on_kb_not_found(
     kbdm,
     shard_creator_handler: shard_creator.ShardCreatorHandler,
-    dummy_nidx_utility: NidxUtility,
     shard_manager,
 ):
     kbdm.exists.return_value = False

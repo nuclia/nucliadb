@@ -37,7 +37,6 @@ from nucliadb_telemetry.jetstream import (
 )
 from nucliadb_utils import const, logger
 from nucliadb_utils.cache.pubsub import PubSubDriver
-from nucliadb_utils.utilities import get_pubsub
 
 
 class WaitFor:
@@ -159,6 +158,8 @@ class TransactionUtility:
         return waiting_event
 
     async def initialize(self, service_name: str | None = None):
+        from nucliadb_utils.utilities import get_pubsub
+
         self.pubsub = await get_pubsub()  # type: ignore
 
         options: dict[str, Any] = {

@@ -30,7 +30,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_field_conversation(
-    storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage, txn: Transaction, cache, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -72,7 +72,7 @@ async def test_create_resource_orm_field_conversation(
 
 
 async def test_create_resource_orm_field_conversation_file(
-    local_files, storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    local_files, storage: Storage, txn: Transaction, cache, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)

@@ -27,9 +27,7 @@ from nucliadb_protos.writer_pb2_grpc import WriterStub
 
 
 @pytest.mark.deploy_modes("component")
-async def test_create_cleansup_on_error(
-    dummy_nidx_utility, nucliadb_ingest_grpc: WriterStub, hosted_nucliadb
-):
+async def test_create_cleansup_on_error(nucliadb_ingest_grpc: WriterStub, hosted_nucliadb):
     # Create a KB
     kbid = str(uuid4())
     slug = f"slug-{kbid}"

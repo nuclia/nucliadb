@@ -12,11 +12,11 @@ from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
+from nucliadb.common.marklogic import documents
 from nucliadb.common.marklogic.admin_client import AdminClient
 from nucliadb.common.marklogic.client import Client, Document
 from nucliadb.common.marklogic.client import Transaction as SDKTransaction
-
-URI_PREFIX = "maindb:"
+from nucliadb.common.marklogic.uris import MarkLogicURIs
 
 
 class MarkLogicDataLayer:
@@ -26,11 +26,11 @@ class MarkLogicDataLayer:
 
     @staticmethod
     def _uri(key: str) -> str:
-        return f"{URI_PREFIX}{key}"
+        return MarkLogicURIs.maindb_key(key)
 
     @staticmethod
     def _key(uri: str) -> str:
-        return uri.removeprefix(URI_PREFIX)
+        return MarkLogicURIs.maindb_key_from_uri(uri)
 
     @staticmethod
     def _encode(key: str, value: bytes) -> dict[str, str]:
@@ -113,15 +113,15 @@ class MarkLogicTransaction(Transaction):
                     self._sdk_transaction = None
 
     async def batch_get(self, keys: list[str], for_update: bool = False) -> list[bytes | None]:
-        result = await self.driver.client.documents.read(
-            [self._data._uri(key) for key in keys],
-            params=await self.params(),
-        )
-        documents = {document.uri: document for document in result}
+        contents = await documents.read_many(self, [self._data._uri(key) for key in keys])
         values: list[bytes | None] = []
         for key in keys:
-            document = documents.get(self._data._uri(key))
-            values.append(self._data._decode(document) if document is not None else None)
+            uri = self._data._uri(key)
+            content = contents.get(uri)
+            if content is None:
+                values.append(None)
+            else:
+                values.append(base64.b64decode(content["value"]))
         return values
 
     async def get(self, key: str, for_update: bool = False) -> bytes | None:
@@ -129,19 +129,11 @@ class MarkLogicTransaction(Transaction):
         return values[0]
 
     async def set(self, key: str, value: bytes) -> None:
-        database = self.database
-        transaction = await self.sdk_transaction()
-        if transaction is None:
-            raise RuntimeError("Cannot set in read only transaction")
-        await self.driver.client.documents.write(
-            Document(
-                uri=self._data._uri(key),
-                content=self._data._encode(key, value),
-                collections=[MarkLogicCollections.MAINDB],
-                content_type="application/json",
-            ),
-            tx=transaction,
-            params={"database": database},
+        await documents.write(
+            self,
+            uri=self._data._uri(key),
+            collection=MarkLogicCollections.MAINDB,
+            content=self._data._encode(key, value),
         )
 
     async def insert(self, key: str, value: bytes) -> None:
@@ -150,13 +142,9 @@ class MarkLogicTransaction(Transaction):
         await self.set(key, value)
 
     async def delete(self, key: str) -> None:
-        if self.read_only:
-            raise RuntimeError("Cannot delete in read only transaction")
-        await self.driver.client.documents.delete(self._data._uri(key), params=await self.params())
+        await documents.delete(self, self._data._uri(key))
 
     async def delete_by_prefix(self, prefix: str) -> None:
-        if await self.sdk_transaction() is None:
-            raise RuntimeError("Cannot delete in read only transaction")
         upper = self._data._prefix_upper_bound(prefix)
         clauses = [
             f"cts.collectionQuery({json.dumps(MarkLogicCollections.MAINDB)})",
@@ -167,7 +155,7 @@ class MarkLogicTransaction(Transaction):
                 f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.MAINDB_KEY)}, '<', {json.dumps(upper)})"
             )
         dsl = f"op.fromDocUris(cts.andQuery([{', '.join(clauses)}])).remove()"
-        await self.driver.client.rows.update(dsl=dsl, params=await self.params())
+        await documents.update_rows(self, dsl)
 
     async def keys(
         self,
@@ -188,7 +176,7 @@ class MarkLogicTransaction(Transaction):
         if count > 0:
             options.append(f"limit={count + (0 if include_start else 1)}")
         javascript = f"cts.uris('', {json.dumps(options)}, cts.andQuery([{', '.join(clauses)}]))"
-        uris = await self.driver.client.eval(javascript=javascript, params=await self.params())
+        uris = await documents.evaluate(self, javascript)
         yielded = 0
         for uri in uris:
             key = self._data._key(str(uri))
@@ -211,7 +199,7 @@ class MarkLogicTransaction(Transaction):
                 f"cts.pathRangeQuery({json.dumps(MarkLogicIndexPaths.MAINDB_KEY)}, '<', {json.dumps(upper)})"
             )
         javascript = f"fn.count(cts.uris('', ['document'], cts.andQuery([{', '.join(clauses)}])))"
-        result = await self.driver.client.eval(javascript=javascript, params=await self.params())
+        result = await documents.evaluate(self, javascript)
         return int(result[0] if len(result) > 0 else 0)
 
 

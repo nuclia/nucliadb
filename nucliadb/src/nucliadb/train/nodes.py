@@ -42,7 +42,6 @@ from nucliadb_protos.train_pb2 import (
     TrainResource,
     TrainSentence,
 )
-from nucliadb_protos.writer_pb2 import ShardObject
 from nucliadb_utils.storages.storage import Storage
 
 
@@ -53,13 +52,8 @@ class TrainShardManager(manager.KBShardManager):
         self.storage = storage
 
     async def get_shard_id(self, kbid: str, shard: str) -> str:
-        shards = await self.get_shards_by_kbid_inner(kbid)
-        try:
-            shard_object: ShardObject = next(filter(lambda x: x.shard == shard, shards.shards))
-        except StopIteration:
-            raise KeyError("Shard not found")
-
-        return shard_object.nidx_shard_id
+        # TODO(Marklogic): Resolve a backend partition if training requires one.
+        return shard
 
     async def get_kb_obj(self, txn: Transaction, kbid: str) -> KnowledgeBox | None:
         if kbid is None:

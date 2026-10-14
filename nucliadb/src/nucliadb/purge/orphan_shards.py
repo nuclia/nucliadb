@@ -21,18 +21,10 @@ import argparse
 import asyncio
 import importlib.metadata
 
-from grpc.aio import AioRpcError
-from nidx_protos import nodereader_pb2, noderesources_pb2
-
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
-from nucliadb.common.nidx import (
-    get_nidx_api_client,
-    start_nidx_utility,
-    stop_nidx_utility,
-)
 from nucliadb.ingest import logger
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
@@ -51,6 +43,8 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardKb]:
     # To avoid detecting a new shard as orphan, query the index first and maindb
     # afterwards
     indexed_shards = await _get_indexed_shards()
+    if not indexed_shards:
+        return {}
     stored_shards = await _get_stored_shards(driver)
 
     # In normal conditions, this should never happen as shards are created first
@@ -73,13 +67,10 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardKb]:
     orphan_shards: dict[str, ShardKb] = {}
     for shard_id in orphan_shard_ids:
         kbid = await _get_kbid(shard_id) or UNKNOWN_KB
-        # Shards with knwon KB ids can be checked and ignore those comming from
-        # an ongoing migration/rollover (ongoing or finished)
+        # Shards with known KB ids are skipped if they are referenced by that KB.
         if kbid != UNKNOWN_KB:
             async with datamanagers.with_ro_transaction() as txn:
-                skip = await datamanagers.rollover.is_rollover_shard(
-                    txn, kbid=kbid, shard_id=shard_id
-                ) or await is_kb_shard(txn, kbid=kbid, shard_id=shard_id)
+                skip = await is_kb_shard(txn, kbid=kbid, shard_id=shard_id)
                 if skip:
                     continue
         orphan_shards[shard_id] = kbid
@@ -101,9 +92,8 @@ async def is_kb_shard(txn: Transaction, *, kbid: str, shard_id: str) -> bool:
 
 
 async def _get_indexed_shards() -> dict[str, ShardKb]:
-    shards = await get_nidx_api_client().ListShards(noderesources_pb2.EmptyQuery())
-
-    return {shard.id: UNKNOWN_KB for shard in shards.ids}
+    # TODO(Marklogic): List backend index shards.
+    return {}
 
 
 async def _get_stored_shards(driver: Driver) -> dict[str, ShardKb]:
@@ -117,28 +107,19 @@ async def _get_stored_shards(driver: Driver) -> dict[str, ShardKb]:
                 continue
 
             for shard_object_pb in kb_shards.shards:
-                stored_shards[shard_object_pb.nidx_shard_id] = kbid
+                stored_shards[shard_object_pb.shard] = kbid
 
     return stored_shards
 
 
 async def _get_kbid(shard_id: str) -> str | None:
-    kbid = None
-    try:
-        req = nodereader_pb2.GetShardRequest()
-        req.shard_id.id = shard_id
-        shard_pb = await get_nidx_api_client().GetShard(req)
-    except AioRpcError as grpc_error:
-        logger.error(
-            "Can't get shard while looking for orphans in nidx, is there something broken?",
-            exc_info=grpc_error,
-            extra={
-                "shard_id": shard_id,
-            },
-        )
-    else:
-        kbid = shard_pb.metadata.kbid
-    return kbid
+    # TODO(Marklogic): Read the KB owning a backend index shard.
+    return None
+
+
+async def _delete_index_shard(shard_id: str) -> None:
+    # TODO(Marklogic): Delete an orphan backend index shard.
+    return None
 
 
 async def report_orphan_shards(driver: Driver):
@@ -176,8 +157,7 @@ async def purge_orphan_shards(driver: Driver):
                 "kbid": kbid,
             },
         )
-        req = noderesources_pb2.ShardId(id=shard_id)
-        await get_nidx_api_client().DeleteShard(req)
+        await _delete_index_shard(shard_id)
 
 
 def parse_arguments():
@@ -209,7 +189,6 @@ async def main():
     """
     args = parse_arguments()
 
-    await start_nidx_utility()
     await setup_cluster()
     driver = await setup_driver()
 
@@ -222,7 +201,6 @@ async def main():
     finally:
         await teardown_driver()
         await teardown_cluster()
-        await stop_nidx_utility()
 
 
 def run() -> int:  # pragma: no cover

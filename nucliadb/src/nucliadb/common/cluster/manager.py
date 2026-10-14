@@ -23,14 +23,8 @@ import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from nidx_protos import noderesources_pb2, nodewriter_pb2
-from nidx_protos.nodewriter_pb2 import (
-    IndexMessage,
-    IndexMessageSource,
-    NewShardRequest,
-    NewVectorSetRequest,
-    TypeMessage,
-)
+from nidx_protos import nodereader_pb2, noderesources_pb2
+from nidx_protos.nodewriter_pb2 import IndexMessageSource
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import (
@@ -38,12 +32,8 @@ from nucliadb.common.cluster.exceptions import (
     ShardsNotFound,
 )
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.nidx import get_nidx, get_nidx_api_client
-from nucliadb.common.vector_index_config import nucliadb_index_config_to_nidx
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 from nucliadb_telemetry import errors
-from nucliadb_utils import const
-from nucliadb_utils.utilities import get_storage, has_feature
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +64,7 @@ class KBShardManager:
         ops = []
 
         for shard_obj in shards:
-            ops.append(aw(shard_obj.nidx_shard_id))
+            ops.append(aw(shard_obj.shard))
 
         try:
             results = await asyncio.wait_for(
@@ -122,34 +112,11 @@ class KBShardManager:
             logger.error(msg, extra={"kbid": kbid})
             raise ShardsNotFound(msg)
 
-        vectorsets = {
-            vectorset_id: nucliadb_index_config_to_nidx(vectorset_config.vectorset_index_config)
-            async for vectorset_id, vectorset_config in datamanagers.vectorsets.iter(txn, kbid=kbid)
-        }
-
-        req = NewShardRequest(
-            kbid=kbid,
-            vectorsets_configs=vectorsets,
-            prewarm_enabled=prewarm_enabled,
-        )
-
-        if has_feature(const.Features.SEMANTIC_GRAPH) and vectorsets:
-            for model in await datamanagers.graph_vectorsets.node.get_all(txn, kbid=kbid):
-                req.relation_node_vectorsets_configs[model.vectorset_id].MergeFrom(
-                    nucliadb_index_config_to_nidx(model.vectorset_index_config)
-                )
-            for model in await datamanagers.graph_vectorsets.edge.get_all(txn, kbid=kbid):
-                req.relation_edge_vectorsets_configs[model.vectorset_id].MergeFrom(
-                    nucliadb_index_config_to_nidx(model.vectorset_index_config)
-                )
-
         shard_uuid = uuid.uuid4().hex
 
         shard = writer_pb2.ShardObject(shard=shard_uuid, read_only=False)
         try:
-            nidx_api = get_nidx_api_client()
-            resp = await nidx_api.NewShard(req)
-            shard.nidx_shard_id = resp.id
+            await self.create_index_shard(kbid, shard, prewarm_enabled=prewarm_enabled)
 
         except Exception as exc:
             errors.capture_exception(exc)
@@ -171,16 +138,22 @@ class KBShardManager:
 
         return shard
 
+    async def create_index_shard(
+        self, kbid: str, shard: writer_pb2.ShardObject, *, prewarm_enabled: bool = False
+    ) -> None:
+        # TODO(Marklogic): Create backend index storage for a logical shard.
+        return None
+
+    async def delete_index_shard(self, shard: writer_pb2.ShardObject) -> None:
+        # TODO(Marklogic): Delete backend index storage for a logical shard.
+        return None
+
+    async def get_index_shard(self, shard: writer_pb2.ShardObject) -> nodereader_pb2.Shard | None:
+        # TODO(Marklogic): Read backend shard statistics.
+        return None
+
     async def rollback_shard(self, shard: writer_pb2.ShardObject):
-        nidx_api = get_nidx_api_client()
-        try:
-            await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
-        except Exception as rollback_error:
-            errors.capture_exception(rollback_error)
-            logger.error(
-                f"New shard rollback error. Nidx Shard: {shard.nidx_shard_id}",
-                exc_info=True,
-            )
+        await self.delete_index_shard(shard)
 
     async def delete_resource(
         self,
@@ -190,16 +163,8 @@ class KBShardManager:
         partition: str,
         kb: str,
     ) -> None:
-        storage = await get_storage()
-        nidx = get_nidx()
-
-        await storage.delete_indexing(resource_uid=uuid, txid=txid, kb=kb, logical_shard=shard.shard)
-
-        nidxpb: nodewriter_pb2.IndexMessage = nodewriter_pb2.IndexMessage()
-        nidxpb.shard = shard.nidx_shard_id
-        nidxpb.resource = uuid
-        nidxpb.typemessage = nodewriter_pb2.TypeMessage.DELETION
-        await nidx.index(nidxpb)
+        # TODO(Marklogic): Delete a resource from the backend index.
+        return None
 
     async def add_resource(
         self,
@@ -211,77 +176,18 @@ class KBShardManager:
         reindex_id: str | None = None,
         source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
     ) -> None:
-        """
-        Stores the Resource object in the object storage and sends an IndexMessage to the indexing Nats stream.
-        """
-        if txid == -1 and reindex_id is None:
-            # This means we are injecting a complete resource via ingest gRPC
-            # outside of a transaction. We need to treat this as a reindex operation.
-            reindex_id = uuid.uuid4().hex
-
-        storage = await get_storage()
-        nidx = get_nidx()
-        indexpb = IndexMessage()
-
-        if reindex_id is not None:
-            storage_key = await storage.reindexing(
-                resource, reindex_id, partition, kb=kb, logical_shard=shard.shard
-            )
-            indexpb.reindex_id = reindex_id
-        else:
-            storage_key = await storage.indexing(
-                resource, txid, partition, kb=kb, logical_shard=shard.shard
-            )
-            indexpb.txid = txid
-
-        indexpb.typemessage = TypeMessage.CREATION
-        indexpb.storage_key = storage_key
-        indexpb.kbid = kb
-        if partition:
-            indexpb.partition = partition
-        indexpb.source = source
-        indexpb.resource = resource.resource.uuid
-
-        indexpb.shard = shard.nidx_shard_id
-        await nidx.index(indexpb)
+        # TODO(Marklogic): Write a resource to the backend index.
+        return None
 
     async def create_vectorset(self, kbid: str, config: knowledgebox_pb2.VectorSetConfig):
         """Create a new vectorset in all KB shards."""
-
-        async def _create_vectorset(shard_id: str):
-            vectorset_id = config.vectorset_id
-            index_config = nucliadb_index_config_to_nidx(config.vectorset_index_config)
-
-            req = NewVectorSetRequest(
-                id=noderesources_pb2.VectorSetID(
-                    shard=noderesources_pb2.ShardId(id=shard_id), vectorset=vectorset_id
-                ),
-                config=index_config,
-            )
-
-            result = await get_nidx_api_client().AddVectorSet(req)
-            if result.status != result.Status.OK:
-                raise NodeError(
-                    f"Unable to create vectorset {vectorset_id} in kb {kbid} shard {shard_id}"
-                )
-
-        await self.apply_for_all_shards(kbid, _create_vectorset, timeout=10)
+        # TODO(Marklogic): Create the backend vectorset index.
+        return None
 
     async def delete_vectorset(self, kbid: str, vectorset_id: str):
         """Delete a vectorset from all KB shards"""
-
-        async def _delete_vectorset(shard_id: str):
-            req = noderesources_pb2.VectorSetID()
-            req.shard.id = shard_id
-            req.vectorset = vectorset_id
-
-            result = await get_nidx_api_client().RemoveVectorSet(req)
-            if result.status != result.Status.OK:
-                raise NodeError(
-                    f"Unable to delete vectorset {vectorset_id} in kb {kbid} shard {shard_id}"
-                )
-
-        await self.apply_for_all_shards(kbid, _delete_vectorset, timeout=10)
+        # TODO(Marklogic): Delete the backend vectorset index.
+        return None
 
 
 class StandaloneKBShardManager(KBShardManager):
@@ -291,61 +197,3 @@ class StandaloneKBShardManager(KBShardManager):
         super().__init__()
         self._lock = asyncio.Lock()
         self._change_count: dict[tuple[str, str], int] = {}
-
-    async def delete_resource(
-        self,
-        shard: writer_pb2.ShardObject,
-        uuid: str,
-        txid: int,
-        partition: str,
-        kb: str,
-    ) -> None:
-        req = noderesources_pb2.ResourceID()
-        req.uuid = uuid
-
-        nidx = get_nidx()
-        if nidx is not None and shard.nidx_shard_id:
-            indexpb: nodewriter_pb2.IndexMessage = nodewriter_pb2.IndexMessage()
-            indexpb.shard = shard.nidx_shard_id
-            indexpb.resource = uuid
-            indexpb.typemessage = nodewriter_pb2.TypeMessage.DELETION
-            await nidx.index(indexpb)
-
-    async def add_resource(
-        self,
-        shard: writer_pb2.ShardObject,
-        resource: noderesources_pb2.Resource,
-        txid: int,
-        partition: str,
-        kb: str,
-        reindex_id: str | None = None,
-        source: IndexMessageSource.ValueType = IndexMessageSource.PROCESSOR,
-    ) -> None:
-        """
-        Calls the node writer's SetResource method directly to store the resource in the node.
-        There is no queuing for standalone nodes at the moment -- indexing is done synchronously.
-        """
-
-        nidx = get_nidx()
-        if nidx is not None and shard.nidx_shard_id:
-            storage = await get_storage()
-            indexpb = IndexMessage()
-            storage_key = await storage.indexing(
-                resource, txid, partition, kb=kb, logical_shard=shard.shard
-            )
-
-            indexpb.typemessage = TypeMessage.CREATION
-            indexpb.storage_key = storage_key
-            indexpb.kbid = kb
-            indexpb.source = source
-            indexpb.resource = resource.resource.uuid
-            indexpb.shard = shard.nidx_shard_id
-
-            await nidx.index(indexpb)
-
-            # Delete indexing message (no longer needed)
-            try:
-                if storage.indexing_bucket:
-                    await storage.delete_upload(storage_key, storage.indexing_bucket)
-            except Exception:
-                pass

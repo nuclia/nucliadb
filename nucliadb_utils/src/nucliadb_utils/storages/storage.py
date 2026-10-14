@@ -35,7 +35,6 @@ from nucliadb_utils.helpers import async_gen_lookahead
 from nucliadb_utils.storages import CHUNK_SIZE
 from nucliadb_utils.storages.exceptions import IndexDataNotFound, InvalidCloudFile
 from nucliadb_utils.storages.utils import ObjectInfo, ObjectMetadata, Range
-from nucliadb_utils.utilities import get_local_storage, get_nuclia_storage
 
 STORAGE_RESOURCE = "kbs/{kbid}/r/{uuid}"
 RESOURCE_USER_RELATIONS = "kbs/{kbid}/r/{uuid}/user-relations"
@@ -287,11 +286,15 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
         elif file.source == CloudFile.FLAPS:
             # NucliaDB On-Prem: the data is stored in NUA, so we need to
             # download it and upload it to NucliaDB's storage
+            from nucliadb_utils.utilities import get_nuclia_storage
+
             flaps_storage = await get_nuclia_storage()
             iterator = flaps_storage.download(file)
             new_cf = await self.uploaditerator(iterator, destination, file)
         elif file.source == CloudFile.LOCAL:
             # For testing purposes: protobuffer is stored in a file in the local filesystem
+            from nucliadb_utils.utilities import get_local_storage
+
             local_storage = get_local_storage()
             iterator = local_storage.download(file.bucket_name, file.uri)
             new_cf = await self.uploaditerator(iterator, destination, file)
@@ -454,10 +457,14 @@ class Storage(abc.ABC, metaclass=abc.ABCMeta):
             async for data in self.download(cf.bucket_name, cf.uri):
                 yield data
         elif cf.source == CloudFile.FLAPS:
+            from nucliadb_utils.utilities import get_nuclia_storage
+
             flaps_storage = await get_nuclia_storage()
             async for data in flaps_storage.download(cf):
                 yield data
         elif cf.source == CloudFile.LOCAL:
+            from nucliadb_utils.utilities import get_local_storage
+
             local_storage = get_local_storage()
             async for data in local_storage.download(cf.bucket_name, cf.uri):
                 yield data

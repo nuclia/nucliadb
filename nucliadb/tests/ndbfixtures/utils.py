@@ -31,7 +31,6 @@ from httpx import ASGITransport, AsyncClient
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import NidxUtility
 from nucliadb.search import API_PREFIX
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.partition import PartitionUtility
@@ -101,7 +100,6 @@ def application_context(
     partitioning: PartitionUtility | None = None,
     nats_manager: NatsConnectionManager | None = None,
     transaction: TransactionUtility | None = None,
-    nidx: NidxUtility | None = None,
 ) -> ApplicationContext:
     """Manipulated application context to inject utilities created by fixtures.
     This avoid the problem of having multiple fixtures manipulating
@@ -119,7 +117,6 @@ def application_context(
         partitioning=partitioning is not None,
         nats_manager=nats_manager is not None,
         transaction=transaction is not None,
-        nidx=nidx is not None,
     )
 
     context._kv_driver = maindb_driver
@@ -128,7 +125,6 @@ def application_context(
     context._partitioning = partitioning
     context._nats_manager = nats_manager
     context._transaction = transaction
-    context._nidx = nidx
 
     # We are injecting already initialized test utilities. Manually mark context
     # as initialized and raise an exception if someone tries to finalize it

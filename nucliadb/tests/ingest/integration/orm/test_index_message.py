@@ -51,9 +51,7 @@ def flatten_field_relations(r: noderesources_pb2.Resource):
             )
 
 
-async def test_for_writer_bm_with_prefilter_update(
-    storage, maindb_driver: Driver, dummy_nidx_utility, knowledgebox: str
-):
+async def test_for_writer_bm_with_prefilter_update(storage, maindb_driver: Driver, knowledgebox: str):
     full_resource = await create_resource(storage, maindb_driver, knowledgebox)
 
     async with maindb_driver.ro_transaction() as txn:

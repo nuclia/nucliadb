@@ -17,6 +17,7 @@ from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
 from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
 from nucliadb.common.marklogic import documents
 from nucliadb.common.marklogic.document_update import DocumentUpdate
+from nucliadb.common.marklogic.uris import MarkLogicURIs
 from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
 logger = logging.getLogger(__name__)
@@ -50,22 +51,6 @@ class KBRegistry:
     kbid: str
     slug: str
     deleted_at: str | None = None
-
-
-def _registry_uri(kbid: str) -> str:
-    return f"/kb/{kbid}/registry.json"
-
-
-def _kbid_from_registry_uri(uri: str) -> str:
-    # Assumes the URI is of the form "/kb/{kbid}/registry.json"
-    parts = uri.strip("/").split("/")
-    if len(parts) != 3 or parts[0] != "kb" or parts[2] != "registry.json":
-        raise ValueError(f"Invalid registry URI: {uri}")
-    return parts[1]
-
-
-def _kb_uri() -> str:
-    return "/kb_data.json"
 
 
 def ensure_system_scope(txn: MarkLogicTransaction):
@@ -107,7 +92,7 @@ async def _set_registry(
     _, marklogic_txn = _driver_txn(txn, system_scope=True, ensure_writes=True)
     await documents.write(
         marklogic_txn,
-        _registry_uri(kbid),
+        MarkLogicURIs.kb_registry(kbid),
         MarkLogicCollections.KB_REGISTRY_ITEM,
         {"kbid": kbid, "slug": slug, "deleted_at": deleted_at},
     )
@@ -121,7 +106,7 @@ async def _get_registry(
     _, marklogic_txn = _driver_txn(txn, system_scope=True)
     content = await documents.read(
         marklogic_txn,
-        _registry_uri(kbid),
+        MarkLogicURIs.kb_registry(kbid),
     )
     if content is None:
         return None
@@ -177,7 +162,9 @@ async def _set_data(
     shards: writer_pb2.Shards | None | _UnsetType = UNSET,
 ) -> None:
     update = DocumentUpdate(
-        uri=_kb_uri(), collection=MarkLogicCollections.KNOWLEDGEBOXES, defaults={"kbid": kbid}
+        uri=MarkLogicURIs.kb_data(),
+        collection=MarkLogicCollections.KNOWLEDGEBOXES,
+        defaults={"kbid": kbid},
     )
     for name, value in (("config", config), ("shards", shards)):
         if value is not UNSET:
@@ -214,7 +201,7 @@ async def _get_data(
     _, marklogic_txn = _driver_txn(txn, system_scope=False, kbid=kbid)
     content = await documents.read(
         marklogic_txn,
-        _kb_uri(),
+        MarkLogicURIs.kb_data(),
     )
     if content is None:
         return None
@@ -238,7 +225,7 @@ async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tupl
     _, marklogic_txn = _driver_txn(txn, system_scope=True)
     uris = await documents.evaluate(marklogic_txn, javascript)
     for uri in uris:
-        kbid = _kbid_from_registry_uri(uri)
+        kbid = MarkLogicURIs.kbid_from_registry(uri)
         registry = await _get_registry(txn, kbid=kbid)
         if registry is None:
             continue
@@ -250,8 +237,13 @@ async def iter(txn: Transaction, *, slug_prefix: str = "") -> AsyncIterator[tupl
 @observer.wrap({"type": "kb", "op": "exists"})
 async def exists(txn: Transaction, *, kbid: str) -> bool:
     _, marklogic_txn = _driver_txn(txn, system_scope=True)
-    content = await documents.read(marklogic_txn, _registry_uri(kbid))
+    content = await documents.read(marklogic_txn, MarkLogicURIs.kb_registry(kbid))
     return content is not None and content.get("slug") is not None and content.get("deleted_at") is None
+
+
+async def exists_by_id(driver: MarkLogicDriver, *, kbid: str) -> bool:
+    async with driver.transaction(read_only=True, system=True) as txn:
+        return await exists(txn, kbid=kbid)
 
 
 @observer.wrap({"type": "kb", "op": "get_kbid"})
@@ -270,7 +262,7 @@ async def _get_kbid_from_slug(txn: Transaction, *, slug: str) -> str | None:
     uris = await documents.evaluate(marklogic_txn, javascript)
     active_kbids = []
     for uri in uris:
-        kbid = _kbid_from_registry_uri(uri)
+        kbid = MarkLogicURIs.kbid_from_registry(uri)
         registry = await _get_registry(txn, kbid=kbid)
         if registry is not None and registry.deleted_at is None:
             active_kbids.append(kbid)
@@ -298,13 +290,13 @@ async def delete(txn: Transaction, *, kbid: str) -> None:
     driver, marklogic_txn = _driver_txn(txn, system_scope=True, ensure_writes=True)
     async with driver.admin_client() as admin_client:
         await admin_client.delete_database(driver.kb_database(kbid))
-    await documents.delete(marklogic_txn, _registry_uri(kbid))
+    await documents.delete(marklogic_txn, MarkLogicURIs.kb_registry(kbid))
 
 
 @observer.wrap({"type": "kb", "op": "registry_delete"})
 async def registry_delete(txn: Transaction, *, kbid: str) -> None:
     _, marklogic_txn = _driver_txn(txn, system_scope=True)
-    await documents.delete(marklogic_txn, _registry_uri(kbid))
+    await documents.delete(marklogic_txn, MarkLogicURIs.kb_registry(kbid))
 
 
 @observer.wrap({"type": "kb", "op": "soft_delete"})
