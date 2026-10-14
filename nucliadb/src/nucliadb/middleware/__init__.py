@@ -33,25 +33,36 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 PROCESS_TIME_HEADER = "X-PROCESS-TIME"
 ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
 KB_VISIBILITY_HEADER = "x-kb-visibility"
+ALLOW_ACCESS_EXTERNAL_MODELS_HEADER = "x-allow-access-external-models"
+
+# Incoming request headers that are propagated to downstream learning services
+LEARNING_FORWARDED_HEADERS = frozenset(
+    {
+        KB_VISIBILITY_HEADER,
+        ALLOW_ACCESS_EXTERNAL_MODELS_HEADER,
+    }
+)
 
 
 logger = logging.getLogger("nucliadb.middleware")
 
-_kb_visibility: ContextVar[str | None] = ContextVar("kb_visibility", default=None)
+_learning_forwarded_headers: ContextVar[dict[str, str] | None] = ContextVar(
+    "learning_forwarded_headers", default=None
+)
 
 
-def get_kb_visibility_headers() -> dict[str, str]:
-    """Headers to propagate the incoming request's KB visibility to downstream learning services."""
-    value = _kb_visibility.get()
-    return {KB_VISIBILITY_HEADER: value} if value is not None else {}
+def get_learning_forwarded_headers() -> dict[str, str]:
+    """Headers from the incoming request to propagate to downstream learning services."""
+    return dict(_learning_forwarded_headers.get() or {})
 
 
-class KbVisibilityMiddleware:
-    """Pure ASGI middleware storing the incoming `x-kb-visibility` header in a context var.
+class LearningForwardedHeadersMiddleware:
+    """Pure ASGI middleware storing the incoming `LEARNING_FORWARDED_HEADERS` in a context var.
 
-    The value is propagated to learning services so they know whether the KB making the
-    request is public or private, for security purposes, e.g. to disable modifying the
-    system prompt for public KBs.
+    These are propagated to learning services for security purposes, e.g. `x-kb-visibility`
+    lets them know whether the KB is public or private (to disable modifying the system
+    prompt for public KBs) and `x-allow-access-external-models` whether the KB is allowed
+    to use external models.
     """
 
     def __init__(self, app: ASGIApp):
@@ -62,17 +73,17 @@ class KbVisibilityMiddleware:
             await self.app(scope, receive, send)
             return
 
-        value = None
-        for name, raw_value in scope.get("headers", []):
-            if name.decode("latin-1").lower() == KB_VISIBILITY_HEADER:
-                value = raw_value.decode("latin-1")
-                break
+        headers: dict[str, str] = {}
+        for raw_name, raw_value in scope.get("headers", []):
+            name = raw_name.decode("latin-1").lower()
+            if name in LEARNING_FORWARDED_HEADERS:
+                headers[name] = raw_value.decode("latin-1")
 
-        token = _kb_visibility.set(value)
+        token = _learning_forwarded_headers.set(headers)
         try:
             await self.app(scope, receive, send)
         finally:
-            _kb_visibility.reset(token)
+            _learning_forwarded_headers.reset(token)
 
 
 class ProcessTimeHeaderMiddleware(BaseHTTPMiddleware):

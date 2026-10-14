@@ -352,8 +352,8 @@ async def test_get_predict_headers_hosterd():
 
 
 @pytest.mark.parametrize("onprem", [True, False])
-async def test_get_predict_headers_forwards_kb_visibility(onprem):
-    from nucliadb.middleware import _kb_visibility
+async def test_get_predict_headers_forwards_learning_headers(onprem):
+    from nucliadb.middleware import _learning_forwarded_headers
 
     pe = PredictEngine(
         "cluster",
@@ -362,11 +362,15 @@ async def test_get_predict_headers_forwards_kb_visibility(onprem):
         onprem=onprem,
         nuclia_service_account="nua-service-account",
     )
-    token = _kb_visibility.set("private")
+    token = _learning_forwarded_headers.set(
+        {"x-kb-visibility": "private", "x-allow-access-external-models": "true"}
+    )
     try:
-        assert pe.get_predict_headers("kbid")["x-kb-visibility"] == "private"
+        headers = pe.get_predict_headers("kbid")
+        assert headers["x-kb-visibility"] == "private"
+        assert headers["x-allow-access-external-models"] == "true"
     finally:
-        _kb_visibility.reset(token)
+        _learning_forwarded_headers.reset(token)
 
 
 async def test_get_answer_generator():

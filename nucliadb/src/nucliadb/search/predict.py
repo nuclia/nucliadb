@@ -34,7 +34,7 @@ from nuclia_models.predict.generative_responses import GenerativeChunk
 from pydantic import ValidationError
 
 from nucliadb.common import datamanagers
-from nucliadb.middleware import get_kb_visibility_headers
+from nucliadb.middleware import get_learning_forwarded_headers
 from nucliadb.search import logger
 from nucliadb.search.predict_models import (
     AppliedDataAugmentation,
@@ -241,7 +241,7 @@ class PredictEngine:
                 headers.update(self.local_predict_headers)
         else:
             headers = {"X-STF-KBID": kbid}
-        headers.update(get_kb_visibility_headers())
+        headers.update(get_learning_forwarded_headers())
         return headers
 
     async def check_response(
