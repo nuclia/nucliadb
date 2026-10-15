@@ -20,7 +20,7 @@
 import asyncio
 import json
 from enum import Enum, auto
-from typing import Awaitable, Callable, assert_never, overload
+from typing import assert_never, overload
 
 from fastapi import HTTPException
 from google.protobuf.json_format import MessageToDict
@@ -34,7 +34,7 @@ from nidx_protos.nodereader_pb2 import (
 )
 
 from nucliadb.search import logger
-from nucliadb.search.search.shards import graph_search_shards, query_shards, suggest_shards
+from nucliadb.search.search.backend import graph_search, hybrid_search, suggest
 from nucliadb.search.settings import settings
 from nucliadb_telemetry import errors
 
@@ -78,33 +78,23 @@ async def query_index(
     pb_query: SearchRequest | SuggestRequest | GraphSearchRequest,
     timeout: float | None = None,
 ) -> SearchResponse | SuggestResponse | GraphSearchResponse:
-    # TODO(Marklogic): Route requests by knowledgebox instead of physical index shards.
-    shards: list[str] = []
-
-    func: (
-        Callable[[list[str], SearchRequest], Awaitable[SearchResponse]]
-        | Callable[[list[str], SuggestRequest], Awaitable[SuggestResponse]]
-        | Callable[[list[str], GraphSearchRequest], Awaitable[GraphSearchResponse]]
-    )
-    if method == Method.SEARCH:
-        func = query_shards
-    elif method == Method.SUGGEST:
-        func = suggest_shards
-    elif method == Method.GRAPH:
-        func = graph_search_shards
-    else:  # pragma: no cover
-        assert_never(method)
-
     timeout = timeout or settings.search_timeout
     result: SearchResponse | SuggestResponse | GraphSearchResponse
     try:
-        result = await asyncio.wait_for(
-            func(
-                shards,
-                pb_query,  # type: ignore[arg-type,ty:invalid-argument-type]
-            ),
-            timeout=timeout,
-        )
+        if method == Method.SEARCH:
+            if not isinstance(pb_query, SearchRequest):
+                raise TypeError("SEARCH requires a SearchRequest")
+            result = await asyncio.wait_for(hybrid_search(kbid, pb_query), timeout=timeout)
+        elif method == Method.SUGGEST:
+            if not isinstance(pb_query, SuggestRequest):
+                raise TypeError("SUGGEST requires a SuggestRequest")
+            result = await asyncio.wait_for(suggest(kbid, pb_query), timeout=timeout)
+        elif method == Method.GRAPH:
+            if not isinstance(pb_query, GraphSearchRequest):
+                raise TypeError("GRAPH requires a GraphSearchRequest")
+            result = await asyncio.wait_for(graph_search(kbid, pb_query), timeout=timeout)
+        else:  # pragma: no cover
+            assert_never(method)
     except Exception as exc:
         query_dict = MessageToDict(pb_query)
         query_dict.pop("vector", None)
@@ -122,7 +112,7 @@ def handle_index_exception(exc: Exception, *, extra: dict[str, str]) -> HTTPExce
     HTTP exception to raise to the user."""
 
     status_code = 500
-    reason = "Error while querying shard data."
+    reason = "Error while querying search backend."
     if isinstance(exc, asyncio.TimeoutError):
         logger.warning("Timeout while querying index", extra=extra)
     else:
