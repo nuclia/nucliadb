@@ -81,7 +81,7 @@ async def purge_kbs(driver: Driver):
 
         # Now delete the delete mark
         try:
-            async with driver.rw_transaction() as txn:
+            async with driver.rw_transaction(kbid=None) as txn:
                 await KnowledgeBox.unmark_for_purge(txn, kbid)
                 await txn.commit()
             logger.info(f"  √ Deleted {kbid}")
@@ -144,7 +144,7 @@ async def purge_kbs_storage(driver: Driver, storage: Storage):
 
         if delete_marker:
             try:
-                async with driver.rw_transaction() as txn:
+                async with driver.rw_transaction(kbid=None) as txn:
                     await txn.delete(key)
                     await txn.commit()
                 logger.info("Deleted KB storage deletion marker", extra={"kbid": kbid})
@@ -212,7 +212,7 @@ async def _purge_resources_storage_batch(driver: Driver, storage: Storage, batch
     await asyncio.gather(*tasks)
 
     # Delete the schedule-to-delete keys
-    async with driver.rw_transaction() as txn:
+    async with driver.rw_transaction(kbid=None) as txn:
         for key in to_delete_batch:
             await txn.delete(key)
         await txn.commit()
@@ -277,7 +277,7 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
                 await asyncio.gather(*tasks)
 
             # Finally, delete the key
-            async with driver.rw_transaction() as txn:
+            async with driver.rw_transaction(kbid=None) as txn:
                 await txn.delete(key)
                 await txn.commit()
 
