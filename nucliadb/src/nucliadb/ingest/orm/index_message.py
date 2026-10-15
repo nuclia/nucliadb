@@ -37,11 +37,20 @@ from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
 from nucliadb_protos.resources_pb2 import Basic, FieldID, FieldType, Origin, Relations, Security
 from nucliadb_protos.utils_pb2 import ExtractedText
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import (
+    BrokerMessage,
+    FieldConversation,
+    FieldFile,
+    FieldKeyValue,
+    FieldLink,
+    FieldText,
+)
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
 
 FilePagePositions = dict[int, tuple[int, int]]
+
+FieldValue = FieldText | FieldFile | FieldConversation | FieldLink | FieldKeyValue
 
 
 @dataclass
@@ -244,10 +253,11 @@ class IndexMessageBuilder:
         if fieldid.field_type == FieldType.KEY_VALUE:
             field_value = await self.get_field_value(fieldid)
             if field_value is not None:
+                field_value = cast(FieldKeyValue, field_value)
                 kv_dict = json.loads(field_value.data)
                 brain.generate_json(self.resource.generate_field_id(fieldid), kv_dict)
 
-    async def get_field_value(self, fieldid: FieldID):
+    async def get_field_value(self, fieldid: FieldID) -> FieldValue | None:
         field = await self.resource.get_field(key=fieldid.field, type=fieldid.field_type, load=False)
         return await field.get_value()
 

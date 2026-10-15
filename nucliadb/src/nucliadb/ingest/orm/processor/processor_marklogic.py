@@ -20,7 +20,7 @@ from nucliadb.ingest.orm.exceptions import (
     InvalidBrokerMessage,
     SequenceOrderViolation,
 )
-from nucliadb.ingest.orm.index_message import FieldData, IndexMessageBuilder, ResourceData
+from nucliadb.ingest.orm.index_message import FieldData, FieldValue, IndexMessageBuilder, ResourceData
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.processor import sequence_manager
@@ -389,7 +389,6 @@ class ProcessorMarkLogic:
                 field_id = resources_pb2.FieldID(field_type=field_type, field=field_name)
                 status = await self.get_updated_status(orm_resource, bm, field_id)
                 field = await orm_resource.get_field(field_name, field_type, load=False)
-                breakpoint()
                 await field.set_value(payload, status=status)
 
     async def persist_fields_processed_data(
@@ -759,21 +758,24 @@ class IndexMessageBuilderV2(IndexMessageBuilder):
         et = await field.get_extracted_text()
         fm = await field.get_field_metadata()
         value = await self.get_field_value(field_id)
+        generated_by = None
+        if isinstance(value, (writer_pb2.FieldConversation, writer_pb2.FieldText)):
+            generated_by = value.generated_by
         return FieldData(
             extracted_text=et,
             field_computed_metadata=fm,
-            generated_by=value.generated_by,
+            generated_by=generated_by,
         )
 
-    async def get_field_value(self, fieldid: writer_pb2.FieldID) -> Any:
+    async def get_field_value(self, fieldid: writer_pb2.FieldID) -> FieldValue | None:
         content = await datamanagers.fields.get_document(
             self.txn,
             resource_id=self.resource_id,
             field_id=fieldid.field,
             field_type=from_proto.field_type_name(fieldid.field_type).abbreviation(),
         )
-        assert content is not None
-        assert content.value is not None
+        if content is None or content.value is None:
+            return None
         pb_class = {
             writer_pb2.FieldType.TEXT: writer_pb2.FieldText,
             writer_pb2.FieldType.FILE: writer_pb2.FieldFile,

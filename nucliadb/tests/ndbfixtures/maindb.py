@@ -33,33 +33,36 @@ logger = logging.getLogger("nucliadb.fixtures:maindb")
 @pytest.fixture(scope="function")
 async def maindb_driver(marklogic_maindb_driver) -> AsyncIterator[Driver]:
     driver: Driver = marklogic_maindb_driver
+    try:
+        await clear_marklogic_system_database(driver)
+    except Exception:
+        logger.exception("Could not cleanup maindb on test teardown")
 
     with global_utility(Utility.MAINDB_DRIVER, driver):
         yield driver
 
     try:
-        await cleanup_maindb(driver)
+        await delete_marklogic_system_database(driver)
+        await delete_marklogic_kb_databases(driver)
     except Exception:
         logger.exception("Could not cleanup maindb on test teardown")
 
 
-async def cleanup_maindb(driver: Driver):
-    if not driver.initialized:
-        return
-    async with driver.rw_transaction(None) as txn:
+async def clear_marklogic_system_database(driver: MarkLogicDriver) -> None:
+    async with driver.rw_transaction(kbid=None) as txn:
         await txn.delete_by_prefix("/")
         await txn.commit()
-    async with driver.ro_transaction(None) as txn:
-        assert await txn.count("/") == 0
-
-    if isinstance(driver, MarkLogicDriver):
-        await cleanup_marklogic_databases(driver)
 
 
-async def cleanup_marklogic_databases(driver: MarkLogicDriver) -> None:
+async def delete_marklogic_system_database(driver: MarkLogicDriver) -> None:
+    async with driver.admin_client() as client:
+        await client.delete_database(driver.system_database)
+
+
+async def delete_marklogic_kb_databases(driver: MarkLogicDriver) -> None:
     """Drop every per-KnowledgeBox database created by the test."""
     async with driver.admin_client() as client:
         for name in await client.list_databases():
-            if name.startswith(driver.kb_database_prefix) or name == driver.system_database:
+            if name.startswith(driver.kb_database_prefix):
                 await client.delete_database(name)
     driver._provisioned.clear()
