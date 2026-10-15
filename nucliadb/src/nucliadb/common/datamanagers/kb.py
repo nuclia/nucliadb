@@ -60,7 +60,6 @@ def ensure_system_scope(txn: MarkLogicTransaction):
 def _driver_txn(
     txn: Transaction, system_scope: bool, ensure_writes: bool = False, kbid: str | None = None
 ) -> tuple[MarkLogicDriver, MarkLogicTransaction]:
-    txn = cast(MarkLogicTransaction, txn)
     marklogic_driver, marklogic_txn = documents.driver_txn(txn, ensure_writes=ensure_writes)
     assert marklogic_txn.is_system_scope == system_scope
     if kbid is not None:
@@ -288,8 +287,7 @@ async def set_slug(txn: Transaction, *, slug: str, kbid: str) -> None:
 @observer.wrap({"type": "kb", "op": "delete"})
 async def delete(txn: Transaction, *, kbid: str) -> None:
     driver, marklogic_txn = _driver_txn(txn, system_scope=True, ensure_writes=True)
-    async with driver.admin_client() as admin_client:
-        await admin_client.delete_database(driver.kb_database(kbid))
+    await driver.delete_kb_database(kbid)
     await documents.delete(marklogic_txn, MarkLogicURIs.kb_registry(kbid))
 
 

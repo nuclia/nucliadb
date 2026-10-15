@@ -67,7 +67,7 @@ async def set_processing_metadata_from_basic(
     kbid: str,
     rid: str,
 ) -> None:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=rid)
     if basic is not None:
         toprocess.title = basic.title

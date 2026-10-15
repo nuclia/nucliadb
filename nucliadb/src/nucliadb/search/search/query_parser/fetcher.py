@@ -158,7 +158,7 @@ class Fetcher:
             if vectorset is None:
                 # in case predict don't answer which vectorset to use, fallback to
                 # the first vectorset of the KB
-                async with datamanagers.with_ro_transaction() as txn:
+                async with datamanagers.with_ro_transaction(kbid=self.kbid) as txn:
                     async for vectorset, _ in datamanagers.vectorsets.iter(txn, kbid=self.kbid):
                         break
                 assert vectorset is not None, "All KBs must have at least one vectorset in maindb"
@@ -234,7 +234,7 @@ class Fetcher:
             if not is_cached(self.cache.labelset_kinds):
                 # Populate the cache with all KB labelsets (not cached)
                 self.cache.labelset_kinds = {}
-                async with datamanagers.with_ro_transaction() as txn:
+                async with datamanagers.with_ro_transaction(kbid=self.kbid) as txn:
                     labelset_ids = await datamanagers.labels.list_labelset_ids(txn, kbid=self.kbid)
                     for id in labelset_ids or []:
                         self.cache.labelset_kinds[id] = not_cached
@@ -247,7 +247,7 @@ class Fetcher:
                 return self.cache.labelset_kinds[labelset_id]  # type: ignore[return-value,ty:invalid-return-type]
 
             # fetch and cache the labelset
-            async with datamanagers.with_ro_transaction() as txn:
+            async with datamanagers.with_ro_transaction(kbid=self.kbid) as txn:
                 labelset = await datamanagers.labels.get_labelset(
                     txn, kbid=self.kbid, labelset_id=labelset_id
                 )
@@ -329,7 +329,7 @@ class Fetcher:
 
     @alru_cache(maxsize=1)
     async def validate_vectorset(self, kbid: str, vectorset: str):
-        async with datamanagers.with_ro_transaction() as txn:
+        async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
             if not await datamanagers.vectorsets.exists(txn, kbid=kbid, vectorset_id=vectorset):
                 raise InvalidQueryError(
                     "vectorset", f"Vectorset {vectorset} doesn't exist in your Knowledge Box"
@@ -375,7 +375,7 @@ async def get_matryoshka_dimension_cached(kbid: str, vectorset: str | None) -> i
 
 @query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})
 async def get_matryoshka_dimension(kbid: str, vectorset: str | None) -> int | None:
-    async with get_driver().ro_transaction() as txn:
+    async with get_driver().ro_transaction(kbid=kbid) as txn:
         matryoshka_dimension = None
         if not vectorset:
             # XXX this should be migrated once we remove the "default" vectorset
@@ -391,5 +391,5 @@ async def get_matryoshka_dimension(kbid: str, vectorset: str | None) -> int | No
 
 @query_parse_dependency_observer.wrap({"type": "synonyms"})
 async def get_kb_synonyms(kbid: str) -> knowledgebox_pb2.Synonyms | None:
-    async with get_driver().ro_transaction() as txn:
+    async with get_driver().ro_transaction(kbid=kbid) as txn:
         return await datamanagers.synonyms.get(txn, kbid=kbid)

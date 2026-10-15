@@ -26,7 +26,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from nucliadb.common.maindb.driver import Transaction
 from nucliadb_models import search as search_models
 from nucliadb_models.search import CatalogFacetsRequest, Resources
 
@@ -72,12 +71,6 @@ class CatalogQuery(BaseModel):
 
 
 class Catalog(abc.ABC, metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    async def update(self, txn: Transaction, kbid: str, rid: str, data: CatalogResourceData): ...
-
-    @abc.abstractmethod
-    async def delete(self, txn: Transaction, kbid: str, rid: str): ...
-
     @abc.abstractmethod
     async def search(self, catalog_query: CatalogQuery) -> Resources: ...
 

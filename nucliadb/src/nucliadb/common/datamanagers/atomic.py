@@ -53,28 +53,48 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-def ro_txn_wrap(fun: Callable[Concatenate[Transaction, P], Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+def ro_txn_wrap(
+    fun: Callable[Concatenate[Transaction, P], Awaitable[T]], system: bool = False
+) -> Callable[P, Awaitable[T]]:
     @wraps(fun)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-        async with with_ro_transaction() as txn:
-            return await fun(txn, *args, **kwargs)
+        if system:
+            async with with_ro_transaction(kbid=None) as txn:
+                return await fun(txn, *args, **kwargs)
+        else:
+            kbid = kwargs.get("kbid")
+            if not isinstance(kbid, str):
+                raise ValueError("kbid must be provided for non-system transactions")
+            async with with_ro_transaction(kbid=kbid) as txn:
+                return await fun(txn, *args, **kwargs)
 
     return wrapper
 
 
-def rw_txn_wrap(fun: Callable[Concatenate[Transaction, P], Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+def rw_txn_wrap(
+    fun: Callable[Concatenate[Transaction, P], Awaitable[T]], system: bool = False
+) -> Callable[P, Awaitable[T]]:
     @wraps(fun)
     async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
-        async with with_transaction() as txn:
-            result = await fun(txn, *args, **kwargs)
-            await txn.commit()
-            return result
+        if system:
+            async with with_transaction(kbid=None) as txn:
+                result = await fun(txn, *args, **kwargs)
+                await txn.commit()
+                return result
+        else:
+            kbid = kwargs.get("kbid")
+            if not isinstance(kbid, str):
+                raise ValueError("kbid must be provided for non-system transactions")
+            async with with_transaction(kbid=kbid) as txn:
+                result = await fun(txn, *args, **kwargs)
+                await txn.commit()
+                return result
 
     return wrapper
 
 
 class kb:
-    exists = ro_txn_wrap(kb_dm.exists)
+    exists = ro_txn_wrap(kb_dm.exists, system=True)
     get_config = ro_txn_wrap(kb_dm.get_config)
     get_shards = ro_txn_wrap(kb_dm.get_shards)
 

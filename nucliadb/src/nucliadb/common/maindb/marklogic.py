@@ -8,8 +8,8 @@ import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from nucliadb.common.maindb import marklogic_schema
 from nucliadb.common.maindb.collections import MarkLogicCollections
-from nucliadb.common.maindb.driver import DEFAULT_SCAN_LIMIT, Driver, Transaction
 from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
 from nucliadb.common.marklogic import documents
@@ -17,6 +17,9 @@ from nucliadb.common.marklogic.admin_client import AdminClient
 from nucliadb.common.marklogic.client import Client, Document
 from nucliadb.common.marklogic.client import Transaction as SDKTransaction
 from nucliadb.common.marklogic.uris import MarkLogicURIs
+
+DEFAULT_SCAN_LIMIT = -1
+DEFAULT_BATCH_SCAN_LIMIT = 500
 
 
 class MarkLogicDataLayer:
@@ -54,13 +57,19 @@ class MarkLogicDataLayer:
         return None
 
 
-class MarkLogicTransaction(Transaction):
+class MarkLogicTransaction:
     driver: MarkLogicDriver
-    read_only: bool = False
 
-    def __init__(self, driver: MarkLogicDriver, *, kbid: str | None = None):
+    def __init__(
+        self,
+        driver: MarkLogicDriver,
+        *,
+        kbid: str | None = None,
+        read_only: bool = False,
+    ):
         self.driver = driver
         self.kbid = kbid
+        self.read_only = read_only
         self._database = driver.system_database if kbid is None else driver.kb_database(kbid)
         self._data = driver.data(self._database)
         self._sdk_transaction: SDKTransaction | None = None
@@ -129,6 +138,8 @@ class MarkLogicTransaction(Transaction):
         return values[0]
 
     async def set(self, key: str, value: bytes) -> None:
+        if self.read_only:
+            raise RuntimeError("Cannot set in read only transaction")
         await documents.write(
             self,
             uri=self._data._uri(key),
@@ -137,14 +148,20 @@ class MarkLogicTransaction(Transaction):
         )
 
     async def insert(self, key: str, value: bytes) -> None:
+        if self.read_only:
+            raise RuntimeError("Cannot insert in read only transaction")
         if await self.get(key) is not None:
             raise ConflictError(key)
         await self.set(key, value)
 
     async def delete(self, key: str) -> None:
+        if self.read_only:
+            raise RuntimeError("Cannot delete in read only transaction")
         await documents.delete(self, self._data._uri(key))
 
     async def delete_by_prefix(self, prefix: str) -> None:
+        if self.read_only:
+            raise RuntimeError("Cannot delete in read only transaction")
         upper = self._data._prefix_upper_bound(prefix)
         clauses = [
             f"cts.collectionQuery({json.dumps(MarkLogicCollections.MAINDB)})",
@@ -203,26 +220,9 @@ class MarkLogicTransaction(Transaction):
         return int(result[0] if len(result) > 0 else 0)
 
 
-class ReadOnlyMarkLogicTransaction(MarkLogicTransaction):
-    read_only: bool = True
+class MarkLogicDriver:
+    initialized = False
 
-    async def commit(self) -> None:
-        raise RuntimeError("Cannot commit transaction in read only mode")
-
-    async def set(self, key: str, value: bytes) -> None:
-        raise RuntimeError("Cannot set in read only transaction")
-
-    async def insert(self, key: str, value: bytes) -> None:
-        raise RuntimeError("Cannot insert in read only transaction")
-
-    async def delete(self, key: str) -> None:
-        raise RuntimeError("Cannot delete in read only transaction")
-
-    async def delete_by_prefix(self, prefix: str) -> None:
-        raise RuntimeError("Cannot delete in read only transaction")
-
-
-class MarkLogicDriver(Driver):
     def __init__(
         self,
         uri: str,
@@ -264,11 +264,43 @@ class MarkLogicDriver(Driver):
         async with AdminClient(f"{self.uri}:{self.admin_port}", self.username, self.password) as client:
             yield client
 
+    async def ensure_system_database(self) -> None:
+        async with self.admin_client() as client:
+            await marklogic_schema.ensure_database(
+                client, self.system_database, marklogic_schema.SYSTEM_PATH_INDEXES
+            )
+
+    async def ensure_kb_database(self, kbid: str) -> str:
+        database = self.kb_database(kbid)
+        if database in self._provisioned:
+            return database
+        async with self._provisioning_lock:
+            if database in self._provisioned:
+                return database
+            async with self.admin_client() as client:
+                await marklogic_schema.ensure_database(
+                    client, database, marklogic_schema.KB_PATH_INDEXES
+                )
+            self._provisioned.add(database)
+        return database
+
+    async def delete_kb_database(self, kbid: str) -> None:
+        database = self.kb_database(kbid)
+        async with self.admin_client() as client:
+            await client.delete_database(database)
+        self._provisioned.discard(database)
+
     async def initialize(self) -> None:
         async with self._lock:
             if self.initialized:
                 return
             self._client = Client(f"{self.uri}:{self.port}", self.username, self.password)
+            try:
+                await self.ensure_system_database()
+            except BaseException:
+                await self._client.aclose()
+                self._client = None
+                raise
             self.initialized = True
 
     async def finalize(self) -> None:
@@ -287,13 +319,19 @@ class MarkLogicDriver(Driver):
             raise ValueError("Cannot specify both system and kbid for a transaction")
         if not self.initialized or self._client is None:
             raise RuntimeError("MarkLogic driver is not initialized")
-        txn = (
-            ReadOnlyMarkLogicTransaction(self, kbid=kbid)
-            if read_only
-            else MarkLogicTransaction(self, kbid=kbid)
-        )
+        txn = MarkLogicTransaction(self, kbid=kbid, read_only=read_only)
         try:
             yield txn
         finally:
             if txn.open:
                 await txn.abort()
+
+    @asynccontextmanager
+    async def ro_transaction(self, *, kbid: str | None = None) -> AsyncGenerator[MarkLogicTransaction]:
+        async with self.transaction(kbid=kbid, read_only=True) as txn:
+            yield txn
+
+    @asynccontextmanager
+    async def rw_transaction(self, *, kbid: str | None = None) -> AsyncGenerator[MarkLogicTransaction]:
+        async with self.transaction(kbid=kbid, read_only=False) as txn:
+            yield txn

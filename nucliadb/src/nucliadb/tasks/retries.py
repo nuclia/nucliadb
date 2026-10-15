@@ -87,10 +87,10 @@ class TaskRetryHandler:
         )
 
     async def get_metadata(self) -> TaskMetadata | None:
-        return await _get_metadata(self.context.kv_driver, self.metadata_key)
+        return await _get_metadata(self.context.kv_driver, self.metadata_key, kbid=self.kbid)
 
     async def set_metadata(self, metadata: TaskMetadata) -> None:
-        await _set_metadata(self.context.kv_driver, self.metadata_key, metadata)
+        await _set_metadata(self.context.kv_driver, self.metadata_key, metadata, kbid=self.kbid)
 
     def wrap(self, func: Callable) -> Callable:
         @functools.wraps(func)
@@ -149,16 +149,18 @@ class TaskRetryHandler:
         return wrapper
 
 
-async def _get_metadata(kv_driver: Driver, metadata_key: str) -> TaskMetadata | None:
-    async with kv_driver.ro_transaction() as txn:
+async def _get_metadata(kv_driver: Driver, metadata_key: str, *, kbid: str) -> TaskMetadata | None:
+    async with kv_driver.ro_transaction(kbid=kbid) as txn:
         metadata = await txn.get(metadata_key)
         if metadata is None:
             return None
         return TaskMetadata.model_validate_json(metadata)
 
 
-async def _set_metadata(kv_driver: Driver, metadata_key: str, metadata: TaskMetadata) -> None:
-    async with kv_driver.rw_transaction() as txn:
+async def _set_metadata(
+    kv_driver: Driver, metadata_key: str, metadata: TaskMetadata, *, kbid: str
+) -> None:
+    async with kv_driver.rw_transaction(kbid=kbid) as txn:
         await txn.set(metadata_key, metadata.model_dump_json().encode())
         await txn.commit()
 

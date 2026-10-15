@@ -103,6 +103,19 @@ class ResourceContent(BaseModel):
     facets: list[str]
 
 
+class ResourceUpdateContent(BaseModel):
+    slug: str | None = None
+    basic: dict[str, Any] | None = None
+    origin: dict[str, Any] | None = None
+    extra: dict[str, Any] | None = None
+    security: dict[str, Any] | None = None
+    title: str | None = None
+    processing_status: str | None = None
+    created_at: str | None = None
+    modified_at: str | None = None
+    facets: list[str] | None = None
+
+
 class ResourceCreateContent(BaseModel):
     slug: str
     basic: dict[str, Any]
@@ -121,7 +134,6 @@ def _driver_txn(
     kbid: str,
     ensure_writes: bool = False,
 ) -> tuple[MarkLogicDriver, MarkLogicTransaction]:
-    txn = cast(MarkLogicTransaction, txn)
     marklogic_driver, marklogic_txn = documents.driver_txn(txn, ensure_writes=ensure_writes)
     assert marklogic_txn.kbid == kbid
     return marklogic_driver, marklogic_txn
@@ -343,11 +355,11 @@ async def update_resource(
     *,
     kbid: str,
     rid: str,
-    data: ResourceContent,
+    data: ResourceContent | ResourceUpdateContent,
 ) -> bool:
     _, marklogic_txn = _driver_txn(txn, kbid=kbid, ensure_writes=True)
     update = DocumentUpdate(uri=MarkLogicURIs.resource(rid), collection=MarkLogicCollections.RESOURCES)
-    update.set(**data.model_dump(mode="json"))
+    update.set(**data.model_dump(mode="json", exclude_unset=True))
     return await documents.update_document(marklogic_txn, update)
 
 

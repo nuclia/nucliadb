@@ -69,7 +69,7 @@ async def detect_orphan_shards(driver: Driver) -> dict[str, ShardKb]:
         kbid = await _get_kbid(shard_id) or UNKNOWN_KB
         # Shards with known KB ids are skipped if they are referenced by that KB.
         if kbid != UNKNOWN_KB:
-            async with datamanagers.with_ro_transaction() as txn:
+            async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
                 skip = await is_kb_shard(txn, kbid=kbid, shard_id=shard_id)
                 if skip:
                     continue

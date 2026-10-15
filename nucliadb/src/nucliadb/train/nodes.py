@@ -59,7 +59,7 @@ class TrainShardManager(manager.KBShardManager):
         if kbid is None:
             return None
 
-        if not (await datamanagers.kb.exists(txn, kbid=kbid)):
+        if not (await datamanagers.atomic.kb.exists(kbid=kbid)):
             return None
 
         kbobj = KnowledgeBox(txn, self.storage, kbid)
@@ -74,7 +74,7 @@ class TrainShardManager(manager.KBShardManager):
         return manager
 
     async def kb_sentences(self, request: GetSentencesRequest) -> AsyncIterator[TrainSentence]:
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             if request.uuid != "":
                 # Filter by uuid
@@ -88,7 +88,7 @@ class TrainShardManager(manager.KBShardManager):
                         yield sentence
 
     async def kb_paragraphs(self, request: GetParagraphsRequest) -> AsyncIterator[TrainParagraph]:
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             if request.uuid != "":
                 # Filter by uuid
@@ -102,7 +102,7 @@ class TrainShardManager(manager.KBShardManager):
                         yield paragraph
 
     async def kb_fields(self, request: GetFieldsRequest) -> AsyncIterator[TrainField]:
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             if request.uuid != "":
                 # Filter by uuid
@@ -116,7 +116,7 @@ class TrainShardManager(manager.KBShardManager):
                         yield field
 
     async def kb_resources(self, request: GetResourcesRequest) -> AsyncIterator[TrainResource]:
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=request.kb.uuid) as txn:
             kb = KnowledgeBox(txn, self.storage, request.kb.uuid)
             async for rid in datamanagers.resources.iter(kbid=request.kb.uuid):
                 resource = await kb.get(rid)

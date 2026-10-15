@@ -28,8 +28,8 @@ from nucliadb.common.maindb.driver import Driver, Transaction
 
 
 @pytest.fixture(scope="function")
-async def txn(maindb_driver: Driver) -> AsyncIterator[Transaction]:
-    async with maindb_driver.rw_transaction() as txn:
+async def txn(maindb_driver: Driver, knowledgebox: str) -> AsyncIterator[Transaction]:
+    async with maindb_driver.rw_transaction(knowledgebox) as txn:
         try:
             yield txn
         finally:

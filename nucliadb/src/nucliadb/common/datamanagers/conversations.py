@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -16,6 +16,7 @@ from nucliadb.common.marklogic.document_update import DocumentUpdate
 from nucliadb.common.marklogic.uris import MarkLogicURIs
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import FieldConversation, SplitsMetadata
+from nucliadb_protos.writer_pb2 import FieldStatus
 
 _SPLITS_METADATA_PAGE = 0
 
@@ -33,17 +34,15 @@ def _marklogic_txn(
     kbid: str,
     ensure_writes: bool = False,
 ) -> MarkLogicTransaction:
-    marklogic_txn = cast(MarkLogicTransaction, txn)
-    documents.driver_txn(marklogic_txn, ensure_writes=ensure_writes)
-    assert marklogic_txn.kbid == kbid
-    return marklogic_txn
+    documents.driver_txn(txn, ensure_writes=ensure_writes)
+    assert txn.kbid == kbid
+    return txn
 
 
 async def create_page(txn: Transaction, data: ConversationPageContent) -> None:
-    marklogic_txn = cast(MarkLogicTransaction, txn)
-    documents.driver_txn(marklogic_txn, ensure_writes=True)
+    documents.driver_txn(txn, ensure_writes=True)
     await documents.write(
-        marklogic_txn,
+        txn,
         uri=MarkLogicURIs.conversation_page(data.resource_id, data.field_id, data.conversation_page),
         collection=MarkLogicCollections.CONVERSATIONS,
         content=data.model_dump(mode="json"),
@@ -74,6 +73,7 @@ async def set_metadata(
     rid: str,
     field_id: str,
     metadata: FieldConversation,
+    status: FieldStatus | None = None,
 ) -> None:
     marklogic_txn = _marklogic_txn(txn, kbid=kbid, ensure_writes=True)
     update = DocumentUpdate(
@@ -81,6 +81,8 @@ async def set_metadata(
         collection=MarkLogicCollections.FIELDS,
     )
     update["value"] = documents.to_json(metadata)
+    if status is not None:
+        update["status"] = documents.to_json(status)
     await documents.update_document(marklogic_txn, update)
 
 

@@ -41,7 +41,6 @@ from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 from nucliadb.common.catalog.dummy import DummyCatalog
 from nucliadb.common.catalog.interface import Catalog, CatalogQuery
 from nucliadb.common.catalog.marklogic import MarkLogicCatalog
-from nucliadb.common.catalog.utils import build_catalog_resource_data
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.settings import CatalogConfig, settings
@@ -59,14 +58,11 @@ def get_catalog() -> Catalog:
 
 
 async def catalog_update(txn: Transaction, kbid: str, resource: Resource, index_message: IndexMessage):
-    catalog = get_catalog()
-    resource_data = build_catalog_resource_data(resource, index_message)
-    await catalog.update(txn, kbid, resource.uuid, resource_data)
+    pass
 
 
 async def catalog_delete(txn: Transaction, kbid: str, rid: str):
-    catalog = get_catalog()
-    await catalog.delete(txn, kbid, rid)
+    pass
 
 
 async def catalog_search(query: CatalogQuery) -> Resources:

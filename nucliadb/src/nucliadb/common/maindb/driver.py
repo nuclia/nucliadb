@@ -17,80 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-from __future__ import annotations
+# Compatibility imports: MarkLogic is the only supported maindb backend.
+from nucliadb.common.maindb.marklogic import DEFAULT_BATCH_SCAN_LIMIT, DEFAULT_SCAN_LIMIT
+from nucliadb.common.maindb.marklogic import MarkLogicDriver as Driver
+from nucliadb.common.maindb.marklogic import MarkLogicTransaction as Transaction
 
-import asyncio
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from typing import ClassVar
-
-DEFAULT_SCAN_LIMIT = -1
-DEFAULT_BATCH_SCAN_LIMIT = 500
-
-
-class Transaction:
-    driver: Driver
-    open: bool
-
-    async def abort(self):
-        raise NotImplementedError()
-
-    async def commit(self):
-        raise NotImplementedError()
-
-    async def batch_get(self, keys: list[str], for_update: bool = False) -> list[bytes | None]:
-        raise NotImplementedError()
-
-    async def get(self, key: str, for_update: bool = False) -> bytes | None:
-        raise NotImplementedError()
-
-    async def set(self, key: str, value: bytes):
-        raise NotImplementedError()
-
-    async def insert(self, key: str, value: bytes):
-        return await self.set(key, value)
-
-    async def delete(self, key: str):
-        raise NotImplementedError()
-
-    async def delete_by_prefix(self, prefix: str) -> None:
-        raise NotImplementedError()
-
-    def keys(
-        self, match: str, count: int = DEFAULT_SCAN_LIMIT, include_start: bool = True
-    ) -> AsyncGenerator[str]:
-        raise NotImplementedError()
-
-    async def count(self, match: str) -> int:
-        raise NotImplementedError()
-
-
-class Driver:
-    initialized = False
-    _abort_tasks: ClassVar[list[asyncio.Task]] = []
-
-    async def initialize(self):
-        raise NotImplementedError()
-
-    async def finalize(self):
-        while len(self._abort_tasks) > 0:
-            task = self._abort_tasks.pop()
-            if not task.done():
-                try:
-                    await task
-                except Exception:
-                    pass
-
-    @asynccontextmanager
-    async def _transaction(self, *, read_only: bool) -> AsyncGenerator[Transaction]:
-        yield Transaction()
-
-    @asynccontextmanager
-    async def ro_transaction(self) -> AsyncGenerator[Transaction]:
-        async with self._transaction(read_only=True) as txn:
-            yield txn
-
-    @asynccontextmanager
-    async def rw_transaction(self) -> AsyncGenerator[Transaction]:
-        async with self._transaction(read_only=False) as txn:
-            yield txn
+__all__ = ["DEFAULT_BATCH_SCAN_LIMIT", "DEFAULT_SCAN_LIMIT", "Driver", "Transaction"]

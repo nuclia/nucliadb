@@ -495,6 +495,7 @@ async def test_get_extracted_vectors_can_select_vectorset(
     nucliadb_ingest_grpc: WriterStub,
     standalone_knowledgebox: str,
 ):
+    kbid = standalone_knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{standalone_knowledgebox}/resources",
         json={
@@ -506,9 +507,9 @@ async def test_get_extracted_vectors_can_select_vectorset(
     assert resp.status_code == 201
     rid = resp.json()["uuid"]
 
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         async for default_vectorset_id, default_vectorset in datamanagers.vectorsets.iter(
-            txn, kbid=standalone_knowledgebox
+            txn, kbid=kbid
         ):
             break
 

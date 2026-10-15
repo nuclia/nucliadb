@@ -27,14 +27,13 @@ from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import writer_pb2
 
 
-async def test_shard_creation(txn: Transaction):
+async def test_shard_creation(txn: Transaction, kbid: str):
     """Given a cluster of index nodes, validate shard creation logic.
 
     Every logic shard should create a configured amount of indexing replicas and
     update the information about writable shards.
 
     """
-    kbid = KnowledgeBox.new_unique_kbid()
     sm = manager.KBShardManager()
 
     # Fake KB shards instead of creating a KB to generate it
@@ -82,6 +81,11 @@ async def test_shard_creation(txn: Transaction):
 
 
 @pytest.fixture
-async def txn(maindb_driver: Driver):
-    async with maindb_driver.rw_transaction() as txn:
+def kbid() -> str:
+    return KnowledgeBox.new_unique_kbid()
+
+
+@pytest.fixture
+async def txn(maindb_driver: Driver, kbid: str):
+    async with maindb_driver.rw_transaction(kbid) as txn:
         yield txn

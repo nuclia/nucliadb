@@ -46,10 +46,10 @@ async def maindb_driver(marklogic_maindb_driver) -> AsyncIterator[Driver]:
 async def cleanup_maindb(driver: Driver):
     if not driver.initialized:
         return
-    async with driver.rw_transaction() as txn:
+    async with driver.rw_transaction(None) as txn:
         await txn.delete_by_prefix("/")
         await txn.commit()
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(None) as txn:
         assert await txn.count("/") == 0
 
     if isinstance(driver, MarkLogicDriver):

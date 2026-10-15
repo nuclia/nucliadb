@@ -107,7 +107,6 @@ class KnowledgeBox:
         description: str = "",
         hidden_resources_enabled: bool = False,
         hidden_resources_hide_on_creation: bool = False,
-        prewarm_enabled: bool = False,
         semantic_graph_node_models: dict[str, SemanticModelMetadata] = dict(),
         semantic_graph_edge_models: dict[str, SemanticModelMetadata] = dict(),
         enforce_security: bool | None = None,
@@ -128,7 +127,7 @@ class KnowledgeBox:
         rollback_ops: list[Callable[[], Coroutine[Any, Any, Any]]] = []
 
         try:
-            async with driver.rw_transaction() as txn:
+            async with driver.rw_transaction(kbid=None) as txn:
                 if await datamanagers.kb.exists(txn, kbid=kbid):
                     raise KnowledgeBoxConflict("KB with this kbid already exists")
 
@@ -137,15 +136,23 @@ class KnowledgeBox:
                     await datamanagers.kb.set_slug(txn, slug=slug, kbid=kbid)
                 except datamanagers.exceptions.KnowledgeBoxConflict as e:
                     raise KnowledgeBoxConflict("Slug already exists") from e
+                await txn.commit()
 
+            async def rollback_registry() -> None:
+                async with driver.rw_transaction(kbid=None) as txn:
+                    await datamanagers.kb.registry_delete(txn, kbid=kbid)
+                    await txn.commit()
+
+            rollback_ops.append(rollback_registry)
+            await driver.ensure_kb_database(kbid)
+
+            async with driver.rw_transaction(kbid=kbid) as txn:
                 # all KBs have the vectorset key initialized, although (for
                 # now), not every KB will store vectorsets there
                 await datamanagers.vectorsets.initialize(txn, kbid=kbid)
 
                 kb_shards = writer_pb2.Shards()
                 kb_shards.kbid = kbid
-                # B/c with Shards.actual
-                kb_shards.actual = -1
 
                 for vectorset_id, semantic_model in semantic_models.items():
                     # if this KB uses a matryoshka model, we can choose a different
@@ -170,7 +177,6 @@ class KnowledgeBox:
                                 for name, model in semantic_graph_node_models.items()
                             ],
                         )
-
                     if semantic_graph_edge_models:
                         await datamanagers.graph_vectorsets.edge.set_all(
                             txn,
@@ -189,7 +195,6 @@ class KnowledgeBox:
                     hidden_resources_enabled=hidden_resources_enabled,
                     hidden_resources_hide_on_creation=hidden_resources_hide_on_creation,
                     enforce_security=enforce_security if enforce_security is not None else False,
-                    prewarm_enabled=prewarm_enabled,
                 )
                 await datamanagers.kb.set(txn, kbid=kbid, shards=kb_shards, config=config)
 
@@ -197,10 +202,7 @@ class KnowledgeBox:
                 # uses this variable anymore
                 del kb_shards
 
-                # Create in storage
-
                 storage = await get_storage(service_name=SERVICE_NAME)
-
                 created = await storage.create_kb(kbid)
                 if not created:
                     logger.error(f"KB {kbid} could not be created")
@@ -208,15 +210,6 @@ class KnowledgeBox:
                         f"KB blob storage could not be created (slug={slug})"
                     )
                 rollback_ops.append(partial(storage.delete_kb, kbid))
-
-                # Create shards in index nodes
-
-                shard_manager = get_shard_manager()
-                # XXX creating a shard is a slow IO operation that requires a write
-                # txn to be open!
-                await shard_manager.create_shard_by_kbid(txn, kbid, prewarm_enabled=prewarm_enabled)
-                # shards don't need a rollback as they will be eventually purged
-
                 await txn.commit()
 
         except Exception as exc:
@@ -246,17 +239,19 @@ class KnowledgeBox:
         migration_version: int | None = None,
         hidden_resources_enabled: bool | None = None,
         hidden_resources_hide_on_creation: bool | None = None,
-        prewarm_enabled: bool | None = None,
         enforce_security: bool | None = None,
     ) -> str:
-        async with driver.rw_transaction() as txn:
+        async with (
+            driver.rw_transaction(kbid=None) as system_txn,
+            driver.rw_transaction(kbid=kbid) as txn,
+        ):
             stored = await datamanagers.kb.get_config(txn, kbid=kbid, for_update=True)
             if not stored:
                 raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
             if slug:
                 try:
-                    await datamanagers.kb.set_slug(txn, slug=slug, kbid=kbid)
+                    await datamanagers.kb.set_slug(system_txn, slug=slug, kbid=kbid)
                 except datamanagers.exceptions.KnowledgeBoxConflict as e:
                     raise KnowledgeBoxConflict("Slug already exists") from e
                 stored.slug = slug
@@ -274,12 +269,6 @@ class KnowledgeBox:
             if hidden_resources_hide_on_creation is not None:
                 stored.hidden_resources_hide_on_creation = hidden_resources_hide_on_creation
 
-            update_prewarm = None
-            if prewarm_enabled is not None:
-                if stored.prewarm_enabled != prewarm_enabled:
-                    update_prewarm = prewarm_enabled
-                stored.prewarm_enabled = prewarm_enabled
-
             if stored.hidden_resources_hide_on_creation and not stored.hidden_resources_enabled:
                 raise KnowledgeBoxCreationError(
                     "Cannot hide new resources if the hidden resources feature is disabled"
@@ -291,16 +280,9 @@ class KnowledgeBox:
             await datamanagers.kb.set(txn, kbid=kbid, config=stored)
 
             await txn.commit()
-
-        if update_prewarm is not None:
-            await cls.configure_shards(driver, kbid, prewarm=update_prewarm)
+            await system_txn.commit()
 
         return kbid
-
-    @classmethod
-    async def configure_shards(cls, driver: Driver, kbid: str, *, prewarm: bool):
-        # TODO(Marklogic): Configure backend shard prewarming.
-        return None
 
     @classmethod
     async def mark_for_purge(cls, txn: Transaction, kbid: str):
@@ -331,7 +313,7 @@ class KnowledgeBox:
         - Mark the KB for purge, which will eventually delete all KB keys in Postgresql and objects in storage.
         """
 
-        async with driver.rw_transaction() as txn:
+        async with driver.rw_transaction(kbid=None) as txn:
             exists = await datamanagers.kb.exists(txn, kbid=kbid)
             if not exists:
                 # Already deleted, or never existed.
@@ -339,18 +321,9 @@ class KnowledgeBox:
 
             await cls.mark_for_purge(txn, kbid=kbid)
 
-            shards_obj = await datamanagers.kb.get_shards(txn, kbid=kbid)
-
             await datamanagers.kb.soft_delete(txn, kbid=kbid)
 
             await txn.commit()
-
-        if shards_obj is None:
-            logger.warning(f"Shards not found for KB while deleting it", extra={"kbid": kbid})
-        else:
-            shard_manager = get_shard_manager()
-            for shard in shards_obj.shards:
-                await shard_manager.delete_index_shard(shard)
 
         audit = get_audit()
         if audit is not None:
@@ -385,7 +358,7 @@ class KnowledgeBox:
             await txn.commit()
 
         # Delete by prefix in another transaction, as it can be slow and we don't want to block the previous one
-        async with driver.rw_transaction() as txn:
+        async with driver.rw_transaction(kbid=None) as txn:
             await cls.delete_all_kb_keys(txn, kbid)
             await txn.commit()
 

@@ -1,13 +1,17 @@
-from typing import Any, TypeVar
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from google.protobuf.json_format import MessageToDict, ParseDict
 from google.protobuf.message import Message
 
-from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
 from nucliadb.common.marklogic.client import Document
 from nucliadb.common.marklogic.document_deletion import DocumentDeletion
 from nucliadb.common.marklogic.document_update import DocumentUpdate
 from nucliadb.common.marklogic.exceptions import DatabaseDoesNotExist
+
+if TYPE_CHECKING:
+    from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
 
 PB = TypeVar("PB", bound=Message)
 
@@ -32,6 +36,8 @@ def from_json(value: dict, pb_klass: type[PB]) -> PB:
 def driver_txn(
     txn: MarkLogicTransaction, ensure_writes: bool = False
 ) -> tuple[MarkLogicDriver, MarkLogicTransaction]:
+    from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
+
     if not isinstance(txn, MarkLogicTransaction) or not isinstance(txn.driver, MarkLogicDriver):
         raise TypeError("KnowledgeBox datamanager requires MarkLogicDriver")
     driver = txn.driver

@@ -21,7 +21,7 @@
 
 import base64
 import json
-from typing import Any, Sequence, cast
+from typing import Any, Sequence
 
 from google.protobuf.message import Message
 from pydantic import BaseModel
@@ -88,13 +88,12 @@ def _marklogic_txn(
     kbid: str | None = None,
     ensure_writes: bool = False,
 ) -> MarkLogicTransaction:
-    marklogic_txn = cast(MarkLogicTransaction, txn)
-    documents.driver_txn(marklogic_txn, ensure_writes=ensure_writes)
-    if marklogic_txn.kbid is None:
+    documents.driver_txn(txn, ensure_writes=ensure_writes)
+    if txn.kbid is None:
         raise ValueError("Field operations require a KnowledgeBox-scoped transaction")
-    if kbid is not None and marklogic_txn.kbid != kbid:
+    if kbid is not None and txn.kbid != kbid:
         raise ValueError("Transaction KnowledgeBox does not match the requested KnowledgeBox")
-    return marklogic_txn
+    return txn
 
 
 def _field_update(
@@ -133,13 +132,12 @@ def _value_to_raw_bytes(value: dict[str, Any] | None, field_type: str) -> bytes 
 @observer.wrap({"type": "field", "op": "create_document"})
 async def create_document(txn: Transaction, data: FieldContent) -> None:
     marklogic_txn = _marklogic_txn(txn, ensure_writes=True)
-    update = _field_update(
-        rid=data.resource_id,
-        field_type=data.field_type,
-        field_id=data.field_id,
-        **data.model_dump(mode="json"),
+    await documents.write(
+        marklogic_txn,
+        uri=MarkLogicURIs.field(data.resource_id, data.field_type, data.field_id),
+        collection=MarkLogicCollections.FIELDS,
+        content=data.model_dump(mode="json"),
     )
-    await documents.update_document(marklogic_txn, update)
 
 
 @observer.wrap({"type": "field", "op": "list_resource_documents"})
@@ -255,11 +253,14 @@ async def set(
     field_type: str,
     field_id: str,
     value: Message | bytes,
+    status: wpb2.FieldStatus | None = None,
+    md5: str | None = None,
 ) -> None:
     if isinstance(value, Message):
         value_json = documents.to_json(value)
     else:
         value_json = {_FIELD_VALUE_RAW_KEY: base64.b64encode(value).decode("ascii")}
+
     marklogic_txn = _marklogic_txn(txn, kbid=kbid, ensure_writes=True)
     await documents.update_document(
         marklogic_txn,
@@ -268,6 +269,8 @@ async def set(
             field_type=field_type,
             field_id=field_id,
             value=value_json,
+            status=documents.to_json(status) if status is not None else None,
+            md5=md5,
         ),
     )
 

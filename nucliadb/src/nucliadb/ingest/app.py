@@ -147,7 +147,6 @@ async def main_subscriber_workers():  # pragma: no cover
     metrics_server = await serve_metrics()
     grpc_health_finalizer = await health.start_grpc_health_service(settings.grpc_port)
     auditor_closer = await consumer_service.start_auditor()
-    shard_creator_closer = await consumer_service.start_shard_creator()
     materializer_closer = await consumer_service.start_materializer()
     await start_processing_engine()
 
@@ -178,7 +177,6 @@ async def main_subscriber_workers():  # pragma: no cover
             stop_processing_engine,
             back_pressure_finalizer,
             materializer_closer,
-            shard_creator_closer,
             auditor_closer,
             grpc_health_finalizer,
             metrics_server.shutdown,

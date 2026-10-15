@@ -17,16 +17,16 @@ check-system:
 
 .PHONY: format
 format:
-	ruff check --fix --config=../ruff.toml .
-	ruff format --config=../ruff.toml .
+	ruff check --fix --config=../ruff.toml $(CODE_PATHS)
+	ruff format --config=../ruff.toml $(CODE_PATHS)
 
 
 .PHONY: lint
 lint:
-	ruff check --config=../ruff.toml .
-	ruff format --check --config=../ruff.toml .
-	ty check .
-	MYPYPATH=../nidx mypy --config-file=../mypy.ini .
+	ruff check --config=../ruff.toml $(CODE_PATHS)
+	ruff format --check --config=../ruff.toml $(CODE_PATHS)
+	ty check $(CODE_PATHS)
+	MYPYPATH=../nidx mypy --config-file=../mypy.ini $(CODE_PATHS)
 
 # pytest doesn't support test discovery across our multiple "top-level folders"
 # so we need to run all test targets one by one

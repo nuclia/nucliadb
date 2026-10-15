@@ -150,7 +150,7 @@ async def test_send_to_process_generated_fields(
     assert payload.textfield[da_field].body == bm.texts[da_field].body
     assert partition == 1
 
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         kb = KnowledgeBox(txn, storage=await get_storage(), kbid=kbid)
         resource = await kb.get(rid)
         assert resource is not None
@@ -442,7 +442,7 @@ async def test_send_to_process_generated_conversation_field(
     )
     assert partition == 1
 
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         kb = KnowledgeBox(txn, storage=await get_storage(), kbid=kbid)
         resource = await kb.get(rid)
         assert resource is not None

@@ -200,7 +200,7 @@ async def get_resource_title_cached(
 
 
 async def get_resource_title(kv_driver: Driver, kbid: str, resource_uuid: str) -> str | None:
-    async with kv_driver.ro_transaction() as txn:
+    async with kv_driver.ro_transaction(kbid=kbid) as txn:
         basic = await datamanagers.resources.get_basic(txn, kbid=kbid, rid=resource_uuid)
         if basic is None:
             return None

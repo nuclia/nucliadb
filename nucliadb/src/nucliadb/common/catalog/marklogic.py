@@ -27,7 +27,6 @@ from nucliadb.common.catalog.interface import (
 )
 from nucliadb_models.search import (
     CatalogFacetsRequest,
-    ResourceResult,
     Resources,
 )
 from nucliadb_telemetry import metrics
@@ -45,21 +44,12 @@ class MarkLogicCatalog(Catalog):
         # TODO(Marklogic)
         return Resources(
             facets=None,
-            results=[
-                ResourceResult(
-                    rid=str(r["rid"]).replace("-", ""),
-                    field="title",
-                    field_type="a",
-                    labels=[label for label in r["labels"] if label.startswith("/l/")],
-                    score=0,
-                )
-                for r in []
-            ],
+            results=[],
             query=catalog_query.query.query if catalog_query.query else "",
             total=0,
             page_number=catalog_query.page_number,
             page_size=catalog_query.page_size,
-            next_page=(catalog_query.page_size * catalog_query.page_number + len([r for r in []]) < 0),
+            next_page=False,
             min_score=0,
         )
 

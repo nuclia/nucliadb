@@ -33,15 +33,15 @@ from nucliadb_protos.resources_pb2 import MessageContent as PBMessageContent
 
 
 @pytest.fixture(scope="function")
-async def txn(maindb_driver: Driver):
-    async with maindb_driver.rw_transaction() as txn:
+async def txn(maindb_driver: Driver, kbid: str):
+    async with maindb_driver.rw_transaction(kbid) as txn:
         yield txn
 
 
 @pytest.fixture(scope="function")
 async def kbid(maindb_driver: Driver):
     kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(None) as txn:
         await datamanagers.kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid
@@ -57,7 +57,7 @@ def storage():
 @pytest.fixture(scope="function")
 async def resource(maindb_driver: Driver, txn: Transaction, storage, kbid: str):
     rid = Resource.new_unique_rid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid) as txn:
         await datamanagers.resources.set_slug(txn, kbid=kbid, rid=rid, slug=f"slug-{rid}")
         await txn.commit()
 

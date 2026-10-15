@@ -389,7 +389,7 @@ async def update_resource_slug(
     rid: str,
     new_slug: str,
 ):
-    async with driver.rw_transaction() as txn:
+    async with driver.rw_transaction(kbid=kbid) as txn:
         old_slug = await datamanagers.resources.update_slug(txn, kbid=kbid, rid=rid, new_slug=new_slug)
         await txn.commit()
         return old_slug
@@ -487,7 +487,7 @@ async def _reprocess_resource(
 
     # First pass: collect all reprocessable field ids and prepare writer message
     all_reprocessable_fields: list[tuple[int, str]] = []
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         kb = KnowledgeBox(txn, storage, kbid)
         resource = await kb.get(rid)
         if resource is None:
@@ -528,7 +528,7 @@ async def _reprocess_resource(
         if basic is not None:
             toprocess.title = basic.title
             toprocess.slug = basic.slug
-        async with driver.ro_transaction() as txn:
+        async with driver.ro_transaction(kbid=kbid) as txn:
             resource.txn = txn
             await collect_fields_for_reprocessing(
                 resource=resource,
@@ -561,7 +561,7 @@ async def get_indexed_resource_ids(kbid: str, request: StreamRequest) -> set[str
 async def delete_resource_batch(request: Request, item: BatchDeleteRequest, kbid: str):
     filter_pb = await parse_expression(item.filter_expression.resource, kbid)
 
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
         if shards is None:
             raise HTTPException(

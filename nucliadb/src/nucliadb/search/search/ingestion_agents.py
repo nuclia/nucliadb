@@ -68,7 +68,7 @@ def _parse_filters(filters: list[AgentsFilter] | None) -> list[NameOperationFilt
 
 
 async def fetch_resource_fields(kbid: str, rid: str) -> list[FieldInfo]:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         resource = await Resource.get(txn, kbid=kbid, rid=rid)
         if resource is None:
             raise ResourceNotFoundError()

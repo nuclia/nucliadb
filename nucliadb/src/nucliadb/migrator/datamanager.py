@@ -45,29 +45,29 @@ class MigrationsDataManager:
 
     async def schedule_all_kbs(self, target_version: int) -> None:
         # Get all kb ids
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=None) as txn:
             kbids = [kbid async for kbid, _ in datamanagers.kb.iter(txn)]
         # Schedule the migrations
-        async with self.driver.rw_transaction() as txn:
+        async with self.driver.rw_transaction(kbid=None) as txn:
             for kbid in kbids:
                 await txn.set(MIGRATIONS_KEY.format(kbid=kbid), str(target_version).encode())
             await txn.commit()
 
     async def get_kb_migrations(self) -> list[str]:
         keys = []
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=None) as txn:
             async for key in txn.keys(MIGRATIONS_CONTAINER_KEY):
                 keys.append(key.split("/")[-1])
 
         return keys
 
     async def delete_kb_migration(self, *, kbid: str) -> None:
-        async with self.driver.rw_transaction() as txn:
+        async with self.driver.rw_transaction(kbid=None) as txn:
             await txn.delete(MIGRATIONS_KEY.format(kbid=kbid))
             await txn.commit()
 
     async def get_kb_info(self, kbid: str) -> KnowledgeBoxInfo | None:
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=kbid) as txn:
             kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
             if kb_config is None:
                 return None
@@ -77,7 +77,7 @@ class MigrationsDataManager:
         await KnowledgeBoxORM.update(self.driver, kbid, migration_version=current_version)
 
     async def get_global_info(self) -> GlobalInfo:
-        async with self.driver.ro_transaction() as txn:
+        async with self.driver.ro_transaction(kbid=None) as txn:
             raw_pb = await txn.get(MIGRATION_INFO_KEY)
         if raw_pb is None:
             return GlobalInfo(current_version=0, target_version=None)
@@ -91,7 +91,7 @@ class MigrationsDataManager:
         current_version: int | _Unset = _UNSET,
         target_version: int | None | _Unset = _UNSET,
     ) -> None:
-        async with self.driver.rw_transaction() as txn:
+        async with self.driver.rw_transaction(kbid=None) as txn:
             raw_pb = await txn.get(MIGRATION_INFO_KEY, for_update=True)
             pb = migrations_pb2.MigrationInfo()
             if raw_pb is not None:

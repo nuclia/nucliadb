@@ -1,8 +1,6 @@
 import asyncio
-import hashlib
 import logging
-from typing import Any, Iterator, cast
-from uuid import uuid4
+from typing import Any, Iterator, Literal, cast
 
 import aiohttp.client_exceptions
 import nats.errors
@@ -10,13 +8,13 @@ import nats.js.errors
 from nidx_protos import noderesources_pb2 as brain
 
 from nucliadb.common import datamanagers
-from nucliadb.common.datamanagers.resources import ResourceContent, ResourceCreateContent
+from nucliadb.common.datamanagers.resources import ResourceCreateContent, ResourceUpdateContent
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
 from nucliadb.common.marklogic import documents
 from nucliadb.common.models_utils import from_proto
-from nucliadb.ingest.fields.conversation import PAGE_SIZE
+from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.exceptions import (
     DeadletteredError,
     InvalidBrokerMessage,
@@ -60,7 +58,6 @@ FieldContent = datamanagers.fields.FieldContent
 FieldProcessedContent = datamanagers.fields.FieldProcessedContent
 ChunkContent = datamanagers.fields.ChunkContent
 ChunkEmbeddingContent = datamanagers.fields.ChunkEmbeddingContent
-ConversationPageContent = datamanagers.conversations.ConversationPageContent
 
 
 logger = logging.getLogger("ingest-processor")
@@ -96,41 +93,41 @@ class ProcessorMarkLogic:
         kbobj = KnowledgeBox(txn, storage, uuid)
         return kbobj
 
-    async def get_extended_audit_data(self, message: writer_pb2.BrokerMessage) -> writer_pb2.Audit:
-        message_audit = writer_pb2.Audit()
-        message_audit.CopyFrom(message.audit)
-        message_audit.kbid = message.kbid
-        message_audit.uuid = message.uuid
-        message_audit.message_source = message.source
-        message_audit.field_metadata.extend([fcmw.field for fcmw in message.field_metadata])
-        audit_fields = await collect_audit_fields(self.driver, self.storage, message)
-        message_audit.audit_fields.extend(audit_fields)
-        return message_audit
+    async def get_extended_audit_data(self, bm: writer_pb2.BrokerMessage) -> writer_pb2.Audit:
+        audit_pb = writer_pb2.Audit()
+        audit_pb.CopyFrom(bm.audit)
+        audit_pb.kbid = bm.kbid
+        audit_pb.uuid = bm.uuid
+        audit_pb.message_source = bm.source
+        audit_pb.field_metadata.extend([fcmw.field for fcmw in bm.field_metadata])
+        audit_fields = await collect_audit_fields(self.driver, self.storage, bm)
+        audit_pb.audit_fields.extend(audit_fields)
+        return audit_pb
 
     async def notify_commit(
         self,
         *,
         partition: str,
         seqid: int,
-        message: writer_pb2.BrokerMessage,
+        bm: writer_pb2.BrokerMessage,
         write_type: writer_pb2.Notification.WriteType.ValueType,
     ):
-        message_audit = await self.get_extended_audit_data(message)
+        audit_pb = await self.get_extended_audit_data(bm)
         notification = writer_pb2.Notification(
             partition=int(partition),
             seqid=seqid,
             multi="",
-            uuid=message.uuid,
-            kbid=message.kbid,
+            uuid=bm.uuid,
+            kbid=bm.kbid,
             action=writer_pb2.Notification.Action.COMMIT,
             write_type=write_type,
-            source=MESSAGE_TO_NOTIFICATION_SOURCE[message.source],
-            processing_errors=len(message.errors) > 0,
-            message_audit=message_audit,
+            source=MESSAGE_TO_NOTIFICATION_SOURCE[bm.source],
+            processing_errors=len(bm.errors) > 0,
+            message_audit=audit_pb,
         )
 
         await self.notify(
-            const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=message.kbid),
+            const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=bm.kbid),
             notification.SerializeToString(),
         )
 
@@ -143,7 +140,7 @@ class ProcessorMarkLogic:
         rid: str,
         source: writer_pb2.BrokerMessage.MessageSource.ValueType,
     ):
-        message = writer_pb2.Notification(
+        bm = writer_pb2.Notification(
             partition=int(partition),
             seqid=seqid,
             multi="",
@@ -154,7 +151,7 @@ class ProcessorMarkLogic:
         )
         await self.notify(
             const.PubSubChannels.RESOURCE_NOTIFY.format(kbid=kbid),
-            message.SerializeToString(),
+            bm.SerializeToString(),
         )
 
     async def notify(self, channel, payload: bytes):
@@ -168,35 +165,36 @@ class ProcessorMarkLogic:
         partition: str | None = None,
         transaction_check: bool = True,
     ) -> None:
+        bm = message
         partition = partition if self.partition is None else self.partition
         if partition is None:
-            raise RuntimeError("Can't process message from unknown partition")
+            raise RuntimeError("Can't process bm from unknown partition")
 
         if transaction_check:
             last_seqid = await sequence_manager.get_last_seqid(self.driver, partition)
             if last_seqid is not None and seqid <= last_seqid:
                 raise SequenceOrderViolation(last_seqid)
 
-        if message.type == writer_pb2.BrokerMessage.MessageType.DELETE:
-            await self.delete(message, seqid, partition, transaction_check)
-        elif message.type == writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT:
-            await self.txn(message, seqid, partition, transaction_check)
+        if bm.type == writer_pb2.BrokerMessage.MessageType.DELETE:
+            await self.delete(bm, seqid, partition, transaction_check)
+        elif bm.type == writer_pb2.BrokerMessage.MessageType.AUTOCOMMIT:
+            await self.txn(bm, seqid, partition, transaction_check)
         else:  # pragma: no cover
             logger.error(
-                f"Unsupported message type: {message.type}",
+                f"Unsupported bm type: {bm.type}",
                 extra={"seqid": seqid, "partition": partition},
             )
 
     @processor_observer.wrap({"type": "delete"})
     async def delete(
         self,
-        message: writer_pb2.BrokerMessage,
+        bm: writer_pb2.BrokerMessage,
         seqid: int,
         partition: str,
         transaction_check: bool = True,
     ) -> None:
         try:
-            kbid, uuid = await self.ensure_kb_and_resource(message.kbid, message.uuid, message.slug)
+            kbid, uuid = await self.ensure_kb_and_resource(bm.kbid, bm.uuid, bm.slug)
         except (KnowledgeBoxDoesNotExist, ResourceDoesNotExist):
             if transaction_check:
                 await self.set_last_seqid(partition, seqid)
@@ -216,13 +214,13 @@ class ProcessorMarkLogic:
                     seqid=seqid,
                     kbid=kbid,
                     rid=uuid,
-                    source=message.source,
+                    source=bm.source,
                 )
                 raise exc
         await self.notify_commit(
             partition=partition,
             seqid=seqid,
-            message=message,
+            bm=bm,
             write_type=writer_pb2.Notification.WriteType.DELETED,
         )
 
@@ -252,219 +250,177 @@ class ProcessorMarkLogic:
         # TODO(Marklogic): Update resource status to error
         return
 
-    async def deadletter(self, message: writer_pb2.BrokerMessage, partition: str, seqid: int) -> None:
-        await self.storage.deadletter(message, 0, seqid, partition)
+    async def deadletter(self, bm: writer_pb2.BrokerMessage, partition: str, seqid: int) -> None:
+        await self.storage.deadletter(bm, 0, seqid, partition)
 
     @processor_observer.wrap({"type": "handle_data_augmentation_fields"})
-    async def handle_data_augmentation_fields(
-        self, message: writer_pb2.BrokerMessage, kbid: str, rid: str
-    ):
+    async def handle_data_augmentation_fields(self, bm: writer_pb2.BrokerMessage, kbid: str, rid: str):
         """
         Fields generated by data augmentation tasks are sent back to the processor to be processed and indexed.
         """
-        generated_fields = await get_generated_fields(message)
+        generated_fields = await get_generated_fields(bm)
         if generated_fields.is_not_empty():
-            await send_generated_fields_to_process_v2(kbid, rid, generated_fields, message)
+            await send_generated_fields_to_process_v2(kbid, rid, generated_fields, bm)
 
-    async def create_resource(
+    def writer_resource_content(
         self,
-        txn: MarkLogicTransaction,
-        broker_message: writer_pb2.BrokerMessage,
-        kbid: str,
+        bm: writer_pb2.BrokerMessage,
         uuid: str,
-        index_message: brain.Resource,
-    ) -> None:
-        assert broker_message.HasField("basic")
-        basic = broker_message.basic
-
-        def get_title(index_message: brain.Resource, basic: writer_pb2.Basic) -> str:
-            title_field_id = "a/title"
-            if title_field_id in index_message.texts:
-                return index_message.texts[title_field_id].text
-            return basic.title or basic.slug
-
-        origin = broker_message.origin if broker_message.HasField("origin") else None
+    ) -> ResourceCreateContent:
+        assert bm.HasField("basic")
+        basic = bm.basic
+        origin = bm.origin if bm.HasField("origin") else None
         created_at = (
-            index_message.metadata.created.ToJsonString()
-            if index_message.metadata.HasField("created")
-            else origin.created.ToJsonString()
+            origin.created.ToJsonString()
             if origin is not None and origin.HasField("created")
             else basic.created.ToJsonString()
             if basic.HasField("created")
             else ""
         )
         modified_at = (
-            index_message.metadata.modified.ToJsonString()
-            if index_message.metadata.HasField("modified")
-            else origin.modified.ToJsonString()
+            origin.modified.ToJsonString()
             if origin is not None and origin.HasField("modified")
             else basic.modified.ToJsonString()
             if basic.HasField("modified")
             else ""
         )
-        content = ResourceCreateContent(
-            slug=basic.slug or uuid,
+        return ResourceCreateContent(
+            slug=basic.slug or bm.slug or uuid,
             basic=documents.to_json(basic),
-            origin=documents.to_json(broker_message.origin)
-            if broker_message.HasField("origin")
-            else None,
-            extra=documents.to_json(broker_message.extra) if broker_message.HasField("extra") else None,
-            security=documents.to_json(broker_message.security)
-            if broker_message.HasField("security")
-            else None,
-            title=get_title(index_message, basic),
+            origin=documents.to_json(bm.origin) if bm.HasField("origin") else None,
+            extra=documents.to_json(bm.extra) if bm.HasField("extra") else None,
+            security=documents.to_json(bm.security) if bm.HasField("security") else None,
+            title=basic.title or basic.slug or bm.slug or uuid,
             created_at=created_at,
             modified_at=modified_at,
-            processing_status=brain.Resource.ResourceStatus.Name(index_message.status),
-            facets=list(index_message.labels),
+            processing_status=writer_pb2.Metadata.Status.Name(basic.metadata.status),
+            facets=sorted(
+                {
+                    f"/l/{classification.labelset}/{classification.label}"
+                    for classification in basic.usermetadata.classifications
+                    if not classification.cancelled_by_user
+                }
+            ),
         )
+
+    async def create_resource(
+        self,
+        txn: MarkLogicTransaction,
+        bm: writer_pb2.BrokerMessage,
+        kbid: str,
+        uuid: str,
+    ) -> None:
+        content = self.writer_resource_content(bm, uuid)
         # TODO(Marklogic): origin relation triplets
         # TODO(Marklogic): user relation triplets
         await datamanagers.resources.create_resource(txn, kbid=kbid, rid=uuid, data=content)
 
         # User relations are stored in the object store
-        if broker_message.HasField("user_relations"):
-            orm_resource = await self.get_orm_resource(txn, kbid, uuid)
-            await orm_resource.set_user_relations(broker_message.user_relations)
+        if bm.HasField("user_relations"):
+            await self.orm_resource(txn, kbid, uuid).set_user_relations(bm.user_relations)
 
-    async def get_orm_resource(self, txn: MarkLogicTransaction, kbid: str, uuid: str) -> Resource:
-        return Resource(
-            txn=txn, storage=await get_storage(), kbid=kbid, uuid=uuid, disable_vectors=False
+    def orm_resource(self, txn: MarkLogicTransaction, kbid: str, uuid: str) -> Resource:
+        return Resource(txn=txn, storage=self.storage, kbid=kbid, uuid=uuid, disable_vectors=False)
+
+    async def get_updated_status(
+        self,
+        resource: Resource,
+        bm: writer_pb2.BrokerMessage,
+        field_id: resources_pb2.FieldID,
+    ) -> writer_pb2.FieldStatus:
+        from_processor = any(
+            generator.WhichOneof("generator") == "processor" for generator in bm.generated_by
         )
+        status = writer_pb2.FieldStatus()
+        if not from_processor:
+            field = await resource.get_field(field_id.field, field_id.field_type, load=False)
+            previous = await field.get_status()
+            if previous is not None:
+                status.CopyFrom(previous)
+        for error in bm.errors:
+            if error.field_type == field_id.field_type and error.field == field_id.field:
+                field_error = status.errors.add(source_error=error)
+                field_error.created.GetCurrentTime()
+        if len(status.errors) > MAX_FIELD_STATUS_ERRORS:
+            errors_to_trim = len(status.errors) - MAX_FIELD_STATUS_ERRORS
+            logger.warning(
+                "Field status error limit exceeded, trimming tail errors",
+                extra={
+                    "kbid": resource.kbid,
+                    "rid": resource.uuid,
+                    "field_type": field_id.field_type,
+                    "field": field_id.field,
+                    "stored_errors": len(status.errors),
+                    "max_errors": MAX_FIELD_STATUS_ERRORS,
+                },
+            )
+            del status.errors[-errors_to_trim:]
+        if bm.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+            status.status = (
+                writer_pb2.FieldStatus.Status.ERROR
+                if any(
+                    error.source_error.severity == writer_pb2.Error.Severity.ERROR
+                    for error in status.errors
+                )
+                else writer_pb2.FieldStatus.Status.PROCESSED
+            )
+        else:
+            explicit = next((entry for entry in bm.field_statuses if entry.id == field_id), None)
+            if explicit is not None:
+                status.status = explicit.status
+        return status
 
     async def create_fields(
         self,
         txn: MarkLogicTransaction,
-        message: writer_pb2.BrokerMessage,
+        bm: writer_pb2.BrokerMessage,
         kbid: str,
         uuid: str,
-        index_message: brain.Resource,
     ) -> None:
-        def get_text_md5(text: writer_pb2.FieldText) -> str | None:
-            if text.md5:
-                return text.md5
-            if text.body:
-                return hashlib.md5(text.body.encode(), usedforsecurity=False).hexdigest()
-            return None
+        orm_resource = self.orm_resource(txn, kbid, uuid)
+        for field_type, values in (
+            (resources_pb2.FieldType.TEXT, bm.texts),
+            (resources_pb2.FieldType.LINK, bm.links),
+            (resources_pb2.FieldType.FILE, bm.files),
+            (resources_pb2.FieldType.KEY_VALUE, bm.key_value_fields),
+            (resources_pb2.FieldType.CONVERSATION, bm.conversations),
+        ):
+            for field_name, payload in values.items():
+                field_id = resources_pb2.FieldID(field_type=field_type, field=field_name)
+                status = await self.get_updated_status(orm_resource, bm, field_id)
+                field = await orm_resource.get_field(field_name, field_type, load=False)
+                breakpoint()
+                await field.set_value(payload, status=status)
 
-        def get_field_status(
-            field_type: resources_pb2.FieldType.ValueType, field: str
-        ) -> dict[str, Any]:
-            status = writer_pb2.FieldStatus()
-            for error in message.errors:
-                if error.field_type == field_type and error.field == field:
-                    field_error = status.errors.add(source_error=error)
-                    field_error.created.GetCurrentTime()
+    async def persist_fields_processed_data(
+        self,
+        txn,
+        kbid: str,
+        uuid: str,
+        bm: writer_pb2.BrokerMessage,
+    ):
+        # Save extracted data from the broker message to the object store
+        await self.orm_resource(txn, kbid, uuid).apply_field_extracted_data(bm)
 
-            if len(status.errors) > MAX_FIELD_STATUS_ERRORS:
-                errors_to_trim = len(status.errors) - MAX_FIELD_STATUS_ERRORS
-                logger.warning(
-                    "Field status error limit exceeded, trimming tail errors",
-                    extra={
-                        "kbid": kbid,
-                        "rid": uuid,
-                        "field_type": field_type,
-                        "field": field,
-                        "stored_errors": len(status.errors),
-                        "max_errors": MAX_FIELD_STATUS_ERRORS,
-                        "trimmed_errors": errors_to_trim,
-                    },
-                )
-                del status.errors[-errors_to_trim:]
-
-            if message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
-                status.status = (
-                    writer_pb2.FieldStatus.Status.ERROR
-                    if any(
-                        error.source_error.severity == writer_pb2.Error.Severity.ERROR
-                        for error in status.errors
-                    )
-                    else writer_pb2.FieldStatus.Status.PROCESSED
-                )
-            else:
-                field_status = next(
-                    (
-                        field_status.status
-                        for field_status in message.field_statuses
-                        if field_status.id.field_type == field_type and field_status.id.field == field
-                    ),
-                    None,
-                )
-                if field_status is not None:
-                    status.status = field_status
-
-            return documents.to_json(status)
-
-        # Persist field values (ORM) in Marklogic
-        for field, text in message.texts.items():
-            field_content = FieldContent(
-                resource_id=uuid,
-                field_id=field,
-                field_type="t",
-                value=documents.to_json(text),
-                md5=get_text_md5(text),
-                status=get_field_status(resources_pb2.FieldType.TEXT, field),
-            )
-            await datamanagers.fields.create_document(txn, field_content)
-
-        for field, link in message.links.items():
-            field_content = FieldContent(
-                resource_id=uuid,
-                field_id=field,
-                field_type="u",
-                value=documents.to_json(link),
-                md5=None,
-                status=get_field_status(resources_pb2.FieldType.LINK, field),
-            )
-            await datamanagers.fields.create_document(txn, field_content)
-
-        for field, file in message.files.items():
-            field_content = FieldContent(
-                resource_id=uuid,
-                field_id=field,
-                field_type="f",
-                value=documents.to_json(file),
-                md5=file.file.md5 or None,
-                status=get_field_status(resources_pb2.FieldType.FILE, field),
-            )
-            await datamanagers.fields.create_document(txn, field_content)
-
-        for field, kv in message.key_value_fields.items():
-            field_content = FieldContent(
-                resource_id=uuid,
-                field_id=field,
-                field_type="k",
-                value=documents.to_json(kv),
-                md5=None,
-                status=get_field_status(resources_pb2.FieldType.KEY_VALUE, field),
-            )
-            await datamanagers.fields.create_document(txn, field_content)
-
-        for field, conversation in message.conversations.items():
-            status = get_field_status(resources_pb2.FieldType.CONVERSATION, field)
-            await self.create_conversation(txn, kbid, uuid, field, conversation, status)
-
-        # Persist processed data for search alongside the source field values.
-        for fpc, chunks, embeddings in self.get_field_processed_contents(index_message):
+        # Now store all the processed contents to Marklogic (embeddings, chunks, etc)
+        im = await self.generate_index_message(txn, uuid, bm)
+        for fpc, chunks, embeddings in self.get_field_processed_contents(im):
+            # TODO: Probably we need to delete existing processed documents before creating new ones
             await datamanagers.fields.create_processed_documents(
                 txn=txn,
                 field=fpc,
                 chunks=chunks,
                 embeddings=embeddings,
-                skip_field_texts=index_message.skip_texts,
-                skip_chunks=index_message.skip_paragraphs,
+                skip_field_texts=im.skip_texts,
+                skip_chunks=im.skip_paragraphs,
             )
-
-        # Persist processed metadata in object storage
-        orm_resource = await self.get_orm_resource(txn, kbid, uuid)
-        await orm_resource.apply_field_extracted_data(message)
 
     def get_field_processed_contents(
         self,
-        index_message: brain.Resource,
+        im: brain.Resource,
     ) -> Iterator[tuple[FieldProcessedContent, list[ChunkContent], list[ChunkEmbeddingContent]]]:
-        resource_id = index_message.resource.uuid
-        for fid, text_data in index_message.texts.items():
+        resource_id = im.resource.uuid
+        for fid, text_data in im.texts.items():
             field_type, field_id = fid.split("/")
             field_text = text_data.text
             field = FieldProcessedContent(
@@ -476,7 +432,7 @@ class ProcessorMarkLogic:
             )
             chunks = []
             embeddings = []
-            field_paragraphs = index_message.paragraphs.get(fid) or brain.IndexParagraphs()
+            field_paragraphs = im.paragraphs.get(fid) or brain.IndexParagraphs()
             for paragraph_id, paragraph_data in field_paragraphs.paragraphs.items():
                 paragaph_text = field_text[paragraph_data.start : paragraph_data.end]
                 chunks.append(
@@ -508,126 +464,103 @@ class ProcessorMarkLogic:
                         )
             yield field, chunks, embeddings
 
-    async def create_conversation(
-        self,
-        txn: MarkLogicTransaction,
-        kbid: str,
-        uuid: str,
-        field_id: str,
-        conversation: writer_pb2.Conversation,
-        status: dict[str, Any],
-    ) -> None:
-        metadata = resources_pb2.FieldConversation(
-            size=PAGE_SIZE,
-            pages=max(1, (len(conversation.messages) + PAGE_SIZE - 1) // PAGE_SIZE),
-            total=len(conversation.messages),
-            extract_strategy=conversation.extract_strategy,
-            split_strategy=conversation.split_strategy,
-            generated_by=conversation.generated_by,
-        )
-        splits_metadata = resources_pb2.SplitsMetadata()
-
-        for message in conversation.messages:
-            attachments = []
-            for attachment_index, attachment in enumerate(message.content.attachments):
-                if self.storage.needs_move(attachment, kbid):
-                    message_ident = message.ident or uuid4().hex
-                    storage_field = self.storage.conversation_field_attachment(
-                        kbid, uuid, field_id, message_ident, attachment_index=attachment_index
-                    )
-                    attachment = await self.storage.normalize_binary(attachment, storage_field)
-                attachments.append(attachment)
-            message.content.ClearField("attachments")
-            message.content.attachments.extend(attachments)
-
-        for page_number in range(1, metadata.pages + 1):
-            start = (page_number - 1) * PAGE_SIZE
-            page_messages = conversation.messages[start : start + PAGE_SIZE]
-            for message in page_messages:
-                splits_metadata.metadata.get_or_create(message.ident).page = page_number
-            page_content = ConversationPageContent(
-                resource_id=uuid,
-                field_id=field_id,
-                conversation_page=page_number,
-                value=documents.to_json(resources_pb2.Conversation(messages=page_messages)),
-            )
-            await datamanagers.conversations.create_page(txn, page_content)
-
-        await datamanagers.conversations.create_page(
-            txn,
-            ConversationPageContent(
-                resource_id=uuid,
-                field_id=field_id,
-                conversation_page=0,
-                value=documents.to_json(splits_metadata),
-            ),
-        )
-        await datamanagers.fields.create_document(
-            txn,
-            FieldContent(
-                resource_id=uuid,
-                field_id=field_id,
-                field_type="c",
-                value=documents.to_json(metadata),
-                md5=None,
-                status=status,
-            ),
-        )
-
     async def update_resource(
         self,
         txn: MarkLogicTransaction,
-        message: writer_pb2.BrokerMessage,
-        resource: ResourceContent,
+        bm: writer_pb2.BrokerMessage,
         kbid: str,
         uuid: str,
-    ) -> None: ...
+    ) -> None:
+        values: dict[str, Any] = {}
+        for behavior in ("basic", "extra", "security", "origin"):
+            if bm.HasField(behavior):
+                values[behavior] = documents.to_json(getattr(bm, behavior))
+        if bm.HasField("basic"):
+            basic = bm.basic
+            values.update(
+                title=basic.title,
+                processing_status=writer_pb2.Metadata.Status.Name(basic.metadata.status),
+                facets=sorted(
+                    {
+                        f"/l/{classification.labelset}/{classification.label}"
+                        for classification in basic.usermetadata.classifications
+                        if not classification.cancelled_by_user
+                    }
+                ),
+            )
+        timestamps: tuple[tuple[Literal["created", "modified"], str], ...] = (
+            ("created", "created_at"),
+            ("modified", "modified_at"),
+        )
+        for timestamp, column in timestamps:
+            if bm.HasField("origin") and bm.origin.HasField(timestamp):
+                values[column] = getattr(bm.origin, timestamp).ToJsonString()
+            elif bm.HasField("basic") and bm.basic.HasField(timestamp):
+                values[column] = getattr(bm.basic, timestamp).ToJsonString()
+        slug = bm.basic.slug or bm.slug
+        if slug:
+            values["slug"] = slug
+        if values:
+            await datamanagers.resources.update_resource(
+                txn, kbid=kbid, rid=uuid, data=ResourceUpdateContent(**values)
+            )
+        if bm.HasField("user_relations"):
+            orm_resource = self.orm_resource(txn, kbid, uuid)
+            await orm_resource.set_user_relations(bm.user_relations)
 
     async def update_fields(
         self,
         txn: MarkLogicTransaction,
-        message: writer_pb2.BrokerMessage,
+        bm: writer_pb2.BrokerMessage,
         kbid: str,
         uuid: str,
-    ) -> None: ...
+    ) -> None:
+        orm_resource = self.orm_resource(txn, kbid, uuid)
+
+        # Field deletions
+        for field in bm.delete_fields:
+            field = await orm_resource.get_field(field.field, field.field_type, load=False)
+            await field.delete()
+
+        # Message deletions
+        for deleted in bm.delete_splits:
+            if deleted.field.field_type == writer_pb2.FieldType.CONVERSATION:
+                field = await orm_resource.get_field(
+                    deleted.field.field, deleted.field.field_type, load=False
+                )
+                conversation = cast(Conversation, field)
+                await conversation.delete_messages(deleted.splits)
+
+        # Set the new field values
+        await self.create_fields(txn, bm, kbid, uuid)
 
     @processor_observer.wrap({"type": "generate_index_message"})
     async def generate_index_message(
         self,
         txn: MarkLogicTransaction,
-        resource: ResourceContent | None,
         uuid: str,
-        message: writer_pb2.BrokerMessage,
+        bm: writer_pb2.BrokerMessage,
     ) -> brain.Resource:
-        resource_created = resource is None
-        orm_resource = Resource(
-            txn=txn,
-            storage=await get_storage(),
-            kbid=message.kbid,
-            uuid=uuid,
-            disable_vectors=False,
-        )
+        orm_resource = self.orm_resource(txn, bm.kbid, uuid)
         builder = IndexMessageBuilderV2(orm_resource)
-        if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
-            return await builder.for_writer_bm(message, resource_created)
-        elif message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
-            return await builder.for_processor_bm(message)
+        if bm.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+            return await builder.for_processor_bm(bm)
         else:  # pragma: no cover
-            raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
+            raise InvalidBrokerMessage(f"Unknown broker bm source: {bm.source}")
 
     @processor_observer.wrap({"type": "txn"})
     async def txn(
         self,
-        message: writer_pb2.BrokerMessage,
+        bm: writer_pb2.BrokerMessage,
         seqid: int,
         partition: str,
         transaction_check: bool = True,
     ) -> None:
         try:
             kbid, uuid = await self.ensure_kb_and_resource(
-                kbid=message.kbid,
-                uuid=message.uuid,
-                slug=message.slug,
+                kbid=bm.kbid,
+                uuid=bm.uuid,
+                slug=bm.slug,
             )
         except (KnowledgeBoxDoesNotExist, ResourceDoesNotExist):
             if transaction_check:
@@ -635,36 +568,38 @@ class ProcessorMarkLogic:
             return None
 
         async with self.driver.transaction(read_only=False, kbid=kbid) as txn:
+            handled_exception = None
             try:
                 resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=uuid)
                 is_new_resource = resource is None
-                if message.source not in (
-                    writer_pb2.BrokerMessage.MessageSource.WRITER,
-                    writer_pb2.BrokerMessage.MessageSource.PROCESSOR,
-                ):
-                    raise InvalidBrokerMessage(f"Unknown broker message source: {message.source}")
+                if bm.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
+                    if is_new_resource:
+                        await self.create_resource(txn, bm, kbid, uuid)
+                        await self.create_fields(txn, bm, kbid, uuid)
+                    else:
+                        await self.update_fields(txn, bm, kbid, uuid)
+                        await self.update_resource(txn, bm, kbid, uuid)
 
-                if message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+                elif bm.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
                     if is_new_resource:
                         logger.info(
-                            f"Processor message for resource received but the resource does not exist, ignoring.",
+                            f"Processor bm for resource received but the resource does not exist, ignoring.",
                             extra={
                                 "kbid": kbid,
                                 "rid": uuid,
                                 "seqid": seqid,
                             },
                         )
+                        if transaction_check:
+                            await self.set_last_seqid(partition, seqid)
                         return None
-                    # Handle data augmentation fields for existing resources
-                    await self.handle_data_augmentation_fields(message, kbid, uuid)
+                    await self.update_fields(txn, bm, kbid, uuid)
+                    await self.persist_fields_processed_data(txn, kbid, uuid, bm)
+                    await self.handle_data_augmentation_fields(bm, kbid, uuid)
 
-                im = await self.generate_index_message(txn, None, uuid, message)
-                if resource is None:
-                    await self.create_resource(txn, message, kbid, uuid, im)
-                    await self.create_fields(txn, message, kbid, uuid, im)
                 else:
-                    await self.update_fields(txn, message, kbid, uuid)
-                    await self.update_resource(txn, message, resource, kbid, uuid)
+                    raise InvalidBrokerMessage(f"Unhandled broker bm source: {bm.source}")
+
                 if transaction_check:
                     await self.set_last_seqid(partition, seqid)
 
@@ -672,7 +607,7 @@ class ProcessorMarkLogic:
                 await self.notify_commit(
                     partition=partition,
                     seqid=seqid,
-                    message=message,
+                    bm=bm,
                     write_type=(
                         writer_pb2.Notification.WriteType.CREATED
                         if is_new_resource
@@ -695,7 +630,7 @@ class ProcessorMarkLogic:
                     seqid=seqid,
                     kbid=kbid,
                     rid=uuid,
-                    source=message.source,
+                    source=bm.source,
                 )
                 raise
             except Exception as exc:
@@ -703,17 +638,17 @@ class ProcessorMarkLogic:
                 # as we need to do some cleanup. The exception will be reraised at the end of the function
                 # and then handled by the top caller, so errors can be handled in the same place.
                 logger.error(
-                    "Error processing message. Broker message stored in dead letter bucket.",
+                    "Error processing bm. Broker bm stored in dead letter bucket.",
                     exc_info=True,
                     extra={"kbid": kbid, "rid": uuid, "seqid": seqid, "partition": partition},
                 )
-                await self.deadletter(message, partition, seqid)
+                await self.deadletter(bm, partition, seqid)
                 await self.notify_abort(
                     partition=partition,
                     seqid=seqid,
                     kbid=kbid,
                     rid=uuid,
-                    source=message.source,
+                    source=bm.source,
                 )
                 handled_exception = exc
             finally:
@@ -741,44 +676,44 @@ class ResourceDoesNotExist(Exception):
     """Exception raised when a Resource does not exist."""
 
 
-def get_bm_modified_fields(message: writer_pb2.BrokerMessage) -> list[writer_pb2.FieldID]:
+def get_bm_modified_fields(bm: writer_pb2.BrokerMessage) -> list[writer_pb2.FieldID]:
     modified = set()
     # Added or modified fields need indexing
-    for link in message.links:
+    for link in bm.links:
         modified.add((link, writer_pb2.FieldType.LINK))
-    for file in message.files:
+    for file in bm.files:
         modified.add((file, writer_pb2.FieldType.FILE))
-    for conv in message.conversations:
+    for conv in bm.conversations:
         modified.add((conv, writer_pb2.FieldType.CONVERSATION))
-    for text in message.texts:
+    for text in bm.texts:
         modified.add((text, writer_pb2.FieldType.TEXT))
-    for kv in message.key_value_fields:
+    for kv in bm.key_value_fields:
         modified.add((kv, writer_pb2.FieldType.KEY_VALUE))
-    if message.HasField("basic"):
+    if bm.HasField("basic"):
         # Add title and summary only if they have changed
-        if message.basic.title != "":
+        if bm.basic.title != "":
             modified.add(("title", writer_pb2.FieldType.GENERIC))
-        if message.basic.summary != "":
+        if bm.basic.summary != "":
             modified.add(("summary", writer_pb2.FieldType.GENERIC))
 
     # Deleted splits also need reindexing of the field
-    for ds in message.delete_splits:
+    for ds in bm.delete_splits:
         modified.add((ds.field.field, ds.field.field_type))
 
-    if message.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
+    if bm.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
         # Messages with field metadata, extracted text or field vectors need indexing
-        for fm in message.field_metadata:
+        for fm in bm.field_metadata:
             modified.add((fm.field.field, fm.field.field_type))
-        for et in message.extracted_text:
+        for et in bm.extracted_text:
             modified.add((et.field.field, et.field.field_type))
-        for fv in message.field_vectors:
+        for fv in bm.field_vectors:
             modified.add((fv.field.field, fv.field.field_type))
 
-    if message.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
+    if bm.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
         # Any field that has fieldmetadata annotations should be considered as modified
         # and needs to be reindexed
-        if message.HasField("basic"):
-            for ufm in message.basic.fieldmetadata:
+        if bm.HasField("basic"):
+            for ufm in bm.basic.fieldmetadata:
                 modified.add((ufm.field.field, ufm.field.field_type))
 
     return [writer_pb2.FieldID(field=field, field_type=field_type) for field, field_type in modified]
@@ -787,7 +722,7 @@ def get_bm_modified_fields(message: writer_pb2.BrokerMessage) -> list[writer_pb2
 class IndexMessageBuilderV2(IndexMessageBuilder):
     @property
     def txn(self) -> MarkLogicTransaction:
-        return cast(MarkLogicTransaction, self.resource.txn)
+        return self.resource.txn
 
     @property
     def kbid(self) -> str:
@@ -809,6 +744,9 @@ class IndexMessageBuilderV2(IndexMessageBuilder):
             origin=documents.from_json(content.origin or {}, writer_pb2.Origin),
             security=documents.from_json(content.security or {}, resources_pb2.Security),
         )
+
+    async def get_basic(self) -> writer_pb2.Basic:
+        return (await self.get_resource_data()).basic
 
     async def get_resource_fields(self) -> list[tuple[writer_pb2.FieldType.ValueType, str]]:
         fields = await datamanagers.fields.list_resource_documents(

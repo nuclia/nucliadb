@@ -24,14 +24,15 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb_models.key_value import Range
 from nucliadb_models.kv_schemas import KVFieldType, KVSchema, KVSchemaField
 from nucliadb_protos.resources_pb2 import FieldKeyValue
+from nucliadb_protos.writer_pb2 import FieldStatus
 
 
 class KeyValue(Field[FieldKeyValue]):
     pbklass = FieldKeyValue
     type: str = "k"
 
-    async def set_value(self, payload: FieldKeyValue) -> None:
-        await self.db_set_value(payload)
+    async def set_value(self, payload: FieldKeyValue, status: FieldStatus | None = None) -> None:
+        await self.db_set_value(payload, status=status)
 
     async def get_value(self) -> FieldKeyValue | None:
         return await self.db_get_value()

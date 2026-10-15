@@ -4,6 +4,7 @@
 #
 
 pytest_flags := -s -rfE -v --tb=native
+CODE_PATHS ?= .
 pytest_extra_flags :=
 pytest_cov_report_flags := --cov-report xml --cov-report term-missing:skip-covered
 

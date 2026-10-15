@@ -42,7 +42,7 @@ async def get_resource_from_cache_or_db(kbid: str, uuid: str) -> ResourceORM | N
 
 async def _get_resource_from_db(kbid: str, uuid: str) -> ResourceORM | None:
     storage = await get_storage(service_name=SERVICE_NAME)
-    async with get_driver().ro_transaction() as transaction:
+    async with get_driver().ro_transaction(kbid=kbid) as transaction:
         kb = KnowledgeBoxORM(transaction, storage, kbid)
         return await kb.get(uuid)
 

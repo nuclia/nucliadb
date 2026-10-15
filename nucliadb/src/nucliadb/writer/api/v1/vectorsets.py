@@ -70,7 +70,7 @@ async def add_vectorset(request: Request, kbid: str, vectorset_id: str) -> Creat
 async def _add_vectorset(kbid: str, vectorset_id: str) -> None:
     storage = await get_storage()
 
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         kbobj = KnowledgeBox(txn, storage, kbid)
         if await kbobj.vectorset_marked_for_deletion(vectorset_id):
             raise VectorSetConflict("Vectorset is already being deleted. Please try again later.")

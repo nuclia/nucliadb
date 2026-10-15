@@ -123,7 +123,7 @@ class IndexAuditHandler:
             total_fields += shard.fields
             total_paragraphs += shard.paragraphs
 
-        async with datamanagers.with_ro_transaction() as txn:
+        async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
             num_vectorsets = (
                 len([vs async for vs in datamanagers.vectorsets.iter(txn=txn, kbid=kbid)]) or 1
             )

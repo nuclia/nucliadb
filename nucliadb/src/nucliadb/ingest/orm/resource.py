@@ -401,7 +401,6 @@ class Resource:
                 "field": field,
                 "stored_errors": len(status.errors),
                 "max_errors": MAX_FIELD_STATUS_ERRORS,
-                "trimmed_errors": errors_to_trim,
             },
         )
         del status.errors[-errors_to_trim:]

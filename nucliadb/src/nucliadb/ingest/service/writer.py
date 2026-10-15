@@ -18,14 +18,12 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from collections.abc import AsyncIterator
-from typing import cast
 
 from nucliadb.backups import tasks as backup_tasks
 from nucliadb.backups import utils as backup_utils
 from nucliadb.common import datamanagers, locking
 from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
-from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.entities import EntitiesManager
@@ -79,7 +77,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def initialize(self):
         self.storage = await get_storage(service_name=SERVICE_NAME)
-        self.driver = cast(MarkLogicDriver, await setup_driver())
+        self.driver = await setup_driver()
         self.proc = Processor(driver=self.driver, storage=self.storage, pubsub=await get_pubsub())
         self.shards_manager = get_shard_manager()
 
@@ -124,7 +122,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 },
                 hidden_resources_enabled=request.hidden_resources_enabled,
                 hidden_resources_hide_on_creation=request.hidden_resources_hide_on_creation,
-                prewarm_enabled=request.prewarm_enabled,
                 enforce_security=request.enforce_security,
             )
 
@@ -165,7 +162,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 description=request.config.description or None,
                 hidden_resources_enabled=request.config.hidden_resources_enabled,
                 hidden_resources_hide_on_creation=request.config.hidden_resources_hide_on_creation,
-                prewarm_enabled=request.config.prewarm_enabled,
                 enforce_security=request.config.enforce_security,
             )
         except KnowledgeBoxNotFound:
@@ -224,7 +220,8 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
 
     async def GetEntities(self, request: GetEntitiesRequest, context=None) -> GetEntitiesResponse:
         response = GetEntitiesResponse()
-        async with self.driver.ro_transaction() as txn:
+        kbid = request.kb.uuid
+        async with self.driver.ro_transaction(kbid=kbid) as txn:
             kbobj = await self.proc.get_kb_obj(txn, request.kb)
             if kbobj is None:
                 response.status = GetEntitiesResponse.Status.NOTFOUND
@@ -246,12 +243,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: ListEntitiesGroupsRequest, context=None
     ) -> ListEntitiesGroupsResponse:
         response = ListEntitiesGroupsResponse()
-        async with self.driver.ro_transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        async with self.driver.ro_transaction(kbid=None) as system_txn:
+            kbobj = await self.proc.get_kb_obj(system_txn, request.kb)
             if kbobj is None:
                 response.status = ListEntitiesGroupsResponse.Status.NOTFOUND
                 return response
 
+        async with self.driver.ro_transaction(kbid=kbobj.kbid) as txn:
+            kbobj = KnowledgeBoxORM(txn, self.storage, kbobj.kbid)
             entities_manager = EntitiesManager(kbobj, txn)
             try:
                 entities_groups = await entities_manager.list_entities_groups()
@@ -270,12 +269,14 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self, request: GetEntitiesGroupRequest, context=None
     ) -> GetEntitiesGroupResponse:
         response = GetEntitiesGroupResponse()
-        async with self.driver.ro_transaction() as txn:
-            kbobj = await self.proc.get_kb_obj(txn, request.kb)
+        async with self.driver.ro_transaction(kbid=None) as system_txn:
+            kbobj = await self.proc.get_kb_obj(system_txn, request.kb)
             if kbobj is None:
                 response.status = GetEntitiesGroupResponse.Status.KB_NOT_FOUND
                 return response
 
+        async with self.driver.ro_transaction(kbid=kbobj.kbid) as txn:
+            kbobj = KnowledgeBoxORM(txn, self.storage, kbobj.kbid)
             entities_manager = EntitiesManager(kbobj, txn)
             try:
                 entities_group = await entities_manager.get_entities_group(request.group)
@@ -300,7 +301,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
             rid = request.rid
             async with (
                 locking.distributed_lock(locking.RESOURCE_LOCK.format(kbid=kbid, resource_id=rid)),
-                self.driver.rw_transaction() as txn,
+                self.driver.rw_transaction(kbid=kbid) as txn,
             ):
                 _ = KnowledgeBoxORM(txn, self.storage, kbid)
                 resobj = ResourceORM(txn, self.storage, kbid, rid)

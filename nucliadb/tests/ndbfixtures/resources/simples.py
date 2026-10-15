@@ -96,7 +96,7 @@ async def create_simple_resource(
     rid = resp.json()["uuid"]
 
     vectorsets = {}
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kbid):
             vectorsets[vectorset_id] = vs
     # use a controlled random seed for vector generation

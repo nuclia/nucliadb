@@ -25,7 +25,6 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from os.path import dirname, getsize
-from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import nats
@@ -37,7 +36,6 @@ from grpc import aio
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -133,7 +131,6 @@ async def ingest_grpc_server(
 
 @pytest.fixture(scope="function")
 def processor(maindb_driver: Driver, storage: Storage, pubsub: PubSubDriver) -> Iterable[Processor]:
-    maindb_driver = cast(MarkLogicDriver, maindb_driver)
     proc = Processor(maindb_driver, storage, pubsub, partition="1")
     yield proc
 
@@ -549,7 +546,7 @@ def broker_resource(knowledgebox: str, rid: str | None = None, slug: str | None 
 async def create_resource(
     storage: Storage, driver: Driver, knowledgebox: str, slug: str = "slug"
 ) -> Resource:
-    async with driver.rw_transaction() as txn:
+    async with driver.rw_transaction(knowledgebox) as txn:
         rid = Resource.new_unique_rid()
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
         test_resource = await kb_obj.add_resource(uuid=rid, slug=slug)
