@@ -546,7 +546,7 @@ def broker_resource(knowledgebox: str, rid: str | None = None, slug: str | None 
 async def create_resource(
     storage: Storage, driver: Driver, knowledgebox: str, slug: str = "slug"
 ) -> Resource:
-    async with driver.rw_transaction(knowledgebox) as txn:
+    async with driver.rw_transaction(kbid=knowledgebox) as txn:
         rid = Resource.new_unique_rid()
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
         test_resource = await kb_obj.add_resource(uuid=rid, slug=slug)

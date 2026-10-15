@@ -156,7 +156,7 @@ def test_maybe_update_basic_icon(basic, icon, updated):
 
 @pytest.fixture(scope="function")
 async def txn(maindb_driver: Driver, kb: str):
-    async with maindb_driver.rw_transaction(kb) as txn:
+    async with maindb_driver.rw_transaction(kbid=kb) as txn:
         yield txn
 
 
@@ -169,7 +169,7 @@ def storage():
 @pytest.fixture(scope="function")
 async def kb(maindb_driver: Driver):
     kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction(None) as txn:
+    async with maindb_driver.rw_transaction(kbid=None) as txn:
         await datamanagers.kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid
@@ -178,7 +178,7 @@ async def kb(maindb_driver: Driver):
 @pytest.fixture(scope="function")
 async def rid(maindb_driver: Driver, kb: str):
     r_id = Resource.new_unique_rid()
-    async with maindb_driver.rw_transaction(kb) as txn:
+    async with maindb_driver.rw_transaction(kbid=kb) as txn:
         await datamanagers.resources.set_slug(txn, kbid=kb, rid=r_id, slug=f"slug-{r_id}")
         await txn.commit()
     return r_id

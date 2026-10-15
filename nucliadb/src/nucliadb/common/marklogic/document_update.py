@@ -3,16 +3,11 @@
 from __future__ import annotations
 
 import builtins
-import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
 
 _PROPERTY_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_\-]*$")
-
-
-def _literal(value: Any) -> str:
-    return json.dumps(value, allow_nan=False)
 
 
 @dataclass
@@ -72,18 +67,3 @@ class DocumentUpdate:
         for name in self._removed:
             content.pop(name, None)
         return content
-
-    def to_optic(self) -> str:
-        """Optic Update DSL patching the document in place; yields no rows if it doesn't exist."""
-        patches = [f".remove({_literal(name)})" for name in sorted(self._removed)]
-        # insertNamedChild fails on an existing key, so drop it first to get replace-or-insert.
-        patches.extend(
-            f".remove({_literal(name)}).insertNamedChild('/', {_literal(name)}, {_literal(value)})"
-            for name, value in self._set.items()
-        )
-        return (
-            f"op.fromDocUris(cts.documentQuery([{_literal(self.uri)}]))"
-            ".joinDocCols(null, op.fragmentIdCol('fragmentId'))"
-            f".patch(op.col('doc'), op.patchBuilder('/'){''.join(patches)})"
-            ".write()"
-        )

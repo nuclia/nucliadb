@@ -71,11 +71,11 @@ async def test_create_knowledgebox(
         semantic_models={"my-semantic-model": SemanticModelMetadata()},
     )
     assert result == (kbid, slug)
-    async with maindb_driver.ro_transaction(None) as txn:
+    async with maindb_driver.ro_transaction(kbid=None) as txn:
         exists = await datamanagers.kb.exists(txn, kbid=kbid)
         assert exists
 
-    async with maindb_driver.ro_transaction(kbid) as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         config = await datamanagers.kb.get_config(txn, kbid=kbid)
         assert config is not None
         assert config.slug == slug
@@ -113,11 +113,11 @@ async def test_create_knowledgebox_with_multiple_vectorsets(
         },
     )
     assert result == (kbid, slug)
-    async with maindb_driver.ro_transaction(None) as txn:
+    async with maindb_driver.ro_transaction(kbid=None) as txn:
         exists = await datamanagers.kb.exists(txn, kbid=kbid)
         assert exists
 
-    async with maindb_driver.ro_transaction(kbid) as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert len([vs async for vs in datamanagers.vectorsets.iter(txn, kbid=kbid)]) == 2
 
         vs1 = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id="vs1")
@@ -237,7 +237,7 @@ async def test_knowledgebox_delete_all_kb_keys(
     knowledgebox: str,
 ):
     kbid = knowledgebox
-    async with maindb_driver.rw_transaction(kbid) as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
 
         # Create some resources in the KB
@@ -255,19 +255,19 @@ async def test_knowledgebox_delete_all_kb_keys(
         await txn.commit()
 
     # Check that all of them are there
-    async with maindb_driver.ro_transaction(kbid) as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         for rid, slug in rids_and_slugs:
             assert await kb_obj.get_resource_uuid_by_slug(slug) == rid
         await txn.abort()
 
     # Now delete all kb keys
-    async with maindb_driver.rw_transaction(kbid) as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await KnowledgeBox.delete_all_kb_keys(txn, kbid)
         await txn.commit()
 
     # Check that all of them were deleted
-    async with maindb_driver.ro_transaction(kbid) as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         for rid, slug in rids_and_slugs:
             assert await kb_obj.get_resource_uuid_by_slug(slug) is None

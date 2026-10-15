@@ -87,5 +87,5 @@ def kbid() -> str:
 
 @pytest.fixture
 async def txn(maindb_driver: Driver, kbid: str):
-    async with maindb_driver.rw_transaction(kbid) as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         yield txn

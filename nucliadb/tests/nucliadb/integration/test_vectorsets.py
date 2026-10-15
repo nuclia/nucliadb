@@ -27,9 +27,6 @@ import pytest
 from httpx import AsyncClient
 from nidx_protos import nodereader_pb2
 from pytest_mock import MockerFixture
-from tests.ndbfixtures.ingest import make_extracted_text
-from tests.utils import inject_message
-from tests.utils.predict import predict_query_hook
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -51,6 +48,9 @@ from nucliadb_utils.utilities import (
     clean_utility,
     set_utility,
 )
+from tests.ndbfixtures.ingest import make_extracted_text
+from tests.utils import inject_message
+from tests.utils.predict import predict_query_hook
 
 DEFAULT_VECTOR_DIMENSION = 512
 VECTORSET_DIMENSION = 12

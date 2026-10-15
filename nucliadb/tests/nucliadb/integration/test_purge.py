@@ -108,7 +108,7 @@ async def test_purge_deletes_everything_from_maindb(
 
 
 async def list_all_keys(driver: Driver) -> list[str]:
-    async with driver.ro_transaction(None) as txn:
+    async with driver.ro_transaction(kbid=None) as txn:
         keys = [key async for key in txn.keys(match="")]
     return keys
 

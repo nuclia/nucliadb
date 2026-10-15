@@ -137,8 +137,7 @@ async def test_paragraphs_with_page(maindb_driver, storage, txn: Transaction, ca
     bm.field_metadata.append(fcmw)
 
     proc = Processor(maindb_driver, storage)
-    await proc.apply_fields(bm, r)
-    await proc.apply_resource(bm, r, new_resource=False)
+    await proc.process(bm, 1)
     index_message = await get_resource_index_message(r, reindex=False)
     for metadata in index_message.paragraphs["t/field1"].paragraphs.values():
         if metadata.start == 84:
@@ -227,8 +226,7 @@ async def test_vector_duplicate_fields(
             )
 
         proc = Processor(maindb_driver, storage)
-        await proc.apply_fields(bm, resource)
-        await proc.apply_resource(bm, resource, new_resource=False)
+        await proc.process(bm, 1)
         index_message = await get_resource_index_message(resource, reindex=False)
         await txn.commit()
 
@@ -252,12 +250,12 @@ async def test_generate_broker_message(storage, maindb_driver, cache, knowledgeb
     full_resource = await create_resource(storage, maindb_driver, knowledgebox)
 
     # Now fetch it
-    async with maindb_driver.ro_transaction(knowledgebox) as txn:
+    async with maindb_driver.ro_transaction(kbid=knowledgebox) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
         resource = await kb_obj.get(full_resource.uuid)
         assert resource is not None
 
-    async with maindb_driver.ro_transaction(knowledgebox) as txn:
+    async with maindb_driver.ro_transaction(kbid=knowledgebox) as txn:
         resource.txn = txn
         bm = await generate_broker_message(resource)
 
@@ -390,7 +388,7 @@ async def test_generate_index_message_contains_all_metadata(
     resource = await create_resource(storage, maindb_driver, knowledgebox)
     resource.disable_vectors = False
 
-    async with maindb_driver.ro_transaction(knowledgebox) as txn:
+    async with maindb_driver.ro_transaction(kbid=knowledgebox) as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
         index_message = await get_resource_index_message(resource, reindex=False)
 

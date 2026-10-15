@@ -54,7 +54,7 @@ def flatten_field_relations(r: noderesources_pb2.Resource):
 async def test_for_writer_bm_with_prefilter_update(storage, maindb_driver: Driver, knowledgebox: str):
     full_resource = await create_resource(storage, maindb_driver, knowledgebox)
 
-    async with maindb_driver.ro_transaction(knowledgebox) as txn:
+    async with maindb_driver.ro_transaction(kbid=knowledgebox) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
         resource = await kb_obj.get(full_resource.uuid)
         assert resource is not None

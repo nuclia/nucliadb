@@ -54,7 +54,7 @@ async def test_create_and_update_knowledgebox_with_prewarm(
     )
     assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
-    async with maindb_driver.ro_transaction(kbid) as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         config = await datamanagers.kb.get_config(txn, kbid=kbid)
         assert config is not None
         assert config.prewarm_enabled == prewarm
@@ -74,7 +74,7 @@ async def test_create_and_update_knowledgebox_with_prewarm(
         )
         assert result.status == knowledgebox_pb2.KnowledgeBoxResponseStatus.OK
 
-        async with maindb_driver.ro_transaction(kbid) as txn:
+        async with maindb_driver.ro_transaction(kbid=kbid) as txn:
             config = await datamanagers.kb.get_config(txn, kbid=kbid)
             assert config is not None
             assert config.prewarm_enabled == updated_prewarm
