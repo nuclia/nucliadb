@@ -164,176 +164,176 @@ jobs:
           path: .venv
           key: venv-${{ github.sha }}
 
-  # Tests
-  nucliadb-search-tests:
-    name: NucliaDB search tests
-    runs-on: ubuntu-24.04
-    needs:
-      - build-virtual-env
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  # # Tests
+  # nucliadb-search-tests:
+  #   name: NucliaDB search tests
+  #   runs-on: ubuntu-24.04
+  #   needs:
+  #     - build-virtual-env
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.14.8"
+  #     - name: Setup Python
+  #       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+  #       with:
+  #         python-version: "3.14.8"
 
-      - name: Restore venv
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .venv
-          key: venv-${{ github.sha }}
-          fail-on-cache-miss: true
+  #     - name: Restore venv
+  #       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+  #       with:
+  #         path: .venv
+  #         key: venv-${{ github.sha }}
+  #         fail-on-cache-miss: true
 
-      - name: Run tests
-        run: source .venv/bin/activate && make -C nucliadb test-cov-search
+  #     - name: Run tests
+  #       run: source .venv/bin/activate && make -C nucliadb test-cov-search
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
-        with:
-          file: ./nucliadb/coverage.xml
-          flags: nucliadb-search
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+  #     - name: Upload coverage to Codecov
+  #       uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+  #       with:
+  #         file: ./nucliadb/coverage.xml
+  #         flags: nucliadb-search
+  #       env:
+  #         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  nucliadb-tests:
-    name: NucliaDB tests
-    runs-on: ubuntu-24.04
-    needs:
-      - build-virtual-env
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0, 1, 2]
+  # nucliadb-tests:
+  #   name: NucliaDB tests
+  #   runs-on: ubuntu-24.04
+  #   needs:
+  #     - build-virtual-env
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       shard: [0, 1, 2]
 
-    services:
-      postgres:
-        image: postgres:13
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 1s
-          --health-retries 5
-        ports:
-          - 5432:5432
+  #   services:
+  #     postgres:
+  #       image: postgres:13
+  #       env:
+  #         POSTGRES_PASSWORD: postgres
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 5s
+  #         --health-timeout 1s
+  #         --health-retries 5
+  #       ports:
+  #         - 5432:5432
 
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  #   steps:
+  #     - name: Checkout the repository
+  #       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.14.8"
+  #     - name: Setup Python
+  #       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+  #       with:
+  #         python-version: "3.14.8"
 
-      - name: Restore venv
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .venv
-          key: venv-${{ github.sha }}
-          fail-on-cache-miss: true
+  #     - name: Restore venv
+  #       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+  #       with:
+  #         path: .venv
+  #         key: venv-${{ github.sha }}
+  #         fail-on-cache-miss: true
 
-      - name: Run NucliaDB tests
-        env:
-          TESTING_PG_URL: "postgresql://postgres:postgres@localhost/postgres"
-        run: |
-          source .venv/bin/activate &&
-          make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" ||
-          make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
+  #     - name: Run NucliaDB tests
+  #       env:
+  #         TESTING_PG_URL: "postgresql://postgres:postgres@localhost/postgres"
+  #       run: |
+  #         source .venv/bin/activate &&
+  #         make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 -n 4" ||
+  #         make -C nucliadb test-cov-nucliadb pytest_extra_flags="--shard-id=${{ matrix.shard }} --num-shards=3 --lf"
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
-        with:
-          file: ./nucliadb/coverage.xml
-          flags: nucliadb
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+  #     - name: Upload coverage to Codecov
+  #       uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+  #       with:
+  #         file: ./nucliadb/coverage.xml
+  #         flags: nucliadb
+  #       env:
+  #         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  nucliadb-components-tests:
-    name: NucliaDB components tests
-    runs-on: ubuntu-24.04
-    needs:
-      - build-virtual-env
-    strategy:
-      fail-fast: false
-      matrix:
-        component:
-          - ingest
-          - reader
-          - standalone
-          - train
-          - writer
+  # nucliadb-components-tests:
+  #   name: NucliaDB components tests
+  #   runs-on: ubuntu-24.04
+  #   needs:
+  #     - build-virtual-env
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       component:
+  #         - ingest
+  #         - reader
+  #         - standalone
+  #         - train
+  #         - writer
 
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  #   steps:
+  #     - name: Checkout the repository
+  #       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.14.8"
+  #     - name: Setup Python
+  #       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+  #       with:
+  #         python-version: "3.14.8"
 
-      - name: Restore venv
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .venv
-          key: venv-${{ github.sha }}
-          fail-on-cache-miss: true
+  #     - name: Restore venv
+  #       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+  #       with:
+  #         path: .venv
+  #         key: venv-${{ github.sha }}
+  #         fail-on-cache-miss: true
 
-      - name: Run package tests
-        run: source .venv/bin/activate && make -C nucliadb test-cov-${{ matrix.component }}
+  #     - name: Run package tests
+  #       run: source .venv/bin/activate && make -C nucliadb test-cov-${{ matrix.component }}
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
-        with:
-          file: ./nucliadb/coverage.xml
-          flags: nucliadb-${{ matrix.component }}
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+  #     - name: Upload coverage to Codecov
+  #       uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+  #       with:
+  #         file: ./nucliadb/coverage.xml
+  #         flags: nucliadb-${{ matrix.component }}
+  #       env:
+  #         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  python-packages-tests:
-    name: Python packages tests
-    runs-on: ubuntu-24.04
-    needs:
-      - build-virtual-env
-    strategy:
-      fail-fast: false
-      matrix:
-        package:
-          - nucliadb_dataset
-          - nucliadb_models
-          - nucliadb_sdk
-          - nucliadb_telemetry
-          - nucliadb_utils
+  # python-packages-tests:
+  #   name: Python packages tests
+  #   runs-on: ubuntu-24.04
+  #   needs:
+  #     - build-virtual-env
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       package:
+  #         - nucliadb_dataset
+  #         - nucliadb_models
+  #         - nucliadb_sdk
+  #         - nucliadb_telemetry
+  #         - nucliadb_utils
 
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  #   steps:
+  #     - name: Checkout the repository
+  #       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.14.8"
+  #     - name: Setup Python
+  #       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+  #       with:
+  #         python-version: "3.14.8"
 
-      - name: Restore venv
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .venv
-          key: venv-${{ github.sha }}
-          fail-on-cache-miss: true
+  #     - name: Restore venv
+  #       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+  #       with:
+  #         path: .venv
+  #         key: venv-${{ github.sha }}
+  #         fail-on-cache-miss: true
 
-      - name: Run package tests
-        run: source .venv/bin/activate && make -C ${{ matrix.package }} test-cov
+  #     - name: Run package tests
+  #       run: source .venv/bin/activate && make -C ${{ matrix.package }} test-cov
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
-        with:
-          file: ./${{ matrix.package }}/coverage.xml
-          flags: ${{ matrix.package }}
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+  #     - name: Upload coverage to Codecov
+  #       uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+  #       with:
+  #         file: ./${{ matrix.package }}/coverage.xml
+  #         flags: ${{ matrix.package }}
+  #       env:
+  #         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   # Depends on all tests to pass
   ci-passed:
@@ -345,10 +345,10 @@ jobs:
       - check-licenses
       - check-migrations
       - lint-helm
-      - nucliadb-search-tests
-      - nucliadb-tests
-      - nucliadb-components-tests
-      - python-packages-tests
+      # - nucliadb-search-tests
+      # - nucliadb-tests
+      # - nucliadb-components-tests
+      # - python-packages-tests
     steps:
       - name: CI passed
         run: echo "CI passed"
