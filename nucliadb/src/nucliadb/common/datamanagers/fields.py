@@ -197,7 +197,9 @@ async def create_processed_documents(
             marklogic_txn,
             documents_to_write=[
                 Document(
-                    uri=MarkLogicURIs.chunk(chunk.resource_id, chunk.field_id, chunk.chunk_id),
+                    uri=MarkLogicURIs.chunk(
+                        chunk.resource_id, chunk.field_type, chunk.field_id, chunk.chunk_id
+                    ),
                     collections=[MarkLogicCollections.CHUNKS],
                     content=chunk.model_dump(mode="json"),
                     content_type="application/json",
@@ -211,7 +213,11 @@ async def create_processed_documents(
             documents_to_write=[
                 Document(
                     uri=MarkLogicURIs.embedding(
-                        embedding.resource_id, embedding.field_id, embedding.chunk_id
+                        embedding.resource_id,
+                        embedding.field_type,
+                        embedding.field_id,
+                        embedding.model_id,
+                        embedding.chunk_id,
                     ),
                     collections=[MarkLogicCollections.EMBEDDINGS],
                     content=embedding.model_dump(mode="json"),
@@ -220,6 +226,60 @@ async def create_processed_documents(
                 for embedding in embeddings
             ],
         )
+
+
+@observer.wrap({"type": "field", "op": "delete_processed_documents"})
+async def delete_processed_documents(
+    txn: Transaction,
+    *,
+    kbid: str,
+    rid: str,
+    field_type: str | None = None,
+    field_id: str | None = None,
+    field_texts: bool = True,
+    chunks: bool = True,
+    embeddings: bool = True,
+    embedding_models: Sequence[str] | None = None,
+) -> None:
+    """
+    Delete processed texts, chunks and embeddings, keeping field values. Scoped to a single field when
+    `field_type` and `field_id` are given, otherwise to all the resource fields. `embedding_models=None`
+    deletes the embeddings of all models.
+    """
+    if (field_type is None) != (field_id is None):
+        raise ValueError("field_type and field_id must be provided together")
+    marklogic_txn = _marklogic_txn(txn, kbid=kbid, ensure_writes=True)
+    deletion = DocumentDeletion()
+    if field_type is None or field_id is None:
+        if embedding_models is not None:
+            raise ValueError("embedding_models requires a field")
+        collections = [
+            collection
+            for collection, selected in (
+                (MarkLogicCollections.FIELDS_PROCESSED, field_texts),
+                (MarkLogicCollections.CHUNKS, chunks),
+                (MarkLogicCollections.EMBEDDINGS, embeddings),
+            )
+            if selected
+        ]
+        if collections:
+            deletion.directory(MarkLogicURIs.fields_directory(rid), collections)
+    else:
+        if field_texts:
+            deletion.uri(MarkLogicURIs.field_processed(rid, field_id, field_type))
+        if chunks:
+            deletion.directory(
+                MarkLogicURIs.chunks_directory(rid, field_type, field_id),
+                (MarkLogicCollections.CHUNKS,),
+            )
+        if embeddings:
+            for model_id in embedding_models if embedding_models is not None else (None,):
+                deletion.directory(
+                    MarkLogicURIs.embeddings_directory(rid, field_type, field_id, model_id),
+                    (MarkLogicCollections.EMBEDDINGS,),
+                )
+    if deletion:
+        await documents.delete_documents(marklogic_txn, deletion)
 
 
 @observer.wrap({"type": "field", "op": "set_status"})

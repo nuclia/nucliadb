@@ -431,8 +431,30 @@ class ProcessorMarkLogic:
 
         # Now store all the processed contents to Marklogic (embeddings, chunks, etc)
         im = await self.generate_index_message(txn, uuid, bm, is_new_resource=is_new_resource)
-        for fpc, chunks, embeddings in self.get_field_processed_contents(im):
-            # TODO: Probably we need to delete existing processed documents before creating new ones
+        for fpc, chunks, embeddings in get_field_processed_contents(im):
+            if not is_new_resource:
+                full_field_id = f"{uuid}/{fpc.field_type}/{fpc.field_id}"
+                # Only replaced fields: conversation appends must keep their previous chunks/embeddings
+                replaced_models = [
+                    vectorset
+                    for vectorset, prefixes in im.vector_prefixes_to_delete.items()
+                    if full_field_id in prefixes.items
+                ]
+                await datamanagers.fields.delete_processed_documents(
+                    txn,
+                    kbid=kbid,
+                    rid=uuid,
+                    field_type=fpc.field_type,
+                    field_id=fpc.field_id,
+                    field_texts=not im.skip_texts,
+                    chunks=(
+                        len(chunks) > 0
+                        and not im.skip_paragraphs
+                        and full_field_id in im.paragraphs_to_delete
+                    ),
+                    embeddings=len(embeddings) > 0,
+                    embedding_models=replaced_models,
+                )
             await datamanagers.fields.create_processed_documents(
                 txn=txn,
                 field=fpc,
@@ -464,55 +486,6 @@ class ProcessorMarkLogic:
                     processing_status=writer_pb2.Metadata.Status.Name(basic.metadata.status),
                 ),
             )
-
-    def get_field_processed_contents(
-        self,
-        im: brain.Resource,
-    ) -> Iterator[tuple[FieldProcessedContent, list[ChunkContent], list[ChunkEmbeddingContent]]]:
-        resource_id = im.resource.uuid
-        for fid, text_data in im.texts.items():
-            field_type, field_id = fid.split("/")
-            field_text = text_data.text
-            field = FieldProcessedContent(
-                resource_id=resource_id,
-                field_id=field_id,
-                field_type=field_type,
-                extracted_text=field_text,
-                facets=list(text_data.labels),
-            )
-            chunks = []
-            embeddings = []
-            field_paragraphs = im.paragraphs.get(fid) or brain.IndexParagraphs()
-            for paragraph_id, paragraph_data in field_paragraphs.paragraphs.items():
-                paragaph_text = field_text[paragraph_data.start : paragraph_data.end]
-                chunks.append(
-                    ChunkContent(
-                        resource_id=resource_id,
-                        field_id=field_id,
-                        field_type=field_type,
-                        chunk_id=paragraph_id,
-                        text=paragaph_text,
-                        facets=list(paragraph_data.labels),
-                        data=documents.to_json(paragraph_data.metadata),
-                    ),
-                )
-                for vectorset_id, embeddings_data in paragraph_data.vectorsets_sentences.items():
-                    for embedding_index, (embedding_key, embedding_data) in enumerate(
-                        embeddings_data.sentences.items()
-                    ):
-                        embeddings.append(
-                            ChunkEmbeddingContent(
-                                resource_id=resource_id,
-                                field_id=field_id,
-                                field_type=field_type,
-                                chunk_id=embedding_key,
-                                model_id=vectorset_id,
-                                chunk_embedding_index=embedding_index,
-                                vector=list(embedding_data.vector),
-                                data=documents.to_json(embedding_data.metadata),
-                            )
-                        )
-            yield field, chunks, embeddings
 
     async def update_resource(
         self,
@@ -737,6 +710,55 @@ class KnowledgeBoxDoesNotExist(Exception):
 
 class ResourceDoesNotExist(Exception):
     """Exception raised when a Resource does not exist."""
+
+
+def get_field_processed_contents(
+    im: brain.Resource,
+) -> Iterator[tuple[FieldProcessedContent, list[ChunkContent], list[ChunkEmbeddingContent]]]:
+    resource_id = im.resource.uuid
+    for fid, text_data in im.texts.items():
+        field_type, field_id = fid.split("/")
+        field_text = text_data.text
+        field = FieldProcessedContent(
+            resource_id=resource_id,
+            field_id=field_id,
+            field_type=field_type,
+            extracted_text=field_text,
+            facets=list(text_data.labels),
+        )
+        chunks = []
+        embeddings = []
+        field_paragraphs = im.paragraphs.get(fid) or brain.IndexParagraphs()
+        for paragraph_id, paragraph_data in field_paragraphs.paragraphs.items():
+            paragaph_text = field_text[paragraph_data.start : paragraph_data.end]
+            chunks.append(
+                ChunkContent(
+                    resource_id=resource_id,
+                    field_id=field_id,
+                    field_type=field_type,
+                    chunk_id=paragraph_id,
+                    text=paragaph_text,
+                    facets=list(paragraph_data.labels),
+                    data=documents.to_json(paragraph_data.metadata),
+                ),
+            )
+            for vectorset_id, embeddings_data in paragraph_data.vectorsets_sentences.items():
+                for embedding_index, (embedding_key, embedding_data) in enumerate(
+                    embeddings_data.sentences.items()
+                ):
+                    embeddings.append(
+                        ChunkEmbeddingContent(
+                            resource_id=resource_id,
+                            field_id=field_id,
+                            field_type=field_type,
+                            chunk_id=embedding_key,
+                            model_id=vectorset_id,
+                            chunk_embedding_index=embedding_index,
+                            vector=list(embedding_data.vector),
+                            data=documents.to_json(embedding_data.metadata),
+                        )
+                    )
+        yield field, chunks, embeddings
 
 
 def get_bm_modified_fields(bm: writer_pb2.BrokerMessage) -> list[writer_pb2.FieldID]:

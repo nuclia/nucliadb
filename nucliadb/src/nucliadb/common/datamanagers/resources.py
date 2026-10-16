@@ -413,6 +413,22 @@ async def count(txn: Transaction, *, kbid: str) -> int:
     return int(result[0] if result else 0)
 
 
+@observer.wrap({"type": "resources", "op": "list_ids"})
+async def list_ids(
+    txn: Transaction,
+    *,
+    kbid: str,
+    after_rid: str | None = None,
+    limit: int = RESOURCE_URI_PAGE_SIZE,
+) -> list[str]:
+    """Page of resource ids in stable URI order, strictly after `after_rid` (which may no longer exist)."""
+    start_uri = MarkLogicURIs.resource(after_rid) if after_rid is not None else None
+    uris = await _resource_uris(txn, kbid, start_uri=start_uri, limit=limit + (start_uri is not None))
+    if start_uri is not None and uris and uris[0] == start_uri:
+        uris = uris[1:]
+    return [MarkLogicURIs.resource_id_from_uri(uri) for uri in uris[:limit]]
+
+
 async def _resource_uris(
     txn: Transaction, kbid: str, *, start_uri: str | None = None, limit: int = RESOURCE_URI_PAGE_SIZE
 ) -> list[str]:

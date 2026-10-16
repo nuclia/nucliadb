@@ -27,8 +27,8 @@ class MarkLogicURIs:
         Field:             ``/resources/resource-123/fields/t/body/data.json``
         Conversation page: ``/resources/resource-123/fields/c/chat/pages/1.json``
         Processed field:   ``/resources/resource-123/fields/t/body/processed.json``
-        Chunk:             ``/resources/resource-123/fields/c/body/chunks/chunk-1/data.json``
-        Embedding:         ``/resources/resource-123/fields/e/body/embeddings/model-1/data.json``
+        Chunk:             ``/resources/resource-123/fields/t/body/chunks/chunk-1/data.json``
+        Embedding:         ``/resources/resource-123/fields/t/body/embeddings/model-1/chunk-1/data.json``
     """
 
     @classmethod
@@ -91,9 +91,22 @@ class MarkLogicURIs:
         return f"{cls.field_directory(rid, field_type, field_id)}processed.json"
 
     @classmethod
-    def embedding(cls, rid: str, field_id: str, embedding_id: str) -> str:
-        return f"{cls.field_directory(rid, 'e', field_id)}embeddings/{embedding_id}/data.json"
+    def chunks_directory(cls, rid: str, field_type: str, field_id: str) -> str:
+        return f"{cls.field_directory(rid, field_type, field_id)}chunks/"
 
     @classmethod
-    def chunk(cls, rid: str, field_id: str, chunk_id: str) -> str:
-        return f"{cls.field_directory(rid, 'c', field_id)}chunks/{chunk_id}/data.json"
+    def chunk(cls, rid: str, field_type: str, field_id: str, chunk_id: str) -> str:
+        return f"{cls.chunks_directory(rid, field_type, field_id)}{chunk_id}/data.json"
+
+    @classmethod
+    def embeddings_directory(
+        cls, rid: str, field_type: str, field_id: str, model_id: str | None = None
+    ) -> str:
+        directory = f"{cls.field_directory(rid, field_type, field_id)}embeddings/"
+        return directory if model_id is None else f"{directory}{model_id}/"
+
+    @classmethod
+    def embedding(
+        cls, rid: str, field_type: str, field_id: str, model_id: str, embedding_id: str
+    ) -> str:
+        return f"{cls.embeddings_directory(rid, field_type, field_id, model_id)}{embedding_id}/data.json"
