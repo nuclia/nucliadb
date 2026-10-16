@@ -6,6 +6,14 @@ imagePullPolicy: IfNotPresent
 image: nuclia/nucliadb
 imageVersion:
 
+marklogic:
+  server:
+    host: marklogic-haproxy.data-platform
+    adminPort: 8002
+    initPort: 8001
+    serverId: default
+    authSecretName: marklogic-admin
+
 # Defines the number of NucliaDB pods to run.
 replicas: 2
 podAnnotations: {}

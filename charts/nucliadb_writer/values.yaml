@@ -7,6 +7,14 @@ imagePullPolicy: IfNotPresent
 containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 image: IMAGE_TO_REPLACE
 
+marklogic:
+  server:
+    host: marklogic-haproxy.data-platform
+    adminPort: 8002
+    initPort: 8001
+    serverId: default
+    authSecretName: marklogic-admin
+
 # Component settings
 # ---
 # These settings are controlled through environment variables

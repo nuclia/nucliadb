@@ -51,6 +51,7 @@ release: {{ .Release.Name }}
 {{- if .Values.commonLabels}}
 {{ toYaml .Values.commonLabels }}
 {{- end }}
+
 {{- end -}}
 
 {{/*

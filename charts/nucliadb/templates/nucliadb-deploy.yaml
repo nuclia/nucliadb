@@ -78,6 +78,7 @@ spec:
           - name: "{{ $key }}"
             value: {{ tpl $value $ | toJson }}
           {{- end }}
+          {{ include "marklogicEnv" . | nindent 10 }}
           {{- if .Values.envSecrets }}
 {{ toYaml .Values.envSecrets | indent 10 }}
           {{- end }}
