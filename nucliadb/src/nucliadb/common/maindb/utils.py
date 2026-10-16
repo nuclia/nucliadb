@@ -38,15 +38,14 @@ async def setup_driver() -> Driver:
         return driver
 
     if settings.driver == DriverConfig.MARKLOGIC:
-        from nucliadb.common.marklogic.settings import env_settings
+        from nucliadb.common.marklogic.settings import settings as server_settings
 
-        meta_server = env_settings.marklogic_meta_server
         marklogic_driver = MarkLogicDriver(
-            uri=meta_server.uri,
-            username=meta_server.username or "",
-            password=meta_server.password.get_secret_value() if meta_server.password else "",
-            port=meta_server.system_port,
-            admin_port=meta_server.admin_port,
+            uri=server_settings.uri,
+            username=server_settings.username or "",
+            password=server_settings.password.get_secret_value() if server_settings.password else "",
+            port=server_settings.system_port,
+            admin_port=server_settings.admin_port,
         )
         set_utility(Utility.MAINDB_DRIVER, marklogic_driver)
     else:
