@@ -1,1 +1,0 @@
-ALTER TABLE merge_jobs ADD COLUMN priority INT NOT NULL DEFAULT 0;

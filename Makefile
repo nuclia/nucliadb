@@ -32,17 +32,11 @@ python-code-lint:
 	$(MAKE) -C nucliadb_models/ lint
 
 rust-code-lint:
-	cargo fmt --all --manifest-path nidx/Cargo.toml
-	cargo clippy --all-features --manifest-path nidx/Cargo.toml
+	cargo fmt --all --manifest-path nidx/nidx_protos/Cargo.toml
+	cargo clippy --all-features --manifest-path nidx/nidx_protos/Cargo.toml
 
 install:
 	uv sync
 
 debug-test-nucliadb:
 	RUST_BACKTRACE=1 pytest nucliadb/tests -sxv
-
-build-nucliadb-local:
-	docker build -t nuclia/nucliadb:latest . -f Dockerfile.withbinding
-
-build-nidx: # Required for tests
-	docker build -t nidx:latest . -f Dockerfile.nidx

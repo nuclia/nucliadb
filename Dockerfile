@@ -1,6 +1,5 @@
 #
 # This Dockerfile build nucliadb without the binding.
-# See also `Dockerfile.withbinding` for a version with a compiled binding (for standalone)
 #
 
 #
