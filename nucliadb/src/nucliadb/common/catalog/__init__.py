@@ -58,10 +58,14 @@ def get_catalog() -> Catalog:
 
 
 async def catalog_update(txn: Transaction, kbid: str, resource: Resource, index_message: IndexMessage):
+    # Leaving for backward compatibility, but it will not be needed in the Marklogic implementation, as we are querying
+    # the resources documents.
     pass
 
 
 async def catalog_delete(txn: Transaction, kbid: str, rid: str):
+    # Leaving for backward compatibility, but it will not be needed in the Marklogic implementation, as we are querying
+    # the resources documents.
     pass
 
 

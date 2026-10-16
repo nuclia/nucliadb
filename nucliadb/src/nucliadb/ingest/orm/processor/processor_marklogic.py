@@ -51,6 +51,8 @@ from nucliadb.ingest.orm.processor.data_augmentation import (
 from nucliadb.ingest.orm.processor.processor import (
     MESSAGE_TO_NOTIFICATION_SOURCE,
     _apply_extracted_basic_updates,
+    _merge_basic,
+    compute_resource_status,
 )
 from nucliadb.ingest.orm.resource import (
     MAX_FIELD_STATUS_ERRORS,
@@ -443,21 +445,24 @@ class ProcessorMarkLogic:
     async def apply_extracted_basic_updates(
         self, orm_resource: Resource, bm: writer_pb2.BrokerMessage
     ) -> None:
-        if not (bm.link_extracted_data or bm.file_extracted_data or bm.field_metadata):
-            # No extracted basic updates to apply
-            return
-
         basic = await orm_resource.get_basic()
         previous_basic = writer_pb2.Basic()
         previous_basic.CopyFrom(basic)
-        filenames = await orm_resource.get_filenames()
-        _apply_extracted_basic_updates(bm, basic, orm_resource.uuid, filenames)
+        if bm.link_extracted_data or bm.file_extracted_data or bm.field_metadata:
+            filenames = await orm_resource.get_filenames()
+            _apply_extracted_basic_updates(bm, basic, orm_resource.uuid, filenames)
+        # Field statuses are already persisted, fold them into the resource status
+        await compute_resource_status(orm_resource.txn, orm_resource.kbid, orm_resource.uuid, basic)
         if basic != previous_basic:
             await datamanagers.resources.update_resource(
                 orm_resource.txn,
                 kbid=orm_resource.kbid,
                 rid=orm_resource.uuid,
-                data=ResourceUpdateContent(basic=documents.to_json(basic), title=basic.title),
+                data=ResourceUpdateContent(
+                    basic=documents.to_json(basic),
+                    title=basic.title,
+                    processing_status=writer_pb2.Metadata.Status.Name(basic.metadata.status),
+                ),
             )
 
     def get_field_processed_contents(
@@ -517,12 +522,17 @@ class ProcessorMarkLogic:
         uuid: str,
     ) -> None:
         values: dict[str, Any] = {}
-        for behavior in ("basic", "extra", "security", "origin"):
+        for behavior in ("extra", "security", "origin"):
             if bm.HasField(behavior):
                 values[behavior] = documents.to_json(getattr(bm, behavior))
-        if bm.HasField("basic"):
-            basic = bm.basic
+        if bm.HasField("basic") or len(bm.delete_fields) > 0:
+            # Merge onto the stored basic so data not sent by the writer (e.g. computed metadata) is kept
+            current_basic = await self.orm_resource(txn, kbid, uuid).get_basic()
+            payload = writer_pb2.Basic()
+            payload.CopyFrom(bm.basic)
+            basic = _merge_basic(current_basic, payload, list(bm.delete_fields))
             values.update(
+                basic=documents.to_json(basic),
                 title=basic.title,
                 processing_status=writer_pb2.Metadata.Status.Name(basic.metadata.status),
                 facets=sorted(
