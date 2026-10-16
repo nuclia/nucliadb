@@ -115,8 +115,3 @@ extraEnv: {}
 extraSecretEnv: {}
   # EXTRA_SENSITIVE_VAR_1: value1
   # EXTRA_SENSITIVE_VAR_2: value2
-
-# nidx:
-#   api_address:
-#   searcher_address:
-#   nats_subject:

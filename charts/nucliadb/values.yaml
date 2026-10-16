@@ -17,9 +17,6 @@ env:
   NUCLIA_ZONE: "europe-1"
   CORS_ORIGINS: '["http://localhost:8080"]'
   #NUA_API_KEY: "..."
-  nidx_api_address: nidx:10000
-  nidx_searcher_address: nidx:10001
-  nidx_indexer_address: nidx-worker:10002
   # when we're k8s, we want structured logs to
   # stdout so they can be scraped by log exporters
   log_output_type: stdout
@@ -61,41 +58,6 @@ worker:
   affinity: {}
   tolerations: []
   resources: {}
-
-# Configuration for the index node
-nidx:
-  image: nuclia/nidx
-  imageVersion:
-  env: {}
-  envSecrets: {}
-  envFrom: {}
-
-  replicas: 2
-  podAnnotations: {}
-  topologySpreadConstraints: []
-  nodeSelector: {}
-  affinity: {}
-  tolerations: []
-  resources: {}
-  volumeMounts: []
-  volumes: []
-
-  worker:
-    replicas: 1
-    podAnnotations: {}
-    topologySpreadConstraints: []
-    nodeSelector: {}
-    affinity: {}
-    tolerations: []
-    resources: {}
-
-  scheduler:
-    podAnnotations: {}
-    topologySpreadConstraints: []
-    nodeSelector: {}
-    affinity: {}
-    tolerations: []
-    resources: {}
 
 serviceAccount:
   create: false
