@@ -29,7 +29,10 @@ from nucliadb.ingest.orm.processor.data_augmentation import (
     get_generated_fields,
     send_generated_fields_to_process_v2,
 )
-from nucliadb.ingest.orm.processor.processor import MESSAGE_TO_NOTIFICATION_SOURCE
+from nucliadb.ingest.orm.processor.processor import (
+    MESSAGE_TO_NOTIFICATION_SOURCE,
+    _apply_extracted_basic_updates,
+)
 from nucliadb.ingest.orm.resource import (
     MAX_FIELD_STATUS_ERRORS,
     Resource,
@@ -400,7 +403,10 @@ class ProcessorMarkLogic:
         self, txn, kbid: str, uuid: str, bm: writer_pb2.BrokerMessage, is_new_resource: bool = False
     ):
         # Save extracted data from the broker message to the object store
-        await self.orm_resource(txn, kbid, uuid).apply_field_extracted_data(bm)
+        resource = self.orm_resource(txn, kbid, uuid)
+        await resource.apply_field_extracted_data(bm)
+
+        await self.apply_extracted_basic_updates(resource, bm)
 
         # Now store all the processed contents to Marklogic (embeddings, chunks, etc)
         im = await self.generate_index_message(txn, uuid, bm, is_new_resource=is_new_resource)
@@ -413,6 +419,26 @@ class ProcessorMarkLogic:
                 embeddings=embeddings,
                 skip_field_texts=im.skip_texts,
                 skip_chunks=im.skip_paragraphs,
+            )
+
+    async def apply_extracted_basic_updates(
+        self, orm_resource: Resource, bm: writer_pb2.BrokerMessage
+    ) -> None:
+        if not (bm.link_extracted_data or bm.file_extracted_data or bm.field_metadata):
+            # No extracted basic updates to apply
+            return
+
+        basic = await orm_resource.get_basic()
+        previous_basic = writer_pb2.Basic()
+        previous_basic.CopyFrom(basic)
+        filenames = await orm_resource.get_filenames()
+        _apply_extracted_basic_updates(bm, basic, orm_resource.uuid, filenames)
+        if basic != previous_basic:
+            await datamanagers.resources.update_resource(
+                orm_resource.txn,
+                kbid=orm_resource.kbid,
+                rid=orm_resource.uuid,
+                data=ResourceUpdateContent(basic=documents.to_json(basic), title=basic.title),
             )
 
     def get_field_processed_contents(
