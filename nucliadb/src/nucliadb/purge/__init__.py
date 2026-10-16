@@ -19,8 +19,9 @@
 #
 import asyncio
 import importlib.metadata
+import itertools
 from collections.abc import AsyncGenerator
-from itertools import batched  # type: ignore
+from typing import Iterable
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
@@ -43,6 +44,17 @@ from nucliadb_telemetry import errors
 from nucliadb_telemetry.logs import setup_logging
 from nucliadb_utils.storages.storage import Storage
 from nucliadb_utils.utilities import get_storage
+
+
+# Adapted from itertools docs.
+# TODO: Replace with itertools.batched once we are at Python>=3.12
+def batched(iterable: Iterable, n: int):
+    # batched('ABCDEFG', 3) → ABC DEF G
+    if n < 1:
+        raise ValueError("n must be at least one")
+    iterator = iter(iterable)
+    while batch := tuple(itertools.islice(iterator, n)):
+        yield batch
 
 
 async def _iter_keys(driver: Driver, match: str) -> AsyncGenerator[str, None]:
