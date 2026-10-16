@@ -98,7 +98,6 @@ spec:
               fieldRef:
                 fieldPath: metadata.labels['version']
           {{- include "toEnv" .Values.env | indent 10 }}
-          {{ include "marklogicEnv" . | nindent 10 }}
         ports:
         - name: grpc-ingest
           containerPort: {{ .Values.serving.grpc }}

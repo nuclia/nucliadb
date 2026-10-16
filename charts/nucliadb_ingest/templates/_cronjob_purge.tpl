@@ -74,7 +74,6 @@ spec:
                   fieldRef:
                     fieldPath: metadata.labels['version']
               {{- include "toEnv" .Values.env | indent 14 }}
-              {{ include "marklogicEnv" . | nindent 14 }}
             imagePullPolicy: Always
             command: ["{{ .command }}"]
 {{ end }}

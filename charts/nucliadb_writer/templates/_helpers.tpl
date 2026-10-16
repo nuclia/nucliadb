@@ -24,4 +24,3 @@ Possible values for the map are:
     {{- end }}
     {{- end }}
 {{- end }}
-

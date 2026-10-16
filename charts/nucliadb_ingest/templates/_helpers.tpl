@@ -25,7 +25,6 @@ Possible values for the map are:
     {{- end }}
 {{- end }}
 
-
 {{/*
 Render a ServiceAccount resource.
 Usage: {{ include "serviceAccount" (dict "component" "ingest" "appLabel" "ingest" "serviceAccount" .Values.ingest.serviceAccount "Chart" .Chart "Release" .Release) }}
