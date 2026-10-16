@@ -18,10 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from pydantic import BaseModel, SecretStr
+from pydantic import SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class MarkLogicServerSettings(BaseModel):
+class MarkLogicServerSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="MARKLOGIC_SERVER_")
+
     uri: str = "http://marklogic-haproxy.data-platform.svc.cluster.local"
     username: str | None = None
     password: SecretStr | None = None
