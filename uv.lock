@@ -10,7 +10,6 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "nidx-binding",
     "nidx-protos",
     "nucliadb",
     "nucliadb-dataset",
@@ -2003,11 +2002,6 @@ nkeys = [
 ]
 
 [[package]]
-name = "nidx-binding"
-version = "7.1.0"
-source = { editable = "nidx/nidx_binding" }
-
-[[package]]
 name = "nidx-protos"
 version = "7.1.0"
 source = { editable = "nidx/nidx_protos" }
@@ -2569,9 +2563,6 @@ dev = [
     { name = "ty" },
     { name = "types-pyyaml" },
 ]
-nidx = [
-    { name = "nidx-binding" },
-]
 sdk = [
     { name = "nucliadb-dataset" },
     { name = "nucliadb-sdk" },
@@ -2604,7 +2595,6 @@ dev = [
     { name = "ty", specifier = ">=0.0.34" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20240808" },
 ]
-nidx = [{ name = "nidx-binding", editable = "nidx/nidx_binding" }]
 sdk = [
     { name = "nucliadb-dataset", editable = "nucliadb_dataset" },
     { name = "nucliadb-sdk", editable = "nucliadb_sdk" },
