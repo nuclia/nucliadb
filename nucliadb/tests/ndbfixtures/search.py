@@ -19,9 +19,8 @@
 
 import asyncio
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 from unittest.mock import patch
 
 import pytest
