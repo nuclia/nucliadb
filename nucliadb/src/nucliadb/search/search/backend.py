@@ -19,6 +19,7 @@
 #
 
 import json
+import re
 
 from google.protobuf.json_format import ParseDict
 from nidx_protos.nodereader_pb2 import (
@@ -98,7 +99,7 @@ def _filter_context(query: SearchRequest) -> str:
         "  if (expression.resource !== undefined) return String(target.resource_id) === expression.resource;",
         "  if (expression.field) return String(target.field_type) === expression.field.field_type && (expression.field.field_id === undefined || String(target.field_id) === expression.field.field_id);",
         "  if (expression.facet !== undefined) return (target.facets || []).includes(expression.facet) || (isField && ((resource && resource.facets) || []).includes(expression.facet));",
-        "  if (expression.keyword !== undefined) return String(target.extracted_text || target.text || '').toLowerCase().includes(expression.keyword.toLowerCase());",
+        "  if (expression.keyword !== undefined) return cts.contains(xdmp.toJSON({text: target.extracted_text || target.text || ''}), cts.jsonPropertyWordQuery('text', expression.keyword, ['case-insensitive', 'unstemmed', 'unwildcarded']));",
         "  if (expression.resource_field_prefix) return String(target.resource_id) === expression.resource_field_prefix.resource_id && String(target.field_type) === expression.resource_field_prefix.field_type && String(target.field_id).startsWith(expression.resource_field_prefix.field_id_prefix);",
         "  return false;",
         "}",
@@ -154,6 +155,38 @@ async def hybrid_search(kbid: str, query: SearchRequest) -> SearchResponse:
     return response
 
 
+def _chunk_results_expression(query: SearchRequest) -> str:
+    terms = re.findall(r'"[^"]*"|\S+', query.body)
+    exact_terms = [term.strip('"') for term in terms]
+    variants = set()
+    for term in terms:
+        if not term.isalnum() or len(term) < 4:
+            continue
+        for index in range(len(term)):
+            variants.add(term[:index] + "?" + term[index + 1 :])
+            variants.add(term[:index] + term[index + 1 :])
+            variants.add(term[:index] + "?" + term[index:])
+            if index + 1 < len(term):
+                variants.add(term[:index] + term[index + 1] + term[index] + term[index + 2 :])
+        variants.add(term + "?")
+    return (
+        "(() => { "
+        f"const exactQuery = cts.wordQuery({json.dumps(exact_terms)}, ['case-insensitive', 'unstemmed', 'unwildcarded']); "
+        f"const fuzzyQuery = cts.wordQuery({json.dumps(sorted(variants))}, ['case-insensitive', 'unstemmed', 'wildcarded']); "
+        "return cts.search(cts.andQuery(["
+        f"cts.collectionQuery({json.dumps(MarkLogicCollections.CHUNKS)}), "
+        "cts.orQuery([exactQuery, fuzzyQuery])"
+        "])).toArray().map(doc => ({doc, content: JSON.parse(xdmp.toJsonString(doc.root))})) "
+        ".filter(item => passesFilters(item.content, item.content)).map(item => { "
+        "const fuzzy = !cts.contains(item.doc, exactQuery); "
+        "const score = Math.max(0, cts.score(item.doc)); "
+        "return {content: {chunk_id: item.content.chunk_id, facets: item.content.facets, "
+        "data: item.content.data}, fuzzy, score: (fuzzy ? 0 : 1) + score / (1 + score)}; "
+        "}).sort((left, right) => right.score - left.score); "
+        "})()"
+    )
+
+
 async def _search_chunks(
     driver: MarkLogicDriver,
     kbid: str,
@@ -161,18 +194,7 @@ async def _search_chunks(
     response: SearchResponse,
 ) -> None:
     filter_context = _filter_context(query)
-    javascript = (
-        "(() => { "
-        f"{filter_context} "
-        "const matches = cts.search(cts.andQuery(["
-        f"cts.collectionQuery({json.dumps(MarkLogicCollections.CHUNKS)}), "
-        f"cts.wordQuery({json.dumps(query.body.split())})"
-        "])).toArray().map(doc => ({doc, content: JSON.parse(xdmp.toJsonString(doc.root))})) "
-        ".filter(item => passesFilters(item.content, item.content)); "
-        "return matches.map(item => ({content: {chunk_id: item.content.chunk_id, facets: item.content.facets, "
-        "data: item.content.data}, score: cts.score(item.doc)})); "
-        "})()"
-    )
+    javascript = f"(() => {{ {filter_context} return {_chunk_results_expression(query)}; }})()"
     async with driver.ro_transaction(kbid=kbid) as txn:
         response.paragraph.query = query.body
         matches = await documents.evaluate(txn, javascript)
@@ -204,6 +226,8 @@ def _append_chunk_results(query: SearchRequest, response: SearchResponse, matche
             labels=content.get("facets", []),
         )
         result.score.bm25 = float(match.get("score", 0.0))
+        if match.get("fuzzy", False):
+            result.matches.append(query.body)
         ParseDict(content.get("data", {}), result.metadata)
         response.paragraph.results.append(result)
     response.paragraph.total = len(response.paragraph.results)
@@ -270,13 +294,7 @@ async def _search_hybrid(
     javascript = (
         "(() => { "
         f"{filter_context} "
-        "const chunks = cts.search(cts.andQuery(["
-        f"cts.collectionQuery({json.dumps(MarkLogicCollections.CHUNKS)}), "
-        f"cts.wordQuery({json.dumps(query.body.split())})"
-        "])).toArray().map(doc => ({doc, content: JSON.parse(xdmp.toJsonString(doc.root))})) "
-        ".filter(item => passesFilters(item.content, item.content)).map(item => "
-        "({content: {chunk_id: item.content.chunk_id, facets: item.content.facets, "
-        "data: item.content.data}, score: cts.score(item.doc)})); "
+        f"const chunks = {_chunk_results_expression(query)}; "
         f"const embeddings = {vector_results}; "
         "return {chunks, embeddings}; "
         "})()"

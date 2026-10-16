@@ -168,22 +168,23 @@ async def update_rows(txn: MarkLogicTransaction, dsl: str) -> None:
 
 
 async def update_document(txn: MarkLogicTransaction, update: DocumentUpdate) -> bool:
-    """Apply `update` in place; returns False if the document is missing and was not created."""
-    _, marklogic_txn = driver_txn(txn, ensure_writes=True)
+    """Patch root properties without reading contents; optionally create a missing document."""
+    driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
     if not update:
         return True
-    existing = await read(marklogic_txn, update.uri)
-    if existing is None:
-        if not update.upsert:
-            return False
-        await write(marklogic_txn, update.uri, update.collection, update.new_document())
+    try:
+        rows = await driver.client.rows.update(
+            dsl=update.to_optic(), params=await marklogic_txn.params()
+        )
+    except DatabaseDoesNotExist:
+        if marklogic_txn.database == driver.system_database:
+            raise
+        rows = []
+    if rows:
         return True
-
-    content = dict(existing)
-    content.update(update.changes)
-    for name in update.removed:
-        content.pop(name, None)
-    await write(marklogic_txn, update.uri, update.collection, content)
+    if not update.upsert:
+        return False
+    await write(marklogic_txn, update.uri, update.collection, update.new_document())
     return True
 
 

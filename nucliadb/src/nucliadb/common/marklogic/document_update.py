@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import builtins
+import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -67,3 +68,18 @@ class DocumentUpdate:
         for name in self._removed:
             content.pop(name, None)
         return content
+
+    def to_optic(self) -> str:
+        patches = ""
+        for name in sorted(self._removed):
+            path = json.dumps(f'node("{name}")')
+            patches += f".remove({path})"
+        for name, value in self._set.items():
+            path = json.dumps(f'node("{name}")')
+            patches += f".remove({path}).insertNamedChild('.', {json.dumps(name)}, {json.dumps(value)})"
+        return (
+            f"op.fromLiterals([{{uri: {json.dumps(self.uri)}}}])"
+            ".joinDoc(op.col('doc'), op.col('uri'))"
+            f".patch(op.col('doc'), op.patchBuilder('/'){patches})"
+            ".write().select(['uri'])"
+        )

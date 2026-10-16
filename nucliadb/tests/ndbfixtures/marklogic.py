@@ -29,16 +29,21 @@ async def _wait_until_ready(port: int) -> None:
 
 
 @pytest.fixture(scope="function")
-async def marklogic_maindb_driver() -> AsyncIterator[MarkLogicDriver]:
+def marklogic_maindb_settings() -> dict:
+    return {
+        "uri": "http://127.0.0.1",
+        "username": "admin",
+        "password": "admin",
+        "port": 8000,
+        "admin_port": 8002,
+    }
+
+
+@pytest.fixture(scope="function")
+async def marklogic_maindb_driver(marklogic_maindb_settings: dict) -> AsyncIterator[MarkLogicDriver]:
     """Connect to MarkLogic started externally by docker compose."""
-    await _wait_until_ready(8002)
-    driver = MarkLogicDriver(
-        uri="http://127.0.0.1",
-        username="admin",
-        password="admin",
-        port=8000,
-        admin_port=8002,
-    )
+    await _wait_until_ready(marklogic_maindb_settings["admin_port"])
+    driver = MarkLogicDriver(**marklogic_maindb_settings)
     await driver.initialize()
     try:
         yield driver

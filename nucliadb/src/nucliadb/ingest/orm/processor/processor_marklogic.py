@@ -269,6 +269,11 @@ class ProcessorMarkLogic:
     ) -> ResourceCreateContent:
         assert bm.HasField("basic")
         basic = bm.basic
+
+        # Make sure the slug is set in both the broker message and the basic message
+        slug = bm.slug or basic.slug or uuid
+        bm.slug = basic.slug = slug
+
         origin = bm.origin if bm.HasField("origin") else None
         created_at = (
             origin.created.ToJsonString()
@@ -285,12 +290,12 @@ class ProcessorMarkLogic:
             else ""
         )
         return ResourceCreateContent(
-            slug=basic.slug or bm.slug or uuid,
+            slug=slug,
             basic=documents.to_json(basic),
             origin=documents.to_json(bm.origin) if bm.HasField("origin") else None,
             extra=documents.to_json(bm.extra) if bm.HasField("extra") else None,
             security=documents.to_json(bm.security) if bm.HasField("security") else None,
-            title=basic.title or basic.slug or bm.slug or uuid,
+            title=basic.title or slug,
             created_at=created_at,
             modified_at=modified_at,
             processing_status=writer_pb2.Metadata.Status.Name(basic.metadata.status),
@@ -392,17 +397,13 @@ class ProcessorMarkLogic:
                 await field.set_value(payload, status=status)
 
     async def persist_fields_processed_data(
-        self,
-        txn,
-        kbid: str,
-        uuid: str,
-        bm: writer_pb2.BrokerMessage,
+        self, txn, kbid: str, uuid: str, bm: writer_pb2.BrokerMessage, is_new_resource: bool = False
     ):
         # Save extracted data from the broker message to the object store
         await self.orm_resource(txn, kbid, uuid).apply_field_extracted_data(bm)
 
         # Now store all the processed contents to Marklogic (embeddings, chunks, etc)
-        im = await self.generate_index_message(txn, uuid, bm)
+        im = await self.generate_index_message(txn, uuid, bm, is_new_resource=is_new_resource)
         for fpc, chunks, embeddings in self.get_field_processed_contents(im):
             # TODO: Probably we need to delete existing processed documents before creating new ones
             await datamanagers.fields.create_processed_documents(
@@ -539,13 +540,16 @@ class ProcessorMarkLogic:
         txn: MarkLogicTransaction,
         uuid: str,
         bm: writer_pb2.BrokerMessage,
+        is_new_resource: bool,
     ) -> brain.Resource:
         orm_resource = self.orm_resource(txn, bm.kbid, uuid)
         builder = IndexMessageBuilderV2(orm_resource)
         if bm.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
             return await builder.for_processor_bm(bm)
-        else:  # pragma: no cover
-            raise InvalidBrokerMessage(f"Unknown broker bm source: {bm.source}")
+        elif bm.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
+            return await builder.for_writer_bm(bm, resource_created=is_new_resource)
+        else:
+            raise ValueError(f"Unknown message source: {bm.source}")
 
     @processor_observer.wrap({"type": "txn"})
     async def txn(
@@ -578,6 +582,11 @@ class ProcessorMarkLogic:
                     else:
                         await self.update_fields(txn, bm, kbid, uuid)
                         await self.update_resource(txn, bm, kbid, uuid)
+
+                    # Title fields are not processed and are persisted right at creation time
+                    await self.persist_fields_processed_data(
+                        txn, kbid, uuid, bm, is_new_resource=is_new_resource
+                    )
 
                 elif bm.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
                     if is_new_resource:

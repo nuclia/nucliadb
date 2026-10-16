@@ -24,10 +24,16 @@ import pytest
 
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.marklogic import MarkLogicDriver
+from nucliadb.ingest.settings import DriverConfig, DriverSettings
 from nucliadb_utils.utilities import Utility
 from tests.ndbfixtures.utils import global_utility
 
 logger = logging.getLogger("nucliadb.fixtures:maindb")
+
+
+@pytest.fixture(scope="function")
+def maindb_settings() -> DriverSettings:
+    return DriverSettings(driver=DriverConfig.MARKLOGIC)
 
 
 @pytest.fixture(scope="function")

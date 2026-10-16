@@ -20,7 +20,6 @@
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import UnsetUtility
 from nucliadb.common.maindb.marklogic import MarkLogicDriver
-from nucliadb.common.marklogic.settings import env_settings
 from nucliadb.ingest.settings import DriverConfig, settings
 from nucliadb_utils.exceptions import ConfigurationError
 from nucliadb_utils.utilities import Utility, clean_utility, get_utility, set_utility
@@ -39,6 +38,8 @@ async def setup_driver() -> Driver:
         return driver
 
     if settings.driver == DriverConfig.MARKLOGIC:
+        from nucliadb.common.marklogic.settings import env_settings
+
         meta_server = env_settings.marklogic_meta_server
         marklogic_driver = MarkLogicDriver(
             uri=meta_server.uri,
