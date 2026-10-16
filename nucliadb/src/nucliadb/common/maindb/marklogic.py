@@ -123,6 +123,9 @@ class MarkLogicTransaction:
         return params
 
     async def abort(self) -> None:
+        if self.read_only:
+            # Nothing to roll back; keeps objects cached beyond the transaction scope (e.g. resource cache) usable
+            return
         async with self._transaction_lock:
             if self.open:
                 self.open = False
