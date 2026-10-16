@@ -100,9 +100,7 @@ jobs:
             tag: arm64
         image:
           - name: nucliadb
-            dockerfile: Dockerfile.withbinding
-          - name: nidx
-            dockerfile: Dockerfile.nidx
+            dockerfile: Dockerfile
 
     steps:
       - name: Checkout
@@ -129,7 +127,6 @@ jobs:
         id: version_step
         run: |-
           python bump.py --build=${{github.run_number}}
-          cargo update --manifest-path nidx/Cargo.toml nidx_binding
           VERSION=`cat VERSION`
           HASH=`git rev-parse --short HEAD`
           echo "version_number=$VERSION" >> $GITHUB_OUTPUT
@@ -166,7 +163,6 @@ jobs:
       matrix:
         image:
           - nucliadb
-          - nidx
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -175,7 +171,6 @@ jobs:
         id: version_step
         run: |-
           python bump.py --build=${{github.run_number}}
-          cargo update --manifest-path nidx/Cargo.toml nidx_binding
           VERSION=`cat VERSION`
           HASH=`git rev-parse --short HEAD`
           echo "version_number=$VERSION" >> $GITHUB_OUTPUT
