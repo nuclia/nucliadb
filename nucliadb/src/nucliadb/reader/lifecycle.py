@@ -47,7 +47,6 @@ async def lifespan(app: FastAPI):
         # skip utilities we don't use
         nats_manager=False,
         partitioning=False,
-        shard_manager=False,
         transaction=False,
     )
     async with inject_app_context(app, context):

@@ -95,8 +95,52 @@ class MarkLogicURIs:
         return f"{cls.field_directory(rid, field_type, field_id)}chunks/"
 
     @classmethod
+    def _field_id_suffix(
+        cls,
+        rid: str,
+        field_type: str,
+        field_id: str,
+        identifier: str,
+        *,
+        has_index: bool = False,
+    ) -> str:
+        """
+        >>> MarkLogicURIs._field_id_suffix("rid", "t", "body", "rid/t/body/12-34")
+        '12-34'
+        >>> MarkLogicURIs._field_id_suffix("rid", "c", "chat", "rid/c/chat/message-1/12-34")
+        'message-1/12-34'
+        >>> MarkLogicURIs._field_id_suffix("rid", "t", "body", "rid/t/body/2/12-34", has_index=True)
+        '2/12-34'
+        >>> MarkLogicURIs._field_id_suffix("rid", "c", "chat", "rid/c/chat/message-1/2/12-34", has_index=True)
+        'message-1/2/12-34'
+        """
+        field_prefix = f"{rid}/{field_type}/{field_id}/"
+        if not identifier.startswith(field_prefix):
+            raise ValueError(f"ID {identifier!r} does not belong to field {field_prefix!r}")
+
+        suffix_parts = identifier.removeprefix(field_prefix).split("/")
+        valid_part_counts = (2, 3) if has_index else (1, 2)
+        if len(suffix_parts) not in valid_part_counts or any(not part for part in suffix_parts):
+            raise ValueError(f"Invalid ID: {identifier!r}")
+
+        chunk_range = suffix_parts[-1]
+        try:
+            start, end = chunk_range.split("-", 1)
+            int(start)
+            int(end)
+        except ValueError as exc:
+            raise ValueError(f"Invalid range in ID: {identifier!r}") from exc
+
+        if has_index:
+            index_position = -2
+            if not suffix_parts[index_position].isdigit():
+                raise ValueError(f"Invalid index in ID: {identifier!r}")
+        return "/".join(suffix_parts)
+
+    @classmethod
     def chunk(cls, rid: str, field_type: str, field_id: str, chunk_id: str) -> str:
-        return f"{cls.chunks_directory(rid, field_type, field_id)}{chunk_id}/data.json"
+        suffix = cls._field_id_suffix(rid, field_type, field_id, chunk_id)
+        return f"{cls.chunks_directory(rid, field_type, field_id)}{suffix}/data.json"
 
     @classmethod
     def embeddings_directory(
@@ -109,4 +153,5 @@ class MarkLogicURIs:
     def embedding(
         cls, rid: str, field_type: str, field_id: str, model_id: str, embedding_id: str
     ) -> str:
-        return f"{cls.embeddings_directory(rid, field_type, field_id, model_id)}{embedding_id}/data.json"
+        suffix = cls._field_id_suffix(rid, field_type, field_id, embedding_id, has_index=True)
+        return f"{cls.embeddings_directory(rid, field_type, field_id, model_id)}{suffix}/data.json"

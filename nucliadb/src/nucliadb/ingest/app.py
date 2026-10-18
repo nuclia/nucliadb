@@ -25,7 +25,6 @@ from nucliadb import health
 from nucliadb.backups.tasks import initialize_consumers as initialize_backup_consumers
 from nucliadb.common.back_pressure.materializer import start_materializer, stop_materializer
 from nucliadb.common.back_pressure.utils import is_back_pressure_enabled
-from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.tasks import get_exports_consumer, get_imports_consumer
 from nucliadb.ingest import SERVICE_NAME
@@ -58,7 +57,6 @@ from nucliadb_utils.utilities import (
 async def initialize() -> list[Callable[[], Awaitable[None]]]:
     await setup_telemetry(SERVICE_NAME)
 
-    await setup_cluster()
     await start_transaction_utility(SERVICE_NAME)
 
     start_partitioning_utility()
@@ -69,7 +67,6 @@ async def initialize() -> list[Callable[[], Awaitable[None]]]:
         stop_partitioning_utility,
         stop_transaction_utility,
         stop_audit_utility,
-        teardown_cluster,
     ]
 
     if not transaction_settings.transaction_local:

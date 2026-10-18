@@ -28,7 +28,6 @@ from unittest.mock import AsyncMock, patch
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.search import API_PREFIX
@@ -96,7 +95,6 @@ def application_context(
     *,
     maindb_driver: Driver | None = None,
     storage: Storage | None = None,
-    shard_manager: KBShardManager | None = None,
     partitioning: PartitionUtility | None = None,
     nats_manager: NatsConnectionManager | None = None,
     transaction: TransactionUtility | None = None,
@@ -113,7 +111,6 @@ def application_context(
         service_name="nucliadb.tests",
         kv_driver=maindb_driver is not None,
         blob_storage=storage is not None,
-        shard_manager=shard_manager is not None,
         partitioning=partitioning is not None,
         nats_manager=nats_manager is not None,
         transaction=transaction is not None,
@@ -121,7 +118,6 @@ def application_context(
 
     context._kv_driver = maindb_driver
     context._blob_storage = storage
-    context._shard_manager = shard_manager
     context._partitioning = partitioning
     context._nats_manager = nats_manager
     context._transaction = transaction

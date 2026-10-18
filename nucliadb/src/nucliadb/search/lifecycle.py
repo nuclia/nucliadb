@@ -21,7 +21,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context.fastapi import inject_app_context
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest.utils import start_ingest, stop_ingest
@@ -46,9 +45,6 @@ async def lifespan(app: FastAPI):
     await start_predict_engine()
 
     await setup_driver()
-    await setup_cluster()
-    # TODO(Marklogic): Initialize the indexing backend when available.
-
     await start_audit_utility(SERVICE_NAME)
 
     async with inject_app_context(app):
@@ -59,9 +55,6 @@ async def lifespan(app: FastAPI):
         clean_utility(Utility.PARTITION)
 
     await stop_predict_engine()
-    # TODO(Marklogic): Finalize the indexing backend when available.
-
     await finalize_utilities()
     await stop_audit_utility()
-    await teardown_cluster()
     await clean_telemetry(SERVICE_NAME)

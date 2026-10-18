@@ -19,7 +19,6 @@
 #
 import json
 import uuid
-from unittest.mock import AsyncMock
 
 import pytest
 from nidx_protos import nodereader_pb2, noderesources_pb2
@@ -457,9 +456,7 @@ async def read_resource_documents(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_writer_persists_resource_and_fields_without_index_message(
-    maindb_driver: MarkLogicDriver, storage: Storage, monkeypatch
-):
+async def test_writer_persists_resource_and_fields(maindb_driver: MarkLogicDriver, storage: Storage):
     kbid = KnowledgeBox.new_unique_kbid()
     slug = f"marklogic-{uuid.uuid4().hex}"
     vectorset_id = "integration-model"
@@ -499,10 +496,7 @@ async def test_writer_persists_resource_and_fields_without_index_message(
         message.texts["body"].body = text
 
         processor = ProcessorMarkLogic(maindb_driver, storage, partition="1")
-        generate_index_message = AsyncMock(side_effect=AssertionError("Writer must not index"))
-        monkeypatch.setattr(processor, "generate_index_message", generate_index_message)
         await processor.process(message, seqid=1)
-        generate_index_message.assert_not_awaited()
 
         async with maindb_driver.transaction(read_only=True, kbid=kbid) as txn:
             resource = await documents.read(txn, MarkLogicURIs.resource(resource_id))
@@ -527,14 +521,33 @@ async def test_writer_persists_resource_and_fields_without_index_message(
                 resource_id=resource_id,
                 collection=MarkLogicCollections.FIELDS_PROCESSED,
             )
-            assert processed_fields == {}
+            assert processed_fields == {
+                MarkLogicURIs.field_processed(resource_id, "summary", "a"): {
+                    "resource_id": resource_id,
+                    "field_id": "summary",
+                    "field_type": "a",
+                    "extracted_text": "Resource and field metadata persisted through the processor",
+                    "facets": [],
+                },
+                MarkLogicURIs.field_processed(resource_id, "title", "a"): {
+                    "resource_id": resource_id,
+                    "field_id": "title",
+                    "field_type": "a",
+                    "extracted_text": "MarkLogic integration resource",
+                    "facets": [],
+                },
+            }
 
             chunks = await read_resource_documents(
                 txn,
                 resource_id=resource_id,
                 collection=MarkLogicCollections.CHUNKS,
             )
-            assert chunks == {}
+            assert len(chunks) == 2
+            assert {(chunk["field_type"], chunk["field_id"]) for chunk in chunks.values()} == {
+                ("a", "summary"),
+                ("a", "title"),
+            }
 
             embeddings = await read_resource_documents(
                 txn,
@@ -553,7 +566,6 @@ async def test_writer_persists_resource_and_fields_without_index_message(
         builder.bm.texts["body"].body = "Updated body"
         message2 = builder.bm
         await processor.process(message2, seqid=2)
-        generate_index_message.assert_not_awaited()
         async with maindb_driver.ro_transaction(kbid=kbid) as txn:
             resource = await documents.read(txn, MarkLogicURIs.resource(resource_id))
             assert resource is not None
@@ -564,14 +576,36 @@ async def test_writer_persists_resource_and_fields_without_index_message(
             field = await documents.read(txn, MarkLogicURIs.field(resource_id, "t", "body"))
             assert field is not None
             assert field["value"]["body"] == "Updated body"
-            for collection in (
-                MarkLogicCollections.FIELDS_PROCESSED,
-                MarkLogicCollections.CHUNKS,
-                MarkLogicCollections.EMBEDDINGS,
-            ):
-                assert (
-                    await read_resource_documents(txn, resource_id=resource_id, collection=collection)
-                    == {}
-                )
+            processed_fields = await read_resource_documents(
+                txn,
+                resource_id=resource_id,
+                collection=MarkLogicCollections.FIELDS_PROCESSED,
+            )
+            assert (
+                processed_fields[MarkLogicURIs.field_processed(resource_id, "title", "a")][
+                    "extracted_text"
+                ]
+                == "MarkLogic integration resource"
+            )
+            assert (
+                processed_fields[MarkLogicURIs.field_processed(resource_id, "summary", "a")][
+                    "extracted_text"
+                ]
+                == "Resource and field metadata persisted through the processor"
+            )
+
+            chunks = await read_resource_documents(
+                txn,
+                resource_id=resource_id,
+                collection=MarkLogicCollections.CHUNKS,
+            )
+            assert len(chunks) == 2
+
+            embeddings = await read_resource_documents(
+                txn,
+                resource_id=resource_id,
+                collection=MarkLogicCollections.EMBEDDINGS,
+            )
+            assert embeddings == {}
     finally:
         await KnowledgeBox.delete(maindb_driver, kbid)

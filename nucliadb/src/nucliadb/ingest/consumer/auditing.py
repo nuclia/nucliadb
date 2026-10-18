@@ -25,8 +25,6 @@ from functools import partial
 from typing import Any
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.exceptions import ShardsNotFound
-from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.constants import AVG_PARAGRAPH_SIZE_BYTES
 from nucliadb_protos import audit_pb2, writer_pb2
 from nucliadb_utils import const
@@ -65,7 +63,6 @@ class IndexAuditHandler:
     ):
         self.audit = audit
         self.pubsub = pubsub
-        self.shard_manager = get_shard_manager()
         self.task_handler = DelayedTaskHandler(check_delay)
 
     async def initialize(self) -> None:
@@ -101,28 +98,13 @@ class IndexAuditHandler:
         if not await datamanagers.atomic.kb.exists(kbid=kbid):
             logger.warning(f"KB does not exist, skipping counter audit", extra={"kbid": kbid})
             return
-        try:
-            shard_groups: list[writer_pb2.ShardObject] = await self.shard_manager.get_shards_by_kbid(
-                kbid
-            )
-        except ShardsNotFound:
-            logger.warning(f"No shards found for kbid {kbid}, skipping")
-            return
 
         logger.info({"message": "Processing counter audit for kbid", "kbid": kbid})
 
         total_fields = 0
         total_paragraphs = 0
 
-        for shard_obj in shard_groups:
-            shard = await self.shard_manager.get_index_shard(shard_obj)
-            if shard is None:
-                # TODO(Marklogic): Report storage once backend statistics are available.
-                return
-
-            total_fields += shard.fields
-            total_paragraphs += shard.paragraphs
-
+        # TODO(Marklogic): count number of chunks in the KB
         async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
             num_vectorsets = (
                 len([vs async for vs in datamanagers.vectorsets.iter(txn=txn, kbid=kbid)]) or 1

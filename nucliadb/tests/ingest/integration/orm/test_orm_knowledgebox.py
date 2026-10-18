@@ -23,7 +23,6 @@ from unittest.mock import AsyncMock
 import pytest
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster import manager as cluster_manager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict, KnowledgeBoxCreationError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -54,7 +53,6 @@ async def shard_manager(
 async def test_create_knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
 ):
     kbid = KnowledgeBox.new_unique_kbid()
     slug = f"slug-{kbid}"
@@ -90,7 +88,6 @@ async def test_create_knowledgebox(
 async def test_create_knowledgebox_with_multiple_vectorsets(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
 ):
     kbid = KnowledgeBox.new_unique_kbid()
     slug = f"slug-{kbid}"
@@ -142,7 +139,6 @@ async def test_create_knowledgebox_with_multiple_vectorsets(
 async def test_create_knowledgebox_without_vectorsets_is_not_allowed(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
 ):
     with pytest.raises(KnowledgeBoxCreationError):
         await KnowledgeBox.create(maindb_driver, kbid="kbid", slug="slug", semantic_models={})
@@ -151,7 +147,6 @@ async def test_create_knowledgebox_without_vectorsets_is_not_allowed(
 async def test_create_knowledgebox_with_same_kbid(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
 ):
     kbid = KnowledgeBox.new_unique_kbid()
 
@@ -175,7 +170,6 @@ async def test_create_knowledgebox_with_same_kbid(
 async def test_create_knowledgebox_with_same_slug(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
 ):
     slug = "my-kb-slug"
 
@@ -199,7 +193,6 @@ async def test_create_knowledgebox_with_same_slug(
 async def test_delete_knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: cluster_manager.KBShardManager,
 ):
     kbid, _ = await KnowledgeBox.create(
         maindb_driver,

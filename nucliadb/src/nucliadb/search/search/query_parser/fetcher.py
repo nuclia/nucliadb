@@ -368,24 +368,18 @@ async def detect_entities(kbid: str, query: str) -> list[utils_pb2.RelationNode]
 
 # in case we see more KBs being searched simultaneously we can increase this value
 @alru_cache(maxsize=100)
-async def get_matryoshka_dimension_cached(kbid: str, vectorset: str | None) -> int | None:
+async def get_matryoshka_dimension_cached(kbid: str, vectorset: str) -> int | None:
     # This can be safely cached as the matryoshka dimension is not expected to change
     return await get_matryoshka_dimension(kbid, vectorset)
 
 
 @query_parse_dependency_observer.wrap({"type": "matryoshka_dimension"})
-async def get_matryoshka_dimension(kbid: str, vectorset: str | None) -> int | None:
+async def get_matryoshka_dimension(kbid: str, vectorset: str) -> int | None:
     async with get_driver().ro_transaction(kbid=kbid) as txn:
         matryoshka_dimension = None
-        if not vectorset:
-            # XXX this should be migrated once we remove the "default" vectorset
-            # concept
-            matryoshka_dimension = await datamanagers.kb.get_matryoshka_vector_dimension(txn, kbid=kbid)
-        else:
-            vectorset_config = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset)
-            if vectorset_config is not None and vectorset_config.vectorset_index_config.vector_dimension:
-                matryoshka_dimension = vectorset_config.vectorset_index_config.vector_dimension
-
+        vectorset_config = await datamanagers.vectorsets.get(txn, kbid=kbid, vectorset_id=vectorset)
+        if vectorset_config is not None and vectorset_config.vectorset_index_config.vector_dimension:
+            matryoshka_dimension = vectorset_config.vectorset_index_config.vector_dimension
         return matryoshka_dimension
 
 

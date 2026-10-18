@@ -17,20 +17,13 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-"""
-Integration tests for nucliadb.common.datamanagers.kb
-
-Covers every public function in the module:
-  set_config, delete, soft_delete, set_slug, update_kb_shards,
-  exists_kb, get_config, get_kbid, get_kbs, get_kb_shards.
-"""
 
 import pytest
 
 from nucliadb.common.datamanagers import kb
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb_protos import knowledgebox_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -45,12 +38,6 @@ def make_config(title: str = "Test KB") -> knowledgebox_pb2.KnowledgeBoxConfig:
     cfg = knowledgebox_pb2.KnowledgeBoxConfig()
     cfg.title = title
     return cfg
-
-
-def make_shards(kbid: str) -> writer_pb2.Shards:
-    shards = writer_pb2.Shards()
-    shards.kbid = kbid
-    return shards
 
 
 # ---------------------------------------------------------------------------
@@ -245,50 +232,6 @@ async def test_delete_on_nonexistent_kb_is_noop(maindb_driver: Driver) -> None:
     async with maindb_driver.rw_transaction(kbid=None) as txn:
         await kb.delete(txn, kbid=new_kbid())  # must not raise
         await txn.commit()
-
-
-# ---------------------------------------------------------------------------
-# update_kb_shards / get_kb_shards
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_update_and_get_kb_shards(maindb_driver: Driver, kbid: str) -> None:
-    shards = make_shards(kbid)
-
-    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
-        await kb.set(txn, kbid=kbid, shards=shards)
-        await txn.commit()
-
-    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
-        result = await kb.get_shards(txn, kbid=kbid)
-
-    assert result is not None
-    assert result.kbid == kbid
-
-
-@pytest.mark.asyncio
-async def test_get_kb_shards_returns_none_for_missing_kb(maindb_driver: Driver) -> None:
-    kbid = new_kbid()
-    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
-        result = await kb.get_shards(txn, kbid=kbid)
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_get_kb_shards_for_update(maindb_driver: Driver, kbid: str) -> None:
-    shards = make_shards(kbid)
-
-    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
-        await kb.set(txn, kbid=kbid, shards=shards)
-        await txn.commit()
-
-    # for_update=True is a SELECT … FOR UPDATE; verify it returns the same data
-    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
-        result = await kb.get_shards(txn, kbid=kbid, for_update=True)
-
-    assert result is not None
-    assert result.kbid == kbid
 
 
 # ---------------------------------------------------------------------------

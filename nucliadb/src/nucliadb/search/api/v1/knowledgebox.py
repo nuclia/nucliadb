@@ -22,9 +22,7 @@ from fastapi_versioning import version
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import ShardsNotFound
-from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.counters import IndexCounts
-from nucliadb.common.models_utils import from_proto
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
 from nucliadb_models.internal.shards import KnowledgeboxShards
@@ -33,7 +31,6 @@ from nucliadb_models.search import (
     KnowledgeboxCounters,
     SearchParamDefaults,
 )
-from nucliadb_protos.writer_pb2 import Shards
 from nucliadb_utils.authentication import requires, requires_one
 
 MAX_PARAGRAPHS_FOR_SMALL_KB = 250_000
@@ -50,15 +47,7 @@ MAX_PARAGRAPHS_FOR_SMALL_KB = 250_000
 @requires(NucliaDBRoles.MANAGER)
 @version(1)
 async def knowledgebox_shards(request: Request, kbid: str) -> KnowledgeboxShards:
-    shard_manager = get_shard_manager()
-    try:
-        shards: Shards = await shard_manager.get_shards_by_kbid_inner(kbid)
-    except ShardsNotFound:
-        raise HTTPException(
-            status_code=404,
-            detail="The knowledgebox or its shards configuration is missing",
-        )
-    return from_proto.kb_shards(shards)
+    return KnowledgeboxShards(kbid=kbid, shards=[])
 
 
 @api.get(

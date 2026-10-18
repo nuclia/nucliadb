@@ -46,7 +46,6 @@ from nucliadb.train.generators.token_classifier import (
 )
 from nucliadb.train.settings import settings
 from nucliadb.train.types import TrainBatch
-from nucliadb.train.utils import get_shard_manager
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import TaskType, TrainSet
 
@@ -57,9 +56,6 @@ async def generate_train_data(
     kbid: str, shard: str, trainset: TrainSet, filter_expression: FilterExpression | None = None
 ):
     # Get the data structure to generate data
-    shard_manager = get_shard_manager()
-    shard_replica_id = await shard_manager.get_shard_id(kbid, shard)
-
     if trainset.batch_size == 0:
         trainset.batch_size = 50
 
@@ -92,7 +88,7 @@ async def generate_train_data(
     # This cache size is an arbitrary number, once we have a metric in place and
     # we analyze memory consumption, we can adjust it with more knoweldge
     with resource_cache(size=settings.resource_cache_size):
-        async for item in batch_generator(kbid, trainset, shard_replica_id, filter_expression):
+        async for item in batch_generator(kbid, trainset, "TODO(Marklogic)", filter_expression):
             payload = item.SerializeToString()
             yield len(payload).to_bytes(4, byteorder="big", signed=False)
             yield payload

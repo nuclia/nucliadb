@@ -19,9 +19,7 @@
 #
 import asyncio
 
-from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.cluster.settings import in_standalone_mode
-from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
 from nucliadb_utils.nats import NatsConnectionManager
@@ -47,7 +45,6 @@ class ApplicationContext:
         service_name: str = "service",
         kv_driver: bool = True,
         blob_storage: bool = True,
-        shard_manager: bool = True,
         partitioning: bool = True,
         nats_manager: bool = True,
         transaction: bool = True,
@@ -57,13 +54,11 @@ class ApplicationContext:
         self._lock = asyncio.Lock()
         self._kv_driver: Driver | None = None
         self._blob_storage: Storage | None = None
-        self._shard_manager: KBShardManager | None = None
         self._partitioning: PartitionUtility | None = None
         self._nats_manager: NatsConnectionManager | None = None
         self._transaction: TransactionUtility | None = None
         self.enabled_kv_driver = kv_driver
         self.enabled_blob_storage = blob_storage
-        self.enabled_shard_manager = shard_manager
         self.enabled_partitioning = partitioning
         self.enabled_nats_manager = nats_manager
         self.enabled_transaction = transaction
@@ -82,8 +77,6 @@ class ApplicationContext:
             self._kv_driver = await setup_driver()
         if self.enabled_blob_storage:
             self._blob_storage = await get_storage()
-        if self.enabled_shard_manager:
-            self._shard_manager = await setup_cluster()
         if self.enabled_partitioning:
             self._partitioning = start_partitioning_utility()
         if not in_standalone_mode() and self.enabled_nats_manager:
@@ -99,11 +92,6 @@ class ApplicationContext:
     def kv_driver(self) -> Driver:
         assert self._kv_driver is not None, "Driver not initialized"
         return self._kv_driver
-
-    @property
-    def shard_manager(self) -> KBShardManager:
-        assert self._shard_manager is not None, "Shard manager not initialized"
-        return self._shard_manager
 
     @property
     def blob_storage(self) -> Storage:
@@ -134,8 +122,6 @@ class ApplicationContext:
             await stop_nats_manager()
         if self.enabled_partitioning:
             stop_partitioning_utility()
-        if self.enabled_shard_manager:
-            await teardown_cluster()
         if self.enabled_blob_storage:
             await teardown_storage()
         if self.enabled_kv_driver:

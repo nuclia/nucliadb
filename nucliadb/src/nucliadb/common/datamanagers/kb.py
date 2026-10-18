@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Final, Literal, TypeAlias, cast
 
-from nucliadb.common.datamanagers.exceptions import KnowledgeBoxConflict, KnowledgeBoxNotFound
+from nucliadb.common.datamanagers.exceptions import KnowledgeBoxConflict
 from nucliadb.common.datamanagers.utils import UNSET, _UnsetType, observer
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
@@ -41,7 +41,7 @@ from nucliadb_protos import knowledgebox_pb2, writer_pb2
 
 logger = logging.getLogger(__name__)
 
-KBColumn: TypeAlias = Literal["slug", "config", "shards"]
+KBColumn: TypeAlias = Literal["slug", "config"]
 
 UNSET_STR: Final[str | None] = cast(str | None, UNSET)
 UNSET_CONFIG: Final[knowledgebox_pb2.KnowledgeBoxConfig | None] = cast(
@@ -58,7 +58,6 @@ class KBData:
 
     slug: str | None = UNSET_STR
     config: knowledgebox_pb2.KnowledgeBoxConfig | None = UNSET_CONFIG
-    shards: writer_pb2.Shards | None = UNSET_SHARDS
 
 
 @dataclass(slots=True)
@@ -150,8 +149,6 @@ def _deserialize(column: KBColumn, value):
         return None
     if column == "config":
         return documents.from_json(value, knowledgebox_pb2.KnowledgeBoxConfig)
-    elif column == "shards":
-        return documents.from_json(value, writer_pb2.Shards)
     else:  # Unknown column
         raise ValueError(f"Unsupported KB column: {column}")
 
@@ -162,13 +159,11 @@ async def set(
     *,
     kbid: str,
     config: knowledgebox_pb2.KnowledgeBoxConfig | None | _UnsetType = UNSET,
-    shards: writer_pb2.Shards | None | _UnsetType = UNSET,
 ) -> None:
     await _set_data(
         txn,
         kbid=kbid,
         config=config,
-        shards=shards,
     )
 
 
@@ -177,14 +172,13 @@ async def _set_data(
     *,
     kbid: str,
     config: knowledgebox_pb2.KnowledgeBoxConfig | None | _UnsetType = UNSET,
-    shards: writer_pb2.Shards | None | _UnsetType = UNSET,
 ) -> None:
     update = DocumentUpdate(
         uri=MarkLogicURIs.kb_data(),
         collection=MarkLogicCollections.KNOWLEDGEBOXES,
         defaults={"kbid": kbid},
     )
-    for name, value in (("config", config), ("shards", shards)):
+    for name, value in (("config", config),):
         if value is not UNSET:
             update[name] = _serialize(value)
     _, marklogic_txn = _driver_txn(txn, system_scope=False, ensure_writes=True, kbid=kbid)
@@ -228,7 +222,7 @@ async def _get_data(
         if column == "slug":
             # Slug is fetched from the config
             value = _deserialize("config", content["config"]).slug
-        elif column in ("config", "shards"):
+        elif column in ("config",):
             value = _deserialize(column, content[column])
         setattr(result, column, value)
     return result
@@ -329,37 +323,3 @@ async def soft_delete(txn: Transaction, *, kbid: str) -> None:
 async def get_config(txn: Transaction, *, kbid: str, for_update: bool = False):
     data = await _get_data(txn, kbid=kbid, columns=("config",), for_update=for_update)
     return data.config if isinstance(data, KBData) else None
-
-
-@observer.wrap({"type": "kb", "op": "get_shards"})
-async def get_shards(txn: Transaction, *, kbid: str, for_update: bool = False):
-    data = await _get_data(txn, kbid=kbid, columns=("shards",), for_update=for_update)
-    return data.shards if isinstance(data, KBData) else None
-
-
-async def get_model_metadata(txn: Transaction, *, kbid: str) -> knowledgebox_pb2.SemanticModelMetadata:
-    shards_obj = await get_shards(txn, kbid=kbid)
-    if shards_obj is None:
-        raise KnowledgeBoxNotFound(kbid)
-    if shards_obj.HasField("model"):
-        return shards_obj.model
-    return knowledgebox_pb2.SemanticModelMetadata(similarity_function=shards_obj.similarity)
-
-
-async def get_matryoshka_vector_dimension(
-    txn: Transaction, *, kbid: str, vectorset_id: str | None = None
-) -> int | None:
-    from . import vectorsets
-
-    async for _, vs in vectorsets.iter(txn, kbid=kbid):
-        dimension = vs.vectorset_index_config.vector_dimension
-        if vs.matryoshka_dimensions and dimension:
-            return dimension if dimension in vs.matryoshka_dimensions else None
-        return None
-    model = await get_model_metadata(txn, kbid=kbid)
-    configured_dimension = model.vector_dimension if model.HasField("vector_dimension") else None
-    return (
-        configured_dimension
-        if configured_dimension is not None and configured_dimension in model.matryoshka_dimensions
-        else None
-    )

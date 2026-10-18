@@ -24,7 +24,6 @@ from typing import Any
 from uuid import uuid4
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import (
@@ -36,7 +35,7 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
-from nucliadb_protos import knowledgebox_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
     KnowledgeBoxConfig,
     SemanticModelMetadata,
@@ -151,9 +150,6 @@ class KnowledgeBox:
                 # now), not every KB will store vectorsets there
                 await datamanagers.vectorsets.initialize(txn, kbid=kbid)
 
-                kb_shards = writer_pb2.Shards()
-                kb_shards.kbid = kbid
-
                 for vectorset_id, semantic_model in semantic_models.items():
                     # if this KB uses a matryoshka model, we can choose a different
                     # dimension
@@ -196,11 +192,7 @@ class KnowledgeBox:
                     hidden_resources_hide_on_creation=hidden_resources_hide_on_creation,
                     enforce_security=enforce_security if enforce_security is not None else False,
                 )
-                await datamanagers.kb.set(txn, kbid=kbid, shards=kb_shards, config=config)
-
-                # shard creation will alter this value on maindb, make sure nobody
-                # uses this variable anymore
-                del kb_shards
+                await datamanagers.kb.set(txn, kbid=kbid, config=config)
 
                 storage = await get_storage(service_name=SERVICE_NAME)
                 created = await storage.create_kb(kbid)
@@ -442,9 +434,6 @@ class KnowledgeBox:
         if deletion_mark is not None:
             await self.txn.delete(deletion_mark_key)
 
-        shard_manager = get_shard_manager()
-        await shard_manager.create_vectorset(self.kbid, config)
-
     async def vectorset_marked_for_deletion(self, vectorset_id: str) -> bool:
         key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id)
         value = await self.txn.get(key)
@@ -466,9 +455,6 @@ class KnowledgeBox:
         deletion_mark_key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id)
         payload = VectorSetPurge(storage_key_kind=deleted.storage_key_kind)
         await self.txn.set(deletion_mark_key, payload.SerializeToString())
-
-        shard_manager = get_shard_manager()
-        await shard_manager.delete_vectorset(self.kbid, vectorset_id)
 
 
 def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:

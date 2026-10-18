@@ -561,13 +561,11 @@ async def get_indexed_resource_ids(kbid: str, request: StreamRequest) -> set[str
 async def delete_resource_batch(request: Request, item: BatchDeleteRequest, kbid: str):
     filter_pb = await parse_expression(item.filter_expression.resource, kbid)
 
-    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
-        shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
-        if shards is None:
-            raise HTTPException(
-                status_code=404,
-                detail="The knowledgebox or its shards configuration is missing",
-            )
+    if not await datamanagers.atomic.kb.exists(kbid=kbid):
+        raise HTTPException(
+            status_code=404,
+            detail="The knowledgebox or its shards configuration is missing",
+        )
 
     stream_request = StreamRequest()
     stream_request.filter_expression.CopyFrom(filter_pb)

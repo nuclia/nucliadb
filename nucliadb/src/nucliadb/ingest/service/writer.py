@@ -22,7 +22,6 @@ from collections.abc import AsyncIterator
 from nucliadb.backups import tasks as backup_tasks
 from nucliadb.backups import utils as backup_utils
 from nucliadb.common import datamanagers, locking
-from nucliadb.common.cluster.utils import get_shard_manager
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
 from nucliadb.common.maindb.utils import setup_driver
 from nucliadb.ingest import SERVICE_NAME, logger
@@ -79,7 +78,6 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
         self.storage = await get_storage(service_name=SERVICE_NAME)
         self.driver = await setup_driver()
         self.proc = Processor(driver=self.driver, storage=self.storage, pubsub=await get_pubsub())
-        self.shards_manager = get_shard_manager()
 
     async def finalize(self): ...
 
@@ -306,15 +304,7 @@ class WriterServicer(writer_pb2_grpc.WriterServicer):
                 _ = KnowledgeBoxORM(txn, self.storage, kbid)
                 resobj = ResourceORM(txn, self.storage, kbid, rid)
                 resobj.disable_vectors = not request.reindex_vectors
-                # index_message = await get_resource_index_message(resobj, reindex=True)
-                # await self.shards_manager.add_resource(
-                #     shard,
-                #     index_message,
-                #     0,
-                #     partition=self.partitions[0],
-                #     kb=kbid,
-                #     reindex_id=uuid.uuid4().hex,
-                # )
+                # TODO(Marklogic): Reindex resource processed data
                 response = IndexStatus()
                 return response
         except Exception as e:

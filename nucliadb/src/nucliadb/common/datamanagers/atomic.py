@@ -96,7 +96,6 @@ def rw_txn_wrap(
 class kb:
     exists = ro_txn_wrap(kb_dm.exists, system=True)
     get_config = ro_txn_wrap(kb_dm.get_config)
-    get_shards = ro_txn_wrap(kb_dm.get_shards)
 
 
 class resources:

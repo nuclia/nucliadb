@@ -35,11 +35,6 @@ class Settings(BaseSettings):
     standalone_node_role: StandaloneNodeRole = StandaloneNodeRole.ALL
 
     # Index limits
-    max_shard_paragraphs: int = Field(
-        default=500_000,
-        title="Max shard paragraphs",
-        description="Maximum number of paragraphs to target per shard",
-    )
     max_resource_paragraphs: int = Field(
         default=300_000,
         title="Max paragraphs per resource",

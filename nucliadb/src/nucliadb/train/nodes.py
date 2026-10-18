@@ -20,7 +20,6 @@
 from collections.abc import AsyncIterator
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster import manager
 
 # XXX: this keys shouldn't be exposed outside datamanagers
 from nucliadb.common.maindb.driver import Driver, Transaction
@@ -45,9 +44,8 @@ from nucliadb_protos.train_pb2 import (
 from nucliadb_utils.storages.storage import Storage
 
 
-class TrainShardManager(manager.KBShardManager):
+class TrainShardManager:
     def __init__(self, driver: Driver, storage: Storage):
-        super().__init__()
         self.driver = driver
         self.storage = storage
 
