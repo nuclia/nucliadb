@@ -23,6 +23,9 @@ from contextvars import ContextVar
 from nidx_protos.nidx_pb2 import ExtractedTextsRequest, ExtractedTextsResponse
 
 from nucliadb.common.ids import FieldId, ParagraphId
+from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.marklogic import documents
+from nucliadb.common.marklogic.uris import MarkLogicURIs
 from nucliadb.search.augmentor.metrics import augmentor_observer
 
 
@@ -61,22 +64,67 @@ async def extracted_texts(
     if requests is None:
         return None
 
-    ops = [asyncio.create_task(_extracted_texts(request)) for request in requests]
+    ops = [asyncio.create_task(_extracted_texts(kbid, request)) for request in requests]
     responses = await asyncio.gather(*ops)
     if not any(response.fields or response.paragraphs for response in responses):
         return None
     return ExtractedTexts(responses)
 
 
-async def _extracted_texts(request: ExtractedTextsRequest) -> ExtractedTextsResponse:
-    # TODO(Marklogic): Fetch extracted text from the indexing backend.
-    return ExtractedTextsResponse()
+async def _extracted_texts(kbid: str, request: ExtractedTextsRequest) -> ExtractedTextsResponse:
+    field_uris = {
+        f"{field.rid}/{field.field_type}/{field.field_name}": MarkLogicURIs.field_processed(
+            field.rid, field.field_name, field.field_type
+        )
+        for field in request.field_ids
+    }
+    paragraph_uris = {}
+    for paragraph in request.paragraph_ids:
+        field_id = FieldId(
+            rid=paragraph.rid,
+            type=paragraph.field_type,
+            key=paragraph.field_name,
+            subfield_id=paragraph.split or None,
+        )
+        paragraph_id = ParagraphId(
+            field_id=field_id,
+            paragraph_start=paragraph.paragraph_start,
+            paragraph_end=paragraph.paragraph_end,
+        )
+        paragraph_uris[paragraph_id.full()] = (
+            paragraph_id,
+            MarkLogicURIs.chunk(field_id.rid, field_id.type, field_id.key, paragraph_id.full()),
+        )
+        field_uris[field_id.full_without_subfield()] = MarkLogicURIs.field_processed(
+            field_id.rid, field_id.key, field_id.type
+        )
+
+    uris = set(field_uris.values()) | {uri for _, uri in paragraph_uris.values()}
+    async with get_driver().ro_transaction(kbid=kbid) as txn:
+        contents = await documents.read_many(txn, list(uris))
+
+    response = ExtractedTextsResponse()
+    for field in request.field_ids:
+        key = f"{field.rid}/{field.field_type}/{field.field_name}"
+        content = contents.get(field_uris[key])
+        if content is not None:
+            response.fields[key] = content["extracted_text"]
+    for key, (paragraph_id, uri) in paragraph_uris.items():
+        content = contents.get(uri)
+        if content is not None:
+            response.paragraphs[key] = content["text"]
+        else:
+            field_content = contents.get(field_uris[paragraph_id.field_id.full_without_subfield()])
+            if field_content is not None:
+                response.paragraphs[key] = field_content["extracted_text"][
+                    paragraph_id.paragraph_start : paragraph_id.paragraph_end
+                ]
+    return response
 
 
 async def _build_requests(
     kbid: str, fields: set[FieldId], paragraphs: set[ParagraphId]
 ) -> list[ExtractedTextsRequest] | None:
-    # TODO(Marklogic): Scope the extracted-text request to the knowledgebox.
     request = ExtractedTextsRequest()
     for field_id in fields:
         request.field_ids.append(

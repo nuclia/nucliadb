@@ -180,8 +180,8 @@ def _chunk_results_expression(query: SearchRequest) -> str:
         variants.add(term + "?")
     return (
         "(() => { "
-        f"const exactQuery = cts.wordQuery({json.dumps(exact_terms)}, ['case-insensitive', 'unstemmed', 'unwildcarded']); "
-        f"const fuzzyQuery = cts.wordQuery({json.dumps(sorted(variants))}, ['case-insensitive', 'unstemmed', 'wildcarded']); "
+        f"const exactQuery = cts.jsonPropertyWordQuery('text', {json.dumps(exact_terms)}, ['case-insensitive', 'unstemmed', 'unwildcarded']); "
+        f"const fuzzyQuery = cts.jsonPropertyWordQuery('text', {json.dumps(sorted(variants))}, ['case-insensitive', 'unstemmed', 'wildcarded']); "
         "return cts.search(cts.andQuery(["
         f"cts.collectionQuery({json.dumps(MarkLogicCollections.CHUNKS)}), "
         "cts.orQuery([exactQuery, fuzzyQuery])"
@@ -316,7 +316,6 @@ async def _search_hybrid(
             result = eval_result
         else:
             return
-        breakpoint()
         _append_chunk_results(query, response, _flatten_eval_array(result.get("chunks", [])))
         _append_vector_results(query, response, _flatten_eval_array(result.get("embeddings", [])))
 
