@@ -55,8 +55,7 @@ async def get_partitions_by_prefix(request: Request, kbid: str, prefix: str) -> 
 
 
 async def get_partitions(kbid: str, prefix: str | None = None) -> TrainSetPartitions:
-    async with datamanagers.with_ro_transaction() as txn:
-        shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
+    shards = await datamanagers.atomic.kb.get_shards(kbid=kbid)
 
     if shards is None:
         # Most likely, KB doesn't exist
