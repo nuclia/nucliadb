@@ -140,4 +140,4 @@ asyncio_mode = "auto"
 where = ["src"]
 
 [tool.setuptools.package-data]
-nucliadb = ["standalone/static/*"]
+nucliadb = ["standalone/static/*", "search/search/stop_words/*.json"]
