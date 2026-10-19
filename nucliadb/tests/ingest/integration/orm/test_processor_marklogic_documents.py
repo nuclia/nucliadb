@@ -437,6 +437,99 @@ async def test_text_block_search_filters_field_and_paragraph_results(
         await KnowledgeBox.delete(maindb_driver, kbid)
 
 
+@pytest.mark.deploy_modes("standalone")
+async def test_resource_relabeling_filters_existing_field_chunks(
+    maindb_driver: MarkLogicDriver, storage: Storage
+):
+    kbid = KnowledgeBox.new_unique_kbid()
+    await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=f"relabel-{uuid.uuid4().hex}",
+        semantic_models={
+            "integration-model": SemanticModelMetadata(
+                similarity_function=utils_pb2.VectorSimilarity.COSINE,
+                vector_dimension=len(VECTOR),
+            )
+        },
+    )
+    resource_id = str(uuid.uuid4())
+    field_id = "body"
+    text = "foo"
+    paragraph_id = f"{resource_id}/t/{field_id}/0-{len(text)}"
+    processor = ProcessorMarkLogic(maindb_driver, storage, partition="1")
+
+    def facet_filter(facet: str):
+        expression = nodereader_pb2.FilterExpression()
+        expression.facet.facet = facet
+        return expression
+
+    async def search(facet: str):
+        retrieval = UnitRetrieval(
+            query=Query(keyword=KeywordQuery(query="foo", is_synonyms_query=False, min_score=0)),
+            top_k=10,
+            filters=RetrievalFilters(field_expression=facet_filter(facet)),
+            rank_fusion=ReciprocalRankFusion(window=10),
+        )
+        blocks, _, _, _ = await text_block_search(kbid, retrieval)
+        return {str(block.paragraph_id) for block in blocks}
+
+    try:
+        writer_message = BrokerMessageBuilder(
+            kbid=kbid,
+            rid=resource_id,
+            source=writer_pb2.BrokerMessage.MessageSource.WRITER,
+        )
+        writer_message.bm.basic.usermetadata.classifications.add(labelset="category", label="X")
+        writer_message.bm.texts[field_id].body = "Stored field value"
+        await processor.process(writer_message.build(), seqid=1, transaction_check=False)
+
+        processor_message = BrokerMessageBuilder(
+            kbid=kbid,
+            rid=resource_id,
+            source=writer_pb2.BrokerMessage.MessageSource.PROCESSOR,
+        )
+        field_builder = processor_message.field_builder(field_id, writer_pb2.FieldType.TEXT)
+        field_builder.with_extracted_labels("field-category", ["field-label"])
+        field_builder.add_paragraph(text)
+        await processor.process(processor_message.build(), seqid=2, transaction_check=False)
+
+        assert await search("/l/category/X") == {paragraph_id}
+        assert await search("/l/field-category/field-label") == {paragraph_id}
+
+        relabel_message = BrokerMessageBuilder(
+            kbid=kbid,
+            rid=resource_id,
+            source=writer_pb2.BrokerMessage.MessageSource.WRITER,
+        )
+        relabel_message.bm.basic.usermetadata.classifications.add(labelset="category", label="Y")
+        await processor.process(relabel_message.build(), seqid=3, transaction_check=False)
+
+        assert await search("/l/category/X") == set()
+        assert await search("/l/category/Y") == {paragraph_id}
+        assert await search("/l/field-category/field-label") == {paragraph_id}
+
+        async with maindb_driver.ro_transaction(kbid=kbid) as txn:
+            processed_fields = await read_resource_documents(
+                txn,
+                resource_id=resource_id,
+                collection=MarkLogicCollections.FIELDS_PROCESSED,
+            )
+            chunks = await read_resource_documents(
+                txn,
+                resource_id=resource_id,
+                collection=MarkLogicCollections.CHUNKS,
+            )
+            assert processed_fields[MarkLogicURIs.field_processed(resource_id, field_id, "t")][
+                "facets"
+            ] == ["/l/field-category/field-label"]
+            assert chunks[MarkLogicURIs.chunk(resource_id, "t", field_id, paragraph_id)]["facets"] == [
+                "/k/text"
+            ]
+    finally:
+        await KnowledgeBox.delete(maindb_driver, kbid)
+
+
 async def read_resource_documents(
     txn: MarkLogicTransaction, *, resource_id: str, collection: MarkLogicCollections
 ) -> dict[str, dict]:

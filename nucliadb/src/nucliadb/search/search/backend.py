@@ -79,17 +79,25 @@ def _filter_context(query: SearchRequest) -> str:
     paragraph_expression = (
         _filter_expression_data(query.paragraph_filter) if query.HasField("paragraph_filter") else None
     )
+    security_groups = list(query.security.access_groups) if query.HasField("security") else None
     setup = [
         f"const fieldExpression = {json.dumps(field_expression)};",
         f"const paragraphExpression = {json.dumps(paragraph_expression)};",
+        f"const securityGroups = {json.dumps(security_groups)};",
         f"const filterOperator = {json.dumps(query.filter_operator)};",
         "const resourcesById = new Map();",
-        "if (fieldExpression) {",
+        "if (fieldExpression || securityGroups !== null) {",
         f"  for (const doc of cts.search(cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)})).toArray()) {{",
         "    const resource = JSON.parse(xdmp.toJsonString(doc.root));",
         "    const resourceId = xdmp.nodeUri(doc).split('/').pop().replace('.json', '');",
         "    resourcesById.set(resourceId, resource);",
         "  }",
+        "}",
+        "function securityMatches(target) {",
+        "  if (securityGroups === null) return true;",
+        "  const resource = resourcesById.get(target.resource_id);",
+        "  const accessGroups = resource && resource.security && resource.security.access_groups || [];",
+        "  return accessGroups.length === 0 || accessGroups.some(group => securityGroups.includes(group));",
         "}",
         "function matchesExpression(expression, target, resource, isField) {",
         "  if (!expression) return true;",
@@ -114,6 +122,7 @@ def _filter_context(query: SearchRequest) -> str:
         "const fieldMatches = target => !fieldExpression || matchingFields.has(target.resource_id + '\\u001f' + target.field_type + '\\u001f' + target.field_id);",
         "const paragraphMatches = target => !paragraphExpression || matchesExpression(paragraphExpression, target, resourcesById.get(target.resource_id), false);",
         "function passesFilters(target, paragraph) {",
+        "  if (!securityMatches(target)) return false;",
         "  const fieldMatch = fieldMatches(target);",
         "  const paragraphMatch = !paragraphExpression || (paragraph && paragraphMatches(paragraph));",
         "  if (fieldExpression && paragraphExpression) return filterOperator === 1 ? fieldMatch || paragraphMatch : fieldMatch && paragraphMatch;",
@@ -307,6 +316,7 @@ async def _search_hybrid(
             result = eval_result
         else:
             return
+        breakpoint()
         _append_chunk_results(query, response, _flatten_eval_array(result.get("chunks", [])))
         _append_vector_results(query, response, _flatten_eval_array(result.get("embeddings", [])))
 
