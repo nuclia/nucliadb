@@ -22,6 +22,7 @@ import logging
 
 from nucliadb.common import locking
 from nucliadb.common.cluster.settings import in_standalone_mode
+from nucliadb.ingest.orm.rollover import rollover_kb
 from nucliadb.migrator.context import ExecutionContext
 from nucliadb.migrator.utils import get_migrations
 from nucliadb_telemetry import errors, metrics
@@ -152,8 +153,32 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
     await context.data_manager.update_global_info(target_version=None)
 
 
+async def run_rollovers(context: ExecutionContext) -> None:
+    kbids = await context.data_manager.get_kbs_to_rollover()
+    max_concurrent = 1 if in_standalone_mode() else context.settings.max_concurrent_migrations
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def run_rollover(kbid: str) -> None:
+        async with semaphore:
+            try:
+                progress = await rollover_kb(kbid)
+                if progress.failed:
+                    raise RuntimeError(f"KB rollover had {progress.failed} failed resources")
+                await context.data_manager.delete_kb_rollover(kbid=kbid)
+            except Exception as exc:
+                errors.capture_exception(exc)
+                logger.exception("Failed to rollover KB", extra={"kbid": kbid})
+                raise
+
+    results = await asyncio.gather(*(run_rollover(kbid) for kbid in kbids), return_exceptions=True)
+    failures = sum(isinstance(result, BaseException) for result in results)
+    if failures:
+        raise RuntimeError(f"Failed to rollover KBs. Failures: {failures}")
+
+
 async def run(context: ExecutionContext, target_version: int | None = None) -> None:
     async with locking.distributed_lock(locking.MIGRATIONS_LOCK):
+        await run_rollovers(context)
         # everything should be in a global lock
         # only 1 migration should be running at a time
         global_info = await context.data_manager.get_global_info()

@@ -37,11 +37,30 @@ _UNSET = _Unset()
 MIGRATIONS_CONTAINER_KEY = "migrations/"
 MIGRATIONS_KEY = "migrations/{kbid}"
 MIGRATION_INFO_KEY = "migration/info"
+ROLLOVER_CONTAINER_KEY = "rollover/"
+ROLLOVER_KEY = "rollover/{kbid}"
 
 
 class MigrationsDataManager:
     def __init__(self, driver: Driver):
         self.driver = driver
+
+    async def get_kbs_to_rollover(self) -> list[str]:
+        async with self.driver.ro_transaction(kbid=None) as txn:
+            return [
+                key.removeprefix(ROLLOVER_CONTAINER_KEY)
+                async for key in txn.keys(ROLLOVER_CONTAINER_KEY)
+            ]
+
+    async def add_kb_rollover(self, kbid: str) -> None:
+        async with self.driver.rw_transaction(kbid=None) as txn:
+            await txn.set(ROLLOVER_KEY.format(kbid=kbid), b"")
+            await txn.commit()
+
+    async def delete_kb_rollover(self, kbid: str) -> None:
+        async with self.driver.rw_transaction(kbid=None) as txn:
+            await txn.delete(ROLLOVER_KEY.format(kbid=kbid))
+            await txn.commit()
 
     async def schedule_all_kbs(self, target_version: int) -> None:
         # Get all kb ids
