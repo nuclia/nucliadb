@@ -609,3 +609,99 @@ async def test_writer_persists_resource_and_fields(maindb_driver: MarkLogicDrive
             assert embeddings == {}
     finally:
         await KnowledgeBox.delete(maindb_driver, kbid)
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_processor_replaces_processed_field_documents(
+    maindb_driver: MarkLogicDriver, storage: Storage
+):
+    kbid = KnowledgeBox.new_unique_kbid()
+    await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=f"marklogic-reprocess-{uuid.uuid4().hex}",
+        semantic_models={
+            "integration-model": SemanticModelMetadata(
+                similarity_function=utils_pb2.VectorSimilarity.COSINE,
+                vector_dimension=len(VECTOR),
+            )
+        },
+    )
+    resource_id = str(uuid.uuid4())
+    processor = ProcessorMarkLogic(maindb_driver, storage, partition="1")
+
+    try:
+        writer_message = BrokerMessageBuilder(
+            kbid=kbid,
+            rid=resource_id,
+            source=writer_pb2.BrokerMessage.MessageSource.WRITER,
+        )
+        writer_message.bm.texts["body"].body = "Stored field value"
+        await processor.process(writer_message.build(), seqid=1, transaction_check=False)
+
+        old_text = "Previous processor output"
+        old_message = BrokerMessageBuilder(
+            kbid=kbid,
+            rid=resource_id,
+            source=writer_pb2.BrokerMessage.MessageSource.PROCESSOR,
+        )
+        old_message.field_builder("body", writer_pb2.FieldType.TEXT).add_paragraph(
+            old_text, vectors={"integration-model": VECTOR}
+        )
+        await processor.process(old_message.build(), seqid=2, transaction_check=False)
+
+        new_text = "Replacement processor output with a new range"
+        new_vector = [0.4, 0.5, 0.6]
+        new_message = BrokerMessageBuilder(
+            kbid=kbid,
+            rid=resource_id,
+            source=writer_pb2.BrokerMessage.MessageSource.PROCESSOR,
+        )
+        new_message.field_builder("body", writer_pb2.FieldType.TEXT).add_paragraph(
+            new_text, vectors={"integration-model": new_vector}
+        )
+        await processor.process(new_message.build(), seqid=3, transaction_check=False)
+
+        expected_chunk_uri = MarkLogicURIs.chunk(
+            resource_id, "t", "body", f"{resource_id}/t/body/0-{len(new_text)}"
+        )
+        expected_embedding_uri = MarkLogicURIs.embedding(
+            resource_id,
+            "t",
+            "body",
+            "integration-model",
+            f"{resource_id}/t/body/0/0-{len(new_text)}",
+        )
+        async with maindb_driver.ro_transaction(kbid=kbid) as txn:
+            processed_fields = await read_resource_documents(
+                txn,
+                resource_id=resource_id,
+                collection=MarkLogicCollections.FIELDS_PROCESSED,
+            )
+            assert set(processed_fields) == {MarkLogicURIs.field_processed(resource_id, "body", "t")}
+            assert (
+                processed_fields[MarkLogicURIs.field_processed(resource_id, "body", "t")][
+                    "extracted_text"
+                ]
+                == new_text
+            )
+
+            chunks = await read_resource_documents(
+                txn,
+                resource_id=resource_id,
+                collection=MarkLogicCollections.CHUNKS,
+            )
+            assert set(chunks) == {expected_chunk_uri}
+            assert chunks[expected_chunk_uri]["text"] == new_text
+
+            embeddings = await read_resource_documents(
+                txn,
+                resource_id=resource_id,
+                collection=MarkLogicCollections.EMBEDDINGS,
+            )
+            assert set(embeddings) == {expected_embedding_uri}
+            assert [round(value, 6) for value in embeddings[expected_embedding_uri]["vector"]] == (
+                new_vector
+            )
+    finally:
+        await KnowledgeBox.delete(maindb_driver, kbid)
