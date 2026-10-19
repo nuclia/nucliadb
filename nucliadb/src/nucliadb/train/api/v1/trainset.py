@@ -18,12 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-
 from fastapi import HTTPException, Request
 from fastapi_versioning import version
 
-from nucliadb.common.cluster.exceptions import ShardNotFound
-from nucliadb.train.api.utils import get_kb_partitions
+from nucliadb.common import datamanagers
 from nucliadb.train.api.v1.router import KB_PREFIX, api
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.trainset import TrainSetPartitions
@@ -39,7 +37,7 @@ from nucliadb_utils.authentication import requires_one
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
-async def get_partitions_all(request: Request, kbid: str) -> TrainSetPartitions:
+async def get_all_partitions(request: Request, kbid: str) -> TrainSetPartitions:
     return await get_partitions(kbid)
 
 
@@ -52,13 +50,21 @@ async def get_partitions_all(request: Request, kbid: str) -> TrainSetPartitions:
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
-async def get_partitions_prefix(request: Request, kbid: str, prefix: str) -> TrainSetPartitions:
+async def get_partitions_by_prefix(request: Request, kbid: str, prefix: str) -> TrainSetPartitions:
     return await get_partitions(kbid, prefix=prefix)
 
 
 async def get_partitions(kbid: str, prefix: str | None = None) -> TrainSetPartitions:
-    try:
-        all_keys = await get_kb_partitions(kbid, prefix)
-    except ShardNotFound:
+    shards = await datamanagers.atomic.kb.get_shards(kbid=kbid)
+
+    if shards is None:
+        # Most likely, KB doesn't exist
         raise HTTPException(status_code=404, detail=f"No shards found for kb")
-    return TrainSetPartitions(partitions=all_keys)
+
+    selected = []
+    prefix = prefix or ""
+    for shard in shards.shards:
+        if shard.shard.startswith(prefix):
+            selected.append(shard.shard)
+
+    return TrainSetPartitions(partitions=selected)

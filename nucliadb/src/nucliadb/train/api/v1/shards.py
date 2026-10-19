@@ -25,8 +25,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from fastapi_versioning import version
 
-from nucliadb.common.cluster.exceptions import ShardNotFound
-from nucliadb.train.api.utils import get_kb_partitions
+from nucliadb.common import datamanagers
 from nucliadb.train.api.v1.router import KB_PREFIX, api
 from nucliadb.train.generator import generate_train_data
 from nucliadb_models.filters import FilterExpression
@@ -44,17 +43,23 @@ from nucliadb_utils.authentication import requires_one
 )
 @requires_one([NucliaDBRoles.READER])
 @version(1)
-async def object_get_response(
+async def stream_train_shard(
     request: Request,
     kbid: str,
     shard: str,
 ) -> StreamingResponse:
-    try:
-        partitions = await get_kb_partitions(kbid, prefix=shard)
-    except ShardNotFound:
+    shards = await datamanagers.atomic.kb.get_shards(kbid=kbid)
+
+    if shards is None:
+        # Most likely, KB doesn't exist
         raise HTTPException(status_code=404, detail=f"No shards found for kb")
-    if shard not in partitions:
+
+    for s in shards.shards:
+        if s.shard == shard:
+            break
+    else:
         raise HTTPException(status_code=404, detail=f"Partition {shard} not found")
+
     trainset, filter_expression = await get_trainset(request)
     return StreamingResponse(
         generate_train_data(kbid, shard, trainset, filter_expression),
