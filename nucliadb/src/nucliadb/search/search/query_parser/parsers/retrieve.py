@@ -295,7 +295,7 @@ class _RetrievalParser:
         self, semantic: nucliadb_models.retrieval.SemanticQuery
     ) -> tuple[str, list[float]]:
         # Make sure the vectorset exists in the KB and is valid
-        vectorset = await self.fetcher.get_user_vectorset()
+        vectorset = await self.fetcher.get_vectorset()
         assert vectorset is not None, "retrieve always enforces a vectorset on semantic search"
 
         # Calculate the matryoshka dimension if applicable
