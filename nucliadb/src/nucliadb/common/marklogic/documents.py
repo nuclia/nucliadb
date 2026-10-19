@@ -19,6 +19,8 @@
 #
 from __future__ import annotations
 
+import json
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from google.protobuf.json_format import MessageToDict, ParseDict
@@ -88,6 +90,49 @@ async def read(txn: MarkLogicTransaction, uri: str) -> dict | None:
     if not isinstance(content, dict):
         raise RuntimeError(f"Invalid document content: {uri}")
     return dict(content)
+
+
+async def read_properties(txn: MarkLogicTransaction, uri: str, properties: Sequence[str]) -> dict | None:
+    """Read selected top-level JSON properties using Optic; absent properties are None."""
+    return (await read_many_properties(txn, [uri], properties)).get(uri)
+
+
+async def read_many_properties(
+    txn: MarkLogicTransaction, uris: Sequence[str], properties: Sequence[str]
+) -> dict[str, dict]:
+    """Project properties for found URIs using Optic; absent properties are None."""
+    if not uris:
+        return {}
+    driver_txn(txn)
+    rows = [{"uri": uri} for uri in dict.fromkeys(uris)]
+    names = list(dict.fromkeys(properties))
+    columns = []
+    for index, name in enumerate(names):
+        literal = "'" + name.replace("'", "''") + "'"
+        path = f"/object-node()/node()[name(.) = {literal}]"
+        columns.append(f"op.as('p{index}', op.xpath('doc', {json.dumps(path)}))")
+    selection = ", ".join(["'uri'", *columns])
+    javascript = (
+        "const op = require('/MarkLogic/optic'); "
+        f"const names = {json.dumps(names)}; "
+        f"Sequence.from(op.fromLiterals({json.dumps(rows)})"
+        ".joinDoc(op.col('doc'), op.col('uri'))"
+        f".select([{selection}]).result().toArray().map(row => {{ "
+        "const content = {}; "
+        "names.forEach((name, index) => { "
+        "const value = row['p' + index]; "
+        "content[name] = value === undefined || value === null ? null : JSON.parse(xdmp.toJsonString(value)); "
+        "}); return {uri: row.uri, content}; }))"
+    )
+    result = await evaluate(txn, javascript)
+    contents: dict[str, dict] = {}
+    for row in result:
+        if not isinstance(row, dict) or not isinstance(row.get("uri"), str):
+            raise RuntimeError("Invalid projected document response")
+        if not isinstance(row.get("content"), dict):
+            raise RuntimeError(f"Invalid projected document content: {row['uri']}")
+        contents[row["uri"]] = row["content"]
+    return contents
 
 
 async def read_many(txn: MarkLogicTransaction, uris: list[str]) -> dict[str, dict]:

@@ -26,6 +26,68 @@ from nucliadb.common.marklogic import documents
 from nucliadb.common.marklogic.document_update import DocumentUpdate
 
 
+async def test_read_properties(marklogic_maindb_driver):
+    uri = f"/tests/document-projection/{uuid4().hex}.json"
+    selected = {
+        "text": "hello",
+        "nested": {"items": [1, 2]},
+        "array": ["first", "second"],
+        "empty_array": [],
+        "empty_object": {},
+        "nullable": None,
+        "enabled": False,
+        "count": 0,
+        "quote'and\"slash/": "escaped",
+    }
+    async with marklogic_maindb_driver.rw_transaction() as txn:
+        await documents.write(txn, uri, "test-projection", {**selected, "excluded": "large content"})
+        with patch.object(
+            marklogic_maindb_driver.client.documents,
+            "read",
+            side_effect=AssertionError("Projection must use Optic"),
+        ):
+            assert await documents.read_properties(txn, uri, [*selected, "absent", "text"]) == {
+                **selected,
+                "absent": None,
+            }
+            assert await documents.read_properties(txn, uri, []) == {}
+            assert await documents.read_properties(txn, uri, ["absent"]) == {"absent": None}
+            assert await documents.read_properties(txn, f"{uri}.missing", ["text"]) is None
+        await txn.commit()
+
+    async with marklogic_maindb_driver.ro_transaction() as txn:
+        assert await documents.read_properties(txn, uri, ["text"]) == {"text": "hello"}
+
+
+async def test_read_many_properties(marklogic_maindb_driver):
+    first_uri = f"/tests/document-projection/{uuid4().hex}.json"
+    second_uri = f"/tests/document-projection/{uuid4().hex}.json"
+    missing_uri = f"{first_uri}.missing"
+    async with marklogic_maindb_driver.rw_transaction() as txn:
+        await documents.write(txn, first_uri, "test-projection", {"text": "first", "extra": 1})
+        await documents.write(txn, second_uri, "test-projection", {"text": "second", "extra": 2})
+        await txn.commit()
+
+    async with marklogic_maindb_driver.ro_transaction() as txn:
+        with patch.object(
+            marklogic_maindb_driver.client.documents,
+            "read",
+            side_effect=AssertionError("Projection must use Optic"),
+        ):
+            assert await documents.read_many_properties(
+                txn, [first_uri, missing_uri, second_uri, first_uri], ["text", "absent"]
+            ) == {
+                first_uri: {"text": "first", "absent": None},
+                second_uri: {"text": "second", "absent": None},
+            }
+            assert await documents.read_many_properties(txn, [first_uri, second_uri], []) == {
+                first_uri: {},
+                second_uri: {},
+            }
+            assert await documents.read_many_properties(txn, [missing_uri], ["text"]) == {}
+            assert await documents.read_many_properties(txn, [], ["text"]) == {}
+
+
 @pytest.mark.parametrize("value", [{"nested": True}, [], None, {}, False, 0])
 async def test_patch_root_properties(marklogic_maindb_driver, value):
     uri = f"/tests/document-patch/{uuid4().hex}.json"
