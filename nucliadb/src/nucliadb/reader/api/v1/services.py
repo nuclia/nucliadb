@@ -259,8 +259,7 @@ async def notifications_endpoint(request: Request, kbid: str) -> StreamingRespon
 
 
 async def exists_kb(kbid: str) -> bool:
-    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
-        return await datamanagers.kb.exists(txn, kbid=kbid)
+    return await datamanagers.atomic.kb.exists(kbid=kbid)
 
 
 @api.get(
