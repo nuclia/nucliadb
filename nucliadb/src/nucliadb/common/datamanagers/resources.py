@@ -462,11 +462,13 @@ async def _get(
     columns: tuple[ResourceColumn, ...],
     for_update: bool = False,
 ) -> ResourceData | None:
-    # TODO(Marklogic): Use optic to select only the requested columns instead of reading the entire document
     _, marklogic_txn = _driver_txn(txn, kbid=kbid)
     if not columns:
         raise ValueError("At least one resource column must be requested")
-    content = await documents.read(marklogic_txn, MarkLogicURIs.resource(rid))
+    if len(columns) <= 2:
+        content = await documents.read_properties(marklogic_txn, MarkLogicURIs.resource(rid), columns)
+    else:
+        content = await documents.read(marklogic_txn, MarkLogicURIs.resource(rid))
     if content is None:
         return None
     resource = ResourceData()
