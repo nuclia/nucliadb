@@ -90,6 +90,10 @@ class RephraseMissingContextError(Exception):
     pass
 
 
+class PredictTimeoutError(TimeoutError):
+    pass
+
+
 DUMMY_RELATION_NODE = [
     RelationNode(value="Ferran", ntype=RelationNode.NodeType.ENTITY, subtype="PERSON"),
     RelationNode(value="Joan Antoni", ntype=RelationNode.NodeType.ENTITY, subtype="PERSON"),
@@ -291,7 +295,10 @@ class PredictEngine:
     )
     async def make_request(self, method: str, **request_args) -> aiohttp.ClientResponse:
         func = getattr(self.session, method.lower())
-        return await func(**request_args)
+        try:
+            return await func(**request_args)
+        except TimeoutError as exc:
+            raise PredictTimeoutError() from exc
 
     @predict_observer.wrap({"type": "rephrase"})
     async def rephrase_query(self, kbid: str, item: RephraseModel) -> RephraseResponse:

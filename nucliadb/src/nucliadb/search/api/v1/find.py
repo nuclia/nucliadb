@@ -19,10 +19,11 @@
 #
 import json
 
-from fastapi import Body, Header, Query, Request, Response
+from fastapi import Body, Header, HTTPException, Query, Request, Response
 from fastapi.openapi.models import Example
 from fastapi_versioning import version
 from pydantic import ValidationError
+from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxNotFound
@@ -31,6 +32,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query, get_injected_security_groups
+from nucliadb.search.predict import PredictTimeoutError
 from nucliadb.search.search import cache
 from nucliadb.search.search.find import find
 from nucliadb.search.search.metrics import Metrics
@@ -257,4 +259,9 @@ async def _find_endpoint(
         return HTTPClientError(
             status_code=err.status,
             detail=err.detail,
+        )
+    except PredictTimeoutError:
+        raise HTTPException(
+            status_code=HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Predict service is currently unavailable, please try later or try disabling reranking",
         )
