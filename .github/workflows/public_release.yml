@@ -50,11 +50,6 @@ jobs:
         with:
           cmd: yq -i '.imageVersion = "${{ steps.version_step.outputs.hash }}"' 'charts/nucliadb/values.yaml'
 
-      - name: Update nidx image version
-        uses: mikefarah/yq@504fc38780cc46be8444ea1b72fb55919fc0bfb0 # v4.54.1
-        with:
-          cmd: yq -i '.nidx.imageVersion = "${{ steps.version_step.outputs.hash }}"' 'charts/nucliadb/values.yaml'
-
       - name: Set chart version
         uses: mikefarah/yq@504fc38780cc46be8444ea1b72fb55919fc0bfb0 # v4.54.1
         with:

@@ -36,26 +36,14 @@ from nucliadb.ingest.orm.processor.processor import (
 )
 from nucliadb.ingest.orm.resource import (
     Resource,
-    get_file_page_positions,
 )
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.resources_pb2 import (
     Basic,
     CloudFile,
     FieldText,
-    FileExtractedData,
-    PagePositions,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
-
-
-async def test_get_file_page_positions():
-    extracted_data = FileExtractedData()
-    extracted_data.file_pages_previews.positions.extend(
-        [PagePositions(start=0, end=10), PagePositions(start=11, end=20)]
-    )
-    file_field = AsyncMock(get_file_extracted_data=AsyncMock(return_value=extracted_data))
-    assert await get_file_page_positions(file_field) == {0: (0, 10), 1: (11, 20)}
 
 
 @pytest.mark.parametrize(
@@ -167,8 +155,8 @@ def test_maybe_update_basic_icon(basic, icon, updated):
 
 
 @pytest.fixture(scope="function")
-async def txn(maindb_driver: Driver):
-    async with maindb_driver.rw_transaction() as txn:
+async def txn(maindb_driver: Driver, kb: str):
+    async with maindb_driver.rw_transaction(kbid=kb) as txn:
         yield txn
 
 
@@ -181,7 +169,7 @@ def storage():
 @pytest.fixture(scope="function")
 async def kb(maindb_driver: Driver):
     kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=None) as txn:
         await datamanagers.kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid
@@ -190,7 +178,7 @@ async def kb(maindb_driver: Driver):
 @pytest.fixture(scope="function")
 async def rid(maindb_driver: Driver, kb: str):
     r_id = Resource.new_unique_rid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kb) as txn:
         await datamanagers.resources.set_slug(txn, kbid=kb, rid=r_id, slug=f"slug-{r_id}")
         await txn.commit()
     return r_id

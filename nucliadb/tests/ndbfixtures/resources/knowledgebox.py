@@ -23,7 +23,6 @@ from collections.abc import AsyncIterator
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.tests.vectors import V1
@@ -37,7 +36,6 @@ from nucliadb_utils.storages.storage import Storage
 async def knowledgebox(
     storage: Storage,
     maindb_driver: Driver,
-    shard_manager: KBShardManager,
 ) -> AsyncIterator[str]:
     """Knowledgebox created through the ORM. This is what ingest gRPC ends up
     calling when backend creates a hosted KB and what the standalone API ends up

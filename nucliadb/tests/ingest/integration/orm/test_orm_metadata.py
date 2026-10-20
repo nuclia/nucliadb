@@ -38,7 +38,7 @@ from nucliadb_utils.storages.storage import Storage
 
 
 async def test_create_resource_orm_metadata(
-    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn: Transaction, cache, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -83,7 +83,7 @@ async def test_create_resource_orm_metadata(
 
 
 async def test_create_resource_orm_metadata_split(
-    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn: Transaction, cache, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)

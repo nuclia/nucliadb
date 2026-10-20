@@ -191,7 +191,7 @@ async def batch_deleter_task(context: ApplicationContext, msg: DeleteBatch):
 async def get_deletion_metadata(
     driver: Driver, kbid: str, deletion_id: UUID
 ) -> BatchDeletionMetadata | None:
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         raw = await txn.get(DELETION_METADATA.format(kbid=kbid, deletion_id=deletion_id))
         if raw is None:
             return None
@@ -201,14 +201,14 @@ async def get_deletion_metadata(
 async def set_deletion_metadata(
     driver: Driver, kbid: str, deletion_id: UUID, metadata: BatchDeletionMetadata
 ):
-    async with driver.rw_transaction() as txn:
+    async with driver.rw_transaction(kbid=kbid) as txn:
         raw = metadata.model_dump_json().encode()
         await txn.set(DELETION_METADATA.format(kbid=kbid, deletion_id=deletion_id), raw)
         await txn.commit()
 
 
 async def delete_deletion_metadata(driver: Driver, kbid: str, deletion_id: UUID):
-    async with driver.rw_transaction() as txn:
+    async with driver.rw_transaction(kbid=kbid) as txn:
         await txn.delete(DELETION_METADATA.format(kbid=kbid, deletion_id=deletion_id))
         await txn.commit()
 

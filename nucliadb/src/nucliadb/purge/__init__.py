@@ -25,10 +25,8 @@ from typing import Iterable
 
 from nucliadb.common import datamanagers
 from nucliadb.common.cluster.exceptions import NodeError, ShardNotFound
-from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.utils import setup_driver, teardown_driver
-from nucliadb.common.nidx import start_nidx_utility, stop_nidx_utility
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import (
@@ -94,7 +92,7 @@ async def purge_kbs(driver: Driver):
 
         # Now delete the delete mark
         try:
-            async with driver.rw_transaction() as txn:
+            async with driver.rw_transaction(kbid=None) as txn:
                 await KnowledgeBox.unmark_for_purge(txn, kbid)
                 await txn.commit()
             logger.info(f"  √ Deleted {kbid}")
@@ -157,7 +155,7 @@ async def purge_kbs_storage(driver: Driver, storage: Storage):
 
         if delete_marker:
             try:
-                async with driver.rw_transaction() as txn:
+                async with driver.rw_transaction(kbid=None) as txn:
                     await txn.delete(key)
                     await txn.commit()
                 logger.info("Deleted KB storage deletion marker", extra={"kbid": kbid})
@@ -225,7 +223,7 @@ async def _purge_resources_storage_batch(driver: Driver, storage: Storage, batch
     await asyncio.gather(*tasks)
 
     # Delete the schedule-to-delete keys
-    async with driver.rw_transaction() as txn:
+    async with driver.rw_transaction(kbid=None) as txn:
         for key in to_delete_batch:
             await txn.delete(key)
         await txn.commit()
@@ -290,7 +288,7 @@ async def purge_kb_vectorsets(driver: Driver, storage: Storage):
                 await asyncio.gather(*tasks)
 
             # Finally, delete the key
-            async with driver.rw_transaction() as txn:
+            async with driver.rw_transaction(kbid=None) as txn:
                 await txn.delete(key)
                 await txn.commit()
 
@@ -312,8 +310,6 @@ async def main():
     """
     This script will purge all knowledge boxes marked to be deleted in maindb.
     """
-    await setup_cluster()
-    await start_nidx_utility()
     driver = await setup_driver()
     storage = await get_storage(
         gcs_scopes=["https://www.googleapis.com/auth/devstorage.full_control"],
@@ -337,8 +333,6 @@ async def main():
             purge_resources_storage_task.cancel()
             await storage.finalize()
             await teardown_driver()
-            await stop_nidx_utility()
-            await teardown_cluster()
         except Exception:  # pragma: no cover
             logger.exception("Error tearing down utilities on purge command")
             pass

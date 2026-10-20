@@ -23,14 +23,8 @@ from functools import partial
 from typing import Any
 from uuid import uuid4
 
-from nidx_protos import nidx_pb2, noderesources_pb2
-
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.utils import get_shard_manager
-from nucliadb.common.external_index_providers.base import VectorsetExternalIndex
 from nucliadb.common.maindb.driver import Driver, Transaction
-from nucliadb.common.maindb.pg import PGTransaction
-from nucliadb.common.nidx import get_nidx_api_client
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import (
     KnowledgeBoxConflict,
@@ -41,12 +35,10 @@ from nucliadb.ingest.orm.metrics import processor_observer
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.orm.utils import choose_matryoshka_dimension, compute_paragraph_key
 from nucliadb.migrator.utils import get_latest_version
-from nucliadb_protos import knowledgebox_pb2, writer_pb2
+from nucliadb_protos import knowledgebox_pb2
 from nucliadb_protos.knowledgebox_pb2 import (
-    CreateExternalIndexProviderMetadata,
     KnowledgeBoxConfig,
     SemanticModelMetadata,
-    StoredExternalIndexProviderMetadata,
     VectorSetPurge,
 )
 from nucliadb_protos.resources_pb2 import Basic
@@ -112,10 +104,8 @@ class KnowledgeBox:
         semantic_models: dict[str, SemanticModelMetadata],
         title: str = "",
         description: str = "",
-        external_index_provider: CreateExternalIndexProviderMetadata = CreateExternalIndexProviderMetadata(),
         hidden_resources_enabled: bool = False,
         hidden_resources_hide_on_creation: bool = False,
-        prewarm_enabled: bool = False,
         semantic_graph_node_models: dict[str, SemanticModelMetadata] = dict(),
         semantic_graph_edge_models: dict[str, SemanticModelMetadata] = dict(),
         enforce_security: bool | None = None,
@@ -136,7 +126,7 @@ class KnowledgeBox:
         rollback_ops: list[Callable[[], Coroutine[Any, Any, Any]]] = []
 
         try:
-            async with driver.rw_transaction() as txn:
+            async with driver.rw_transaction(kbid=None) as txn:
                 if await datamanagers.kb.exists(txn, kbid=kbid):
                     raise KnowledgeBoxConflict("KB with this kbid already exists")
 
@@ -145,17 +135,20 @@ class KnowledgeBox:
                     await datamanagers.kb.set_slug(txn, slug=slug, kbid=kbid)
                 except datamanagers.exceptions.KnowledgeBoxConflict as e:
                     raise KnowledgeBoxConflict("Slug already exists") from e
+                await txn.commit()
 
+            async def rollback_registry() -> None:
+                async with driver.rw_transaction(kbid=None) as txn:
+                    await datamanagers.kb.registry_delete(txn, kbid=kbid)
+                    await txn.commit()
+
+            rollback_ops.append(rollback_registry)
+            await driver.ensure_kb_database(kbid)
+
+            async with driver.rw_transaction(kbid=kbid) as txn:
                 # all KBs have the vectorset key initialized, although (for
                 # now), not every KB will store vectorsets there
                 await datamanagers.vectorsets.initialize(txn, kbid=kbid)
-
-                kb_shards = writer_pb2.Shards()
-                kb_shards.kbid = kbid
-                # B/c with Shards.actual
-                kb_shards.actual = -1
-
-                vs_external_indexes = []
 
                 for vectorset_id, semantic_model in semantic_models.items():
                     # if this KB uses a matryoshka model, we can choose a different
@@ -164,14 +157,6 @@ class KnowledgeBox:
                         dimension = choose_matryoshka_dimension(semantic_model.matryoshka_dimensions)
                     else:
                         dimension = semantic_model.vector_dimension
-
-                    vs_external_indexes.append(
-                        VectorsetExternalIndex(
-                            vectorset_id=vectorset_id,
-                            dimension=dimension,
-                            similarity=semantic_model.similarity_function,
-                        )
-                    )
 
                     vectorset_config = semantic_model_to_vectorset(
                         vectorset_id, semantic_model, dimension
@@ -188,7 +173,6 @@ class KnowledgeBox:
                                 for name, model in semantic_graph_node_models.items()
                             ],
                         )
-
                     if semantic_graph_edge_models:
                         await datamanagers.graph_vectorsets.edge.set_all(
                             txn,
@@ -199,17 +183,6 @@ class KnowledgeBox:
                             ],
                         )
 
-                stored_external_index_provider = await cls._maybe_create_external_indexes(
-                    kbid, request=external_index_provider, indexes=vs_external_indexes
-                )
-                rollback_ops.append(
-                    partial(
-                        cls._maybe_delete_external_indexes,
-                        kbid,
-                        stored_external_index_provider,
-                    )
-                )
-
                 config = KnowledgeBoxConfig(
                     title=title,
                     description=description,
@@ -218,19 +191,10 @@ class KnowledgeBox:
                     hidden_resources_enabled=hidden_resources_enabled,
                     hidden_resources_hide_on_creation=hidden_resources_hide_on_creation,
                     enforce_security=enforce_security if enforce_security is not None else False,
-                    prewarm_enabled=prewarm_enabled,
                 )
-                config.external_index_provider.CopyFrom(stored_external_index_provider)
-                await datamanagers.kb.set(txn, kbid=kbid, shards=kb_shards, config=config)
-
-                # shard creation will alter this value on maindb, make sure nobody
-                # uses this variable anymore
-                del kb_shards
-
-                # Create in storage
+                await datamanagers.kb.set(txn, kbid=kbid, config=config)
 
                 storage = await get_storage(service_name=SERVICE_NAME)
-
                 created = await storage.create_kb(kbid)
                 if not created:
                     logger.error(f"KB {kbid} could not be created")
@@ -238,15 +202,6 @@ class KnowledgeBox:
                         f"KB blob storage could not be created (slug={slug})"
                     )
                 rollback_ops.append(partial(storage.delete_kb, kbid))
-
-                # Create shards in index nodes
-
-                shard_manager = get_shard_manager()
-                # XXX creating a shard is a slow IO operation that requires a write
-                # txn to be open!
-                await shard_manager.create_shard_by_kbid(txn, kbid, prewarm_enabled=prewarm_enabled)
-                # shards don't need a rollback as they will be eventually purged
-
                 await txn.commit()
 
         except Exception as exc:
@@ -274,20 +229,21 @@ class KnowledgeBox:
         title: str | None = None,
         description: str | None = None,
         migration_version: int | None = None,
-        external_index_provider: StoredExternalIndexProviderMetadata | None = None,
         hidden_resources_enabled: bool | None = None,
         hidden_resources_hide_on_creation: bool | None = None,
-        prewarm_enabled: bool | None = None,
         enforce_security: bool | None = None,
     ) -> str:
-        async with driver.rw_transaction() as txn:
+        async with (
+            driver.rw_transaction(kbid=None) as system_txn,
+            driver.rw_transaction(kbid=kbid) as txn,
+        ):
             stored = await datamanagers.kb.get_config(txn, kbid=kbid, for_update=True)
             if not stored:
                 raise datamanagers.exceptions.KnowledgeBoxNotFound()
 
             if slug:
                 try:
-                    await datamanagers.kb.set_slug(txn, slug=slug, kbid=kbid)
+                    await datamanagers.kb.set_slug(system_txn, slug=slug, kbid=kbid)
                 except datamanagers.exceptions.KnowledgeBoxConflict as e:
                     raise KnowledgeBoxConflict("Slug already exists") from e
                 stored.slug = slug
@@ -300,19 +256,10 @@ class KnowledgeBox:
             if migration_version is not None:
                 stored.migration_version = migration_version
 
-            if external_index_provider is not None:
-                stored.external_index_provider.MergeFrom(external_index_provider)
-
             if hidden_resources_enabled is not None:
                 stored.hidden_resources_enabled = hidden_resources_enabled
             if hidden_resources_hide_on_creation is not None:
                 stored.hidden_resources_hide_on_creation = hidden_resources_hide_on_creation
-
-            update_nidx_prewarm = None
-            if prewarm_enabled is not None:
-                if stored.prewarm_enabled != prewarm_enabled:
-                    update_nidx_prewarm = prewarm_enabled
-                stored.prewarm_enabled = prewarm_enabled
 
             if stored.hidden_resources_hide_on_creation and not stored.hidden_resources_enabled:
                 raise KnowledgeBoxCreationError(
@@ -325,31 +272,9 @@ class KnowledgeBox:
             await datamanagers.kb.set(txn, kbid=kbid, config=stored)
 
             await txn.commit()
-
-        if update_nidx_prewarm is not None:
-            await cls.configure_shards(driver, kbid, prewarm=update_nidx_prewarm)
+            await system_txn.commit()
 
         return kbid
-
-    @classmethod
-    async def configure_shards(cls, driver: Driver, kbid: str, *, prewarm: bool):
-        shards_obj = await datamanagers.atomic.kb.get_shards(kbid=kbid)
-        if shards_obj is None:
-            logger.warning(f"Shards not found for KB while updating pre-warm flag", extra={"kbid": kbid})
-            return
-
-        nidx_shard_ids = [shard.nidx_shard_id for shard in shards_obj.shards]
-
-        nidx_api = get_nidx_api_client()
-        if nidx_api is not None and len(nidx_shard_ids) > 0:
-            configs = [
-                nidx_pb2.ShardConfig(
-                    shard_id=shard_id,
-                    prewarm_enabled=prewarm,
-                )
-                for shard_id in nidx_shard_ids
-            ]
-            await nidx_api.ConfigureShards(nidx_pb2.ShardsConfig(configs=configs))
 
     @classmethod
     async def mark_for_purge(cls, txn: Transaction, kbid: str):
@@ -376,39 +301,21 @@ class KnowledgeBox:
         In the current transaction, the KB is marked for and we only delete:
         - The KB config
         - The KB slug
-        - Mark shards to be deleted from nidx
+        - Mark backend shards for deletion
         - Mark the KB for purge, which will eventually delete all KB keys in Postgresql and objects in storage.
         """
 
-        async with driver.rw_transaction() as txn:
+        async with driver.rw_transaction(kbid=None) as txn:
             exists = await datamanagers.kb.exists(txn, kbid=kbid)
             if not exists:
                 # Already deleted, or never existed.
                 return
 
-            kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
-
             await cls.mark_for_purge(txn, kbid=kbid)
-
-            shards_obj = await datamanagers.kb.get_shards(txn, kbid=kbid)
 
             await datamanagers.kb.soft_delete(txn, kbid=kbid)
 
             await txn.commit()
-
-        if shards_obj is None:
-            logger.warning(f"Shards not found for KB while deleting it", extra={"kbid": kbid})
-        else:
-            nidx_api = get_nidx_api_client()
-            # Delete shards from nidx. They'll be marked for eventual deletion,
-            # so this call shouldn't be costly
-            if nidx_api is not None:
-                for shard in shards_obj.shards:
-                    if shard.nidx_shard_id:
-                        await nidx_api.DeleteShard(noderesources_pb2.ShardId(id=shard.nidx_shard_id))
-
-        if kb_config is not None:
-            await cls._maybe_delete_external_indexes(kbid, kb_config.external_index_provider)
 
         audit = get_audit()
         if audit is not None:
@@ -443,7 +350,7 @@ class KnowledgeBox:
             await txn.commit()
 
         # Delete by prefix in another transaction, as it can be slow and we don't want to block the previous one
-        async with driver.rw_transaction() as txn:
+        async with driver.rw_transaction(kbid=None) as txn:
             await cls.delete_all_kb_keys(txn, kbid)
             await txn.commit()
 
@@ -452,17 +359,6 @@ class KnowledgeBox:
         prefix = KB_KEYS.format(kbid=kbid)
         await txn.delete_by_prefix(prefix)
         await datamanagers.kb.delete(txn, kbid=kbid)
-
-    async def get_resource_shard(self, shard_id: str) -> writer_pb2.ShardObject | None:
-        async with datamanagers.with_ro_transaction() as txn:
-            pb = await datamanagers.kb.get_shards(txn, kbid=self.kbid)
-            if pb is None:
-                logger.warning("Shards not found for kbid", extra={"kbid": self.kbid})
-                return None
-        for shard in pb.shards:
-            if shard.shard == shard_id:
-                return shard
-        return None
 
     async def get(self, uuid: str) -> Resource | None:
         return await Resource.get(self.txn, self.kbid, uuid)
@@ -538,9 +434,6 @@ class KnowledgeBox:
         if deletion_mark is not None:
             await self.txn.delete(deletion_mark_key)
 
-        shard_manager = get_shard_manager()
-        await shard_manager.create_vectorset(self.kbid, config)
-
     async def vectorset_marked_for_deletion(self, vectorset_id: str) -> bool:
         key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=vectorset_id)
         value = await self.txn.get(key)
@@ -563,26 +456,6 @@ class KnowledgeBox:
         payload = VectorSetPurge(storage_key_kind=deleted.storage_key_kind)
         await self.txn.set(deletion_mark_key, payload.SerializeToString())
 
-        shard_manager = get_shard_manager()
-        await shard_manager.delete_vectorset(self.kbid, vectorset_id)
-
-    @classmethod
-    async def _maybe_create_external_indexes(
-        cls,
-        kbid: str,
-        request: CreateExternalIndexProviderMetadata,
-        indexes: list[VectorsetExternalIndex],
-    ) -> StoredExternalIndexProviderMetadata:
-        return StoredExternalIndexProviderMetadata(type=request.type)
-
-    @classmethod
-    async def _maybe_delete_external_indexes(
-        cls,
-        kbid: str,
-        stored: StoredExternalIndexProviderMetadata,
-    ) -> None:
-        return
-
 
 def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:
     # For the case when you want to create a resource with already labeled paragraphs (on the same request),
@@ -596,7 +469,4 @@ def fix_paragraph_annotation_keys(uuid: str, basic: Basic) -> None:
 
 @processor_observer.wrap({"type": "catalog_delete_kb"})
 async def catalog_delete_kb(txn: Transaction, kbid: str):
-    if not isinstance(txn, PGTransaction):
-        return
-    async with txn.connection.cursor() as cur:
-        await cur.execute("DELETE FROM catalog where kbid = %(kbid)s", {"kbid": kbid})
+    return

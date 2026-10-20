@@ -23,7 +23,6 @@ from typing import Awaitable, Callable
 
 from fastapi import FastAPI
 
-from nucliadb.common.cluster.utils import setup_cluster, teardown_cluster
 from nucliadb.common.context.fastapi import inject_app_context
 from nucliadb.ingest.app import initialize_grpc as initialize_ingest_grpc
 from nucliadb.ingest.app import initialize_pull_workers
@@ -52,8 +51,6 @@ async def lifespan(app: FastAPI):
         train_lifespan(app),
         inject_app_context(app),
     ):
-        await setup_cluster()
-
         yield
 
         for finalizer in SYNC_FINALIZERS:
@@ -64,4 +61,3 @@ async def lifespan(app: FastAPI):
         SYNC_FINALIZERS.clear()
 
     await finalize_utilities()
-    await teardown_cluster()

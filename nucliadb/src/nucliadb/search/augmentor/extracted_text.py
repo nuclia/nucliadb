@@ -21,18 +21,17 @@ import asyncio
 from contextvars import ContextVar
 
 from nidx_protos.nidx_pb2 import ExtractedTextsRequest, ExtractedTextsResponse
-from nidx_protos.nidx_pb2_grpc import NidxSearcherStub
 
-from nucliadb.common import datamanagers
 from nucliadb.common.ids import FieldId, ParagraphId
-from nucliadb.common.nidx import get_nidx_searcher_client
-from nucliadb.search import logger
+from nucliadb.common.maindb.utils import get_driver
+from nucliadb.common.marklogic import documents
+from nucliadb.common.marklogic.uris import MarkLogicURIs
 from nucliadb.search.augmentor.metrics import augmentor_observer
 
 
 class ExtractedTexts:
-    def __init__(self, nidx_responses: list[ExtractedTextsResponse]):
-        self.responses = nidx_responses
+    def __init__(self, responses: list[ExtractedTextsResponse]):
+        self.responses = responses
 
     def get_field_text(self, id: FieldId) -> str | None:
         text = None
@@ -51,112 +50,100 @@ class ExtractedTexts:
         return text
 
 
-nidx_et_cache: ContextVar[ExtractedTexts | None] = ContextVar("nidx_et_cache", default=None)
+index_et_cache: ContextVar[ExtractedTexts | None] = ContextVar("index_et_cache", default=None)
 
 
-@augmentor_observer.wrap({"type": "nidx_extracted_texts"})
+@augmentor_observer.wrap({"type": "index_extracted_texts"})
 async def extracted_texts(
     kbid: str, fields: set[FieldId], paragraphs: set[ParagraphId]
 ) -> ExtractedTexts | None:
-    nidx_searcher = get_nidx_searcher_client()
+    if not fields and not paragraphs:
+        return None
+
     requests = await _build_requests(kbid, fields, paragraphs)
     if requests is None:
         return None
 
-    ops = [asyncio.create_task(_extracted_texts(nidx_searcher, request)) for request in requests]
+    ops = [asyncio.create_task(_extracted_texts(kbid, request)) for request in requests]
     responses = await asyncio.gather(*ops)
+    if not any(response.fields or response.paragraphs for response in responses):
+        return None
     return ExtractedTexts(responses)
 
 
-async def _extracted_texts(
-    nidx_searcher: NidxSearcherStub, request: ExtractedTextsRequest
-) -> ExtractedTextsResponse:
-    # wrapper to help recognize the gRPC call as a coroutine
-    return await nidx_searcher.ExtractedTexts(request)
+async def _extracted_texts(kbid: str, request: ExtractedTextsRequest) -> ExtractedTextsResponse:
+    field_uris = {
+        f"{field.rid}/{field.field_type}/{field.field_name}": MarkLogicURIs.field_processed(
+            field.rid, field.field_name, field.field_type
+        )
+        for field in request.field_ids
+    }
+    paragraph_uris = {}
+    for paragraph in request.paragraph_ids:
+        field_id = FieldId(
+            rid=paragraph.rid,
+            type=paragraph.field_type,
+            key=paragraph.field_name,
+            subfield_id=paragraph.split or None,
+        )
+        paragraph_id = ParagraphId(
+            field_id=field_id,
+            paragraph_start=paragraph.paragraph_start,
+            paragraph_end=paragraph.paragraph_end,
+        )
+        paragraph_uris[paragraph_id.full()] = (
+            paragraph_id,
+            MarkLogicURIs.chunk(field_id.rid, field_id.type, field_id.key, paragraph_id.full()),
+        )
+        field_uris[field_id.full_without_subfield()] = MarkLogicURIs.field_processed(
+            field_id.rid, field_id.key, field_id.type
+        )
+
+    uris = set(field_uris.values()) | {uri for _, uri in paragraph_uris.values()}
+    async with get_driver().ro_transaction(kbid=kbid) as txn:
+        contents = await documents.read_many(txn, list(uris))
+
+    response = ExtractedTextsResponse()
+    for field in request.field_ids:
+        key = f"{field.rid}/{field.field_type}/{field.field_name}"
+        content = contents.get(field_uris[key])
+        if content is not None:
+            response.fields[key] = content["extracted_text"]
+    for key, (paragraph_id, uri) in paragraph_uris.items():
+        content = contents.get(uri)
+        if content is not None:
+            response.paragraphs[key] = content["text"]
+        else:
+            field_content = contents.get(field_uris[paragraph_id.field_id.full_without_subfield()])
+            if field_content is not None:
+                response.paragraphs[key] = field_content["extracted_text"][
+                    paragraph_id.paragraph_start : paragraph_id.paragraph_end
+                ]
+    return response
 
 
 async def _build_requests(
     kbid: str, fields: set[FieldId], paragraphs: set[ParagraphId]
 ) -> list[ExtractedTextsRequest] | None:
-    # shard_id -> nidx gRPC request
-    nidx_requests: dict[str, ExtractedTextsRequest] = {}
-
-    async with datamanagers.with_ro_transaction() as txn:
-        kb_shards = await datamanagers.kb.get_shards(txn, kbid=kbid)
-        if kb_shards is None:
-            return None
-
-        logical_to_nidx_shard = {}
-        for shard in kb_shards.shards:
-            logical_to_nidx_shard[shard.shard] = shard.nidx_shard_id
-
-        rids = list(
-            {field_id.rid for field_id in fields}.union(
-                {paragraph_id.rid for paragraph_id in paragraphs}
+    request = ExtractedTextsRequest()
+    for field_id in fields:
+        request.field_ids.append(
+            ExtractedTextsRequest.FieldId(
+                rid=field_id.rid,
+                field_type=field_id.type,
+                field_name=field_id.key,
+                split=field_id.subfield_id,
             )
         )
-        resource_shards = await datamanagers.resources.get_shards(txn, kbid=kbid, rids=rids)
-        resource_nidx_shard: dict[str, str] = {}
-
-        for field_id in fields:
-            rid = field_id.rid
-            if rid not in resource_nidx_shard:
-                resource_shard_id = resource_shards.get(rid)
-                if resource_shard_id is None:
-                    # Resource not in DB, either a dirty read (reading a delete)
-                    # or a user requesting a deleted or wrong resource. Skip
-                    continue
-                nidx_shard_id = logical_to_nidx_shard.get(resource_shard_id)
-                if nidx_shard_id is None:
-                    logger.warning(
-                        "nidx shard not found for resource shard",
-                        extra={"kbid": kbid, "resource_shard_id": resource_shard_id},
-                    )
-                    return None
-                resource_nidx_shard[rid] = nidx_shard_id
-
-            nidx_shard_id = resource_nidx_shard[rid]
-            request = nidx_requests.setdefault(nidx_shard_id, ExtractedTextsRequest())
-            request.shard_id = nidx_shard_id
-            request.field_ids.append(
-                ExtractedTextsRequest.FieldId(
-                    rid=field_id.rid,
-                    field_type=field_id.type,
-                    field_name=field_id.key,
-                    split=field_id.subfield_id,
-                )
+    for paragraph_id in paragraphs:
+        request.paragraph_ids.append(
+            ExtractedTextsRequest.ParagraphId(
+                rid=paragraph_id.field_id.rid,
+                field_type=paragraph_id.field_id.type,
+                field_name=paragraph_id.field_id.key,
+                split=paragraph_id.field_id.subfield_id,
+                paragraph_start=paragraph_id.paragraph_start,
+                paragraph_end=paragraph_id.paragraph_end,
             )
-
-        for paragraph_id in paragraphs:
-            rid = paragraph_id.rid
-            if rid not in resource_nidx_shard:
-                resource_shard_id = resource_shards.get(rid)
-                if resource_shard_id is None:
-                    # Resource not in DB, either a dirty read (reading a delete)
-                    # or a user requesting a deleted or wrong resource. Skip
-                    continue
-                nidx_shard_id = logical_to_nidx_shard.get(resource_shard_id)
-                if nidx_shard_id is None:
-                    logger.warning(
-                        "nidx shard not found for resource shard",
-                        extra={"kbid": kbid, "resource_shard_id": resource_shard_id},
-                    )
-                    return None
-
-                resource_nidx_shard[rid] = nidx_shard_id
-
-            nidx_shard_id = resource_nidx_shard[rid]
-            request = nidx_requests.setdefault(nidx_shard_id, ExtractedTextsRequest())
-            request.shard_id = nidx_shard_id
-            request.paragraph_ids.append(
-                ExtractedTextsRequest.ParagraphId(
-                    rid=paragraph_id.field_id.rid,
-                    field_type=paragraph_id.field_id.type,
-                    field_name=paragraph_id.field_id.key,
-                    split=paragraph_id.field_id.subfield_id,
-                    paragraph_start=paragraph_id.paragraph_start,
-                    paragraph_end=paragraph_id.paragraph_end,
-                )
-            )
-
-    return list(nidx_requests.values())
+        )
+    return [request]

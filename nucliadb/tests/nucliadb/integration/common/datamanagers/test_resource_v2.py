@@ -37,7 +37,7 @@ from nucliadb_protos import resources_pb2
 async def kbid(maindb_driver: Driver) -> str:
     """Create a new knowledge box and return its kbid."""
     kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=None) as txn:
         await kb.set_slug(txn, slug=kbid, kbid=kbid)
         await txn.commit()
     return kbid
@@ -50,7 +50,7 @@ async def test_set_slug_raises_conflict_error(
 ) -> None:
     rid = Resource.new_unique_rid()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await resources.set_slug(
             txn,
             kbid=kbid,
@@ -61,7 +61,7 @@ async def test_set_slug_raises_conflict_error(
 
     # Now try to set the same slug again for another resource, which should raise a conflict error
     with pytest.raises(ConflictError):
-        async with maindb_driver.rw_transaction() as txn:
+        async with maindb_driver.rw_transaction(kbid=kbid) as txn:
             rid2 = Resource.new_unique_rid()
             await resources.set_slug(
                 txn,
@@ -72,7 +72,7 @@ async def test_set_slug_raises_conflict_error(
             await txn.commit()
 
     # But setting it for the previous resource should succeed, as it is idempotent
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await resources.set_slug(
             txn,
             kbid=kbid,
@@ -91,7 +91,7 @@ async def test_modify_slug(
     """
     rid = Resource.new_unique_rid()
     initial_slug = "initial-slug"
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         basic = resources_pb2.Basic(slug=initial_slug, title="Test Title")
         await resources.set(txn, kbid=kbid, rid=rid, basic=basic)
         await resources.set_slug(
@@ -103,7 +103,7 @@ async def test_modify_slug(
         await txn.commit()
 
     # Now modify the slug
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         old_slug = await resources.update_slug(
             txn,
             kbid=kbid,
@@ -125,7 +125,7 @@ async def test_resource_set_get(
     rid = Resource.new_unique_rid()
     assert {rid async for rid in resources.iter(kbid=kbid)} == set()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         assert await resources.exists(txn, kbid=kbid, rid=rid) is False
         assert await resources.count(txn, kbid=kbid) == 0
 
@@ -137,7 +137,7 @@ async def test_resource_set_get(
         )
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await resources.count(txn, kbid=kbid) == 1
         assert [rid async for rid in resources.iter(kbid=kbid)] == [rid]
         assert await resources.exists(txn, kbid=kbid, rid=rid) is True
@@ -150,10 +150,9 @@ async def test_resource_set_get(
         assert data.origin is None
         assert data.security is None
         assert data.extra is None
-        assert await resources.get_shard(txn, kbid=kbid, rid=rid) is None
         assert await resources.get_rid(txn, kbid=kbid, slug="test-slug") == rid
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         extra = resources_pb2.Extra()
         extra.metadata.update({"key": "value"})
         await resources.set(txn, kbid=kbid, rid=rid, extra=extra)
@@ -163,19 +162,18 @@ async def test_resource_set_get(
         await resources.set(
             txn, kbid=kbid, rid=rid, security=resources_pb2.Security(access_groups=["group1", "group2"])
         )
-        await resources.set(txn, kbid=kbid, rid=rid, shard="shard-1")
         await resources.set(
             txn, kbid=kbid, rid=rid, basic=resources_pb2.Basic(slug="test-slug", title="Test Title")
         )
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         basic = await resources.get_basic(txn, kbid=kbid, rid=rid)
         assert basic is not None
         assert basic.slug == "test-slug"
         assert basic.title == "Test Title"
         data = await resources.get(
-            txn, kbid=kbid, rid=rid, columns=("basic", "origin", "security", "extra", "shard", "slug")
+            txn, kbid=kbid, rid=rid, columns=("basic", "origin", "security", "extra", "slug")
         )
         assert data is not None
         assert data.basic is not None
@@ -193,14 +191,11 @@ async def test_resource_set_get(
         assert extra_ is not None
         assert extra_.metadata["key"] == "value"
 
-        assert data.shard is not None
-        assert data.shard == "shard-1"
-
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await resources.delete(txn, kbid=kbid, rid=rid)
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await resources.exists(txn, kbid=kbid, rid=rid) is False
         assert await resources.count(txn, kbid=kbid) == 0
         assert [rid async for rid in resources.iter(kbid=kbid)] == []
@@ -211,6 +206,7 @@ async def test_resource_set_get(
 async def test_exists_returns_false_for_invalid_uuid(
     maindb_driver: Driver,
 ) -> None:
-    async with maindb_driver.ro_transaction() as txn:
-        result = await resources.exists(txn, kbid="not-a-valid-uuid", rid="also-not-valid")
+    kbid = "not-a-valid-uuid"
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
+        result = await resources.exists(txn, kbid=kbid, rid="also-not-valid")
     assert result is False

@@ -20,10 +20,10 @@
 
 import hashlib
 
-from nucliadb.common.datamanagers import fields
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb_protos.resources_pb2 import FieldAuthor, FieldText
+from nucliadb_protos.writer_pb2 import FieldStatus
 
 
 class Text(Field[FieldText]):
@@ -31,18 +31,10 @@ class Text(Field[FieldText]):
     value: FieldText
     type: str = "t"
 
-    async def set_value(self, payload: FieldText):
+    async def set_value(self, payload: FieldText, status: FieldStatus | None = None) -> None:
         if payload.md5 == "":
             payload.md5 = hashlib.md5(payload.body.encode(), usedforsecurity=False).hexdigest()
-        await fields.set_md5(
-            self.resource.txn,
-            kbid=self.kbid,
-            md5=payload.md5,
-            rid=self.rid,
-            field_id=self.id,
-            field_type=self.type,
-        )
-        await self.db_set_value(payload)
+        await self.db_set_value(payload, status=status, md5=payload.md5)
 
     async def get_value(self) -> FieldText | None:
         return await self.db_get_value()

@@ -201,7 +201,7 @@ async def predict_proxy(
 
 
 async def exists_kb(kbid: str) -> bool:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         return await datamanagers.kb.exists(txn, kbid=kbid)
 
 

@@ -28,7 +28,7 @@ from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query
-from nucliadb.search.requesters.utils import Method, nidx_query
+from nucliadb.search.requesters.utils import Method, query_index
 from nucliadb.search.search import cache
 from nucliadb.search.search.merge import merge_paragraphs_results
 from nucliadb.search.search.query import paragraph_query_to_pb
@@ -108,7 +108,7 @@ async def resource_search(
             detail = json.loads(exc.json())
             return HTTPClientError(status_code=422, detail=detail)
 
-        results = await nidx_query(kbid, Method.SEARCH, pb_query)
+        results = await query_index(kbid, Method.SEARCH, pb_query)
         queried_shards = list(results.shard_ids)
 
         # We need to merge

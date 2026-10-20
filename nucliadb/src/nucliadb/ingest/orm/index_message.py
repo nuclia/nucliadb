@@ -22,6 +22,8 @@
 import asyncio
 import json
 from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any, cast
 
 from nidx_protos.noderesources_pb2 import Resource as IndexMessage
 
@@ -29,16 +31,41 @@ from nucliadb.common import datamanagers
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb.ingest.fields.file import File
-from nucliadb.ingest.fields.key_value import KeyValue
 from nucliadb.ingest.orm.brain_v2 import ResourceBrain
 from nucliadb.ingest.orm.metrics import index_message_observer as observer
-from nucliadb.ingest.orm.resource import Resource, get_file_page_positions
+from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.knowledgebox_pb2 import VectorSetConfig
-from nucliadb_protos.resources_pb2 import Basic, FieldID, FieldType
+from nucliadb_protos.resources_pb2 import Basic, FieldID, FieldType, Origin, Relations, Security
 from nucliadb_protos.utils_pb2 import ExtractedText
-from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_protos.writer_pb2 import (
+    BrokerMessage,
+    FieldConversation,
+    FieldFile,
+    FieldKeyValue,
+    FieldLink,
+    FieldText,
+)
 from nucliadb_utils import const
 from nucliadb_utils.utilities import has_feature
+
+FilePagePositions = dict[int, tuple[int, int]]
+
+FieldValue = FieldText | FieldFile | FieldConversation | FieldLink | FieldKeyValue
+
+
+@dataclass
+class ResourceData:
+    basic: Basic
+    user_relations: Relations
+    origin: Origin | None
+    security: Security | None
+
+
+@dataclass
+class FieldData:
+    extracted_text: Any | None
+    field_computed_metadata: Any | None = None
+    generated_by: Any | None = None
 
 
 class IndexMessageBuilder:
@@ -46,14 +73,30 @@ class IndexMessageBuilder:
         self.resource = resource
         self.brain = ResourceBrain(resource.uuid)
 
-    @observer.wrap({"type": "resource_data"})
-    async def _apply_resource_index_data(self, brain: ResourceBrain) -> None:
-        # Set the metadata at the resource level
-        basic = await self.resource.get_basic()
-        assert basic is not None
+    async def get_resource_data(self) -> ResourceData:
+        basic = await self.get_basic()
         user_relations = await self.resource.get_user_relations()
         origin = await self.resource.get_origin()
         security = await self.resource.get_security()
+        return ResourceData(
+            basic=basic,
+            user_relations=user_relations,
+            origin=origin,
+            security=security,
+        )
+
+    async def get_resource_fields(self) -> list[tuple[FieldType.ValueType, str]]:
+        fields = await self.resource.get_fields()
+        return list(fields.keys())
+
+    @observer.wrap({"type": "resource_data"})
+    async def _apply_resource_index_data(self, brain: ResourceBrain) -> None:
+        # Set the metadata at the resource level
+        resource_data = await self.get_resource_data()
+        basic = resource_data.basic
+        user_relations = resource_data.user_relations
+        origin = resource_data.origin
+        security = resource_data.security
         await asyncio.to_thread(
             brain.generate_resource_metadata,
             basic,
@@ -61,6 +104,17 @@ class IndexMessageBuilder:
             origin,
             self.resource._previous_status,
             security,
+        )
+
+    async def get_field_data(self, field_id: FieldID) -> FieldData:
+        field = await self.resource.get_field(field_id.field, field_id.field_type, load=False)
+        et = await field.get_extracted_text()
+        fm = await field.get_field_metadata()
+        author = await field.generated_by()
+        return FieldData(
+            extracted_text=et,
+            field_computed_metadata=fm,
+            generated_by=author,
         )
 
     @observer.wrap({"type": "field_data"})
@@ -78,9 +132,9 @@ class IndexMessageBuilder:
         append_splits: set[str] | None = None,
         deleted_splits: set[str] | None = None,
     ):
-        field = await self.resource.get_field(fieldid.field, fieldid.field_type)
-        extracted_text = await field.get_extracted_text()
-        field_computed_metadata = await field.get_field_metadata()
+        field_data = await self.get_field_data(fieldid)
+        extracted_text = field_data.extracted_text
+        field_computed_metadata = field_data.field_computed_metadata
         user_field_metadata = next(
             (fm for fm in basic.fieldmetadata if fm.field == fieldid),
             None,
@@ -93,7 +147,7 @@ class IndexMessageBuilder:
 
             if extracted_text is not None:
                 try:
-                    field_author = await field.generated_by()
+                    field_author = field_data.generated_by
                 except FieldAuthorNotFound:
                     field_author = None
                 await asyncio.to_thread(
@@ -117,7 +171,9 @@ class IndexMessageBuilder:
             # We need to compute the paragraphs when we're going to generate the vectors too.
             if extracted_text is not None and field_computed_metadata is not None:
                 page_positions = (
-                    await get_file_page_positions(field) if isinstance(field, File) else None
+                    await self.get_file_page_positions(fieldid)
+                    if fieldid.field_type == FieldType.FILE
+                    else None
                 )
                 await asyncio.to_thread(
                     brain.generate_paragraphs,
@@ -135,7 +191,8 @@ class IndexMessageBuilder:
         if vectors:
             assert vectorset_configs is not None
             for vectorset_config in vectorset_configs:
-                vo = await field.get_vectors(
+                vo = await self.get_field_vectors(
+                    fieldid,
                     vectorset=vectorset_config.vectorset_id,
                     storage_key_kind=vectorset_config.storage_key_kind,
                 )
@@ -165,8 +222,8 @@ class IndexMessageBuilder:
                     self.resource.txn, kbid=self.resource.kbid
                 )
                 for vectorset_config in node_vectorset_configs:
-                    node_vectors = await field.get_relation_node_vectors(
-                        vectorset=vectorset_config.vectorset_id
+                    node_vectors = await self.get_field_relation_node_vectors(
+                        fieldid, vectorset=vectorset_config.vectorset_id
                     )
                     if node_vectors is not None:
                         await asyncio.to_thread(
@@ -181,8 +238,8 @@ class IndexMessageBuilder:
                     self.resource.txn, kbid=self.resource.kbid
                 )
                 for vectorset_config in edge_vectorset_configs:
-                    edge_vectors = await field.get_relation_edge_vectors(
-                        vectorset=vectorset_config.vectorset_id
+                    edge_vectors = await self.get_field_relation_edge_vectors(
+                        fieldid, vectorset=vectorset_config.vectorset_id
                     )
                     if edge_vectors is not None:
                         await asyncio.to_thread(
@@ -193,11 +250,40 @@ class IndexMessageBuilder:
                             replace,
                         )
 
-        if isinstance(field, KeyValue):
-            field_value = await field.get_value()
+        if fieldid.field_type == FieldType.KEY_VALUE:
+            field_value = await self.get_field_value(fieldid)
             if field_value is not None:
+                field_value = cast(FieldKeyValue, field_value)
                 kv_dict = json.loads(field_value.data)
                 brain.generate_json(self.resource.generate_field_id(fieldid), kv_dict)
+
+    async def get_field_value(self, fieldid: FieldID) -> FieldValue | None:
+        field = await self.resource.get_field(key=fieldid.field, type=fieldid.field_type, load=False)
+        return await field.get_value()
+
+    async def get_field_relation_edge_vectors(self, fieldid: FieldID, vectorset: str):
+        field = await self.resource.get_field(key=fieldid.field, type=fieldid.field_type, load=False)
+        return await field.get_relation_edge_vectors(
+            vectorset=vectorset,
+        )
+
+    async def get_field_vectors(
+        self,
+        fieldid: FieldID,
+        vectorset: str,
+        storage_key_kind: VectorSetConfig.StorageKeyKind.ValueType,
+    ):
+        field = await self.resource.get_field(key=fieldid.field, type=fieldid.field_type, load=False)
+        return await field.get_vectors(
+            vectorset=vectorset,
+            storage_key_kind=storage_key_kind,
+        )
+
+    async def get_field_relation_node_vectors(self, fieldid: FieldID, vectorset: str):
+        field = await self.resource.get_field(key=fieldid.field, type=fieldid.field_type, load=False)
+        return await field.get_relation_node_vectors(
+            vectorset=vectorset,
+        )
 
     def _apply_field_deletions(
         self,
@@ -206,6 +292,17 @@ class IndexMessageBuilder:
     ) -> None:
         for field_id in field_ids:
             brain.delete_field(self.resource.generate_field_id(field_id))
+
+    async def get_file_page_positions(self, fieldid: FieldID) -> FilePagePositions:
+        field = await self.resource.get_field(key=fieldid.field, type=fieldid.field_type, load=False)
+        file_field = cast(File, field)
+        positions: FilePagePositions = {}
+        file_extracted_data = await file_field.get_file_extracted_data()
+        if file_extracted_data is None:
+            return positions
+        for index, position in enumerate(file_extracted_data.file_pages_previews.positions):
+            positions[index] = (position.start, position.end)
+        return positions
 
     @observer.wrap({"type": "writer_bm"})
     async def for_writer_bm(
@@ -230,7 +327,7 @@ class IndexMessageBuilder:
             # in the texts index (as it is the one used for prefiltering).
             fields_to_index = [
                 FieldID(field=field_id, field_type=field_type)
-                for field_type, field_id in await self.resource.get_fields()
+                for field_type, field_id in await self.get_resource_fields()
             ]
         else:
             # Simply process the fields that are in the message
@@ -240,7 +337,7 @@ class IndexMessageBuilder:
                 continue
             deleted_splits = None
             if fieldid.field_type == FieldType.CONVERSATION:
-                _, deleted_splits = await get_stored_split_ids(fieldid, self.resource)
+                _, deleted_splits = await self.get_stored_split_ids(fieldid)
 
             vectors_update = needs_vectors_update(fieldid, message)
             if vectors_update and vectorsets_configs is None:
@@ -285,8 +382,8 @@ class IndexMessageBuilder:
             modified_splits = None
             deleted_splits = None
             if fieldid.field_type == FieldType.CONVERSATION:
-                modified_splits = await get_bm_modified_split_ids(fieldid, message, self.resource)
-                stored_splits, deleted_splits = await get_stored_split_ids(fieldid, self.resource)
+                modified_splits = await self.get_bm_modified_split_ids(fieldid, message)
+                stored_splits, deleted_splits = await self.get_stored_split_ids(fieldid)
                 is_append_messages_op = modified_splits.issubset(stored_splits) and 0 < len(
                     modified_splits
                 ) < len(stored_splits)
@@ -319,7 +416,7 @@ class IndexMessageBuilder:
         for fieldid in fields_to_index:
             deleted_splits = None
             if fieldid.field_type == FieldType.CONVERSATION:
-                _, deleted_splits = await get_stored_split_ids(fieldid, self.resource)
+                _, deleted_splits = await self.get_stored_split_ids(fieldid)
             await self._apply_field_index_data(
                 self.brain,
                 fieldid,
@@ -350,6 +447,37 @@ class IndexMessageBuilder:
             )
         ]
         return vectorset_configs
+
+    async def get_stored_split_ids(
+        self,
+        conversation_field_id: FieldID,
+    ) -> tuple[set[str], set[str]]:
+        fid = conversation_field_id
+        conv: Conversation = await self.resource.get_field(fid.field, fid.field_type, load=False)
+        splits_metadata = await conv.get_splits_metadata()
+        deleted_splits = set(splits_metadata.deleted_splits)
+        existing_splits = set(splits_metadata.metadata.keys()) - deleted_splits
+        return existing_splits, deleted_splits
+
+    async def get_bm_modified_split_ids(
+        self,
+        conversation_field_id: FieldID,
+        message: BrokerMessage,
+    ) -> set[str]:
+        message_etw = next(
+            (etw for etw in message.extracted_text if etw.field == conversation_field_id), None
+        )
+        if message_etw is None:
+            return set()
+        storage = self.resource.storage
+        if message_etw.HasField("file"):
+            raw_payload = await storage.downloadbytescf(message_etw.file)
+            message_extracted_text = ExtractedText()
+            message_extracted_text.ParseFromString(raw_payload.read())
+            raw_payload.flush()
+        else:
+            message_extracted_text = message_etw.body
+        return set(message_extracted_text.split_text.keys())
 
 
 def get_bm_modified_fields(message: BrokerMessage) -> list[FieldID]:
@@ -459,39 +587,6 @@ def needs_vectors_update(
     return has_deleted_splits(field_id, message) or any(
         field_vectors.field == field_id for field_vectors in message.field_vectors
     )
-
-
-async def get_bm_modified_split_ids(
-    conversation_field_id: FieldID,
-    message: BrokerMessage,
-    resource: Resource,
-) -> set[str]:
-    message_etw = next(
-        (etw for etw in message.extracted_text if etw.field == conversation_field_id), None
-    )
-    if message_etw is None:
-        return set()
-    storage = resource.storage
-    if message_etw.HasField("file"):
-        raw_payload = await storage.downloadbytescf(message_etw.file)
-        message_extracted_text = ExtractedText()
-        message_extracted_text.ParseFromString(raw_payload.read())
-        raw_payload.flush()
-    else:
-        message_extracted_text = message_etw.body
-    return set(message_extracted_text.split_text.keys())
-
-
-async def get_stored_split_ids(
-    conversation_field_id: FieldID,
-    resource: Resource,
-) -> tuple[set[str], set[str]]:
-    fid = conversation_field_id
-    conv: Conversation = await resource.get_field(fid.field, fid.field_type, load=False)
-    splits_metadata = await conv.get_splits_metadata()
-    deleted_splits = set(splits_metadata.deleted_splits)
-    existing_splits = set(splits_metadata.metadata.keys()) - deleted_splits
-    return existing_splits, deleted_splits
 
 
 def needs_relations_update(

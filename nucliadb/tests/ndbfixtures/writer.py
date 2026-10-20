@@ -93,7 +93,6 @@ async def writer_api_server(
     transaction_utility,
     dummy_processing,
     tus_manager,
-    dummy_nidx_utility,
 ) -> AsyncIterator[FastAPI]:
     with patch.object(nucliadb_settings, "nucliadb_ingest", ingest_grpc_server.address):
         application = create_application()

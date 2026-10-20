@@ -49,6 +49,7 @@ VECTORS = {
 
 @pytest.fixture
 async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, standalone_knowledgebox):
+    kbid = standalone_knowledgebox
     resp = await nucliadb_writer.post(
         f"/kb/{standalone_knowledgebox}/resources",
         json={
@@ -65,7 +66,7 @@ async def graph_resource(nucliadb_writer: AsyncClient, nucliadb_ingest_grpc, sta
 
     node_vectorset = None
     edge_vectorset = None
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         node_vectorsets = await datamanagers.graph_vectorsets.node.get_all(
             txn, kbid=standalone_knowledgebox
         )

@@ -21,6 +21,7 @@ from typing import Any
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb_protos.resources_pb2 import CloudFile, FieldFile, FileExtractedData
+from nucliadb_protos.writer_pb2 import FieldStatus
 from nucliadb_utils.storages.storage import StorageField
 
 FILE_METADATA = "file_metadata"
@@ -36,7 +37,7 @@ class File(Field[FieldFile]):
         super().__init__(id, resource)
         self.file_extracted_data = None
 
-    async def set_value(self, payload: FieldFile):
+    async def set_value(self, payload: FieldFile, status: FieldStatus | None = None) -> None:
         old_file = await self.get_value()
         if old_file is None:
             old_cf: CloudFile | None = None
@@ -49,7 +50,7 @@ class File(Field[FieldFile]):
             cf: CloudFile = await self.storage.normalize_binary(payload.file, sf)
             payload.file.CopyFrom(cf)
 
-        await self.db_set_value(payload)
+        await self.db_set_value(payload, status=status)
 
     async def get_value(self) -> FieldFile | None:
         return await self.db_get_value()

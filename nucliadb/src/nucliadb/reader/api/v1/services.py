@@ -259,8 +259,7 @@ async def notifications_endpoint(request: Request, kbid: str) -> StreamingRespon
 
 
 async def exists_kb(kbid: str) -> bool:
-    async with datamanagers.with_ro_transaction() as txn:
-        return await datamanagers.kb.exists(txn, kbid=kbid)
+    return await datamanagers.atomic.kb.exists(kbid=kbid)
 
 
 @api.get(
@@ -292,7 +291,7 @@ async def processing_status(
     storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
 
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         kb = KnowledgeBox(txn, storage, kbid)
 
         max_simultaneous = asyncio.Semaphore(10)
@@ -333,7 +332,7 @@ async def processing_status(
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def get_search_configuration(request: Request, kbid: str, config_name: str) -> SearchConfiguration:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
@@ -354,7 +353,7 @@ async def get_search_configuration(request: Request, kbid: str, config_name: str
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def list_search_configurations(request: Request, kbid: str) -> dict[str, SearchConfiguration]:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
@@ -371,7 +370,7 @@ async def list_search_configurations(request: Request, kbid: str) -> dict[str, S
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def list_kv_schemas(request: Request, kbid: str) -> KBKVSchemas:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
@@ -388,7 +387,7 @@ async def list_kv_schemas(request: Request, kbid: str) -> KBKVSchemas:
 @requires(NucliaDBRoles.READER)
 @version(1)
 async def get_kv_schema(request: Request, kbid: str, schema_id: str) -> KVSchema:
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         if not await datamanagers.kb.exists(txn, kbid=kbid):
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 

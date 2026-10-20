@@ -6,7 +6,6 @@ dependencies = ["nucliadb"]
 
 [tool.uv.workspace]
 members = [
-    "nidx/nidx_binding",
     "nidx/nidx_protos",
     "nucliadb_dataset",
     "nucliadb_models",
@@ -22,7 +21,6 @@ default-groups = "all"
 managed = true
 
 [tool.uv.sources]
-nidx-binding = { workspace = true }
 nidx-protos = { workspace = true }
 nucliadb = { workspace = true }
 nucliadb-dataset = { workspace = true }
@@ -57,9 +55,6 @@ dev = [
     "requests-mock>=1.12.1",
     "types-PyYAML>=6.0.12.20240808",
     "ty>=0.0.34",
-]
-nidx = [
-  "nidx-binding"
 ]
 sdk = [
     "nucliadb_sdk",

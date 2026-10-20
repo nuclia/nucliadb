@@ -547,7 +547,7 @@ async def test_knowledgebox_file_upload_field_sync(
         )
         assert resp.status_code == 201
 
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         assert (
             await datamanagers.fields.exists(
                 txn,

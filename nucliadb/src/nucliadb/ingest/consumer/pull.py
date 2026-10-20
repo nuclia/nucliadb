@@ -39,7 +39,7 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest import SERVICE_NAME, logger, logger_activity
 from nucliadb.ingest.consumer.consumer import consumer_observer
 from nucliadb.ingest.orm.exceptions import ReallyStopPulling
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_telemetry import errors
 from nucliadb_telemetry.metrics import Gauge
@@ -101,7 +101,6 @@ class PullV2Worker:
         self.pull_time_error_backoff = pull_time_error_backoff
         self.pull_time_empty_backoff = pull_time_empty_backoff
         self.pull_api_timeout = pull_api_timeout
-
         self.processor = Processor(driver, storage, pubsub, "-1")
 
     async def handle_message(self, seq: int, payload: bytes) -> None:

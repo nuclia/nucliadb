@@ -27,7 +27,7 @@ from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.broker_message import generate_broker_message
 from nucliadb.ingest.orm.index_message import get_resource_index_message
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb_protos import resources_pb2 as rpb
 from nucliadb_protos import utils_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
@@ -48,9 +48,7 @@ from nucliadb_protos.writer_pb2 import (
 from tests.ndbfixtures.ingest import create_resource
 
 
-async def test_create_resource_orm_with_basic(
-    storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
-):
+async def test_create_resource_orm_with_basic(storage, txn: Transaction, cache, knowledgebox: str):
     basic = PBBasic(
         icon="text/plain",
         title="My title",
@@ -97,9 +95,7 @@ async def test_create_resource_orm_with_basic(
     await txn.abort()
 
 
-async def test_paragraphs_with_page(
-    maindb_driver, storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
-):
+async def test_paragraphs_with_page(maindb_driver, storage, txn: Transaction, cache, knowledgebox: str):
     # Create a resource
     basic = PBBasic(
         icon="text/plain",
@@ -141,8 +137,7 @@ async def test_paragraphs_with_page(
     bm.field_metadata.append(fcmw)
 
     proc = Processor(maindb_driver, storage)
-    await proc.apply_fields(bm, r)
-    await proc.apply_resource(bm, r, new_resource=False)
+    await proc.process(bm, 1)
     index_message = await get_resource_index_message(r, reindex=False)
     for metadata in index_message.paragraphs["t/field1"].paragraphs.values():
         if metadata.start == 84:
@@ -163,7 +158,7 @@ async def test_paragraphs_with_page(
 
 
 async def test_vector_duplicate_fields(
-    maindb_driver, storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    maindb_driver, storage, txn: Transaction, cache, knowledgebox: str
 ):
     basic = PBBasic(title="My title", summary="My summary")
     basic.metadata.status = PBMetadata.Status.PROCESSED
@@ -231,8 +226,7 @@ async def test_vector_duplicate_fields(
             )
 
         proc = Processor(maindb_driver, storage)
-        await proc.apply_fields(bm, resource)
-        await proc.apply_resource(bm, resource, new_resource=False)
+        await proc.process(bm, 1)
         index_message = await get_resource_index_message(resource, reindex=False)
         await txn.commit()
 
@@ -251,19 +245,17 @@ async def test_vector_duplicate_fields(
     await txn.abort()
 
 
-async def test_generate_broker_message(
-    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox: str
-):
+async def test_generate_broker_message(storage, maindb_driver, cache, knowledgebox: str):
     # Create a resource with all possible metadata in it
     full_resource = await create_resource(storage, maindb_driver, knowledgebox)
 
     # Now fetch it
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=knowledgebox) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
         resource = await kb_obj.get(full_resource.uuid)
         assert resource is not None
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=knowledgebox) as txn:
         resource.txn = txn
         bm = await generate_broker_message(resource)
 
@@ -390,13 +382,13 @@ async def test_generate_broker_message(
 
 
 async def test_generate_index_message_contains_all_metadata(
-    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox: str
+    storage, maindb_driver, cache, knowledgebox: str
 ):
     # Create a resource with all possible metadata in it
     resource = await create_resource(storage, maindb_driver, knowledgebox)
     resource.disable_vectors = False
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=knowledgebox) as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
         index_message = await get_resource_index_message(resource, reindex=False)
 
@@ -471,13 +463,13 @@ async def test_generate_index_message_contains_all_metadata(
 
 
 async def test_generate_index_message_vectorsets(
-    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_with_vectorsets: str
+    storage, maindb_driver, cache, knowledgebox_with_vectorsets: str
 ):
     # Create a resource with all possible metadata in it
     resource = await create_resource(storage, maindb_driver, knowledgebox_with_vectorsets)
     resource.disable_vectors = False
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(knowledgebox_with_vectorsets) as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
         index_message = await get_resource_index_message(resource, reindex=False)
 
@@ -502,12 +494,12 @@ async def test_generate_index_message_vectorsets(
 
 
 async def test_generate_index_message_cancels_labels(
-    storage, maindb_driver, cache, dummy_nidx_utility, knowledgebox_with_vectorsets: str
+    storage, maindb_driver, cache, knowledgebox_with_vectorsets: str
 ):
     # Create a resource with all possible metadata in it
     resource = await create_resource(storage, maindb_driver, knowledgebox_with_vectorsets)
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(knowledgebox_with_vectorsets) as txn:
         resource.txn = txn  # I don't like this but this is the API we have...
         index_message = await get_resource_index_message(resource, reindex=False)
 

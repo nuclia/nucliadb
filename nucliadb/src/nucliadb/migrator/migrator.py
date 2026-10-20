@@ -19,14 +19,12 @@
 #
 import asyncio
 import logging
-from typing import cast
 
 from nucliadb.common import locking
-from nucliadb.common.cluster.rollover import rollover_kb_index
 from nucliadb.common.cluster.settings import in_standalone_mode
-from nucliadb.common.maindb.pg import PGDriver, PGTransaction
+from nucliadb.ingest.orm.rollover import rollover_kb
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb.migrator.utils import get_migrations, get_pg_migrations
+from nucliadb.migrator.utils import get_migrations
 from nucliadb_telemetry import errors, metrics
 
 migration_observer = metrics.Observer("nucliadb_migrations", labels={"type": "kb", "target_version": ""})
@@ -155,99 +153,32 @@ async def run_global_migrations(context: ExecutionContext, target_version: int) 
     await context.data_manager.update_global_info(target_version=None)
 
 
-async def run_rollover_in_parallel(
-    context: ExecutionContext,
-    kbid: str,
-    max_concurrent: asyncio.Semaphore,
-) -> None:
-    async with max_concurrent:
-        try:
-            await rollover_kb_index(context, kbid)
-            await context.data_manager.delete_kb_rollover(kbid=kbid)
-        except Exception as exc:
-            errors.capture_exception(exc)
-            logger.exception(
-                "Failed to rollover KB",
-                extra={"kbid": kbid},
-            )
-            raise
-
-
 async def run_rollovers(context: ExecutionContext) -> None:
-    kbs_to_rollover = await context.data_manager.get_kbs_to_rollover()
-
-    if len(kbs_to_rollover) == 0:
-        return
-
-    max_concurrent = context.settings.max_concurrent_migrations
+    kbids = await context.data_manager.get_kbs_to_rollover()
+    max_concurrent = 1 if in_standalone_mode() else context.settings.max_concurrent_migrations
     semaphore = asyncio.Semaphore(max_concurrent)
 
-    logger.info(
-        f"Scheduling KB rollovers.",
-        extra={"max_concurrent": max_concurrent, "kbs": len(kbs_to_rollover)},
-    )
+    async def run_rollover(kbid: str) -> None:
+        async with semaphore:
+            try:
+                progress = await rollover_kb(kbid)
+                if progress.failed:
+                    raise RuntimeError(f"KB rollover had {progress.failed} failed resources")
+                await context.data_manager.delete_kb_rollover(kbid=kbid)
+            except Exception as exc:
+                errors.capture_exception(exc)
+                logger.exception("Failed to rollover KB", extra={"kbid": kbid})
+                raise
 
-    tasks = [
-        asyncio.create_task(
-            run_rollover_in_parallel(context, kbid, semaphore),
-            name=f"rollover_kb_{kbid}",
-        )
-        for kbid in kbs_to_rollover
-    ]
-
-    failures = 0
-    for future in asyncio.as_completed(tasks):
-        try:
-            await future
-        except Exception:
-            failures += 1
-
-    if failures > 0:
-        raise Exception(f"Failed to migrate KBs. Failures: {failures}")
-
-
-async def run_pg_schema_migrations(driver: PGDriver):
-    migrations = get_pg_migrations()
-
-    # The migration uses two transactions. The former is only used to get a lock (pg_advisory_lock)
-    # without having to worry about correctly unlocking it (postgres unlocks it when the transaction ends)
-    async with (
-        driver.rw_transaction() as tx_lock,
-        cast(PGTransaction, tx_lock).connection.cursor() as cur_lock,
-    ):  # type: ignore[attr-defined]
-        await cur_lock.execute(
-            "CREATE TABLE IF NOT EXISTS migrations (version INT PRIMARY KEY, migrated_at TIMESTAMP NOT NULL DEFAULT NOW())"
-        )
-        await tx_lock.commit()
-        await cur_lock.execute("SELECT pg_advisory_xact_lock(3116614845278015934)")
-
-        await cur_lock.execute("SELECT version FROM migrations")
-        migrated = [r[0] for r in await cur_lock.fetchall()]
-
-        for version, migration in migrations:
-            if version in migrated:
-                continue
-
-            logger.info(f"Running PG schema migration {version}: {migration.__name__}")
-            # Gets a new transaction for each migration, so if they get interrupted we at least
-            # save the state of the last finished transaction
-            async with driver.rw_transaction() as tx, cast(PGTransaction, tx).connection.cursor() as cur:
-                await migration.migrate(tx)
-                await cur.execute("INSERT INTO migrations (version) VALUES (%s)", (version,))
-                await tx.commit()
+    results = await asyncio.gather(*(run_rollover(kbid) for kbid in kbids), return_exceptions=True)
+    failures = sum(isinstance(result, BaseException) for result in results)
+    if failures:
+        raise RuntimeError(f"Failed to rollover KBs. Failures: {failures}")
 
 
 async def run(context: ExecutionContext, target_version: int | None = None) -> None:
-    # Run schema migrations first, since they create the `resources` table needed for the lock below
-    # Schema migrations use their own locking system
-    if isinstance(context.kv_driver, PGDriver):
-        await run_pg_schema_migrations(context.kv_driver)
-
     async with locking.distributed_lock(locking.MIGRATIONS_LOCK):
-        # before we move to managed migrations, see if there are any rollovers
-        # scheduled and run them
         await run_rollovers(context)
-
         # everything should be in a global lock
         # only 1 migration should be running at a time
         global_info = await context.data_manager.get_global_info()

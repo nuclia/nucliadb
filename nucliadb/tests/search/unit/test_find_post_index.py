@@ -167,12 +167,11 @@ async def test_find_post_index_search(expected_find_response: dict[str, Any], pr
 
     with (
         patch("nucliadb.search.search.retrieval.convert_retrieval_to_proto"),
-        patch("nucliadb.search.search.retrieval.nidx_query", return_value=search_response),
+        patch("nucliadb.search.search.retrieval.query_index", return_value=search_response),
     ):
         text_blocks, _, _, _ = await text_block_search("kbid", retrieval)
 
     with (
-        patch("nucliadb.search.search.find.get_external_index_manager", return_value=None),
         patch(
             "nucliadb.search.search.find_merge.augment_resources_deep",
             side_effect=mock_augment_resources,

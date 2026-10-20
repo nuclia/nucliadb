@@ -46,7 +46,7 @@ from nucliadb_protos.resources_pb2 import (
 @pytest.fixture()
 async def kbid(maindb_driver: Driver) -> str:
     kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=None) as txn:
         await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
         await txn.commit()
     return kbid
@@ -55,7 +55,7 @@ async def kbid(maindb_driver: Driver) -> str:
 @pytest.fixture()
 async def rid(maindb_driver: Driver, kbid: str) -> str:
     rid = Resource.new_unique_rid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await resources.set_slug(txn, kbid=kbid, rid=rid, slug=f"slug-{rid}")
         await txn.commit()
     return rid
@@ -65,7 +65,7 @@ async def rid(maindb_driver: Driver, kbid: str) -> str:
 async def field_id(maindb_driver: Driver, kbid: str, rid: str) -> str:
     """Create the parent kb_fields row ('c' type) so FK constraints are satisfied."""
     fid = "chat"
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await fields.set(txn, kbid=kbid, rid=rid, field_type="c", field_id=fid, value=b"")
         await txn.commit()
     return fid
@@ -108,11 +108,11 @@ def make_splits_metadata(*split_ids: str) -> SplitsMetadata:
 async def test_set_and_get_metadata(maindb_driver: Driver, kbid: str, rid: str, field_id: str) -> None:
     meta = make_metadata(pages=3)
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.set_metadata(txn, kbid=kbid, rid=rid, field_id=field_id, metadata=meta)
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await conversations.get_metadata(txn, kbid=kbid, rid=rid, field_id=field_id)
 
     assert result is not None
@@ -123,19 +123,19 @@ async def test_set_and_get_metadata(maindb_driver: Driver, kbid: str, rid: str, 
 async def test_set_metadata_overwrites(
     maindb_driver: Driver, kbid: str, rid: str, field_id: str
 ) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.set_metadata(
             txn, kbid=kbid, rid=rid, field_id=field_id, metadata=make_metadata(pages=1)
         )
         await txn.commit()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.set_metadata(
             txn, kbid=kbid, rid=rid, field_id=field_id, metadata=make_metadata(pages=5)
         )
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await conversations.get_metadata(txn, kbid=kbid, rid=rid, field_id=field_id)
 
     assert result is not None
@@ -146,7 +146,7 @@ async def test_set_metadata_overwrites(
 async def test_get_metadata_returns_none_for_missing_field(
     maindb_driver: Driver, kbid: str, rid: str
 ) -> None:
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await conversations.get_metadata(txn, kbid=kbid, rid=rid, field_id="no-such-field")
     assert result is None
 
@@ -160,11 +160,11 @@ async def test_get_metadata_returns_none_for_missing_field(
 async def test_set_and_get_page(maindb_driver: Driver, kbid: str, rid: str, field_id: str) -> None:
     conv = make_conversation("Hello", "World")
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.set_page(txn, kbid=kbid, rid=rid, field_id=field_id, page=1, value=conv)
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await conversations.get_page(txn, kbid=kbid, rid=rid, field_id=field_id, page=1)
 
     assert result is not None
@@ -175,19 +175,19 @@ async def test_set_and_get_page(maindb_driver: Driver, kbid: str, rid: str, fiel
 
 @pytest.mark.asyncio
 async def test_set_page_overwrites(maindb_driver: Driver, kbid: str, rid: str, field_id: str) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.set_page(
             txn, kbid=kbid, rid=rid, field_id=field_id, page=1, value=make_conversation("v1")
         )
         await txn.commit()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.set_page(
             txn, kbid=kbid, rid=rid, field_id=field_id, page=1, value=make_conversation("v2")
         )
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await conversations.get_page(txn, kbid=kbid, rid=rid, field_id=field_id, page=1)
 
     assert result is not None
@@ -198,7 +198,7 @@ async def test_set_page_overwrites(maindb_driver: Driver, kbid: str, rid: str, f
 async def test_multiple_pages_are_independent(
     maindb_driver: Driver, kbid: str, rid: str, field_id: str
 ) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.set_page(
             txn, kbid=kbid, rid=rid, field_id=field_id, page=1, value=make_conversation("page-one")
         )
@@ -207,7 +207,7 @@ async def test_multiple_pages_are_independent(
         )
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         p1 = await conversations.get_page(txn, kbid=kbid, rid=rid, field_id=field_id, page=1)
         p2 = await conversations.get_page(txn, kbid=kbid, rid=rid, field_id=field_id, page=2)
 
@@ -219,7 +219,7 @@ async def test_multiple_pages_are_independent(
 async def test_get_page_returns_none_for_missing_page(
     maindb_driver: Driver, kbid: str, rid: str, field_id: str
 ) -> None:
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await conversations.get_page(txn, kbid=kbid, rid=rid, field_id=field_id, page=99)
     assert result is None
 
@@ -228,7 +228,7 @@ async def test_get_page_returns_none_for_missing_page(
 async def test_set_page_rejects_page_zero(
     maindb_driver: Driver, kbid: str, rid: str, field_id: str
 ) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         with pytest.raises(ValueError, match="pages start at index 1"):
             await conversations.set_page(
                 txn, kbid=kbid, rid=rid, field_id=field_id, page=0, value=make_conversation("x")
@@ -239,7 +239,7 @@ async def test_set_page_rejects_page_zero(
 async def test_get_page_rejects_page_zero(
     maindb_driver: Driver, kbid: str, rid: str, field_id: str
 ) -> None:
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         with pytest.raises(ValueError, match="pages start at index 1"):
             await conversations.get_page(txn, kbid=kbid, rid=rid, field_id=field_id, page=0)
 
@@ -255,13 +255,13 @@ async def test_set_and_get_splits_metadata(
 ) -> None:
     splits = make_splits_metadata("split-a", "split-b")
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.set_splits_metadata(
             txn, kbid=kbid, rid=rid, field_id=field_id, splits_metadata=splits
         )
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await conversations.get_splits_metadata(txn, kbid=kbid, rid=rid, field_id=field_id)
 
     assert result is not None
@@ -273,7 +273,7 @@ async def test_set_and_get_splits_metadata(
 async def test_get_splits_metadata_returns_none_when_not_set(
     maindb_driver: Driver, kbid: str, rid: str, field_id: str
 ) -> None:
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         result = await conversations.get_splits_metadata(txn, kbid=kbid, rid=rid, field_id=field_id)
     assert result is None
 
@@ -283,7 +283,7 @@ async def test_splits_metadata_does_not_clash_with_pages(
     maindb_driver: Driver, kbid: str, rid: str, field_id: str
 ) -> None:
     """The sentinel page=0 must not conflict with real page data."""
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.set_splits_metadata(
             txn,
             kbid=kbid,
@@ -296,7 +296,7 @@ async def test_splits_metadata_does_not_clash_with_pages(
         )
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         splits = await conversations.get_splits_metadata(txn, kbid=kbid, rid=rid, field_id=field_id)
         page = await conversations.get_page(txn, kbid=kbid, rid=rid, field_id=field_id, page=1)
 
@@ -313,7 +313,7 @@ async def test_splits_metadata_does_not_clash_with_pages(
 async def test_delete_field_removes_all_pages_and_metadata(
     maindb_driver: Driver, kbid: str, rid: str, field_id: str
 ) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.set_page(
             txn, kbid=kbid, rid=rid, field_id=field_id, page=1, value=make_conversation("p1")
         )
@@ -329,11 +329,11 @@ async def test_delete_field_removes_all_pages_and_metadata(
         )
         await txn.commit()
 
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.delete_field(txn, kbid=kbid, rid=rid, field_id=field_id)
         await txn.commit()
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         assert await conversations.get_page(txn, kbid=kbid, rid=rid, field_id=field_id, page=1) is None
         assert await conversations.get_page(txn, kbid=kbid, rid=rid, field_id=field_id, page=2) is None
         assert (
@@ -343,6 +343,6 @@ async def test_delete_field_removes_all_pages_and_metadata(
 
 @pytest.mark.asyncio
 async def test_delete_field_noop_when_no_rows_exist(maindb_driver: Driver, kbid: str, rid: str) -> None:
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await conversations.delete_field(txn, kbid=kbid, rid=rid, field_id="ghost")
         await txn.commit()  # must not raise

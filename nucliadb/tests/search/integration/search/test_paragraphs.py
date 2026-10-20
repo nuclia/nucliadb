@@ -29,7 +29,7 @@ from nucliadb_protos.resources_pb2 import Basic, ExtractedTextWrapper, FieldType
 from nucliadb_protos.utils_pb2 import ExtractedText
 
 
-async def test_get_paragraph_text(storage, cache, txn, dummy_nidx_utility, processor, knowledgebox):
+async def test_get_paragraph_text(storage, cache, txn, processor, knowledgebox):
     kbid = knowledgebox
     rid = Resource.new_unique_rid()
     basic = Basic(slug="slug", uuid=rid)

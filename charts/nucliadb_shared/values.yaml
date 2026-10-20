@@ -19,8 +19,7 @@ http:
     - http://localhost:4200
 
 maindb:
-  driver: pg
-  driver_pg_url:
+  driver: marklogic
 
 storage:
   file_backend: gcs
@@ -116,8 +115,3 @@ extraEnv: {}
 extraSecretEnv: {}
   # EXTRA_SENSITIVE_VAR_1: value1
   # EXTRA_SENSITIVE_VAR_2: value2
-
-# nidx:
-#   api_address:
-#   searcher_address:
-#   nats_subject:

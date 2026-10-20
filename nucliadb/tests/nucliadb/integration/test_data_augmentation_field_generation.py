@@ -31,7 +31,7 @@ from pytest_mock import MockerFixture
 
 from nucliadb.common import datamanagers
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.processing import (
     DummyProcessingEngine,
@@ -92,7 +92,6 @@ def partition_utility() -> Iterable[PartitionUtility]:
 
 
 async def test_send_to_process_generated_fields(
-    dummy_nidx_utility,
     knowledgebox: str,
     processor: Processor,
     partition_utility: PartitionUtility,
@@ -151,7 +150,7 @@ async def test_send_to_process_generated_fields(
     assert payload.textfield[da_field].body == bm.texts[da_field].body
     assert partition == 1
 
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         kb = KnowledgeBox(txn, storage=await get_storage(), kbid=kbid)
         resource = await kb.get(rid)
         assert resource is not None
@@ -176,7 +175,7 @@ async def test_send_to_process_generated_fields(
         )
     )
 
-    index_resource_spy = mocker.spy(processor.index_node_shard_manager, "add_resource")
+    index_resource_spy = mocker.spy(processor, "generate_index_message")
     await processor.process(bm, 4)
 
     index_message: noderesources_pb2.Resource = index_resource_spy.call_args.args[1]
@@ -355,7 +354,6 @@ async def test_data_augmentation_field_generation_and_search(
 
 
 async def test_send_to_process_generated_conversation_field(
-    dummy_nidx_utility,
     knowledgebox: str,
     processor: Processor,
     partition_utility: PartitionUtility,
@@ -444,7 +442,7 @@ async def test_send_to_process_generated_conversation_field(
     )
     assert partition == 1
 
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         kb = KnowledgeBox(txn, storage=await get_storage(), kbid=kbid)
         resource = await kb.get(rid)
         assert resource is not None
@@ -459,7 +457,7 @@ async def test_send_to_process_generated_conversation_field(
     facts_conv = bmb.field_builder(user_facts_field_id, FieldType.CONVERSATION)
     facts_conv.with_extracted_text("This is the extracted text of the fact", split="msg1")
     bm = bmb.build()
-    index_resource_spy = mocker.spy(processor.index_node_shard_manager, "add_resource")
+    index_resource_spy = mocker.spy(processor, "generate_index_message")
     await processor.process(bm, 4)
 
     index_message: noderesources_pb2.Resource = index_resource_spy.call_args.args[1]
