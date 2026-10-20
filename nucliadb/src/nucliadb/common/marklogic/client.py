@@ -25,6 +25,7 @@ Implements the subset of the marklogic-python-client API used by the maindb driv
 from __future__ import annotations
 
 import json
+import logging
 import secrets
 from dataclasses import dataclass
 from decimal import Decimal
@@ -33,6 +34,7 @@ from email.parser import BytesParser
 from email.policy import default
 from typing import Any
 
+import backoff
 import httpx
 
 from nucliadb.common.marklogic.exceptions import (
@@ -42,6 +44,42 @@ from nucliadb.common.marklogic.exceptions import (
 )
 
 DEFAULT_TIMEOUT = 60.0
+
+# 503 "Retryable Error" codes MarkLogic returns while a new database is still coming online
+RETRYABLE_ERROR_CODES = (b"XDMP-DBTIMESTAMP", b"XDMP-FORESTNOTOPEN")
+RETRY_ATTEMPTS = 10
+RETRY_MAX_DELAY = 2.0
+
+logger = logging.getLogger(__name__)
+
+
+def _is_database_not_ready(response: httpx.Response) -> bool:
+    # Requests are sent non-streamed, so the body is already loaded
+    return response.status_code == 503 and any(
+        code in response.content for code in RETRYABLE_ERROR_CODES
+    )
+
+
+def _log_retry(details: Any) -> None:
+    logger.warning(
+        "MarkLogic database not ready, retrying request",
+        extra={"url": str(details["args"][1].url), "tries": details["tries"]},
+    )
+
+
+class _RetryingAsyncClient(httpx.AsyncClient):
+    """Retries requests rejected before execution because a database is not ready yet."""
+
+    @backoff.on_predicate(
+        backoff.expo,
+        _is_database_not_ready,
+        factor=0.1,
+        max_value=RETRY_MAX_DELAY,
+        max_tries=RETRY_ATTEMPTS,
+        on_backoff=_log_retry,
+    )
+    async def send(self, request: httpx.Request, **kwargs: Any) -> httpx.Response:
+        return await super().send(request, **kwargs)
 
 
 @dataclass
@@ -364,7 +402,7 @@ class Client:
         password: str,
         timeout: float | None = DEFAULT_TIMEOUT,
     ):
-        self._http = httpx.AsyncClient(
+        self._http = _RetryingAsyncClient(
             base_url=base_url,
             auth=httpx.DigestAuth(username, password),
             timeout=timeout,

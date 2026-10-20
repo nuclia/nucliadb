@@ -39,7 +39,10 @@ from pathlib import Path
 import httpx
 from faker import Faker
 
-from nucliadb_models.metadata import InputOrigin
+from nucliadb_models.common import UserClassification
+from nucliadb_models.labels import Label, LabelSet
+from nucliadb_models.metadata import InputOrigin, UserMetadata
+from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import TextField, TextFormat
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_sdk import NucliaDBAsync
@@ -83,6 +86,28 @@ PARAGRAPHS_PER_FIELD = PROD_TEXT_BLOCKS / PROD_FIELDS  # ~20.5
 
 # P(1)=0.65, P(2)=0.25, P(3)=0.10 -> mean 1.45 fields per resource
 FIELDS_PER_RESOURCE_DIST = {1: 0.65, 2: 0.25, 3: 0.10}
+
+# Labelset -> (labels, max labels per resource). Created in every KB so they can be used as search filters
+LABELSETS: dict[str, tuple[list[str], int]] = {
+    "topic": (
+        ["finance", "legal", "health", "technology", "science", "sports", "politics", "education"],
+        2,
+    ),
+    "department": (["sales", "marketing", "engineering", "support", "hr", "operations"], 1),
+    "priority": (["low", "medium", "high"], 1),
+}
+SECURITY_GROUPS = [
+    "group-admins",
+    "group-managers",
+    "group-employees",
+    "group-contractors",
+    "group-partners",
+    "group-customers",
+    "group-auditors",
+    "group-interns",
+]
+# Fraction of resources without access groups (visible to everyone)
+PUBLIC_RESOURCE_RATIO = 0.2
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +206,8 @@ class ResourceGenerator:
             summary=self.fake.paragraph(nb_sentences=2),
             slug=f"synth-{self.seed}-{index:09d}",
             texts=texts,
+            usermetadata=UserMetadata(classifications=self._classifications(rng, stats)),
+            security=ResourceSecurity(access_groups=self._access_groups(rng, stats)),
             origin=InputOrigin(
                 url=self.fake.url(),
                 tags=[self.fake.word() for _ in range(rng.randint(0, 4))],
@@ -188,6 +215,34 @@ class ResourceGenerator:
             ),
         )
         return payload, stats
+
+    def _classifications(self, rng: random.Random, stats: Counter) -> list[UserClassification]:
+        classifications = []
+        for labelset, (labels, max_labels) in LABELSETS.items():
+            for label in rng.sample(labels, rng.randint(1, max_labels)):
+                classifications.append(UserClassification(labelset=labelset, label=label))
+                stats[f"label_{labelset}/{label}"] += 1
+        return classifications
+
+    def _access_groups(self, rng: random.Random, stats: Counter) -> list[str]:
+        if rng.random() < PUBLIC_RESOURCE_RATIO:
+            stats["public_resources"] += 1
+            return []
+        groups = rng.sample(SECURITY_GROUPS, rng.randint(1, 3))
+        for group in groups:
+            stats[f"group_{group}"] += 1
+        return groups
+
+
+async def ensure_labelsets(ndb: NucliaDBAsync, kbid: str) -> None:
+    for labelset, (labels, max_labels) in LABELSETS.items():
+        await ndb.set_labelset(
+            kbid=kbid,
+            labelset=labelset,
+            content=LabelSet(
+                title=labelset, multiple=max_labels > 1, labels=[Label(title=label) for label in labels]
+            ),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -292,6 +347,8 @@ def make_generator(args) -> ResourceGenerator:
 
 async def cmd_ingest(args):
     ndb = None if args.dry_run else build_client(args)
+    if ndb is not None:
+        await ensure_labelsets(ndb, args.kbid)
     report = await ingest_kb(
         ndb, make_generator(args), args.kbid, args.resources, args.start_index, args
     )
@@ -360,6 +417,7 @@ async def cmd_run(args):
         else:
             print(f"[{i}/{len(plan)}] KB {slug} already exists ({kbid})")
 
+        await ensure_labelsets(ndb, kbid)
         report = await ingest_kb(ndb, gen, kbid, item["resources"], 0, args)
         report.update(slug=slug, tier=item["tier"])
         print(json.dumps(report))
