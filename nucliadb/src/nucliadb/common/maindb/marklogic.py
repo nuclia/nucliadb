@@ -24,8 +24,12 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
+
+import backoff
 
 from nucliadb.common.maindb import marklogic_schema
 from nucliadb.common.maindb.collections import MarkLogicCollections
@@ -48,6 +52,20 @@ DEFAULT_BATCH_SCAN_LIMIT = 500
 DATABASE_READY_TIMEOUT = 60.0
 DATABASE_READY_PROBES = 3
 DATABASE_NOT_READY_CODES = {"XDMP-DBTIMESTAMP", "XDMP-FORESTNOTOPEN", "XDMP-NOSUCHDB"}
+DATABASE_READY_PROBE_URI = "/nucliadb/readiness-probe.json"
+
+logger = logging.getLogger(__name__)
+
+
+class DatabaseNotReady(Exception):
+    pass
+
+
+def _log_not_ready(details: Any) -> None:
+    logger.warning(
+        "MarkLogic database not ready yet, retrying",
+        extra={"database": details["args"][1], "tries": details["tries"]},
+    )
 
 
 class MarkLogicDataLayer:
@@ -304,27 +322,39 @@ class MarkLogicDriver:
 
     async def _wait_until_queryable(self, database: str) -> None:
         """A freshly created database answers XDMP-DBTIMESTAMP until its forest is open on every host."""
-        deadline = asyncio.get_running_loop().time() + DATABASE_READY_TIMEOUT
-        successes = 0
-        delay = 0.1
+        try:
+            await self._probe_database(database)
+        except DatabaseNotReady as exc:
+            raise TimeoutError(f"MarkLogic database {database} not queryable after creation") from exc
+
+    @backoff.on_exception(
+        backoff.expo,
+        DatabaseNotReady,
+        jitter=backoff.random_jitter,
+        factor=0.1,
+        max_value=2.0,
+        max_time=DATABASE_READY_TIMEOUT,
+        on_backoff=_log_not_ready,
+    )
+    async def _probe_database(self, database: str) -> None:
         # Several consecutive successes, as requests may be balanced across hosts
-        while successes < DATABASE_READY_PROBES:
+        for _ in range(DATABASE_READY_PROBES):
             try:
-                await self.client.eval("cts.estimate(cts.trueQuery())", params={"database": database})
-                successes += 1
-                continue
-            except NoHealthyUpstreamError:
-                pass
+                # Plain document read rather than /v1/eval: server-side JS can crash (JS-FATAL) on new databases
+                await self.client.documents.exists(
+                    DATABASE_READY_PROBE_URI, params={"database": database}
+                )
+            except NoHealthyUpstreamError as exc:
+                raise DatabaseNotReady(database) from exc
             except MarkLogicResponseError as exc:
-                if exc.code not in DATABASE_NOT_READY_CODES and not isinstance(
-                    exc, DatabaseDoesNotExist
+                server_error = exc.status_code is not None and exc.status_code >= 500
+                if (
+                    exc.code in DATABASE_NOT_READY_CODES
+                    or isinstance(exc, DatabaseDoesNotExist)
+                    or server_error
                 ):
-                    raise
-            successes = 0
-            if asyncio.get_running_loop().time() > deadline:
-                raise TimeoutError(f"MarkLogic database {database} not queryable after creation")
-            await asyncio.sleep(delay)
-            delay = min(delay * 2, 2.0)
+                    raise DatabaseNotReady(database) from exc
+                raise
 
     async def ensure_kb_database(self, kbid: str) -> str:
         database = self.kb_database(kbid)
