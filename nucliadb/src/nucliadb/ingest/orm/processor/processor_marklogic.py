@@ -600,6 +600,8 @@ class ProcessorMarkLogic:
 
         async with self.driver.transaction(read_only=False, kbid=kbid) as txn:
             handled_exception = None
+            # None until the resource lookup succeeds
+            is_new_resource: bool | None = None
             try:
                 resource = await datamanagers.resources.get_resource(txn, kbid=kbid, rid=uuid)
                 is_new_resource = resource is None
@@ -697,7 +699,7 @@ class ProcessorMarkLogic:
                 if seqid == -1:
                     raise handled_exception
                 else:
-                    if not is_new_resource:
+                    if is_new_resource is False:
                         await self._mark_resource_error(kbid, uuid)
                     raise DeadletteredError() from handled_exception
 

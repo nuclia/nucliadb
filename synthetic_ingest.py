@@ -15,14 +15,13 @@ Subcommands:
   ingest  Push synthetic resources into one existing KB using nucliadb_sdk.
   run     Create all KBs from the plan (account API) and fill them.
 
-Auth: pass the bearer token with --token, --token-file (re-read on 401) or NUCLIA_TOKEN.
+Target cluster, account and KB settings are hardcoded below; only the Nuclia bearer
+token is a parameter (--token or NUCLIA_TOKEN). Tokens are short-lived (~1h).
 
 Examples:
   python synthetic_ingest.py plan --scale 0.1
-  python synthetic_ingest.py ingest --url http://localhost:8080/api --kbid <KBID> --resources 1000
-  NUCLIA_TOKEN=... python synthetic_ingest.py run --scale 0.1 \
-      --url https://gcp-dev-1.dp.gcp-global-dev-1.nuclia.io/api \
-      --account <ACCOUNT_ID> --zone gcp-dev-1 --report run.jsonl
+  python synthetic_ingest.py ingest --token ... --kbid <KBID> --resources 1000
+  NUCLIA_TOKEN=... python synthetic_ingest.py run --scale 0.1 --report run.jsonl
 """
 
 import argparse
@@ -44,7 +43,30 @@ from nucliadb_models.metadata import InputOrigin
 from nucliadb_models.text import TextField, TextFormat
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_sdk import NucliaDBAsync
-from nucliadb_sdk.v2.exceptions import AuthError, ConflictError, RateLimitError
+from nucliadb_sdk.v2.exceptions import ConflictError, RateLimitError
+
+# Dev cluster where the MarkLogic implementation is deployed
+NUCLIA_API_URL = "https://gcp-dev-1.dp.gcp-global-dev-1.nuclia.io/api"
+ACCOUNT_ID = "57104109-8afe-48b2-81aa-be6204eef0f0"
+ZONE = "gcp-dev-1"
+SEMANTIC_MODEL = "multilingual-2024-05-06"
+# The account API rejects requests that don't look like they come from the admin dashboard
+BROWSER_HEADERS = {
+    "user-agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+    ),
+    "accept": "*/*",
+    "accept-language": "en-US,en;q=0.9",
+    "origin": "https://admin.gcp-global-dev-1.nuclia.io",
+    "referer": "https://admin.gcp-global-dev-1.nuclia.io/",
+    "sec-ch-ua": '"Not:A-Brand";v="8", "Chromium";v="156", "Google Chrome";v="156"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"macOS"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+}
 
 # Production reference numbers
 PROD_KBS = 356
@@ -173,32 +195,12 @@ class ResourceGenerator:
 # ---------------------------------------------------------------------------
 
 
-def parse_headers(raw: list[str]) -> dict[str, str]:
-    headers = {}
-    for h in raw:
-        key, _, value = h.partition(":")
-        headers[key.strip()] = value.strip()
-    return headers
-
-
-def read_token(args) -> str | None:
-    if args.token_file:
-        return Path(args.token_file).read_text().strip()
-    return args.token or os.environ.get("NUCLIA_TOKEN")
-
-
 def auth_headers(args) -> dict[str, str]:
-    headers = parse_headers(args.header)
-    token = read_token(args)
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return headers
+    return {**BROWSER_HEADERS, "Authorization": f"Bearer {args.token}"}
 
 
 def build_client(args) -> NucliaDBAsync:
-    return NucliaDBAsync(
-        url=args.url, api_key=args.api_key, headers=auth_headers(args), timeout=args.timeout
-    )
+    return NucliaDBAsync(url=NUCLIA_API_URL, headers=auth_headers(args), timeout=args.timeout)
 
 
 async def push_resource(
@@ -211,12 +213,6 @@ async def push_resource(
         except ConflictError:
             # Slug already exists: resource pushed in a previous run
             return "skipped"
-        except AuthError:
-            # Tokens are short-lived: re-read --token-file so it can be refreshed mid-run
-            if not args.token_file or attempt == args.retries:
-                raise
-            ndb.session.headers["Authorization"] = f"Bearer {read_token(args)}"
-            await asyncio.sleep(5)
         except RateLimitError as exc:
             await asyncio.sleep(exc.try_after or 2**attempt)
         except (httpx.TransportError, httpx.TimeoutException):
@@ -312,7 +308,7 @@ async def cmd_ingest(args):
 class AccountAPI:
     def __init__(self, args):
         self.args = args
-        self.kbs_url = f"{args.url.rstrip('/')}/v1/account/{args.account}/kbs"
+        self.kbs_url = f"{NUCLIA_API_URL}/v1/account/{ACCOUNT_ID}/kbs"
         self.client = httpx.AsyncClient(timeout=args.timeout)
 
     def _headers(self) -> dict[str, str]:
@@ -330,12 +326,12 @@ class AccountAPI:
             json={
                 "title": slug,
                 "description": "",
-                "zone": self.args.zone,
+                "zone": ZONE,
                 "enforce_security": True,
                 "slug": slug,
                 "learning_configuration": {
                     "anonymization_model": "disabled",
-                    "semantic_models": [self.args.semantic_model],
+                    "semantic_models": [SEMANTIC_MODEL],
                 },
             },
         )
@@ -393,15 +389,11 @@ def main():
     plan_args.add_argument("--kb-prefix", default="sizing-kb", help="KB slug prefix")
 
     push_args = argparse.ArgumentParser(add_help=False)
-    push_args.add_argument("--url", required=True, help="NucliaDB API base URL, e.g. https://<zone>.../api")
-    push_args.add_argument("--token", default=None, help="Bearer token (prefer NUCLIA_TOKEN env var)")
-    push_args.add_argument("--token-file", default=None, help="File with the bearer token, re-read on 401")
-    push_args.add_argument("--api-key", default=None)
     push_args.add_argument(
-        "--header",
-        action="append",
-        default=[],
-        help="Extra header 'Key: Value' (repeatable), e.g. 'X-NUCLIADB-ROLES: WRITER'",
+        "--token",
+        default=os.environ.get("NUCLIA_TOKEN"),
+        required="NUCLIA_TOKEN" not in os.environ,
+        help="Nuclia bearer token (or NUCLIA_TOKEN env var)",
     )
     push_args.add_argument(
         "--paragraphs-per-field",
@@ -426,9 +418,6 @@ def main():
     p.add_argument("--dry-run", action="store_true", help="Generate payloads without pushing")
 
     p = sub.add_parser("run", parents=[plan_args, push_args], help="Create KBs from the plan and fill them")
-    p.add_argument("--account", required=True, help="Account id")
-    p.add_argument("--zone", required=True, help="e.g. gcp-dev-1")
-    p.add_argument("--semantic-model", default="multilingual-2024-05-06")
     p.add_argument("--report", default=None, help="Append one JSON line per KB to this path")
 
     args = parser.parse_args()
