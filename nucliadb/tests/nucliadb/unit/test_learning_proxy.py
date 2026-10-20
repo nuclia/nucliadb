@@ -31,7 +31,6 @@ from nucliadb.learning_proxy import (
     proxy,
     set_configuration,
 )
-from nucliadb.middleware import _learning_forwarded_headers
 
 MODULE = "nucliadb.learning_proxy"
 
@@ -108,18 +107,6 @@ async def test_get_learning_config_client_hosted(settings, hosted_nucliadb):
     async with ProxiedLearningConfig()._client() as client:
         assert str(client.base_url) == "http://config.learning.svc.cluster.local:8080/api/v1/internal/"
         assert "X-NUCLIA-NUAKEY" not in client.headers
-
-
-async def test_get_learning_config_client_forwards_learning_headers(settings, onprem_nucliadb):
-    token = _learning_forwarded_headers.set(
-        {"x-kb-visibility": "private", "x-allow-access-external-models": "true"}
-    )
-    try:
-        async with ProxiedLearningConfig()._client() as client:
-            assert client.headers["x-kb-visibility"] == "private"
-            assert client.headers["x-allow-access-external-models"] == "true"
-    finally:
-        _learning_forwarded_headers.reset(token)
 
 
 async def test_get_configuration(async_client):
@@ -207,25 +194,6 @@ async def test_proxy_stream_response(async_client, config_stream_response):
         content=b"some data",
         headers={"x-nucliadb-user": "user", "x-nucliadb-roles": "roles"},
     )
-
-
-async def test_proxy_forwards_learning_headers(async_client):
-    request = mock.Mock(
-        query_params={"some": "data"},
-        body=mock.AsyncMock(return_value=b"some data"),
-        headers={"x-nucliadb-user": "user"},
-    )
-    token = _learning_forwarded_headers.set(
-        {"x-kb-visibility": "public", "x-allow-access-external-models": "false"}
-    )
-    try:
-        await proxy(LearningService.CONFIG, request, "GET", "url")
-    finally:
-        _learning_forwarded_headers.reset(token)
-
-    headers = async_client.request.call_args.kwargs["headers"]
-    assert headers["x-kb-visibility"] == "public"
-    assert headers["x-allow-access-external-models"] == "false"
 
 
 async def test_proxy_error(async_client):

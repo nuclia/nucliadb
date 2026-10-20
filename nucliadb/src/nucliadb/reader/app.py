@@ -29,7 +29,6 @@ from starlette.responses import HTMLResponse
 
 from nucliadb.middleware import (
     ClientErrorPayloadLoggerMiddleware,
-    LearningForwardedHeadersMiddleware,
     UUIDPathParamsValidationMiddleware,
 )
 from nucliadb.reader import API_PREFIX
@@ -50,7 +49,6 @@ from nucliadb_utils.utilities import get_audit
 middleware = []
 middleware.extend(
     [
-        Middleware(LearningForwardedHeadersMiddleware),
         Middleware(UUIDPathParamsValidationMiddleware),
         Middleware(
             AuthenticationMiddleware,

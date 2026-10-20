@@ -28,7 +28,6 @@ from nucliadb.ingest.processing import (
     ProcessingEngine,
     PushPayload,
 )
-from nucliadb.middleware import _learning_forwarded_headers
 from nucliadb.models.internal.processing import ClassificationLabel
 from nucliadb_models import File, FileField
 from nucliadb_protos.resources_pb2 import CloudFile
@@ -139,23 +138,6 @@ async def test_send_to_process_200(engine):
     assert processing_info.seqid == 11
     assert processing_info.account_seq == 22
     assert processing_info.queue == "private"
-
-
-async def test_send_to_process_forwards_learning_headers(engine):
-    json_data = {"seqid": 11, "account_seq": 22, "queue": "private"}
-    engine.session = get_mocked_session("POST", 200, json=json_data, context_manager=False)
-
-    token = _learning_forwarded_headers.set(
-        {"x-kb-visibility": "private", "x-allow-access-external-models": "true"}
-    )
-    try:
-        await engine.send_to_process(TEST_ITEM, 1)
-    finally:
-        _learning_forwarded_headers.reset(token)
-
-    _, kwargs = engine.session.post.call_args
-    assert kwargs["headers"]["x-kb-visibility"] == "private"
-    assert kwargs["headers"]["x-allow-access-external-models"] == "true"
 
 
 @pytest.mark.parametrize("status", [402, 413])

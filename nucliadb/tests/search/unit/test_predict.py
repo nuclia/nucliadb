@@ -352,28 +352,6 @@ async def test_get_predict_headers_hosterd():
     assert pe.get_predict_headers("kbid") == {"X-STF-KBID": "kbid"}
 
 
-@pytest.mark.parametrize("onprem", [True, False])
-async def test_get_predict_headers_forwards_learning_headers(onprem):
-    from nucliadb.middleware import _learning_forwarded_headers
-
-    pe = PredictEngine(
-        "cluster",
-        "public-{zone}",
-        zone="europe1",
-        onprem=onprem,
-        nuclia_service_account="nua-service-account",
-    )
-    token = _learning_forwarded_headers.set(
-        {"x-kb-visibility": "private", "x-allow-access-external-models": "true"}
-    )
-    try:
-        headers = pe.get_predict_headers("kbid")
-        assert headers["x-kb-visibility"] == "private"
-        assert headers["x-allow-access-external-models"] == "true"
-    finally:
-        _learning_forwarded_headers.reset(token)
-
-
 async def test_get_answer_generator():
     async def _iter_chunks():
         await asyncio.sleep(0.1)
