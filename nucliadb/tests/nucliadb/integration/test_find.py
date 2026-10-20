@@ -25,7 +25,7 @@ import pytest
 from httpx import AsyncClient
 from pytest_mock import MockerFixture
 
-from nucliadb.search.predict import DummyPredictEngine
+from nucliadb.search.predict import DummyPredictEngine, PredictTimeoutError
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
 from nucliadb.search.utilities import get_predict
 from nucliadb_models.search import FindOptions
@@ -39,6 +39,7 @@ from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from nucliadb_utils.exceptions import LimitsExceededError
+from tests.ndbfixtures.resources import smb_wonder_resource
 from tests.utils import inject_message
 
 
@@ -633,3 +634,39 @@ async def test_find_query_image(
     assert predict.calls[0][1].query_image.content_type == "image/png"
     assert predict.calls[0][1].query_image.b64encoded == "dummy_base64_image"
     assert predict.calls[0][1].text == "whatever"
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_find_handles_predict_timeout_error(
+    nucliadb_reader: AsyncClient,
+    nucliadb_writer: AsyncClient,
+    nucliadb_ingest_grpc: WriterStub,
+    standalone_knowledgebox: str,
+):
+    kbid = standalone_knowledgebox
+    _ = await smb_wonder_resource(kbid, nucliadb_writer, nucliadb_ingest_grpc)
+
+    predict = get_predict()
+
+    # A timeout on /query is accepted, the request only uses keyword search and
+    # a 206 is returned indicating partial results
+    with patch.object(predict, "query", side_effect=PredictTimeoutError()):
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "query": "wonder",
+            },
+        )
+        assert resp.status_code == 206
+
+    # An timeout on reranking is raised as an internal error
+    with patch.object(predict, "rerank", side_effect=PredictTimeoutError()):
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json={
+                "query": "wonder",
+                "reranker": "predict",
+            },
+        )
+        assert resp.status_code == 503
+        resp.json()["detail"] == "Service currently unavailable, please try later"

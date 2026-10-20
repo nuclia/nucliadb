@@ -19,7 +19,7 @@
 #
 import asyncio
 from unittest import mock
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import aiohttp
 import pytest
@@ -35,6 +35,7 @@ from yarl import URL
 from nucliadb.search.predict import (
     DummyPredictEngine,
     PredictEngine,
+    PredictTimeoutError,
     ProxiedPredictAPIError,
     RephraseError,
     RephraseMissingContextError,
@@ -457,3 +458,22 @@ async def test_chat_query_ndjson():
 
     # Make sure the request was made with the correct headers
     pe.session.post.call_args_list[0].kwargs["headers"]["Accept"] == "application/ndjson"
+
+
+async def test_predict_timeout_error_handling():
+    pe = PredictEngine(
+        "cluster",
+        "public-{zone}",
+        zone="europe1",
+        onprem=False,
+    )
+    await pe.initialize()
+
+    with patch.object(pe.session, "post", side_effect=TimeoutError):
+        with pytest.raises(PredictTimeoutError):
+            await pe.query("kbid", Mock())
+
+        with pytest.raises(PredictTimeoutError):
+            await pe.rerank("kbid", Mock())
+
+    await pe.finalize()
