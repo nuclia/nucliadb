@@ -27,7 +27,7 @@ classifiers = [
 ]
 requires-python = ">=3.11, <4"
 dependencies = [
-    "protobuf>=6.31.1,<7.0.0"
+    "protobuf>=7.0.0,<8"
 ]
 
 [project.optional-dependencies]
