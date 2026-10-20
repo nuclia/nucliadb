@@ -255,7 +255,7 @@ jobs:
         with:
           max_attempts: 2
           retry_on: error
-          timeout_minutes: 20
+          timeout_minutes: 60
           command: uv sync --no-editable
       - name: Upload virtualenv to cache
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
