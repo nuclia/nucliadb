@@ -24,6 +24,7 @@ from nucliadb.common.datamanagers import kb
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb_protos import knowledgebox_pb2
+from tests.utils.knowledgebox import create_knowledgebox
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -47,12 +48,8 @@ def make_config(title: str = "Test KB") -> knowledgebox_pb2.KnowledgeBoxConfig:
 
 @pytest.fixture()
 async def kbid(maindb_driver: Driver) -> str:
-    """Create a minimal KB row (with a slug) and return its kbid."""
-    kbid = new_kbid()
-    async with maindb_driver.rw_transaction(kbid=None) as txn:
-        await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
-    return kbid
+    """Create a KB through the ORM and return its kbid."""
+    return await create_knowledgebox(maindb_driver)
 
 
 # ---------------------------------------------------------------------------
@@ -62,7 +59,8 @@ async def kbid(maindb_driver: Driver) -> str:
 
 @pytest.mark.asyncio
 async def test_set_config_creates_row_and_is_readable(maindb_driver: Driver) -> None:
-    kbid = new_kbid()
+
+    kbid = await create_knowledgebox(maindb_driver)
     cfg = make_config("My KB")
 
     async with maindb_driver.rw_transaction(kbid=kbid) as txn:
@@ -78,7 +76,7 @@ async def test_set_config_creates_row_and_is_readable(maindb_driver: Driver) -> 
 
 @pytest.mark.asyncio
 async def test_set_config_overwrites_existing(maindb_driver: Driver) -> None:
-    kbid = new_kbid()
+    kbid = await create_knowledgebox(maindb_driver)
 
     async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await kb.set(txn, kbid=kbid, config=make_config("First"))
@@ -110,7 +108,7 @@ async def test_get_config_returns_none_for_missing_kb(maindb_driver: Driver) -> 
 
 @pytest.mark.asyncio
 async def test_set_slug_and_get_kbid(maindb_driver: Driver) -> None:
-    kbid = new_kbid()
+    kbid = await create_knowledgebox(maindb_driver)
     slug = f"my-slug-{kbid}"
 
     async with maindb_driver.rw_transaction(kbid=None) as txn:
@@ -125,7 +123,7 @@ async def test_set_slug_and_get_kbid(maindb_driver: Driver) -> None:
 
 @pytest.mark.asyncio
 async def test_set_slug_overwrites_slug(maindb_driver: Driver) -> None:
-    kbid = new_kbid()
+    kbid = await create_knowledgebox(maindb_driver)
 
     async with maindb_driver.rw_transaction(kbid=None) as txn:
         await kb.set_slug(txn, kbid=kbid, slug="old-slug")
@@ -241,13 +239,8 @@ async def test_delete_on_nonexistent_kb_is_noop(maindb_driver: Driver) -> None:
 
 @pytest.mark.asyncio
 async def test_get_kbs_yields_active_kbs(maindb_driver: Driver) -> None:
-    kbid_a = new_kbid()
-    kbid_b = new_kbid()
-
-    async with maindb_driver.rw_transaction(kbid=None) as txn:
-        await kb.set_slug(txn, kbid=kbid_a, slug="prefix-alpha")
-        await kb.set_slug(txn, kbid=kbid_b, slug="prefix-beta")
-        await txn.commit()
+    kbid_a = await create_knowledgebox(maindb_driver)
+    kbid_b = await create_knowledgebox(maindb_driver)
 
     async with maindb_driver.ro_transaction(kbid=None) as txn:
         all_kbs = {kbid async for kbid, _ in kb.iter(txn)}
@@ -258,16 +251,10 @@ async def test_get_kbs_yields_active_kbs(maindb_driver: Driver) -> None:
 
 @pytest.mark.asyncio
 async def test_get_kbs_with_slug_prefix(maindb_driver: Driver) -> None:
-    kbid_a = new_kbid()
-    kbid_b = new_kbid()
-    kbid_c = new_kbid()
-    prefix = f"pfx-{kbid_a[:8]}-"
-
-    async with maindb_driver.rw_transaction(kbid=None) as txn:
-        await kb.set_slug(txn, kbid=kbid_a, slug=f"{prefix}one")
-        await kb.set_slug(txn, kbid=kbid_b, slug=f"{prefix}two")
-        await kb.set_slug(txn, kbid=kbid_c, slug="other-slug")
-        await txn.commit()
+    prefix = f"pfx-{new_kbid()[:8]}-"
+    kbid_a = await create_knowledgebox(maindb_driver, slug=f"{prefix}one")
+    kbid_b = await create_knowledgebox(maindb_driver, slug=f"{prefix}two")
+    kbid_c = await create_knowledgebox(maindb_driver)
 
     async with maindb_driver.ro_transaction(kbid=None) as txn:
         filtered = {kbid async for kbid, _ in kb.iter(txn, slug_prefix=prefix)}
@@ -279,11 +266,7 @@ async def test_get_kbs_with_slug_prefix(maindb_driver: Driver) -> None:
 
 @pytest.mark.asyncio
 async def test_get_kbs_does_not_yield_soft_deleted(maindb_driver: Driver) -> None:
-    kbid = new_kbid()
-
-    async with maindb_driver.rw_transaction(kbid=None) as txn:
-        await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
+    kbid = await create_knowledgebox(maindb_driver)
 
     async with maindb_driver.rw_transaction(kbid=None) as txn:
         await kb.soft_delete(txn, kbid=kbid)

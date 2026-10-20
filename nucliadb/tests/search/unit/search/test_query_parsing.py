@@ -23,9 +23,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from nucliadb.common.datamanagers import kb
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import DummyPredictEngine
 from nucliadb.search.search.query_parser import models as parser_models
 from nucliadb.search.search.query_parser.parsers import parse_find
@@ -33,6 +31,7 @@ from nucliadb.search.search.query_parser.parsers.find import fetcher_for_find
 from nucliadb.search.utilities import PredictEngine, get_predict
 from nucliadb_models import search as search_models
 from nucliadb_models.search import FindRequest
+from tests.utils.knowledgebox import create_knowledgebox
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -45,11 +44,7 @@ def disable_hidden_resources_check():
 
 @pytest.fixture(scope="function", autouse=True)
 async def kbid(maindb_driver: Driver):
-    kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction(kbid=None) as txn:
-        await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
-    return kbid
+    return await create_knowledgebox(maindb_driver)
 
 
 async def test_find_query_parsing__top_k(

@@ -24,10 +24,10 @@ import pytest
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.models_utils import from_proto
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import Basic, FieldLink
+from tests.utils.knowledgebox import create_knowledgebox
 
 
 async def check_slug(driver: Driver, kbid, rid, slug):
@@ -41,11 +41,7 @@ async def check_slug(driver: Driver, kbid, rid, slug):
 
 @pytest.fixture(scope="function")
 async def kbid(maindb_driver: Driver) -> AsyncIterator[str]:
-    kbid = KnowledgeBox.new_unique_kbid()
-    slug = kbid
-    async with maindb_driver.rw_transaction(kbid=None) as txn:
-        await datamanagers.kb.set_slug(txn, kbid=kbid, slug=slug)
-        await txn.commit()
+    kbid = await create_knowledgebox(maindb_driver)
     try:
         yield kbid
     finally:

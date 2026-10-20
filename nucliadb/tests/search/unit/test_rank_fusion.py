@@ -31,11 +31,9 @@ import pytest
 from nidx_protos.nodereader_pb2 import DocumentScored, GraphSearchResponse, ParagraphResult
 
 import nucliadb_models.search as search_models
-from nucliadb.common import datamanagers
 from nucliadb.common.external_index_providers.base import TextBlockMatch
 from nucliadb.common.ids import ParagraphId, VectorId
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.search.predict import PredictEngine
 from nucliadb.search.search.query_parser.parsers import parse_find
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion, WeightedCombSum, get_rank_fusion
@@ -47,6 +45,7 @@ from nucliadb.search.search.retrieval import (
 )
 from nucliadb_models.search import SCORE_TYPE, FindRequest
 from nucliadb_protos.utils_pb2 import RelationMetadata
+from tests.utils.knowledgebox import create_knowledgebox
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -59,11 +58,7 @@ def disable_hidden_resources_check():
 
 @pytest.fixture(scope="function")
 async def kbid(maindb_driver: Driver) -> str:
-    kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction(kbid=None) as txn:
-        await datamanagers.kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
-    return kbid
+    return await create_knowledgebox(maindb_driver)
 
 
 @pytest.mark.parametrize(

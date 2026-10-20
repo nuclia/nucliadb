@@ -21,12 +21,12 @@
 
 import pytest
 
-from nucliadb.common.datamanagers import kb, resources
+from nucliadb.common.datamanagers import resources
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos import resources_pb2
+from tests.utils.knowledgebox import create_knowledgebox
 
 # ---------------------------------------------------------------------------
 # Tests
@@ -36,11 +36,7 @@ from nucliadb_protos import resources_pb2
 @pytest.fixture(scope="function")
 async def kbid(maindb_driver: Driver) -> str:
     """Create a new knowledge box and return its kbid."""
-    kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction(kbid=None) as txn:
-        await kb.set_slug(txn, slug=kbid, kbid=kbid)
-        await txn.commit()
-    return kbid
+    return await create_knowledgebox(maindb_driver)
 
 
 @pytest.mark.asyncio

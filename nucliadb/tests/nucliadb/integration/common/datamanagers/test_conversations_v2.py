@@ -26,9 +26,8 @@ Covers: set_metadata, get_metadata, set_page, get_page,
 
 import pytest
 
-from nucliadb.common.datamanagers import conversations, fields, kb, resources
+from nucliadb.common.datamanagers import conversations, fields, resources
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.resources_pb2 import (
     Conversation,
@@ -37,6 +36,7 @@ from nucliadb_protos.resources_pb2 import (
     SplitMetadata,
     SplitsMetadata,
 )
+from tests.utils.knowledgebox import create_knowledgebox
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -45,11 +45,7 @@ from nucliadb_protos.resources_pb2 import (
 
 @pytest.fixture()
 async def kbid(maindb_driver: Driver) -> str:
-    kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction(kbid=None) as txn:
-        await kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
-    return kbid
+    return await create_knowledgebox(maindb_driver)
 
 
 @pytest.fixture()

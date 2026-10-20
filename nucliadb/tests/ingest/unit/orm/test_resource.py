@@ -26,7 +26,6 @@ import pytest
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.orm.brain_v2 import ResourceBrain
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor.processor import (
     get_text_field_mimetype,
     maybe_update_basic_icon,
@@ -44,6 +43,7 @@ from nucliadb_protos.resources_pb2 import (
     FieldText,
 )
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from tests.utils.knowledgebox import create_knowledgebox
 
 
 @pytest.mark.parametrize(
@@ -168,11 +168,7 @@ def storage():
 
 @pytest.fixture(scope="function")
 async def kb(maindb_driver: Driver):
-    kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction(kbid=None) as txn:
-        await datamanagers.kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
-    return kbid
+    return await create_knowledgebox(maindb_driver)
 
 
 @pytest.fixture(scope="function")

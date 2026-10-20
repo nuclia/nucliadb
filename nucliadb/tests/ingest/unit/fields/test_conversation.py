@@ -24,12 +24,12 @@ import pytest
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest.fields.conversation import Conversation
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import Message as PBMessage
 from nucliadb_protos.resources_pb2 import MessageContent as PBMessageContent
+from tests.utils.knowledgebox import create_knowledgebox
 
 
 @pytest.fixture(scope="function")
@@ -40,11 +40,7 @@ async def txn(maindb_driver: Driver, kbid: str):
 
 @pytest.fixture(scope="function")
 async def kbid(maindb_driver: Driver):
-    kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction(kbid=None) as txn:
-        await datamanagers.kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
-    return kbid
+    return await create_knowledgebox(maindb_driver)
 
 
 @pytest.fixture(scope="function")
