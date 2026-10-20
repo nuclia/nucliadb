@@ -51,11 +51,6 @@ async def stream_train_shard(
     if not await datamanagers.atomic.kb.exists(kbid=kbid):
         raise HTTPException(status_code=404, detail=f"No shards found for kb")
 
-    # TODO(Marklogic): train partitions are not implemented yet
-    partitions: list[str] = []
-    if shard not in partitions:
-        raise HTTPException(status_code=404, detail=f"Partition {shard} not found")
-
     trainset, filter_expression = await get_trainset(request)
     return StreamingResponse(
         generate_train_data(kbid, shard, trainset, filter_expression),
