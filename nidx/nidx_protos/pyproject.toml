@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-grpc = ["grpcio>=1.8.0"]
+grpc = ["grpcio>=1.84.0"]
 
 [project.urls]
 Homepage = "https://nuclia.com"
