@@ -2262,7 +2262,7 @@ grpc = [
 
 [package.metadata]
 requires-dist = [
-    { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.8.0" },
+    { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.84.0" },
     { name = "protobuf", specifier = ">=7.0.0,<8" },
 ]
 provides-extras = ["grpc"]
@@ -2493,7 +2493,7 @@ grpc = [
 
 [package.metadata]
 requires-dist = [
-    { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.76.0" },
+    { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.84.0" },
     { name = "protobuf", specifier = ">=7.0.0,<8" },
 ]
 provides-extras = ["grpc"]
