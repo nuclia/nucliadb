@@ -21,69 +21,19 @@ import logging
 import time
 import uuid
 from collections import deque
-from contextvars import ContextVar
 from typing import Callable, ClassVar
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import BaseRoute, Match, Mount
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import Scope
 
 PROCESS_TIME_HEADER = "X-PROCESS-TIME"
 ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
-KB_VISIBILITY_HEADER = "x-kb-visibility"
-ALLOW_ACCESS_EXTERNAL_MODELS_HEADER = "x-allow-access-external-models"
-
-# Incoming request headers that are propagated to downstream learning services
-LEARNING_FORWARDED_HEADERS = frozenset(
-    {
-        KB_VISIBILITY_HEADER,
-        ALLOW_ACCESS_EXTERNAL_MODELS_HEADER,
-    }
-)
 
 
 logger = logging.getLogger("nucliadb.middleware")
-
-_learning_forwarded_headers: ContextVar[dict[str, str] | None] = ContextVar(
-    "learning_forwarded_headers", default=None
-)
-
-
-def get_learning_forwarded_headers() -> dict[str, str]:
-    """Headers from the incoming request to propagate to downstream learning services."""
-    return dict(_learning_forwarded_headers.get() or {})
-
-
-class LearningForwardedHeadersMiddleware:
-    """Pure ASGI middleware storing the incoming `LEARNING_FORWARDED_HEADERS` in a context var.
-
-    These are propagated to learning services for security purposes, e.g. `x-kb-visibility`
-    lets them know whether the KB is public or private (to disable modifying the system
-    prompt for public KBs) and `x-allow-access-external-models` whether the KB is allowed
-    to use external models.
-    """
-
-    def __init__(self, app: ASGIApp):
-        self.app = app
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        headers: dict[str, str] = {}
-        for raw_name, raw_value in scope.get("headers", []):
-            name = raw_name.decode("latin-1").lower()
-            if name in LEARNING_FORWARDED_HEADERS:
-                headers[name] = raw_value.decode("latin-1")
-
-        token = _learning_forwarded_headers.set(headers)
-        try:
-            await self.app(scope, receive, send)
-        finally:
-            _learning_forwarded_headers.reset(token)
 
 
 class ProcessTimeHeaderMiddleware(BaseHTTPMiddleware):

@@ -23,68 +23,15 @@ import time
 import pytest
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
-from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from nucliadb.middleware import (
     EventCounter,
-    LearningForwardedHeadersMiddleware,
     ProcessTimeHeaderMiddleware,
     UUIDPathParamsValidationMiddleware,
-    get_learning_forwarded_headers,
 )
-
-
-class TestCaseLearningForwardedHeadersMiddleware:
-    @pytest.fixture(scope="class")
-    def app(self):
-        def foo(request):
-            return JSONResponse(get_learning_forwarded_headers())
-
-        app = Starlette(
-            routes=[
-                Route("/foo/", foo),
-            ],
-            middleware=[
-                Middleware(LearningForwardedHeadersMiddleware),
-            ],
-        )
-        yield app
-
-    @pytest.fixture
-    def client(self, app):
-        return TestClient(app)
-
-    def test_headers_are_captured_and_forwarded(self, client):
-        response = client.get(
-            "/foo/",
-            headers={
-                "x-kb-visibility": "private",
-                "X-Allow-Access-External-Models": "true",
-                "x-other": "ignored",
-            },
-        )
-
-        assert response.json() == {
-            "x-kb-visibility": "private",
-            "x-allow-access-external-models": "true",
-        }
-
-    def test_only_present_headers_are_forwarded(self, client):
-        response = client.get("/foo/", headers={"x-allow-access-external-models": "false"})
-
-        assert response.json() == {"x-allow-access-external-models": "false"}
-
-    def test_missing_headers_yield_empty_headers(self, client):
-        response = client.get("/foo/")
-
-        assert response.json() == {}
-
-    def test_context_is_reset_after_request(self, client):
-        client.get("/foo/", headers={"x-kb-visibility": "public"})
-
-        assert get_learning_forwarded_headers() == {}
 
 
 class TestCaseProcessTimeHeaderMiddleware:
