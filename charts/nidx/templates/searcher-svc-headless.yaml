@@ -1,0 +1,33 @@
+{{- if .Values.searcher.headlessService.enabled }}
+# Headless Service so a service mesh (e.g. Istio) knows the searcher pod IPs and can
+# apply mTLS to searcher-to-searcher traffic on podIP:10001 (shard partitioning
+# "kubernetes"). Nothing resolves this name. appProtocol must stay tcp: Istio only builds
+# per-pod-IP listeners for TCP headless ports; HTTP/gRPC ones only match by hostname.
+kind: Service
+apiVersion: v1
+metadata:
+  name: nidx-searcher-headless
+  labels:
+    version: "{{ .Chart.Version | replace "+" "_" }}"
+    chart: "{{ .Chart.Name }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+  {{- with .Values.searcher.headlessService.labels }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.searcher.headlessService.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    app: nidx-searcher
+  ports:
+    - name: tcp-nidx-searcher
+      port: 10001
+      targetPort: 10001
+      protocol: TCP
+      appProtocol: tcp
+{{- end }}

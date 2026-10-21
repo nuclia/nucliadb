@@ -213,3 +213,12 @@ searcher:
     labels: {}
     # -- Annotations for the searcher service
     annotations: {}
+  headlessService:
+    # -- Create a headless Service for the searchers. Only useful with a service mesh and
+    # SEARCHER__SHARD_PARTITIONING__METHOD=kubernetes: it gives the mesh the searcher pod
+    # IPs so searcher-to-searcher traffic gets mTLS.
+    enabled: false
+    # -- Additional labels for the headless searcher service
+    labels: {}
+    # -- Annotations for the headless searcher service
+    annotations: {}
