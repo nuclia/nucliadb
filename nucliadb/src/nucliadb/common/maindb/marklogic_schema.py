@@ -28,6 +28,7 @@ from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
 from nucliadb.common.marklogic.admin_client import AdminClient
 
 STRING_COLLATION = "http://marklogic.com/collation/codepoint"
+SCHEMAS_DATABASE = "Schemas"
 
 DATABASE_PROPERTIES = {
     "collection-lexicon": True,
@@ -53,7 +54,17 @@ KB_PATH_INDEXES = (
     MarkLogicIndexPaths.SHARD,
     MarkLogicIndexPaths.SLUG,
     MarkLogicIndexPaths.TITLE,
+    MarkLogicIndexPaths.FACETS,
+    MarkLogicIndexPaths.RESOURCE_FACETS,
+    MarkLogicIndexPaths.ACCESS_GROUPS,
 )
+
+# Expands fuzzy keyword patterns into indexed words, so fuzzy matches get BM25 scores
+KB_WORD_LEXICON_PROPERTIES = ("text",)
+
+
+def _word_lexicon(prop: str) -> dict:
+    return {"namespace-uri": "", "localname": prop, "collation": STRING_COLLATION}
 
 
 def _path_index(path: str) -> dict:
@@ -78,7 +89,12 @@ async def _ensure_forest(client: AdminClient, database: str) -> None:
     await client.create_forest(forest_name, host=host, database=database)
 
 
-async def _reconcile_properties(client: AdminClient, database: str, path_indexes: Sequence[str]) -> None:
+async def _reconcile_properties(
+    client: AdminClient,
+    database: str,
+    path_indexes: Sequence[str],
+    word_lexicon_properties: Sequence[str],
+) -> None:
     properties = await client.get_database_properties(database)
     changed: dict = {key: value for key, value in DATABASE_PROPERTIES.items() if not properties.get(key)}
     existing = properties.get("range-path-index", [])
@@ -89,23 +105,40 @@ async def _reconcile_properties(client: AdminClient, database: str, path_indexes
     ]
     if missing:
         changed["range-path-index"] = [*existing, *(_path_index(path) for path in missing)]
+    existing_lexicons = properties.get("element-word-lexicon", [])
+    missing_lexicons = [
+        prop
+        for prop in word_lexicon_properties
+        if not any(item.get("localname") == prop for item in existing_lexicons)
+    ]
+    if missing_lexicons:
+        changed["element-word-lexicon"] = [
+            *existing_lexicons,
+            *(_word_lexicon(prop) for prop in missing_lexicons),
+        ]
     if not changed:
         return
     await client.update_database_properties(database, changed)
 
 
-async def ensure_database(client: AdminClient, database: str, path_indexes: Sequence[str]) -> None:
+async def ensure_database(
+    client: AdminClient,
+    database: str,
+    path_indexes: Sequence[str],
+    word_lexicon_properties: Sequence[str] = (),
+) -> None:
     """Create the database with its forest and indexes, or reconcile an existing one."""
     if await client.get_database(database) is None:
         await client.create_database(
             {
                 "database-name": database,
-                "schema-database": "Schemas",
+                "schema-database": SCHEMAS_DATABASE,
                 "triggers-database": "Triggers",
                 **DATABASE_PROPERTIES,
                 "range-path-index": [_path_index(path) for path in path_indexes],
+                "element-word-lexicon": [_word_lexicon(prop) for prop in word_lexicon_properties],
             }
         )
     else:
-        await _reconcile_properties(client, database, path_indexes)
+        await _reconcile_properties(client, database, path_indexes, word_lexicon_properties)
     await _ensure_forest(client, database)

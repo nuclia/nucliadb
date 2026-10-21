@@ -523,6 +523,9 @@ async def test_resource_relabeling_filters_existing_field_chunks(
             assert processed_fields[MarkLogicURIs.field_processed(resource_id, field_id, "t")][
                 "facets"
             ] == ["/l/field-category/field-label"]
+            assert processed_fields[MarkLogicURIs.field_processed(resource_id, field_id, "t")][
+                "resource_facets"
+            ] == ["/l/category/Y"]
             assert chunks[MarkLogicURIs.chunk(resource_id, "t", field_id, paragraph_id)]["facets"] == [
                 "/k/text"
             ]
@@ -621,6 +624,8 @@ async def test_writer_persists_resource_and_fields(maindb_driver: MarkLogicDrive
                     "field_type": "a",
                     "extracted_text": "Resource and field metadata persisted through the processor",
                     "facets": [],
+                    "resource_facets": ["/l/topic/first"],
+                    "security": {"access_groups": ["team"]},
                 },
                 MarkLogicURIs.field_processed(resource_id, "title", "a"): {
                     "resource_id": resource_id,
@@ -628,6 +633,8 @@ async def test_writer_persists_resource_and_fields(maindb_driver: MarkLogicDrive
                     "field_type": "a",
                     "extracted_text": "MarkLogic integration resource",
                     "facets": [],
+                    "resource_facets": ["/l/topic/first"],
+                    "security": {"access_groups": ["team"]},
                 },
             }
 
@@ -686,6 +693,9 @@ async def test_writer_persists_resource_and_fields(maindb_driver: MarkLogicDrive
                 ]
                 == "Resource and field metadata persisted through the processor"
             )
+            for processed_field in processed_fields.values():
+                assert processed_field["resource_facets"] == ["/l/topic/second"]
+                assert processed_field["security"] == {"access_groups": ["team"]}
 
             chunks = await read_resource_documents(
                 txn,

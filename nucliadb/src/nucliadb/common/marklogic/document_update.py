@@ -89,16 +89,29 @@ class DocumentUpdate:
         return content
 
     def to_optic(self) -> str:
-        patches = ""
-        for name in sorted(self._removed):
-            path = json.dumps(f'node("{name}")')
-            patches += f".remove({path})"
-        for name, value in self._set.items():
-            path = json.dumps(f'node("{name}")')
-            patches += f".remove({path}).insertNamedChild('.', {json.dumps(name)}, {json.dumps(value)})"
-        return (
-            f"op.fromLiterals([{{uri: {json.dumps(self.uri)}}}])"
-            ".joinDoc(op.col('doc'), op.col('uri'))"
-            f".patch(op.col('doc'), op.patchBuilder('/'){patches})"
-            ".write().select(['uri'])"
+        return _patch_plan(
+            f"op.fromLiterals([{{uri: {json.dumps(self.uri)}}}])", self._removed, self._set
         )
+
+
+def patch_matching_optic(query: str, values: dict[str, Any]) -> str:
+    """Optic plan replacing top-level properties of every document matching the cts `query`."""
+    for name in values:
+        DocumentUpdate._validate(name)
+    return _patch_plan(f"op.fromDocUris({query})", builtins.set(), values)
+
+
+def _patch_plan(source: str, removed: builtins.set[str], values: dict[str, Any]) -> str:
+    patches = ""
+    for name in sorted(removed):
+        path = json.dumps(f'node("{name}")')
+        patches += f".remove({path})"
+    for name, value in values.items():
+        path = json.dumps(f'node("{name}")')
+        patches += f".remove({path}).insertNamedChild('.', {json.dumps(name)}, {json.dumps(value)})"
+    return (
+        f"{source}"
+        ".joinDoc(op.col('doc'), op.col('uri'))"
+        f".patch(op.col('doc'), op.patchBuilder('/'){patches})"
+        ".write().select(['uri'])"
+    )

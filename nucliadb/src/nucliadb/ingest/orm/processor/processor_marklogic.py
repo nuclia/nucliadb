@@ -104,15 +104,13 @@ class ProcessorMarkLogic:
         self, txn: Transaction, kbid: knowledgebox_pb2.KnowledgeBoxID
     ) -> KnowledgeBox | None:
         uuid: str | None = kbid.uuid
-        if uuid == "":
+        if uuid:
+            if not await datamanagers.atomic.kb.exists(kbid=uuid):
+                return None
+        else:
             uuid = await datamanagers.kb.get_kbid(txn, slug=kbid.slug)
-
-        if uuid is None:
+        if not uuid:
             return None
-
-        if not (await datamanagers.kb.exists(txn, kbid=uuid)):
-            return None
-
         storage = await get_storage()
         kbobj = KnowledgeBox(txn, storage, uuid)
         return kbobj
@@ -431,7 +429,13 @@ class ProcessorMarkLogic:
 
         # Now store all the processed contents to Marklogic (embeddings, chunks, etc)
         im = await self.generate_index_message(txn, uuid, bm, is_new_resource=is_new_resource)
-        for fpc, chunks, embeddings in get_field_processed_contents(im):
+        processed_contents = list(get_field_processed_contents(im))
+        if processed_contents:
+            resource_copies = await datamanagers.resources.get_processed_field_copies(
+                txn, kbid=kbid, rid=uuid
+            )
+        for fpc, chunks, embeddings in processed_contents:
+            fpc = fpc.model_copy(update=resource_copies)
             if not is_new_resource:
                 full_field_id = f"{uuid}/{fpc.field_type}/{fpc.field_id}"
                 # Only replaced fields: conversation appends must keep their previous chunks/embeddings
@@ -761,49 +765,6 @@ def get_field_processed_contents(
                         )
                     )
         yield field, chunks, embeddings
-
-
-def get_bm_modified_fields(bm: writer_pb2.BrokerMessage) -> list[writer_pb2.FieldID]:
-    modified = set()
-    # Added or modified fields need indexing
-    for link in bm.links:
-        modified.add((link, writer_pb2.FieldType.LINK))
-    for file in bm.files:
-        modified.add((file, writer_pb2.FieldType.FILE))
-    for conv in bm.conversations:
-        modified.add((conv, writer_pb2.FieldType.CONVERSATION))
-    for text in bm.texts:
-        modified.add((text, writer_pb2.FieldType.TEXT))
-    for kv in bm.key_value_fields:
-        modified.add((kv, writer_pb2.FieldType.KEY_VALUE))
-    if bm.HasField("basic"):
-        # Add title and summary only if they have changed
-        if bm.basic.title != "":
-            modified.add(("title", writer_pb2.FieldType.GENERIC))
-        if bm.basic.summary != "":
-            modified.add(("summary", writer_pb2.FieldType.GENERIC))
-
-    # Deleted splits also need reindexing of the field
-    for ds in bm.delete_splits:
-        modified.add((ds.field.field, ds.field.field_type))
-
-    if bm.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
-        # Messages with field metadata, extracted text or field vectors need indexing
-        for fm in bm.field_metadata:
-            modified.add((fm.field.field, fm.field.field_type))
-        for et in bm.extracted_text:
-            modified.add((et.field.field, et.field.field_type))
-        for fv in bm.field_vectors:
-            modified.add((fv.field.field, fv.field.field_type))
-
-    if bm.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
-        # Any field that has fieldmetadata annotations should be considered as modified
-        # and needs to be reindexed
-        if bm.HasField("basic"):
-            for ufm in bm.basic.fieldmetadata:
-                modified.add((ufm.field.field, ufm.field.field_type))
-
-    return [writer_pb2.FieldID(field=field, field_type=field_type) for field, field_type in modified]
 
 
 class IndexMessageBuilderV2(IndexMessageBuilder):

@@ -89,6 +89,9 @@ CHILD_COLLECTIONS = (
     MarkLogicCollections.EMBEDDINGS,
 )
 
+# Resource properties copied to its processed fields, so search prefilters only query processed fields
+PROCESSED_FIELD_COPIES = {"facets": "resource_facets", "security": "security"}
+
 
 class ResourceContent(BaseModel):
     slug: str
@@ -229,6 +232,38 @@ async def _set(
     update = DocumentUpdate(uri=MarkLogicURIs.resource(rid), collection=MarkLogicCollections.RESOURCES)
     update.set(**{column: value for column, value in values.items() if value is not UNSET})
     await documents.update_document(marklogic_txn, update)
+    await _sync_processed_fields(marklogic_txn, rid, update.changes)
+
+
+async def _sync_processed_fields(
+    txn: MarkLogicTransaction, rid: str, resource_changes: dict[str, Any]
+) -> None:
+    copies = {
+        copy: resource_changes[name]
+        for name, copy in PROCESSED_FIELD_COPIES.items()
+        if name in resource_changes
+    }
+    if not copies:
+        return
+    query = (
+        f"cts.andQuery([cts.collectionQuery({json.dumps(MarkLogicCollections.FIELDS_PROCESSED)}), "
+        f"cts.directoryQuery({json.dumps(MarkLogicURIs.fields_directory(rid))}, 'infinity')])"
+    )
+    await documents.update_matching(txn, query, copies)
+
+
+@observer.wrap({"type": "resources", "op": "get_processed_field_copies"})
+async def get_processed_field_copies(txn: Transaction, *, kbid: str, rid: str) -> dict[str, Any]:
+    """Resource properties to store in its processed field documents."""
+    _, marklogic_txn = _driver_txn(txn, kbid=kbid)
+    content = await documents.read_properties(
+        marklogic_txn, MarkLogicURIs.resource(rid), list(PROCESSED_FIELD_COPIES)
+    )
+    content = content or {}
+    return {
+        "resource_facets": content.get("facets") or [],
+        "security": content.get("security"),
+    }
 
 
 @observer.wrap({"type": "resources", "op": "set_slug"})
@@ -360,7 +395,9 @@ async def update_resource(
     _, marklogic_txn = _driver_txn(txn, kbid=kbid, ensure_writes=True)
     update = DocumentUpdate(uri=MarkLogicURIs.resource(rid), collection=MarkLogicCollections.RESOURCES)
     update.set(**data.model_dump(mode="json", exclude_unset=True))
-    return await documents.update_document(marklogic_txn, update)
+    updated = await documents.update_document(marklogic_txn, update)
+    await _sync_processed_fields(marklogic_txn, rid, update.changes)
+    return updated
 
 
 @observer.wrap({"type": "resources", "op": "delete_resource"})

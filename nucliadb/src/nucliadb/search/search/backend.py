@@ -19,11 +19,14 @@
 #
 
 import json
+from typing import Any, NamedTuple
 
 from google.protobuf.json_format import ParseDict
 from nidx_protos.nodereader_pb2 import (
     DocumentScored,
     DocumentVectorIdentifier,
+    FilterExpression,
+    FilterOperator,
     GraphSearchRequest,
     GraphSearchResponse,
     ParagraphResult,
@@ -35,184 +38,270 @@ from nidx_protos.nodereader_pb2 import (
 
 from nucliadb.common.ids import ParagraphId
 from nucliadb.common.maindb.collections import MarkLogicCollections
+from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
 from nucliadb.common.maindb.marklogic import MarkLogicDriver
+from nucliadb.common.maindb.marklogic_schema import STRING_COLLATION
 from nucliadb.common.maindb.utils import get_driver
-from nucliadb.common.marklogic import documents
+from nucliadb.common.marklogic import documents, vector_views
+from nucliadb.common.marklogic.uris import MarkLogicURIs
 from nucliadb.search.search.keyword_terms import keyword_terms
+from nucliadb.search.search.metrics import semantic_search_mode
 
+# Below this many candidate embeddings, an exact scan is cheaper and more precise than ANN
+EXACT_VECTOR_SEARCH_MAX_CANDIDATES = 1000
+ANN_OVERSAMPLING = 4
 
-def _filter_expression_data(expression):
-    kind = expression.WhichOneof("expr")
-    if kind == "bool_and":
-        return {"and": [_filter_expression_data(item) for item in expression.bool_and.operands]}
-    if kind == "bool_or":
-        return {"or": [_filter_expression_data(item) for item in expression.bool_or.operands]}
-    if kind == "bool_not":
-        return {"not": _filter_expression_data(expression.bool_not)}
-    if kind == "resource":
-        return {"resource": expression.resource.resource_id}
-    if kind == "field":
-        field = {"field_type": expression.field.field_type}
-        if expression.field.HasField("field_id"):
-            field["field_id"] = expression.field.field_id
-        return {"field": field}
-    if kind == "facet":
-        return {"facet": expression.facet.facet}
-    if kind == "keyword":
-        return {"keyword": expression.keyword.keyword}
-    if kind == "resource_field_prefix":
-        prefix = expression.resource_field_prefix
-        return {
-            "resource_field_prefix": {
-                "resource_id": prefix.resource_id,
-                "field_type": prefix.field_type,
-                "field_id_prefix": prefix.field_id_prefix,
-            }
+_WORD_OPTIONS = "['case-insensitive', 'unstemmed', 'unwildcarded']"
+# Results come sorted by descending score, which the min score cut relies on
+_BM25_OPTIONS = ["score-bm25", "bm25-length-weight=0.5"]
+# Same boost as nidx gives to its fuzzy fallback query
+FUZZY_SCORE_BOOST = 0.5
+
+_CONSTANTS_JS = (
+    "const COLLECTIONS = "
+    + json.dumps(
+        {
+            "resources": MarkLogicCollections.RESOURCES,
+            "fieldsProcessed": MarkLogicCollections.FIELDS_PROCESSED,
+            "chunks": MarkLogicCollections.CHUNKS,
+            "embeddings": MarkLogicCollections.EMBEDDINGS,
         }
-    raise ValueError(f"Unsupported filter expression type: {kind}")
+    )
+    + "; const PATHS = "
+    + json.dumps(
+        {
+            "facets": MarkLogicIndexPaths.FACETS,
+            "resourceFacets": MarkLogicIndexPaths.RESOURCE_FACETS,
+            "accessGroups": MarkLogicIndexPaths.ACCESS_GROUPS,
+        }
+    )
+    + "; const VECTOR_SCHEMA = "
+    + json.dumps(vector_views.SCHEMA_NAME)
+    + ";"
+)
+
+# Field ids never contain '/', so directory URIs select resources and fields exactly via the URI index
+_HELPERS_JS = r"""
+let semanticMode = null;
+function dirsQuery(dirs) { return dirs.length ? cts.directoryQuery(dirs, 'infinity') : cts.falseQuery(); }
+function matchingUris(query, filtered) {
+  if (!filtered) return cts.uris('', [], query).toArray().map(String);
+  const uris = [];
+  for (const doc of cts.search(query, ['filtered', 'score-zero'])) uris.push(String(xdmp.nodeUri(doc)));
+  return uris;
+}
+function facetQuery(facet) { return cts.pathRangeQuery(PATHS.facets, '=', facet); }
+// Processed fields hold a copy of their resource facets
+function fieldFacetQuery(facet) {
+  return cts.orQuery([facetQuery(facet), cts.pathRangeQuery(PATHS.resourceFacets, '=', facet)]);
+}
+function fieldPrefixQuery(base, prefix) {
+  const start = base + prefix;
+  const uris = cts.uriMatch(start + '*/processed.json').toArray().map(String).filter(uri => uri.startsWith(start));
+  return dirsQuery(uris.map(uri => uri.replace(/processed\.json$/, '')));
+}
+// Documents restricted to access groups, none of them in `groups`
+function deniedQuery(groups) {
+  const restricted = cts.pathRangeQuery(PATHS.accessGroups, '>', '');
+  if (!groups.length) return restricted;
+  return cts.andQuery([restricted, cts.notQuery(cts.pathRangeQuery(PATHS.accessGroups, '=', groups))]);
+}
+function deniedResources(groups) {
+  const query = cts.andQuery([cts.collectionQuery(COLLECTIONS.resources), deniedQuery(groups)]);
+  return cts.uris('', [], query).toArray().map(uri => String(uri).replace(/\.json$/, '/'));
+}
+function fieldDir(root) { return '/resources/' + root.resource_id + '/fields/' + root.field_type + '/' + root.field_id + '/'; }
+function chunkKey(uri) {
+  const match = /^(\/resources\/[^\/]+\/fields\/[^\/]+\/[^\/]+\/)chunks\/(.+)\/data\.json$/.exec(uri);
+  return match ? match[1] + match[2] : null;
+}
+function embeddingKey(root) {
+  // Vector ids are rid/field_type/field_id/[split/]index/start-end
+  const parts = String(root.chunk_id).split('/');
+  const split = parts.length === 6 ? parts[3] + '/' : '';
+  const position = root.data && root.data.position;
+  return position ? fieldDir(root) + split + position.start + '-' + position.end : null;
+}
+function semanticSearch(search) {
+  semanticMode = 'exact';
+  if (!search.limit) return [];
+  const similarity = root => 1 - vec.cosineDistance(vec.vector(root.vector), search.queryVector);
+  const keep = (scored, root) => {
+    if (search.accept !== null && !search.accept(root)) return;
+    const score = similarity(root);
+    if (score >= search.minScore) scored.push({score, root});
+  };
+  function exact() {
+    const scored = [];
+    for (const doc of cts.search(search.scope, ['unfiltered', 'score-zero'])) {
+      const root = doc.root.toObject();
+      if (root.model_id === search.model) keep(scored, root);
+    }
+    return scored;
+  }
+  // Optic filters only apply after the ANN candidates are chosen, so they are oversampled
+  function ann(k) {
+    const op = require('/MarkLogic/optic');
+    const rows = op.fromView(VECTOR_SCHEMA, search.view, '', op.fragmentIdCol('fid'))
+      .annTopK(k, op.col('vector'), search.queryVector, op.col('distance'), {maxDistance: 1 - search.minScore})
+      .joinDocUri(op.col('uri'), op.fragmentIdCol('fid'))
+      .select(['uri', 'model_id']).result().toArray();
+    const uris = rows.filter(row => row.model_id === search.model).map(row => String(row.uri));
+    const allowed = uris.length
+      ? new Set(cts.uris('', [], cts.andQuery([search.scope, cts.documentQuery(uris)])).toArray().map(String))
+      : new Set();
+    const scored = [];
+    for (const uri of uris) if (allowed.has(uri)) keep(scored, cts.doc(uri).toObject());
+    return {scored, saturated: rows.length >= k};
+  }
+  let scored = null;
+  if (cts.estimate(search.scope) > search.exactMax) {
+    try {
+      const base = Math.max(search.limit * search.oversampling, 100);
+      for (const k of [base, base * 8]) {
+        const result = ann(k);
+        if (result.scored.length >= search.limit || !result.saturated) { scored = result.scored; semanticMode = 'ann'; break; }
+      }
+    } catch (error) {
+      // Views of dimensions never written, or still being reindexed
+      if (!/SQL-TABLE(NOTFOUND|REINDEXING)/.test(String(error.name) + String(error.message))) throw error;
+    }
+  }
+  if (scored === null) scored = exact();
+  scored.sort((left, right) => right.score - left.score);
+  return scored.slice(0, search.limit).map(({score, root}) =>
+    ({score, content: {chunk_id: root.chunk_id, facets: root.facets, data: root.data}}));
+}
+"""
 
 
-def _paragraph_filter_query(expression) -> str:
+class _CtsQuery(NamedTuple):
+    js: str
+    # Universal index resolution may be inexact (e.g. phrases), so documents must be filtered
+    filtered: bool
+
+
+def _value_query(prop: str, value: str) -> str:
+    return f"cts.jsonPropertyValueQuery({json.dumps(prop)}, {json.dumps(value)}, ['exact'])"
+
+
+def _word_query(prop: str, value: str) -> str:
+    return f"cts.jsonPropertyWordQuery({json.dumps(prop)}, {json.dumps(value)}, {_WORD_OPTIONS})"
+
+
+def _expression_query(expression: FilterExpression, *, field_level: bool) -> _CtsQuery:
+    """Field level expressions run on processed fields, paragraph level ones on chunks."""
     kind = expression.WhichOneof("expr")
     if kind in ("bool_and", "bool_or"):
-        operands = [_paragraph_filter_query(item) for item in getattr(expression, kind).operands]
-        operation = "andQuery" if kind == "bool_and" else "orQuery"
-        return f"cts.{operation}([{', '.join(operands)}])"
-    if kind == "bool_not":
-        return f"cts.notQuery({_paragraph_filter_query(expression.bool_not)})"
-    if kind == "facet":
-        return f"cts.jsonPropertyValueQuery('facets', {json.dumps(expression.facet.facet)})"
-    if kind == "keyword":
-        return (
-            f"cts.jsonPropertyWordQuery('text', {json.dumps(expression.keyword.keyword)}, "
-            "['case-insensitive', 'unstemmed', 'unwildcarded'])"
-        )
-    if kind == "resource":
-        return (
-            f"cts.jsonPropertyValueQuery('resource_id', {json.dumps(expression.resource.resource_id)})"
-        )
-    if kind == "field":
-        predicates = [
-            f"cts.jsonPropertyValueQuery('field_type', {json.dumps(expression.field.field_type)})"
+        operands = [
+            _expression_query(item, field_level=field_level)
+            for item in getattr(expression, kind).operands
         ]
+        operation = "andQuery" if kind == "bool_and" else "orQuery"
+        return _CtsQuery(
+            f"cts.{operation}([{', '.join(item.js for item in operands)}])",
+            any(item.filtered for item in operands),
+        )
+    if kind == "bool_not":
+        inner = _expression_query(expression.bool_not, field_level=field_level)
+        return _CtsQuery(f"cts.notQuery({inner.js})", inner.filtered)
+    if kind == "resource":
+        directory = MarkLogicURIs.resource_directory(expression.resource.resource_id)
+        return _CtsQuery(f"cts.directoryQuery({json.dumps(directory)}, 'infinity')", False)
+    if kind == "field":
+        predicates = [_value_query("field_type", expression.field.field_type)]
         if expression.field.HasField("field_id"):
-            predicates.append(
-                f"cts.jsonPropertyValueQuery('field_id', {json.dumps(expression.field.field_id)})"
-            )
-        return f"cts.andQuery([{', '.join(predicates)}])"
+            predicates.append(_value_query("field_id", expression.field.field_id))
+        return _CtsQuery(f"cts.andQuery([{', '.join(predicates)}])", False)
     if kind == "resource_field_prefix":
         prefix = expression.resource_field_prefix
-        field_prefix = (
-            prefix.field_id_prefix.replace("\\", "\\\\").replace("*", "\\*").replace("?", "\\?")
+        base = f"{MarkLogicURIs.fields_directory(prefix.resource_id)}{prefix.field_type}/"
+        return _CtsQuery(
+            f"fieldPrefixQuery({json.dumps(base)}, {json.dumps(prefix.field_id_prefix)})", False
         )
-        return (
-            "cts.andQuery(["
-            f"cts.jsonPropertyValueQuery('resource_id', {json.dumps(prefix.resource_id)}), "
-            f"cts.jsonPropertyValueQuery('field_type', {json.dumps(prefix.field_type)}), "
-            f"cts.jsonPropertyValueQuery('field_id', {json.dumps(field_prefix + '*')}, ['wildcarded'])])"
-        )
+    if kind == "facet":
+        facet = json.dumps(expression.facet.facet)
+        return _CtsQuery(f"{'fieldFacetQuery' if field_level else 'facetQuery'}({facet})", False)
+    if kind == "keyword":
+        prop = "extracted_text" if field_level else "text"
+        return _CtsQuery(_word_query(prop, expression.keyword.keyword), True)
     raise ValueError(f"Unsupported filter expression type: {kind}")
 
 
-def _filter_context(query: SearchRequest) -> str:
-    field_expression = (
-        _filter_expression_data(query.field_filter) if query.HasField("field_filter") else None
-    )
-    paragraph_expression = (
-        _filter_expression_data(query.paragraph_filter) if query.HasField("paragraph_filter") else None
-    )
-    security_groups = list(query.security.access_groups) if query.HasField("security") else None
-    setup = [
-        f"const fieldExpression = {json.dumps(field_expression)};",
-        f"const paragraphExpression = {json.dumps(paragraph_expression)};",
-        f"const securityGroups = {json.dumps(security_groups)};",
-        f"const filterOperator = {json.dumps(query.filter_operator)};",
-        "const resourcesById = new Map();",
-        "if (fieldExpression || securityGroups !== null) {",
-        f"  for (const doc of cts.search(cts.collectionQuery({json.dumps(MarkLogicCollections.RESOURCES)})).toArray()) {{",
-        "    const resource = JSON.parse(xdmp.toJsonString(doc.root));",
-        "    const resourceId = xdmp.nodeUri(doc).split('/').pop().replace('.json', '');",
-        "    resourcesById.set(resourceId, resource);",
-        "  }",
-        "}",
-        "function securityMatches(target) {",
-        "  if (securityGroups === null) return true;",
-        "  const resource = resourcesById.get(target.resource_id);",
-        "  const accessGroups = resource && resource.security && resource.security.access_groups || [];",
-        "  return accessGroups.length === 0 || accessGroups.some(group => securityGroups.includes(group));",
-        "}",
-        "function matchesExpression(expression, target, resource, isField) {",
-        "  if (!expression) return true;",
-        "  if (expression.and) return expression.and.every(item => matchesExpression(item, target, resource, isField));",
-        "  if (expression.or) return expression.or.some(item => matchesExpression(item, target, resource, isField));",
-        "  if (expression.not) return !matchesExpression(expression.not, target, resource, isField);",
-        "  if (expression.resource !== undefined) return String(target.resource_id) === expression.resource;",
-        "  if (expression.field) return String(target.field_type) === expression.field.field_type && (expression.field.field_id === undefined || String(target.field_id) === expression.field.field_id);",
-        "  if (expression.facet !== undefined) return (target.facets || []).includes(expression.facet) || (isField && ((resource && resource.facets) || []).includes(expression.facet));",
-        "  if (expression.keyword !== undefined) return cts.contains(xdmp.toJSON({text: target.extracted_text || target.text || ''}), cts.jsonPropertyWordQuery('text', expression.keyword, ['case-insensitive', 'unstemmed', 'unwildcarded']));",
-        "  if (expression.resource_field_prefix) return String(target.resource_id) === expression.resource_field_prefix.resource_id && String(target.field_type) === expression.resource_field_prefix.field_type && String(target.field_id).startsWith(expression.resource_field_prefix.field_id_prefix);",
-        "  return false;",
-        "}",
-        "const matchingFields = new Set();",
-        "const matchingFieldDirectories = [];",
-        "if (fieldExpression) {",
-        f"  for (const doc of cts.search(cts.collectionQuery({json.dumps(MarkLogicCollections.FIELDS_PROCESSED)})).toArray()) {{",
-        "    const field = JSON.parse(xdmp.toJsonString(doc.root));",
-        "    const resource = resourcesById.get(field.resource_id);",
-        "    if (matchesExpression(fieldExpression, field, resource, true)) {",
-        "      matchingFields.add(field.resource_id + '\\u001f' + field.field_type + '\\u001f' + field.field_id);",
-        "      matchingFieldDirectories.push('/resources/' + field.resource_id + '/fields/' + field.field_type + '/' + field.field_id + '/');",
-        "    }",
-        "  }",
-        "}",
-        "const fieldMatches = target => !fieldExpression || matchingFields.has(target.resource_id + '\\u001f' + target.field_type + '\\u001f' + target.field_id);",
-        "const paragraphMatches = target => !paragraphExpression || matchesExpression(paragraphExpression, target, resourcesById.get(target.resource_id), false);",
-        "function passesFilters(target, paragraph) {",
-        "  if (!securityMatches(target)) return false;",
-        "  const fieldMatch = fieldMatches(target);",
-        "  const paragraphMatch = !paragraphExpression || (paragraph && paragraphMatches(paragraph));",
-        "  if (fieldExpression && paragraphExpression) return filterOperator === 1 ? fieldMatch || paragraphMatch : fieldMatch && paragraphMatch;",
-        "  return fieldExpression ? fieldMatch : paragraphMatch;",
-        "}",
+def _prefilter_javascript(
+    field_filter: FilterExpression | None,
+    security_groups: list[str] | None,
+    *,
+    paragraph_or: bool = False,
+) -> str:
+    """Defines `fieldDirs`: null when every allowed field matches, otherwise the directories of the
+    matching fields. Also `securityQuery`, the security restriction not already in `fieldDirs`."""
+    lines = [
+        f"const groups = {json.dumps(security_groups)};",
+        "const fieldSecurityQuery = groups === null ? cts.trueQuery() : cts.notQuery(deniedQuery(groups));",
     ]
-    paragraph_query = (
-        _paragraph_filter_query(query.paragraph_filter) if paragraph_expression else "cts.trueQuery()"
+    if field_filter is None:
+        lines.append("const fieldDirs = null;")
+    else:
+        query = _expression_query(field_filter, field_level=True)
+        lines.append(
+            "const fieldDirs = (() => { "
+            "const scope = cts.andQuery([cts.collectionQuery(COLLECTIONS.fieldsProcessed), fieldSecurityQuery]); "
+            f"const uris = matchingUris(cts.andQuery([scope, {query.js}]), {json.dumps(query.filtered)}); "
+            "if (uris.length && uris.length >= cts.estimate(scope)) return null; "
+            "return uris.map(uri => uri.replace(/processed\\.json$/, '')); "
+            "})();"
+        )
+    # Matching field directories already exclude the denied fields, unless they are not applied
+    lines.append(
+        f"const denied = groups !== null && (fieldDirs === null || {json.dumps(paragraph_or)}) "
+        "? deniedResources(groups) : [];"
     )
-    setup.extend(
+    lines.append(
+        "const securityQuery = denied.length ? "
+        "cts.notQuery(cts.directoryQuery(denied, 'infinity')) : cts.trueQuery();"
+    )
+    return " ".join(lines)
+
+
+def _search_javascript(query: SearchRequest, *, lexical: bool, semantic: bool) -> str:
+    field_filter = query.field_filter if query.HasField("field_filter") else None
+    paragraph_filter = query.paragraph_filter if query.HasField("paragraph_filter") else None
+    security_groups = list(query.security.access_groups) if query.HasField("security") else None
+    paragraph_or = (
+        field_filter is not None
+        and paragraph_filter is not None
+        and query.filter_operator == FilterOperator.OR
+    )
+    paragraph_query = (
+        _expression_query(paragraph_filter, field_level=False) if paragraph_filter is not None else None
+    )
+    chunks = _chunk_results_expression(query) if lexical else "[]"
+    embeddings = (
+        _vector_results_expression(query, paragraph_query is not None and paragraph_query.filtered)
+        if semantic
+        else "[]"
+    )
+    return " ".join(
         [
-            "const fieldCandidateQuery = !fieldExpression ? cts.trueQuery() : "
-            "matchingFieldDirectories.length ? cts.directoryQuery(matchingFieldDirectories, 'infinity') : cts.falseQuery();",
-            f"const paragraphCandidateQuery = {paragraph_query};",
-            "const combinedCandidateQuery = fieldExpression && paragraphExpression ? "
-            "(filterOperator === 1 ? cts.orQuery([fieldCandidateQuery, paragraphCandidateQuery]) : "
-            "cts.andQuery([fieldCandidateQuery, paragraphCandidateQuery])) : "
-            "fieldExpression ? fieldCandidateQuery : paragraphCandidateQuery;",
-            "const allowedResourceIds = [];",
-            "if (securityGroups !== null) resourcesById.forEach((resource, resourceId) => { "
-            "if (securityMatches({resource_id: resourceId})) allowedResourceIds.push(resourceId); });",
-            "const securityCandidateQuery = securityGroups === null ? cts.trueQuery() : "
-            "allowedResourceIds.length ? cts.jsonPropertyValueQuery('resource_id', allowedResourceIds) : cts.falseQuery();",
-            "const candidateQuery = cts.andQuery([securityCandidateQuery, combinedCandidateQuery]);",
-            "const vectorCandidateQuery = fieldExpression && paragraphExpression && filterOperator === 1 ? "
-            "securityCandidateQuery : cts.andQuery([securityCandidateQuery, fieldCandidateQuery]);",
+            "(() => {",
+            _CONSTANTS_JS,
+            _HELPERS_JS,
+            _prefilter_javascript(field_filter, security_groups, paragraph_or=paragraph_or),
+            f"const paragraphOr = {json.dumps(paragraph_or)};",
+            "if (fieldDirs !== null && !fieldDirs.length && !paragraphOr) return {chunks: [], embeddings: []};",
+            f"const paragraphQuery = {paragraph_query.js if paragraph_query else 'null'};",
+            "const fieldQuery = fieldDirs === null ? null : dirsQuery(fieldDirs);",
+            "const filterQuery = paragraphQuery === null ? fieldQuery : "
+            "fieldQuery === null ? (paragraphOr ? null : paragraphQuery) : "
+            "paragraphOr ? cts.orQuery([fieldQuery, paragraphQuery]) : cts.andQuery([fieldQuery, paragraphQuery]);",
+            "const chunkScope = filterQuery === null ? securityQuery : cts.andQuery([securityQuery, filterQuery]);",
+            "const embeddingScope = !paragraphOr && fieldQuery !== null ? "
+            "cts.andQuery([securityQuery, fieldQuery]) : securityQuery;",
+            f"return {{chunks: {chunks}, embeddings: {embeddings}, semantic_mode: semanticMode}};",
+            "})()",
         ]
     )
-    if paragraph_expression:
-        setup.extend(
-            [
-                "const chunksByParagraph = new Map();",
-                f"for (const doc of cts.search(cts.collectionQuery({json.dumps(MarkLogicCollections.CHUNKS)})).toArray()) {{",
-                "  const chunk = JSON.parse(xdmp.toJsonString(doc.root));",
-                "  const position = chunk.data && chunk.data.position;",
-                "  if (position) chunksByParagraph.set(paragraphKey(chunk, position), chunk);",
-                "}",
-                "function paragraphKey(target, position) { return target.resource_id + '/' + target.field_type + '/' + target.field_id + '/' + position.start + '-' + position.end; }",
-                "function paragraphForEmbedding(embedding) { const position = embedding.data && embedding.data.position; return position ? chunksByParagraph.get(paragraphKey(embedding, position)) : null; }",
-            ]
-        )
-    else:
-        setup.append("function paragraphForEmbedding(embedding) { return embedding; }")
-    return " ".join(setup)
 
 
 async def hybrid_search(kbid: str, query: SearchRequest) -> SearchResponse:
@@ -221,15 +310,30 @@ async def hybrid_search(kbid: str, query: SearchRequest) -> SearchResponse:
         return SearchResponse()
 
     response = SearchResponse()
-    has_lexical_query = query.paragraph and bool(query.body)
-    has_vector_query = bool(query.vector)
-    if has_lexical_query and has_vector_query:
-        await _search_hybrid(driver, kbid, query, response)
-    elif has_lexical_query:
-        await _search_chunks(driver, kbid, query, response)
-    elif has_vector_query:
-        await _search_vectors(driver, kbid, query, response)
+    lexical = query.paragraph and bool(query.body)
+    semantic = bool(query.vector)
+    if not lexical and not semantic:
+        return response
+
+    javascript = _search_javascript(query, lexical=lexical, semantic=semantic)
+    async with driver.ro_transaction(kbid=kbid) as txn:
+        result = _eval_object(await documents.evaluate(txn, javascript))
+    if lexical:
+        _append_chunk_results(query, response, _flatten_eval_array(result.get("chunks", [])))
+    if semantic:
+        _append_vector_results(response, _flatten_eval_array(result.get("embeddings", [])))
+        if result.get("semantic_mode"):
+            semantic_search_mode.inc({"mode": result["semantic_mode"]})
     return response
+
+
+def _eval_object(value: Any) -> dict:
+    if isinstance(value, dict):
+        return value
+    value = _flatten_eval_array(value)
+    if len(value) == 1 and isinstance(value[0], dict):
+        return value[0]
+    return {}
 
 
 def _chunk_results_expression(query: SearchRequest) -> str:
@@ -249,41 +353,39 @@ def _chunk_results_expression(query: SearchRequest) -> str:
         variants.add(term + "?")
     return (
         "(() => { "
-        f"const exactQuery = cts.jsonPropertyWordQuery('text', {json.dumps(exact_terms)}, ['case-insensitive', 'unstemmed', 'unwildcarded']); "
         f"const limit = {limit}; "
-        "function search(textQuery, fuzzy) { const results = []; "
-        "if (!limit) return results; "
-        "for (const doc of cts.search(cts.andQuery(["
-        f"cts.collectionQuery({json.dumps(MarkLogicCollections.CHUNKS)}), "
-        "candidateQuery, textQuery"
-        "]))) { "
-        "const content = JSON.parse(xdmp.toJsonString(doc.root)); "
-        "if (!passesFilters(content, content)) continue; "
-        "const score = Math.max(0, cts.score(doc)); "
-        "results.push({content: {chunk_id: content.chunk_id, facets: content.facets, "
-        "data: content.data}, fuzzy, score: (fuzzy ? 0 : 1) + score / (1 + score)}); "
+        f"const minScore = {json.dumps(query.min_score_bm25)}; "
+        "if (!limit) return []; "
+        "function run(textQuery, fuzzy, boost) { "
+        "const results = []; "
+        "const search = cts.search(cts.andQuery([cts.collectionQuery(COLLECTIONS.chunks), chunkScope, textQuery]), "
+        f"{json.dumps(_BM25_OPTIONS)}); "
+        "for (const doc of search) { "
+        "const score = cts.score(doc) * boost; "
+        "if (score < minScore) break; "
+        "const content = doc.root.toObject(); "
+        "results.push({content: {chunk_id: content.chunk_id, facets: content.facets, data: content.data}, fuzzy, score}); "
         "if (results.length >= limit) break; "
-        "} return results; } "
-        "const exactResults = search(exactQuery, false); "
-        "if (exactResults.length) return exactResults; "
-        f"const fuzzyQuery = cts.jsonPropertyWordQuery('text', {json.dumps(sorted(variants))}, ['case-insensitive', 'unstemmed', 'wildcarded']); "
-        "return search(fuzzyQuery, true); "
+        "} "
+        "return results; "
+        "} "
+        f"const exact = run(cts.jsonPropertyWordQuery('text', {json.dumps(exact_terms)}, {_WORD_OPTIONS}), false, 1); "
+        # Like nidx, fuzzy matching is only a fallback for unfiltered scores without keyword matches
+        f"const patterns = {json.dumps(sorted(variants))}; "
+        "if (exact.length || minScore !== 0 || !patterns.length) return exact; "
+        "let fuzzyQuery; "
+        "try { "
+        "const words = patterns.flatMap(pattern => cts.jsonPropertyWordMatch('text', pattern, "
+        f"{json.dumps(['case-insensitive', f'collation={STRING_COLLATION}'])}).toArray().map(String)); "
+        f"fuzzyQuery = words.length ? cts.jsonPropertyWordQuery('text', words, {_WORD_OPTIONS}) : null; "
+        "} catch (error) { "
+        # Without the word lexicon wildcards still match, but BM25 gives them no score
+        "if (!/LXCNNOTFOUND/.test(String(error.name) + String(error.message))) throw error; "
+        "fuzzyQuery = cts.jsonPropertyWordQuery('text', patterns, ['case-insensitive', 'unstemmed', 'wildcarded']); "
+        "} "
+        f"return fuzzyQuery === null ? [] : run(fuzzyQuery, true, {FUZZY_SCORE_BOOST}); "
         "})()"
     )
-
-
-async def _search_chunks(
-    driver: MarkLogicDriver,
-    kbid: str,
-    query: SearchRequest,
-    response: SearchResponse,
-) -> None:
-    filter_context = _filter_context(query)
-    javascript = f"(() => {{ {filter_context} return {_chunk_results_expression(query)}; }})()"
-    async with driver.ro_transaction(kbid=kbid) as txn:
-        response.paragraph.query = query.body
-        matches = await documents.evaluate(txn, javascript)
-        _append_chunk_results(query, response, _flatten_eval_array(matches))
 
 
 def _flatten_eval_array(value):
@@ -318,16 +420,7 @@ def _append_chunk_results(query: SearchRequest, response: SearchResponse, matche
     response.paragraph.total = len(response.paragraph.results)
 
 
-async def _search_vectors(
-    driver: MarkLogicDriver, kbid: str, query: SearchRequest, response: SearchResponse
-) -> None:
-    javascript = _vector_search_expression(query)
-    async with driver.ro_transaction(kbid=kbid) as txn:
-        results = await documents.evaluate(txn, javascript)
-        _append_vector_results(query, response, _flatten_eval_array(results))
-
-
-def _append_vector_results(query: SearchRequest, response: SearchResponse, embeddings) -> None:
+def _append_vector_results(response: SearchResponse, embeddings) -> None:
     for result in embeddings:
         if not isinstance(result, dict):
             continue
@@ -343,65 +436,41 @@ def _append_vector_results(query: SearchRequest, response: SearchResponse, embed
         response.vector.documents.append(result)
 
 
-def _vector_search_expression(query: SearchRequest) -> str:
-    filter_context = _filter_context(query)
-    vector_results = _vector_results_expression(query)
-    return f"(() => {{ {filter_context} return {vector_results}; }})()"
-
-
-def _vector_results_expression(query: SearchRequest) -> str:
-    query_vector = f"vec.vector({json.dumps(list(query.vector))})"
+def _vector_results_expression(query: SearchRequest, paragraph_filtered: bool) -> str:
     limit = max(0, query.result_per_page)
     return (
-        "cts.search(cts.andQuery([cts.collectionQuery("
-        f"{json.dumps(MarkLogicCollections.EMBEDDINGS)}), vectorCandidateQuery, "
-        f"cts.jsonPropertyValueQuery('model_id', {json.dumps(query.vectorset)})])).toArray().map(doc => {{"
-        "const root = JSON.parse(xdmp.toJsonString(doc.root)); "
-        "if (!passesFilters(root, paragraphForEmbedding(root))) return null; "
-        f"if (root.model_id != {json.dumps(query.vectorset)}) return null; "
-        "const score = 1 - vec.cosineDistance(vec.vector(root.vector), "
-        f"{query_vector}); "
-        f"if (score < {json.dumps(query.min_score_semantic)}) return null; "
-        "return {score, content: {chunk_id: root.chunk_id, facets: root.facets, data: root.data}}; "
-        "}).filter(result => result !== null)"
-        ".sort((left, right) => right.score - left.score)"
-        f".slice(0, {limit})"
-    )
-
-
-async def _search_hybrid(
-    driver: MarkLogicDriver,
-    kbid: str,
-    query: SearchRequest,
-    response: SearchResponse,
-) -> None:
-    filter_context = _filter_context(query)
-    vector_results = _vector_results_expression(query)
-    javascript = (
         "(() => { "
-        f"{filter_context} "
-        f"const chunks = {_chunk_results_expression(query)}; "
-        f"const embeddings = {vector_results}; "
-        "return {chunks, embeddings}; "
+        # Embeddings have no paragraph facets: paragraph filters go through the matching chunk keys
+        "let accept = null; "
+        f"if ({limit} && paragraphQuery !== null && !(paragraphOr && fieldQuery === null)) {{ "
+        "const chunkQuery = cts.andQuery([cts.collectionQuery(COLLECTIONS.chunks), securityQuery, "
+        "...(!paragraphOr && fieldQuery !== null ? [fieldQuery] : []), paragraphQuery]); "
+        f"const keys = new Set(matchingUris(chunkQuery, {json.dumps(paragraph_filtered)}).map(chunkKey)); "
+        "const fields = paragraphOr ? new Set(fieldDirs) : null; "
+        "accept = root => (fields !== null && fields.has(fieldDir(root))) || keys.has(embeddingKey(root)); "
+        "} "
+        f"const model = {json.dumps(query.vectorset)}; "
+        "const scope = cts.andQuery([cts.collectionQuery(COLLECTIONS.embeddings), embeddingScope, "
+        "cts.jsonPropertyValueQuery('model_id', model, ['exact'])]); "
+        "return semanticSearch({"
+        f"limit: {limit}, model, scope, accept, "
+        f"queryVector: vec.vector({json.dumps(list(query.vector))}), "
+        f"minScore: {json.dumps(query.min_score_semantic)}, "
+        f"view: {json.dumps(vector_views.view_name(len(query.vector)))}, "
+        f"exactMax: {EXACT_VECTOR_SEARCH_MAX_CANDIDATES}, "
+        f"oversampling: {ANN_OVERSAMPLING}"
+        "}); "
         "})()"
     )
-    async with driver.ro_transaction(kbid=kbid) as txn:
-        eval_result = _flatten_eval_array(await documents.evaluate(txn, javascript))
-        if len(eval_result) == 1 and isinstance(eval_result[0], dict):
-            result = eval_result[0]
-        elif isinstance(eval_result, dict):
-            result = eval_result
-        else:
-            return
-        _append_chunk_results(query, response, _flatten_eval_array(result.get("chunks", [])))
-        _append_vector_results(query, response, _flatten_eval_array(result.get("embeddings", [])))
 
 
 async def suggest(kbid: str, query: SuggestRequest) -> SuggestResponse:
-    # TODO(Marklogic): Execute the suggestion request against the indexing backend.
+    # TODO(Marklogic): Execute the suggestion request against the indexing backend, scoped by
+    # _prefilter_javascript(query.field_filter, query.security.access_groups) like hybrid_search.
     return SuggestResponse()
 
 
 async def graph_search(kbid: str, query: GraphSearchRequest) -> GraphSearchResponse:
-    # TODO(Marklogic): Execute the graph request against the indexing backend.
+    # TODO(Marklogic): Execute the graph request against the indexing backend, scoped by
+    # _prefilter_javascript(query.field_filter, query.security.access_groups) like hybrid_search.
     return GraphSearchResponse()

@@ -31,7 +31,7 @@ from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.marklogic import MarkLogicTransaction
-from nucliadb.common.marklogic import documents
+from nucliadb.common.marklogic import documents, vector_views
 from nucliadb.common.marklogic.client import Document
 from nucliadb.common.marklogic.document_deletion import DocumentDeletion
 from nucliadb.common.marklogic.document_update import DocumentUpdate
@@ -56,6 +56,9 @@ class FieldProcessedContent(BaseModel):
     field_type: str
     extracted_text: str
     facets: list[str]
+    # Copies of the resource properties, see resources.PROCESSED_FIELD_COPIES
+    resource_facets: list[str] = []
+    security: dict[str, Any] | None = None
 
 
 class ChunkContent(BaseModel):
@@ -208,6 +211,8 @@ async def create_processed_documents(
             ],
         )
     if embeddings:
+        for dimension in {len(embedding.vector) for embedding in embeddings}:
+            await vector_views.ensure_view(marklogic_txn.driver, marklogic_txn.database, dimension)
         await documents.write_many(
             marklogic_txn,
             documents_to_write=[
@@ -219,7 +224,10 @@ async def create_processed_documents(
                         embedding.model_id,
                         embedding.chunk_id,
                     ),
-                    collections=[MarkLogicCollections.EMBEDDINGS],
+                    collections=[
+                        MarkLogicCollections.EMBEDDINGS,
+                        vector_views.collection(len(embedding.vector)),
+                    ],
                     content=embedding.model_dump(mode="json"),
                     content_type="application/json",
                 )

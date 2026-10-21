@@ -28,7 +28,7 @@ from google.protobuf.message import Message
 
 from nucliadb.common.marklogic.client import Document
 from nucliadb.common.marklogic.document_deletion import DocumentDeletion
-from nucliadb.common.marklogic.document_update import DocumentUpdate
+from nucliadb.common.marklogic.document_update import DocumentUpdate, patch_matching_optic
 from nucliadb.common.marklogic.exceptions import DatabaseDoesNotExist
 
 if TYPE_CHECKING:
@@ -257,3 +257,11 @@ async def delete_documents(txn: MarkLogicTransaction, deletion: DocumentDeletion
         driver_txn(txn, ensure_writes=True)
         return
     await update_rows(txn, deletion.to_optic())
+
+
+async def update_matching(txn: MarkLogicTransaction, query: str, values: dict[str, Any]) -> None:
+    """Replace top-level properties of the documents matching the cts `query` expression."""
+    if not values:
+        driver_txn(txn, ensure_writes=True)
+        return
+    await update_rows(txn, patch_matching_optic(query, values))

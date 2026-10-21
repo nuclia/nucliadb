@@ -25,3 +25,7 @@ class MarkLogicIndexPaths:
     SHARD = "/shard"
     SLUG = "/slug"
     TITLE = "/title"
+
+    FACETS = "/facets"
+    RESOURCE_FACETS = "/resource_facets"
+    ACCESS_GROUPS = "/security/access_groups"

@@ -21,51 +21,94 @@ import json
 from uuid import uuid4
 
 import pytest
-from nidx_protos.nodereader_pb2 import SearchRequest
+from nidx_protos.nodereader_pb2 import FilterExpression
 
-from nucliadb.common.maindb.collections import MarkLogicCollections
+from nucliadb.common.datamanagers import fields as field_datamanager
+from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.common.marklogic import documents
-from nucliadb.search.search.backend import _filter_context
+from nucliadb.common.marklogic.uris import MarkLogicURIs
+from nucliadb.search.search import backend
 from nucliadb.search.search.query_parser.old_filters import convert_keyword_filter_to_expression
 from nucliadb_models.search import Filter
 
+TEXT = "[SKU-123:4] Friedrich Nietzsche wrote this treatise."
 
-@pytest.mark.parametrize("text_property", ["text", "extracted_text"])
-async def test_keyword_field_prefilter(marklogic_maindb_driver, text_property):
-    resource_id = uuid4().hex
-    target = {"resource_id": resource_id, "field_type": "a", "field_id": "summary"}
-    async with marklogic_maindb_driver.rw_transaction() as txn:
-        await documents.write(
-            txn,
-            f"/tests/keyword-filter/{resource_id}.json",
-            MarkLogicCollections.FIELDS_PROCESSED,
-            {
-                **target,
-                "facets": ["/test/facet"],
-                text_property: "[SKU-123:4] Friedrich Nietzsche wrote this treatise.",
-            },
-        )
-        for keyword, expected in [
-            ("Nietzsche", True),
-            ("niEtZscHe", True),
-            ("Friedrich Nietzsche", True),
-            ("SKU-123:4", True),
-            ("Nietz", False),
-            ("Nietzche", False),
-            ("Nietzsche Friedrich", False),
-            ("Focault", False),
-            ("summary", False),
-            (Filter(all=["Nietzsche", "Kant"]), False),
-            (Filter(any=["Nietzsche", "Kant"]), True),
-            (Filter(none=["Kant"]), True),
-            (Filter(none=["Nietzsche"]), False),
-        ]:
-            query = SearchRequest()
-            operands = query.field_filter.bool_and.operands
-            operands.add().resource.resource_id = resource_id
-            operands.add().facet.facet = "/test/facet"
-            operands.add().CopyFrom(convert_keyword_filter_to_expression(keyword))
-            javascript = (
-                f"(() => {{ {_filter_context(query)} return fieldMatches({json.dumps(target)}); }})()"
+
+async def write_field(txn, resource_id: str, text: str) -> None:
+    await field_datamanager.create_processed_documents(
+        txn,
+        field=field_datamanager.FieldProcessedContent(
+            resource_id=resource_id,
+            field_id="summary",
+            field_type="a",
+            extracted_text=text,
+            facets=["/test/facet"],
+        ),
+        chunks=[
+            field_datamanager.ChunkContent(
+                resource_id=resource_id,
+                field_id="summary",
+                field_type="a",
+                chunk_id=f"{resource_id}/a/summary/0-{len(text)}",
+                text=text,
+                facets=["/test/facet"],
+                data={},
             )
-            assert await documents.evaluate(txn, javascript) == [expected], keyword
+        ],
+        embeddings=[],
+    )
+
+
+@pytest.mark.parametrize("field_level", [True, False])
+async def test_keyword_filters(marklogic_maindb_driver: MarkLogicDriver, field_level: bool):
+    kbid = uuid4().hex
+    await marklogic_maindb_driver.ensure_kb_database(kbid)
+    resource_id = uuid4().hex
+    try:
+        async with marklogic_maindb_driver.rw_transaction(kbid=kbid) as txn:
+            await write_field(txn, resource_id, TEXT)
+            # Unrelated field, so a match never selects every field
+            await write_field(txn, uuid4().hex, "unrelated text")
+            if field_level:
+                expected_match = [MarkLogicURIs.field_directory(resource_id, "a", "summary")]
+            else:
+                expected_match = [
+                    MarkLogicURIs.chunk(
+                        resource_id, "a", "summary", f"{resource_id}/a/summary/0-{len(TEXT)}"
+                    )
+                ]
+
+            cases: list[tuple[str | Filter, bool]] = [
+                ("Nietzsche", True),
+                ("niEtZscHe", True),
+                ("Friedrich Nietzsche", True),
+                ("SKU-123:4", True),
+                ("Nietz", False),
+                ("Nietzche", False),
+                ("Nietzsche Friedrich", False),
+                ("Focault", False),
+                ("summary", False),
+                (Filter(all=["Nietzsche", "Kant"]), False),
+                (Filter(any=["Nietzsche", "Kant"]), True),
+                (Filter(none=["Kant"]), True),
+                (Filter(none=["Nietzsche"]), False),
+            ]
+            for keyword, expected in cases:
+                expression = FilterExpression()
+                operands = expression.bool_and.operands
+                operands.add().resource.resource_id = resource_id
+                operands.add().facet.facet = "/test/facet"
+                operands.add().CopyFrom(convert_keyword_filter_to_expression(keyword))
+                if field_level:
+                    body = f"{backend._prefilter_javascript(expression, None)} return fieldDirs;"
+                else:
+                    query = backend._expression_query(expression, field_level=False)
+                    body = (
+                        "return matchingUris(cts.andQuery([cts.collectionQuery(COLLECTIONS.chunks), "
+                        f"{query.js}]), {json.dumps(query.filtered)});"
+                    )
+                javascript = f"(() => {{ {backend._CONSTANTS_JS} {backend._HELPERS_JS} {body} }})()"
+                matches = backend._flatten_eval_array(await documents.evaluate(txn, javascript))
+                assert matches == (expected_match if expected else []), keyword
+    finally:
+        await marklogic_maindb_driver.delete_kb_database(kbid)

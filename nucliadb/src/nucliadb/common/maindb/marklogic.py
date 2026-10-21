@@ -365,7 +365,10 @@ class MarkLogicDriver:
                 return database
             async with self.admin_client() as client:
                 await marklogic_schema.ensure_database(
-                    client, database, marklogic_schema.KB_PATH_INDEXES
+                    client,
+                    database,
+                    marklogic_schema.KB_PATH_INDEXES,
+                    marklogic_schema.KB_WORD_LEXICON_PROPERTIES,
                 )
             await self._wait_until_queryable(database)
             self._provisioned.add(database)
