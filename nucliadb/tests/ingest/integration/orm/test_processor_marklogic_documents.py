@@ -17,7 +17,9 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import json
+import math
 import uuid
 
 import pytest
@@ -27,11 +29,13 @@ from nucliadb.common.datamanagers import fields as field_datamanager
 from nucliadb.common.ids import VectorId
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
-from nucliadb.common.marklogic import documents
+from nucliadb.common.marklogic import documents, vector_views
 from nucliadb.common.marklogic.document_update import DocumentUpdate
 from nucliadb.common.marklogic.uris import MarkLogicURIs
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic
+from nucliadb.ingest.orm.rollover import rollover_resource
+from nucliadb.search.search import backend
 from nucliadb.search.search.query_parser.models import (
     Filters as RetrievalFilters,
 )
@@ -44,7 +48,8 @@ from nucliadb.search.search.query_parser.models import (
 )
 from nucliadb.search.search.retrieval import text_block_search
 from nucliadb_models.search import SCORE_TYPE
-from nucliadb_protos import utils_pb2, writer_pb2
+from nucliadb_models.security import RequestSecurity
+from nucliadb_protos import knowledgebox_pb2, utils_pb2, writer_pb2
 from nucliadb_protos.knowledgebox_pb2 import SemanticModelMetadata
 from nucliadb_utils.storages.storage import Storage
 from tests.utils.broker_messages import BrokerMessageBuilder
@@ -544,6 +549,84 @@ async def test_resource_relabeling_filters_existing_field_chunks(
         await KnowledgeBox.delete(maindb_driver, kbid)
 
 
+@pytest.mark.deploy_modes("standalone")
+async def test_rollover_restores_resource_copies_in_processed_fields(
+    maindb_driver: MarkLogicDriver, storage: Storage
+):
+    kbid = KnowledgeBox.new_unique_kbid()
+    await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=f"rollover-{uuid.uuid4().hex}",
+        semantic_models={
+            "integration-model": SemanticModelMetadata(
+                similarity_function=utils_pb2.VectorSimilarity.COSINE,
+                vector_dimension=len(VECTOR),
+            )
+        },
+    )
+    resource_id = str(uuid.uuid4())
+    field_id = "body"
+    text = "foo"
+    paragraph_id = f"{resource_id}/t/{field_id}/0-{len(text)}"
+    processed_uri = MarkLogicURIs.field_processed(resource_id, field_id, "t")
+    processor = ProcessorMarkLogic(maindb_driver, storage, partition="1")
+
+    async def search(filters: RetrievalFilters) -> set[str]:
+        retrieval = UnitRetrieval(
+            query=Query(keyword=KeywordQuery(query="foo", is_synonyms_query=False, min_score=0)),
+            top_k=10,
+            filters=filters,
+            rank_fusion=ReciprocalRankFusion(window=10),
+        )
+        blocks, _, _, _ = await text_block_search(kbid, retrieval)
+        return {str(block.paragraph_id) for block in blocks}
+
+    label_filter = nodereader_pb2.FilterExpression()
+    label_filter.facet.facet = "/l/category/X"
+    by_label = RetrievalFilters(field_expression=label_filter)
+    by_other_group = RetrievalFilters(
+        field_expression=label_filter, security=RequestSecurity(groups=["other"])
+    )
+
+    try:
+        writer_message = BrokerMessageBuilder(
+            kbid=kbid, rid=resource_id, source=writer_pb2.BrokerMessage.MessageSource.WRITER
+        )
+        writer_message.bm.basic.usermetadata.classifications.add(labelset="category", label="X")
+        writer_message.bm.security.access_groups.append("secret")
+        writer_message.bm.texts[field_id].body = "Stored field value"
+        await processor.process(writer_message.build(), seqid=1, transaction_check=False)
+        processor_message = BrokerMessageBuilder(
+            kbid=kbid, rid=resource_id, source=writer_pb2.BrokerMessage.MessageSource.PROCESSOR
+        )
+        processor_message.field_builder(field_id, writer_pb2.FieldType.TEXT).add_paragraph(text)
+        await processor.process(processor_message.build(), seqid=2, transaction_check=False)
+
+        # Processed fields written before the resource copies existed
+        async with maindb_driver.rw_transaction(kbid=kbid) as txn:
+            await documents.update_document(
+                txn,
+                DocumentUpdate(
+                    uri=processed_uri, collection=MarkLogicCollections.FIELDS_PROCESSED, upsert=False
+                ).remove("resource_facets", "security"),
+            )
+            await txn.commit()
+        assert await search(by_label) == set()
+
+        assert await rollover_resource(maindb_driver, storage, kbid, resource_id)
+
+        async with maindb_driver.ro_transaction(kbid=kbid) as txn:
+            processed_field = await documents.read(txn, processed_uri)
+        assert processed_field is not None
+        assert processed_field["resource_facets"] == ["/l/category/X"]
+        assert processed_field["security"] == {"access_groups": ["secret"]}
+        assert await search(by_label) == {paragraph_id}
+        assert await search(by_other_group) == set()
+    finally:
+        await KnowledgeBox.delete(maindb_driver, kbid)
+
+
 async def read_resource_documents(
     txn: MarkLogicTransaction, *, resource_id: str, collection: MarkLogicCollections
 ) -> dict[str, dict]:
@@ -817,5 +900,224 @@ async def test_processor_replaces_processed_field_documents(
             assert [round(value, 6) for value in embeddings[expected_embedding_uri]["vector"]] == (
                 new_vector
             )
+    finally:
+        await KnowledgeBox.delete(maindb_driver, kbid)
+
+
+async def wait_for_vector_views(
+    driver: MarkLogicDriver, kbid: str, rows: dict[tuple[str, int], int]
+) -> None:
+    """New view templates are unavailable while the databases are reindexed."""
+    counts: dict[tuple[str, int], object] = {}
+    for _ in range(120):
+        for (vectorset_id, dimension), expected in rows.items():
+            javascript = (
+                "const op = require('/MarkLogic/optic'); "
+                f"op.fromView({json.dumps(vector_views.SCHEMA_NAME)}, "
+                f"{json.dumps(vector_views.view_name(vectorset_id, dimension))})"
+                ".groupBy(null, op.count('n')).result().toArray()[0].n"
+            )
+            try:
+                async with driver.ro_transaction(kbid=kbid) as txn:
+                    counts[(vectorset_id, dimension)] = (await documents.evaluate(txn, javascript))[0]
+            except Exception as exc:
+                counts[(vectorset_id, dimension)] = exc
+        if all(counts[key] == expected for key, expected in rows.items()):
+            return
+        await asyncio.sleep(1)
+    raise TimeoutError(f"Vector views not ready: {counts}, expected {rows}")
+
+
+def cosine(left: list[float], right: list[float]) -> float:
+    dot = sum(a * b for a, b in zip(left, right))
+    return dot / (math.sqrt(sum(a * a for a in left)) * math.sqrt(sum(b * b for b in right)))
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_ann_semantic_search_with_multiple_vectorsets(
+    maindb_driver: MarkLogicDriver, storage: Storage, monkeypatch: pytest.MonkeyPatch
+):
+    # Each vectorset gets its own view, also when two of them share the dimension
+    models = {"model-a": 3, "model-b": 3, "model-c": 4}
+    kbid = KnowledgeBox.new_unique_kbid()
+    await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=f"multi-vectorset-{uuid.uuid4().hex}",
+        semantic_models={
+            model: SemanticModelMetadata(
+                similarity_function=utils_pb2.VectorSimilarity.COSINE, vector_dimension=dimension
+            )
+            for model, dimension in models.items()
+        },
+    )
+    resource_id = str(uuid.uuid4())
+    n_paragraphs = 10
+    vectors = {
+        model: [
+            [math.cos(index + offset), math.sin(index + offset), *([0.5] * (dimension - 2))]
+            for index in range(n_paragraphs)
+        ]
+        for offset, (model, dimension) in enumerate(models.items())
+    }
+    # model-b vectors are the closest to model-a queries, so they must not leak into its results
+    query_vectors = {
+        "model-a": vectors["model-b"][0],
+        "model-b": vectors["model-b"][5],
+        "model-c": vectors["model-c"][3],
+    }
+    processor = ProcessorMarkLogic(maindb_driver, storage, partition="1")
+
+    modes: list[str] = []
+    monkeypatch.setattr(backend.semantic_search_mode, "inc", lambda labels: modes.append(labels["mode"]))
+
+    async def search(model: str) -> dict[int, float]:
+        retrieval = UnitRetrieval(
+            query=Query(
+                semantic=SemanticQuery(query=query_vectors[model], vectorset=model, min_score=-1)
+            ),
+            top_k=20,
+            rank_fusion=ReciprocalRankFusion(window=20),
+        )
+        _, _, response, _ = await text_block_search(kbid, retrieval)
+        return {
+            paragraph_starts.index(document.metadata.position.start): document.score
+            for document in response.vector.documents
+        }
+
+    try:
+        writer_message = BrokerMessageBuilder(
+            kbid=kbid, rid=resource_id, source=writer_pb2.BrokerMessage.MessageSource.WRITER
+        )
+        writer_message.bm.texts["body"].body = "Stored field value"
+        await processor.process(writer_message.build(), seqid=1, transaction_check=False)
+        processor_message = BrokerMessageBuilder(
+            kbid=kbid, rid=resource_id, source=writer_pb2.BrokerMessage.MessageSource.PROCESSOR
+        )
+        field_builder = processor_message.field_builder("body", writer_pb2.FieldType.TEXT)
+        paragraph_starts = []
+        for index in range(n_paragraphs):
+            _, paragraph = field_builder.add_paragraph(
+                f"paragraph {index}. ",
+                vectors={model: vectors[model][index] for model in models},
+            )
+            paragraph_starts.append(paragraph.start)
+        await processor.process(processor_message.build(), seqid=2, transaction_check=False)
+        await wait_for_vector_views(
+            maindb_driver,
+            kbid,
+            {(model, dimension): n_paragraphs for model, dimension in models.items()},
+        )
+
+        exact = {model: await search(model) for model in models}
+        monkeypatch.setattr(backend, "EXACT_VECTOR_SEARCH_MAX_CANDIDATES", 0)
+        for model in models:
+            modes.clear()
+            scores = await search(model)
+            assert modes == ["ann"], model
+            assert scores.keys() == set(range(n_paragraphs)), model
+            for index, score in scores.items():
+                expected = cosine(query_vectors[model], vectors[model][index])
+                assert score == pytest.approx(expected, abs=1e-4), (model, index)
+            assert scores == pytest.approx(exact[model], abs=1e-6), model
+    finally:
+        await KnowledgeBox.delete(maindb_driver, kbid)
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_vectorset_created_after_kb_ingests_and_searches(
+    maindb_driver: MarkLogicDriver, storage: Storage, monkeypatch: pytest.MonkeyPatch
+):
+    """Existing resources keep no embeddings for a new vectorset, new data is ingested and searchable."""
+    kbid = KnowledgeBox.new_unique_kbid()
+    await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=f"new-vectorset-{uuid.uuid4().hex}",
+        semantic_models={
+            "model-a": SemanticModelMetadata(
+                similarity_function=utils_pb2.VectorSimilarity.COSINE, vector_dimension=3
+            )
+        },
+    )
+    new_model, new_dimension = "model-new", 5
+    processor = ProcessorMarkLogic(maindb_driver, storage, partition="1")
+    query_vector = [1.0, 0.5, 0.0, 0.25, 0.1]
+    seqid = 0
+
+    modes: list[str] = []
+    monkeypatch.setattr(backend.semantic_search_mode, "inc", lambda labels: modes.append(labels["mode"]))
+
+    async def ingest(rid: str, vectors: dict[str, list[list[float]]]) -> list[str]:
+        nonlocal seqid
+        writer_message = BrokerMessageBuilder(
+            kbid=kbid, rid=rid, source=writer_pb2.BrokerMessage.MessageSource.WRITER
+        )
+        writer_message.bm.texts["body"].body = "Stored field value"
+        seqid += 1
+        await processor.process(writer_message.build(), seqid=seqid, transaction_check=False)
+        processor_message = BrokerMessageBuilder(
+            kbid=kbid, rid=rid, source=writer_pb2.BrokerMessage.MessageSource.PROCESSOR
+        )
+        field_builder = processor_message.field_builder("body", writer_pb2.FieldType.TEXT)
+        paragraph_ids = []
+        for index in range(3):
+            paragraph_id, _ = field_builder.add_paragraph(
+                f"paragraph {index}. ",
+                vectors={model: model_vectors[index] for model, model_vectors in vectors.items()},
+            )
+            paragraph_ids.append(paragraph_id.full())
+        seqid += 1
+        await processor.process(processor_message.build(), seqid=seqid, transaction_check=False)
+        return paragraph_ids
+
+    async def search(model: str, query: list[float]) -> tuple[set[str], list[float]]:
+        retrieval = UnitRetrieval(
+            query=Query(semantic=SemanticQuery(query=query, vectorset=model, min_score=-1)),
+            top_k=20,
+            rank_fusion=ReciprocalRankFusion(window=20),
+        )
+        blocks, _, response, _ = await text_block_search(kbid, retrieval)
+        scores = sorted((document.score for document in response.vector.documents), reverse=True)
+        return {str(block.paragraph_id) for block in blocks}, scores
+
+    try:
+        old_rid, new_rid = str(uuid.uuid4()), str(uuid.uuid4())
+        old_paragraphs = await ingest(old_rid, {"model-a": [[1.0, 0.0, 0.0]] * 3})
+
+        async with maindb_driver.rw_transaction(kbid=kbid) as txn:
+            await KnowledgeBox(txn, storage, kbid).create_vectorset(
+                knowledgebox_pb2.VectorSetConfig(
+                    vectorset_id=new_model,
+                    vectorset_index_config=knowledgebox_pb2.VectorIndexConfig(
+                        vector_dimension=new_dimension,
+                        similarity=utils_pb2.VectorSimilarity.COSINE,
+                    ),
+                )
+            )
+            await txn.commit()
+
+        new_vectors = [[1.0, 0.5, 0.0, 0.25, 0.1], [0.0, 1.0, 0.0, 0.0, 0.0], [0.5, 0.5, 0.5, 0.5, 0.5]]
+        new_paragraphs = await ingest(
+            new_rid, {"model-a": [[0.0, 1.0, 0.0]] * 3, new_model: new_vectors}
+        )
+        await wait_for_vector_views(
+            maindb_driver, kbid, {("model-a", 3): 6, (new_model, new_dimension): 3}
+        )
+        expected_scores = sorted((cosine(query_vector, vector) for vector in new_vectors), reverse=True)
+
+        # Only the data pushed after the vectorset creation has its embeddings
+        paragraphs, scores = await search(new_model, query_vector)
+        assert paragraphs == set(new_paragraphs)
+        assert scores == pytest.approx(expected_scores, abs=1e-4)
+        paragraphs, _ = await search("model-a", [1.0, 0.0, 0.0])
+        assert paragraphs == {*old_paragraphs, *new_paragraphs}
+
+        monkeypatch.setattr(backend, "EXACT_VECTOR_SEARCH_MAX_CANDIDATES", 0)
+        modes.clear()
+        paragraphs, scores = await search(new_model, query_vector)
+        assert modes == ["ann"]
+        assert paragraphs == set(new_paragraphs)
+        assert scores == pytest.approx(expected_scores, abs=1e-4)
     finally:
         await KnowledgeBox.delete(maindb_driver, kbid)

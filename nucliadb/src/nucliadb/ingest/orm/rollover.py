@@ -82,7 +82,7 @@ async def rollover_resource(driver: MarkLogicDriver, storage: Storage, kbid: str
         index_message = await IndexMessageBuilderV2(resource).full(reindex=True)
         # Drop previous documents first so chunks/embeddings that are no longer produced don't linger
         await datamanagers.fields.delete_processed_documents(txn, kbid=kbid, rid=rid)
-        for field, chunks, embeddings in get_field_processed_contents(index_message):
+        for field, chunks, embeddings in await get_field_processed_contents(txn, kbid, index_message):
             await datamanagers.fields.create_processed_documents(
                 txn, field=field, chunks=chunks, embeddings=embeddings
             )

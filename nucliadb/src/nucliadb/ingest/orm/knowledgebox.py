@@ -25,6 +25,7 @@ from uuid import uuid4
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver, Transaction
+from nucliadb.common.marklogic import documents, vector_views
 from nucliadb.ingest import SERVICE_NAME, logger
 from nucliadb.ingest.orm.exceptions import (
     KnowledgeBoxConflict,
@@ -143,7 +144,7 @@ class KnowledgeBox:
                     await txn.commit()
 
             rollback_ops.append(rollback_registry)
-            await driver.ensure_kb_database(kbid)
+            database = await driver.ensure_kb_database(kbid)
 
             async with driver.rw_transaction(kbid=kbid) as txn:
                 # all KBs have the vectorset key initialized, although (for
@@ -162,6 +163,7 @@ class KnowledgeBox:
                         vectorset_id, semantic_model, dimension
                     )
                     await datamanagers.vectorsets.set(txn, kbid=kbid, config=vectorset_config)
+                    await vector_views.ensure_view(driver, database, vectorset_id, dimension)
 
                 if has_feature(const.Features.SEMANTIC_GRAPH):
                     if semantic_graph_node_models:
@@ -427,6 +429,13 @@ class KnowledgeBox:
         # key kind
         config.storage_key_kind = knowledgebox_pb2.VectorSetConfig.StorageKeyKind.VECTORSET_PREFIX
         await datamanagers.vectorsets.set(self.txn, kbid=self.kbid, config=config)
+        driver, marklogic_txn = documents.driver_txn(self.txn)
+        await vector_views.ensure_view(
+            driver,
+            marklogic_txn.database,
+            config.vectorset_id,
+            config.vectorset_index_config.vector_dimension,
+        )
 
         # Remove the async deletion mark if it exists, just in case there was a previous deletion
         deletion_mark_key = KB_VECTORSET_TO_DELETE.format(kbid=self.kbid, vectorset=config.vectorset_id)

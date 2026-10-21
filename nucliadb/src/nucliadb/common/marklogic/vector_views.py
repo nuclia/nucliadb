@@ -17,16 +17,20 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-"""TDE views with an ANN index over the embeddings of each vector dimension.
+"""TDE views with an ANN index over the embeddings of each vectorset.
 
-A view column has a fixed dimension, so embeddings are also stored in a per-dimension collection
-that scopes the view. Templates live in the Schemas database shared by every KB database.
+Embeddings are also stored in a per-vectorset collection that scopes its view. Templates live in the
+Schemas database shared by every KB database, while view rows are per database, so a view only
+holds the embeddings of its own KB. Views are keyed by vectorset id and dimension, as KBs may use
+the same vectorset id with different dimensions.
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import re
 from typing import TYPE_CHECKING
 
 from nucliadb.common.maindb.marklogic_schema import SCHEMAS_DATABASE
@@ -36,34 +40,40 @@ if TYPE_CHECKING:
 
 SCHEMA_NAME = "nucliadb"
 
-_ensured: set[int] = set()
+_ensured: set[tuple[str, int]] = set()
 _lock = asyncio.Lock()
 
 
-def collection(dimension: int) -> str:
-    return f"embeddings_d{dimension}"
+def view_name(vectorset_id: str, dimension: int) -> str:
+    """
+    >>> view_name("multilingual-2024-05-06", 1024)
+    'embeddings_multilingual_2024_05_06_d1024_da99bad1'
+    """
+    safe_id = re.sub(r"[^A-Za-z0-9_]", "_", vectorset_id)
+    # Keeps ids that normalize to the same name apart
+    digest = hashlib.sha256(vectorset_id.encode()).hexdigest()[:8]
+    return f"embeddings_{safe_id}_d{dimension}_{digest}"
 
 
-def view_name(dimension: int) -> str:
-    return collection(dimension)
+def collection(vectorset_id: str, dimension: int) -> str:
+    return view_name(vectorset_id, dimension)
 
 
-def template_uri(dimension: int) -> str:
-    return f"/nucliadb/tde/{view_name(dimension)}.json"
+def template_uri(vectorset_id: str, dimension: int) -> str:
+    return f"/nucliadb/tde/{view_name(vectorset_id, dimension)}.json"
 
 
-def template(dimension: int) -> dict:
+def template(vectorset_id: str, dimension: int) -> dict:
     return {
         "template": {
             "context": "/",
-            "collections": [collection(dimension)],
+            "collections": [collection(vectorset_id, dimension)],
             "rows": [
                 {
                     "schemaName": SCHEMA_NAME,
-                    "viewName": view_name(dimension),
+                    "viewName": view_name(vectorset_id, dimension),
                     "viewLayout": "sparse",
                     "columns": [
-                        {"name": "model_id", "scalarType": "string", "val": "model_id"},
                         {
                             "name": "vector",
                             "scalarType": "vector",
@@ -82,15 +92,16 @@ def template(dimension: int) -> dict:
     }
 
 
-async def ensure_view(driver: MarkLogicDriver, database: str, dimension: int) -> None:
-    """Install the view template for `dimension`. Inserting a template reindexes the databases
+async def ensure_view(driver: MarkLogicDriver, database: str, vectorset_id: str, dimension: int) -> None:
+    """Install the view template of a vectorset. Inserting a template reindexes the databases
     using it, so it is only inserted when missing."""
-    if dimension in _ensured:
+    key = (vectorset_id, dimension)
+    if key in _ensured:
         return
     async with _lock:
-        if dimension in _ensured:
+        if key in _ensured:
             return
-        uri = json.dumps(template_uri(dimension))
+        uri = json.dumps(template_uri(vectorset_id, dimension))
         exists = await driver.client.eval(
             javascript=f"fn.docAvailable({uri})", params={"database": SCHEMAS_DATABASE}
         )
@@ -99,9 +110,10 @@ async def ensure_view(driver: MarkLogicDriver, database: str, dimension: int) ->
             await driver.client.eval(
                 javascript=(
                     "declareUpdate(); const tde = require('/MarkLogic/tde.xqy'); "
-                    f"tde.templateInsert({uri}, xdmp.toJSON({json.dumps(template(dimension))}), "
+                    f"tde.templateInsert({uri}, "
+                    f"xdmp.toJSON({json.dumps(template(vectorset_id, dimension))}), "
                     "xdmp.defaultPermissions(), ['tde']);"
                 ),
                 params={"database": database},
             )
-        _ensured.add(dimension)
+        _ensured.add(key)

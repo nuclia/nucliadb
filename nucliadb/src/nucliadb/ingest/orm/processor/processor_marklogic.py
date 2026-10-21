@@ -19,7 +19,7 @@
 #
 import asyncio
 import logging
-from typing import Any, Iterator, Literal, cast
+from typing import Any, Literal, cast
 
 import aiohttp.client_exceptions
 import nats.errors
@@ -429,13 +429,7 @@ class ProcessorMarkLogic:
 
         # Now store all the processed contents to Marklogic (embeddings, chunks, etc)
         im = await self.generate_index_message(txn, uuid, bm, is_new_resource=is_new_resource)
-        processed_contents = list(get_field_processed_contents(im))
-        if processed_contents:
-            resource_copies = await datamanagers.resources.get_processed_field_copies(
-                txn, kbid=kbid, rid=uuid
-            )
-        for fpc, chunks, embeddings in processed_contents:
-            fpc = fpc.model_copy(update=resource_copies)
+        for fpc, chunks, embeddings in await get_field_processed_contents(txn, kbid, im):
             if not is_new_resource:
                 full_field_id = f"{uuid}/{fpc.field_type}/{fpc.field_id}"
                 # Only replaced fields: conversation appends must keep their previous chunks/embeddings
@@ -718,10 +712,17 @@ class ResourceDoesNotExist(Exception):
     """Exception raised when a Resource does not exist."""
 
 
-def get_field_processed_contents(
-    im: brain.Resource,
-) -> Iterator[tuple[FieldProcessedContent, list[ChunkContent], list[ChunkEmbeddingContent]]]:
+async def get_field_processed_contents(
+    txn: MarkLogicTransaction, kbid: str, im: brain.Resource
+) -> list[tuple[FieldProcessedContent, list[ChunkContent], list[ChunkEmbeddingContent]]]:
+    """Processed documents of the index message fields, with the copies of their resource properties."""
     resource_id = im.resource.uuid
+    if not im.texts:
+        return []
+    resource_copies = await datamanagers.resources.get_processed_field_copies(
+        txn, kbid=kbid, rid=resource_id
+    )
+    contents = []
     for fid, text_data in im.texts.items():
         field_type, field_id = fid.split("/")
         field_text = text_data.text
@@ -731,6 +732,7 @@ def get_field_processed_contents(
             field_type=field_type,
             extracted_text=field_text,
             facets=list(text_data.labels),
+            **resource_copies,
         )
         chunks = []
         embeddings = []
@@ -764,7 +766,8 @@ def get_field_processed_contents(
                             data=documents.to_json(embedding_data.metadata),
                         )
                     )
-        yield field, chunks, embeddings
+        contents.append((field, chunks, embeddings))
+    return contents
 
 
 class IndexMessageBuilderV2(IndexMessageBuilder):

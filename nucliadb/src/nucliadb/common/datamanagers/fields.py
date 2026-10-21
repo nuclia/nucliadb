@@ -211,8 +211,6 @@ async def create_processed_documents(
             ],
         )
     if embeddings:
-        for dimension in {len(embedding.vector) for embedding in embeddings}:
-            await vector_views.ensure_view(marklogic_txn.driver, marklogic_txn.database, dimension)
         await documents.write_many(
             marklogic_txn,
             documents_to_write=[
@@ -226,7 +224,7 @@ async def create_processed_documents(
                     ),
                     collections=[
                         MarkLogicCollections.EMBEDDINGS,
-                        vector_views.collection(len(embedding.vector)),
+                        vector_views.collection(embedding.model_id, len(embedding.vector)),
                     ],
                     content=embedding.model_dump(mode="json"),
                     content_type="application/json",

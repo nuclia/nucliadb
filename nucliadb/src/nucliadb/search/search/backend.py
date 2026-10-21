@@ -160,8 +160,8 @@ function semanticSearch(search) {
     const rows = op.fromView(VECTOR_SCHEMA, search.view, '', op.fragmentIdCol('fid'))
       .annTopK(k, op.col('vector'), search.queryVector, op.col('distance'), {maxDistance: 1 - search.minScore})
       .joinDocUri(op.col('uri'), op.fragmentIdCol('fid'))
-      .select(['uri', 'model_id']).result().toArray();
-    const uris = rows.filter(row => row.model_id === search.model).map(row => String(row.uri));
+      .select(['uri']).result().toArray();
+    const uris = rows.map(row => String(row.uri));
     const allowed = uris.length
       ? new Set(cts.uris('', [], cts.andQuery([search.scope, cts.documentQuery(uris)])).toArray().map(String))
       : new Set();
@@ -471,7 +471,7 @@ def _vector_results_expression(query: SearchRequest, paragraph_filtered: bool) -
         f"limit: {limit}, model, scope, accept, "
         f"queryVector: vec.vector({json.dumps(list(query.vector))}), "
         f"minScore: {json.dumps(query.min_score_semantic)}, "
-        f"view: {json.dumps(vector_views.view_name(len(query.vector)))}, "
+        f"view: {json.dumps(vector_views.view_name(query.vectorset, len(query.vector)))}, "
         f"exactMax: {EXACT_VECTOR_SEARCH_MAX_CANDIDATES}, "
         f"oversampling: {ANN_OVERSAMPLING}"
         "}); "

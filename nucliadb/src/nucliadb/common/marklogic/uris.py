@@ -21,14 +21,20 @@ class MarkLogicURIs:
     """Canonical document URI builders and parsers for the MarkLogic schema.
 
     Examples:
+        Maindb key:        ``maindb:/kbs/kbid-123/some/key``
         KB registry:       ``/kb/kbid-123/registry.json``
         KB data:           ``/kb_data.json``
         Resource:          ``/resources/resource-123.json``
         Field:             ``/resources/resource-123/fields/t/body/data.json``
         Conversation page: ``/resources/resource-123/fields/c/chat/pages/1.json``
         Processed field:   ``/resources/resource-123/fields/t/body/processed.json``
-        Chunk:             ``/resources/resource-123/fields/t/body/chunks/chunk-1/data.json``
-        Embedding:         ``/resources/resource-123/fields/t/body/embeddings/model-1/chunk-1/data.json``
+        Chunk:             ``/resources/resource-123/fields/t/body/chunks/0-120/data.json``
+        Split chunk:       ``/resources/resource-123/fields/c/chat/chunks/message-1/0-120/data.json``
+        Embedding:         ``/resources/resource-123/fields/t/body/embeddings/model-1/0/0-120/data.json``
+        Split embedding:   ``/resources/resource-123/fields/c/chat/embeddings/model-1/message-1/0/0-120/data.json``
+
+    Chunk and embedding URIs end with the paragraph/vector id suffix after the field prefix:
+    ``[split/]start-end`` for chunks and ``[split/]index/start-end`` for embeddings.
     """
 
     @classmethod
