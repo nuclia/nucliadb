@@ -417,6 +417,17 @@ async def test_text_block_search_filters_field_and_paragraph_results(
         )
         assert matches == {chunk_id(specs[0]), chunk_id(specs[2]), chunk_id(specs[3])}
 
+        # Facets are hierarchical: a parent facet matches its children, a partial segment doesn't
+        all_chunks = {chunk_id(spec) for spec in specs}
+        matches, _ = await search(RetrievalFilters(paragraph_expression=facet_filter("/l/state")))
+        assert matches == all_chunks
+        matches, _ = await search(RetrievalFilters(paragraph_expression=facet_filter("/l/sta")))
+        assert matches == set()
+        matches, _ = await search(RetrievalFilters(field_expression=facet_filter("/l/field")))
+        assert matches == all_chunks
+        matches, _ = await search(RetrievalFilters(field_expression=facet_filter("/l/field/alph")))
+        assert matches == set()
+
         # Semantic-only and hybrid retrieval apply the same combined predicates.
         combined_filters = RetrievalFilters(
             field_expression=boolean_filter(

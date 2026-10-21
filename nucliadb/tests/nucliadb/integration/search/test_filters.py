@@ -459,3 +459,37 @@ async def test_filtering_field_and_paragraph(app_context, nucliadb_reader: Async
         },
         set.union(FILTERS_TO_PARAGRAPHS[resource_label], FILTERS_TO_PARAGRAPHS[paragraph_label]),
     )
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_filtering_by_labelset_and_entity_type(nucliadb_reader: AsyncClient, kbid: str):
+    """Filters without a label or entity value match everything below the labelset or type."""
+    paragraph_labelset = ClassificationLabels.PARAGRAPH_ANNOTATED.split("/")[0]
+    resource_labelset = ClassificationLabels.RESOURCE_ANNOTATED.split("/")[0]
+    entity_type = EntityLabels.DETECTED.split("/")[0]
+    for filter_expression, expected_paragraphs in [
+        ({"field": {"prop": "entity", "subtype": entity_type}}, {PARAGRAPH1, PARAGRAPH2}),
+        ({"field": {"prop": "entity", "subtype": "COUNTR"}}, set()),
+        ({"field": {"prop": "label", "labelset": resource_labelset}}, {PARAGRAPH3, PARAGRAPH4}),
+        ({"paragraph": {"prop": "label", "labelset": paragraph_labelset}}, {PARAGRAPH3}),
+        ({"paragraph": {"prop": "label", "labelset": "user-paragraph-other"}}, set()),
+    ]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json=dict(
+                query="",
+                features=[FindOptions.SEMANTIC],
+                vector=Q,
+                min_score=MinScore(semantic=-1).model_dump(),
+                reranker=RerankerName.NOOP,
+                filter_expression=filter_expression,
+            ),
+        )
+        assert resp.status_code == 200, resp.text
+        paragraphs = {
+            paragraph["text"]
+            for resource in resp.json()["resources"].values()
+            for field in resource["fields"].values()
+            for paragraph in field["paragraphs"].values()
+        }
+        assert paragraphs == expected_paragraphs, filter_expression

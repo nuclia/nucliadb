@@ -77,6 +77,8 @@ _CONSTANTS_JS = (
     )
     + "; const VECTOR_SCHEMA = "
     + json.dumps(vector_views.SCHEMA_NAME)
+    + "; const COLLATION = "
+    + json.dumps(STRING_COLLATION)
     + ";"
 )
 
@@ -90,10 +92,23 @@ function matchingUris(query, filtered) {
   for (const doc of cts.search(query, ['filtered', 'score-zero'])) uris.push(String(xdmp.nodeUri(doc)));
   return uris;
 }
-function facetQuery(facet) { return cts.pathRangeQuery(PATHS.facets, '=', facet); }
+// Facets are hierarchical: a labelset or entity type also matches all the facets below it
+function facetValues(path, facet) {
+  const values = [facet];
+  const prefix = facet + '/';
+  const reference = cts.pathReference(path, ['type=string', 'collation=' + COLLATION]);
+  for (const value of cts.values(reference, prefix)) {
+    const text = String(value);
+    if (!text.startsWith(prefix)) break;
+    values.push(text);
+  }
+  return values;
+}
+function facetQuery(facet) { return cts.pathRangeQuery(PATHS.facets, '=', facetValues(PATHS.facets, facet)); }
 // Processed fields hold a copy of their resource facets
 function fieldFacetQuery(facet) {
-  return cts.orQuery([facetQuery(facet), cts.pathRangeQuery(PATHS.resourceFacets, '=', facet)]);
+  const resourceFacets = facetValues(PATHS.resourceFacets, facet);
+  return cts.orQuery([facetQuery(facet), cts.pathRangeQuery(PATHS.resourceFacets, '=', resourceFacets)]);
 }
 function fieldPrefixQuery(base, prefix) {
   const start = base + prefix;
