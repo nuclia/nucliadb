@@ -17,7 +17,4 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-# reexports
-from .processor import Processor
-
-__all__ = ["Processor"]
+"""Broker message processing and shared ingestion helpers."""

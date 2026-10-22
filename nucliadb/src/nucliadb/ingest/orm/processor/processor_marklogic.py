@@ -212,7 +212,7 @@ class ProcessorMarkLogic:
                 extra={"seqid": seqid, "partition": partition},
             )
 
-    @processor_observer.wrap({"type": "delete"})
+    @processor_observer.wrap({"type": "delete_resource"})
     async def delete(
         self,
         bm: writer_pb2.BrokerMessage,
@@ -336,6 +336,7 @@ class ProcessorMarkLogic:
             ),
         )
 
+    @processor_observer.wrap({"type": "apply_resource"})
     async def create_resource(
         self,
         txn: MarkLogicTransaction,
@@ -344,7 +345,8 @@ class ProcessorMarkLogic:
         uuid: str,
     ) -> None:
         content = self.writer_resource_content(bm, uuid)
-        await datamanagers.resources.create_resource(txn, kbid=kbid, rid=uuid, data=content)
+        with processor_observer({"type": "commit_slug"}):
+            await datamanagers.resources.create_resource(txn, kbid=kbid, rid=uuid, data=content)
 
         # User relations are stored in the object store
         if bm.HasField("user_relations"):
@@ -401,6 +403,8 @@ class ProcessorMarkLogic:
                 status.status = explicit.status
         return status
 
+    @processor_observer.wrap({"type": "apply_fields"})
+    @processor_observer.wrap({"type": "apply_field_values"})
     async def create_fields(
         self,
         txn: MarkLogicTransaction,
@@ -427,12 +431,25 @@ class ProcessorMarkLogic:
     ):
         # Save extracted data from the broker message to the object store
         resource = self.orm_resource(txn, kbid, uuid)
-        await resource.apply_field_extracted_data(bm)
+        with processor_observer({"type": "apply_fields"}):
+            with processor_observer({"type": "apply_field_extracted_data"}):
+                await resource.apply_field_extracted_data(bm)
 
         await self.apply_extracted_basic_updates(resource, bm)
 
         # Now store all the processed contents to Marklogic (embeddings, chunks, etc)
         im = await self.generate_index_message(txn, uuid, bm, is_new_resource=is_new_resource)
+        await self.index_resource(txn, kbid, uuid, im, is_new_resource)
+
+    @processor_observer.wrap({"type": "index_resource"})
+    async def index_resource(
+        self,
+        txn: MarkLogicTransaction,
+        kbid: str,
+        uuid: str,
+        im: brain.Resource,
+        is_new_resource: bool,
+    ) -> None:
         for fpc, chunks, embeddings in await get_field_processed_contents(txn, kbid, im):
             if not is_new_resource:
                 full_field_id = f"{uuid}/{fpc.field_type}/{fpc.field_id}"
@@ -466,6 +483,7 @@ class ProcessorMarkLogic:
                 skip_chunks=im.skip_paragraphs,
             )
 
+    @processor_observer.wrap({"type": "apply_resource"})
     async def apply_extracted_basic_updates(
         self, orm_resource: Resource, bm: writer_pb2.BrokerMessage
     ) -> None:
@@ -489,6 +507,7 @@ class ProcessorMarkLogic:
                 ),
             )
 
+    @processor_observer.wrap({"type": "apply_resource"})
     async def update_resource(
         self,
         txn: MarkLogicTransaction,
