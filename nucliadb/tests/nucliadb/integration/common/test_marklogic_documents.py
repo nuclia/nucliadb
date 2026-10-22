@@ -23,7 +23,48 @@ from uuid import uuid4
 import pytest
 
 from nucliadb.common.marklogic import documents
+from nucliadb.common.marklogic.client import Document
 from nucliadb.common.marklogic.document_update import DocumentUpdate
+
+
+async def test_read_many_documents_uses_post_search(marklogic_maindb_driver):
+    prefix = f"/tests/document-bulk-read/{uuid4().hex}/"
+    expected = {
+        f"{prefix}{index}-{'long-field-name-' * 12}.json": {
+            "index": index,
+            "nested": {"items": [index, None, False]},
+            "text": "Full document content",
+        }
+        for index in range(40)
+    }
+    missing_uri = f"{prefix}missing.json"
+    requested = [*reversed(expected), missing_uri, next(iter(expected))]
+    client = marklogic_maindb_driver.client
+    try:
+        async with marklogic_maindb_driver.rw_transaction() as txn:
+            await documents.write_many(
+                txn,
+                [
+                    Document(uri=uri, content=content, collections=["test-bulk-read"])
+                    for uri, content in expected.items()
+                ],
+            )
+            with patch.object(client._http, "post", wraps=client._http.post) as post:
+                assert await documents.read_many(txn, requested) == expected
+                post.assert_called_once()
+                assert post.call_args.args[0] == "/v1/search"
+                assert post.call_args.kwargs["params"]["database"] == txn.database
+                assert "txid" in post.call_args.kwargs["params"]
+            await txn.commit()
+
+        async with marklogic_maindb_driver.ro_transaction() as txn:
+            assert await documents.read_many(txn, requested) == expected
+            assert await documents.read_many(txn, [missing_uri, f"{missing_uri}.other"]) == {}
+    finally:
+        async with marklogic_maindb_driver.rw_transaction() as txn:
+            for uri in expected:
+                await documents.delete(txn, uri)
+            await txn.commit()
 
 
 async def test_read_properties(marklogic_maindb_driver):

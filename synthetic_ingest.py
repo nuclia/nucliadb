@@ -397,6 +397,51 @@ class AccountAPI:
         return body.get("id") or body.get("uuid") if isinstance(body, dict) else None
 
 
+    async def delete_kb(self, kbid: str) -> None:
+        response = await self.client.delete(
+            f"{NUCLIA_API_URL}/v1/account/{ACCOUNT_ID}/kb/{kbid}",
+            headers=self._headers(),
+        )
+        response.raise_for_status()
+
+
+async def cmd_delete(args):
+    if not args.kb_prefix.strip():
+        raise ValueError("--kb-prefix must not be empty")
+    if not args.dry_run and not args.yes:
+        raise ValueError("Use --dry-run to preview deletions or --yes to confirm")
+    account = AccountAPI(args)
+    deleted = 0
+    failed = 0
+    try:
+        existing = await account.list_kbs()
+        prefix = f"{args.kb_prefix}-"
+        matches = sorted(
+            (slug, kbid)
+            for slug, kbid in existing.items()
+            if slug.startswith(prefix)
+            and slug[len(prefix):].isascii()
+            and slug[len(prefix):].isdigit()
+        )
+        for slug, kbid in matches:
+            if args.dry_run:
+                print(f"Would delete {slug} ({kbid})")
+                continue
+            try:
+                await account.delete_kb(kbid)
+            except httpx.HTTPError as exc:
+                failed += 1
+                print(f"Failed to delete {slug} ({kbid}): {exc}", file=sys.stderr)
+            else:
+                deleted += 1
+                print(f"Deleted {slug} ({kbid})")
+        print(f"Matched={len(matches)} deleted={deleted} failed={failed}")
+        if failed:
+            raise SystemExit(1)
+    finally:
+        await account.client.aclose()
+
+
 async def cmd_run(args):
     plan = plan_distribution(args.scale, args.seed, args.sigma, args.kb_prefix)
     account = AccountAPI(args)
@@ -478,6 +523,13 @@ def main():
     p = sub.add_parser("run", parents=[plan_args, push_args], help="Create KBs from the plan and fill them")
     p.add_argument("--report", default=None, help="Append one JSON line per KB to this path")
 
+    p = sub.add_parser("delete", help="Delete synthetic KBs matching <prefix>-<number>")
+    p.add_argument("--token", default=os.environ.get("NUCLIA_TOKEN"), required="NUCLIA_TOKEN" not in os.environ)
+    p.add_argument("--timeout", type=float, default=120)
+    p.add_argument("--kb-prefix", default="sizing-kb")
+    p.add_argument("--dry-run", action="store_true", help="List matching KBs without deleting")
+    p.add_argument("--yes", action="store_true", help="Confirm deletion of all matching KBs")
+
     args = parser.parse_args()
     if args.command == "plan":
         cmd_plan(args)
@@ -485,6 +537,8 @@ def main():
         asyncio.run(cmd_ingest(args))
     elif args.command == "run":
         asyncio.run(cmd_run(args))
+    elif args.command == "delete":
+        asyncio.run(cmd_delete(args))
 
 
 if __name__ == "__main__":

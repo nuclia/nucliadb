@@ -260,11 +260,22 @@ class DocumentManager:
         if not uris:
             return []
         params = _with_txid(params, tx)
-        params["uri"] = uris if isinstance(uris, list) else [uris]
+        uris = uris if isinstance(uris, list) else [uris]
         params["format"] = "json"
-        response = await self._http.get(
-            "/v1/documents", params=params, headers={"Accept": "multipart/mixed"}
-        )
+        if len(uris) > 1:
+            params.pop("uri", None)
+            params.update(view="none", start=1, pageLength=len(uris))
+            response = await self._http.post(
+                "/v1/search",
+                params=params,
+                json={"query": {"document-query": {"uri": uris}}},
+                headers={"Accept": "multipart/mixed"},
+            )
+        else:
+            params["uri"] = uris
+            response = await self._http.get(
+                "/v1/documents", params=params, headers={"Accept": "multipart/mixed"}
+            )
         if response.status_code == 404:
             if "No such database" in response.text or "XDMP-NOSUCHDB" in response.text:
                 _check(response, "read documents")
