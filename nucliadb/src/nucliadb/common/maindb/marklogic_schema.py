@@ -57,6 +57,8 @@ KB_PATH_INDEXES = (
     MarkLogicIndexPaths.FACETS,
     MarkLogicIndexPaths.RESOURCE_FACETS,
     MarkLogicIndexPaths.ACCESS_GROUPS,
+    "/relations/source_normalized",
+    "/relations/destination_normalized",
 )
 
 # Expands fuzzy keyword patterns into indexed words, so fuzzy matches get BM25 scores

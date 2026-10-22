@@ -28,10 +28,13 @@ from nidx_protos import noderesources_pb2 as brain
 
 from nucliadb.common import datamanagers
 from nucliadb.common.datamanagers.resources import ResourceCreateContent, ResourceUpdateContent
+from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.common.maindb.exceptions import ConflictError, MaindbServerError
 from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
-from nucliadb.common.marklogic import documents
+from nucliadb.common.marklogic import documents, graph
+from nucliadb.common.marklogic.document_update import DocumentUpdate
+from nucliadb.common.marklogic.uris import MarkLogicURIs
 from nucliadb.common.models_utils import from_proto
 from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.exceptions import (
@@ -58,10 +61,12 @@ from nucliadb.ingest.orm.resource import (
     MAX_FIELD_STATUS_ERRORS,
     Resource,
 )
+from nucliadb_models.labels import LABEL_HIDDEN
 from nucliadb_models.metadata import ResourceProcessingStatus
 from nucliadb_protos import (
     knowledgebox_pb2,
     resources_pb2,
+    utils_pb2,
     writer_pb2,
 )
 from nucliadb_utils import const
@@ -327,6 +332,7 @@ class ProcessorMarkLogic:
                     for classification in basic.usermetadata.classifications
                     if not classification.cancelled_by_user
                 }
+                | ({LABEL_HIDDEN} if basic.hidden else set())
             ),
         )
 
@@ -338,8 +344,6 @@ class ProcessorMarkLogic:
         uuid: str,
     ) -> None:
         content = self.writer_resource_content(bm, uuid)
-        # TODO(Marklogic): origin relation triplets
-        # TODO(Marklogic): user relation triplets
         await datamanagers.resources.create_resource(txn, kbid=kbid, rid=uuid, data=content)
 
         # User relations are stored in the object store
@@ -458,7 +462,7 @@ class ProcessorMarkLogic:
                 field=fpc,
                 chunks=chunks,
                 embeddings=embeddings,
-                skip_field_texts=im.skip_texts,
+                skip_field_texts=False,
                 skip_chunks=im.skip_paragraphs,
             )
 
@@ -512,6 +516,7 @@ class ProcessorMarkLogic:
                         for classification in basic.usermetadata.classifications
                         if not classification.cancelled_by_user
                     }
+                    | ({LABEL_HIDDEN} if basic.hidden else set())
                 ),
             )
         timestamps: tuple[tuple[Literal["created", "modified"], str], ...] = (
@@ -573,7 +578,19 @@ class ProcessorMarkLogic:
         if bm.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR:
             return await builder.for_processor_bm(bm)
         elif bm.source == writer_pb2.BrokerMessage.MessageSource.WRITER:
-            return await builder.for_writer_bm(bm, resource_created=is_new_resource)
+            message = await builder.for_writer_bm(bm, resource_created=is_new_resource)
+            for name in ("title", "summary"):
+                value = getattr(bm.basic, name)
+                if value:
+                    field_key = f"a/{name}"
+                    message.texts[field_key].text = value
+                    paragraph_id = f"{uuid}/{field_key}/0-{len(value)}"
+                    paragraph = message.paragraphs[field_key].paragraphs[paragraph_id]
+                    paragraph.start = paragraph.metadata.position.start = 0
+                    paragraph.end = paragraph.metadata.position.end = len(value)
+                    message.paragraphs_to_delete.append(f"{uuid}/{field_key}")
+                    message.skip_texts = message.skip_paragraphs = False
+            return message
         else:
             raise ValueError(f"Unknown message source: {bm.source}")
 
@@ -717,23 +734,87 @@ async def get_field_processed_contents(
 ) -> list[tuple[FieldProcessedContent, list[ChunkContent], list[ChunkEmbeddingContent]]]:
     """Processed documents of the index message fields, with the copies of their resource properties."""
     resource_id = im.resource.uuid
-    if not im.texts:
-        return []
     resource_copies = await datamanagers.resources.get_processed_field_copies(
         txn, kbid=kbid, rid=resource_id
     )
     contents = []
-    for fid, text_data in im.texts.items():
-        field_type, field_id = fid.split("/")
-        field_text = text_data.text
-        field = FieldProcessedContent(
-            resource_id=resource_id,
-            field_id=field_id,
-            field_type=field_type,
-            extracted_text=field_text,
-            facets=list(text_data.labels),
-            **resource_copies,
+    if "a/metadata" in im.field_relations or "a/metadata" in im.relation_fields_to_delete:
+        resource_relations = [
+            graph.relation_content(relation, "", index)
+            for index, relation in enumerate(im.field_relations["a/metadata"].relations)
+        ]
+        await documents.update_document(
+            txn,
+            DocumentUpdate(
+                uri=MarkLogicURIs.resource(resource_id), collection=MarkLogicCollections.RESOURCES
+            ).set(relations=resource_relations),
         )
+        await documents.delete(txn, MarkLogicURIs.field_processed(resource_id, "metadata", "a"))
+    field_ids = (
+        set(im.texts)
+        | set(im.field_relations)
+        | set(im.field_node_vectors)
+        | set(im.field_edge_vectors)
+        | set(im.relation_fields_to_delete)
+    )
+    for fid in sorted(field_ids):
+        if fid == "a/metadata":
+            continue
+        field_type, field_id = fid.split("/")
+        uri = MarkLogicURIs.field_processed(resource_id, field_id, field_type)
+        previous = await documents.read(txn, uri)
+        field = FieldProcessedContent.model_validate(
+            previous
+            or dict(
+                resource_id=resource_id,
+                field_id=field_id,
+                field_type=field_type,
+                extracted_text="",
+                facets=[],
+            )
+        )
+        for name, value in resource_copies.items():
+            setattr(field, name, value)
+        if fid in im.texts and not im.skip_texts:
+            field.extracted_text = im.texts[fid].text
+            field.facets = list(im.texts[fid].labels)
+        if fid in im.relation_fields_to_delete:
+            field.relations = []
+        occurrence_start = len(field.relations)
+        field.relations.extend(
+            graph.relation_content(relation, f"{resource_id}/{fid}", occurrence_start + index)
+            for index, relation in enumerate(im.field_relations[fid].relations)
+        )
+        full_field_id = f"{resource_id}/{fid}"
+        replaced_models = {
+            model
+            for model, prefixes in im.vector_prefixes_to_delete.items()
+            if full_field_id in prefixes.items
+        }
+        if full_field_id in im.vectors_to_delete_in_all_vectorsets:
+            field.graph_vectors = []
+        else:
+            field.graph_vectors = [
+                entry for entry in field.graph_vectors if entry["model_id"] not in replaced_models
+            ]
+        for kind, models, value_key in (
+            ("node", im.field_node_vectors[fid].node_vectors, "node_value"),
+            ("edge", im.field_edge_vectors[fid].edge_vectors, "relation_label"),
+        ):
+            for model, vectors in models.items():
+                field.graph_vectors.extend(
+                    dict(
+                        kind=kind,
+                        model_id=model,
+                        value=getattr(vector, value_key),
+                        normalized=graph.normalize(getattr(vector, value_key)),
+                        vector=list(vector.vector),
+                    )
+                    for vector in vectors.vectors
+                )
+        if fid not in im.texts and previous is None and not field.relations and not field.graph_vectors:
+            continue
+        field_text = field.extracted_text
         chunks = []
         embeddings = []
         field_paragraphs = im.paragraphs.get(fid) or brain.IndexParagraphs()
@@ -803,9 +884,21 @@ class IndexMessageBuilderV2(IndexMessageBuilder):
         fields = await datamanagers.fields.list_resource_documents(
             self.txn, resource_id=self.resource_id
         )
+        basic = await self.get_basic()
+        fields.extend(
+            (writer_pb2.FieldType.GENERIC, name) for name in ("title", "summary") if getattr(basic, name)
+        )
         return fields
 
     async def get_field_data(self, field_id: writer_pb2.FieldID) -> FieldData:
+        if field_id.field_type == writer_pb2.FieldType.GENERIC:
+            value = getattr(await self.get_basic(), field_id.field)
+            metadata = writer_pb2.FieldComputedMetadata()
+            if value:
+                metadata.metadata.paragraphs.add(start=0, end=len(value))
+            return FieldData(
+                extracted_text=utils_pb2.ExtractedText(text=value), field_computed_metadata=metadata
+            )
         field = await self.resource.get_field(field_id.field, field_id.field_type, load=False)
         et = await field.get_extracted_text()
         fm = await field.get_field_metadata()

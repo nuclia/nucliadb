@@ -371,6 +371,9 @@ class MarkLogicDriver:
                     marklogic_schema.KB_WORD_LEXICON_PROPERTIES,
                 )
             await self._wait_until_queryable(database)
+            from nucliadb.common.marklogic.graph import ensure_view
+
+            await ensure_view(self, database)
             self._provisioned.add(database)
         return database
 

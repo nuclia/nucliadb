@@ -59,6 +59,8 @@ class FieldProcessedContent(BaseModel):
     # Copies of the resource properties, see resources.PROCESSED_FIELD_COPIES
     resource_facets: list[str] = []
     security: dict[str, Any] | None = None
+    relations: list[dict[str, Any]] = []
+    graph_vectors: list[dict[str, Any]] = []
 
 
 class ChunkContent(BaseModel):
@@ -189,11 +191,15 @@ async def create_processed_documents(
 ) -> None:
     marklogic_txn = _marklogic_txn(txn, ensure_writes=True)
     if not skip_field_texts:
+        content = field.model_dump(mode="json")
+        for name in ("relations", "graph_vectors"):
+            if not content[name]:
+                content.pop(name)
         await documents.write(
             marklogic_txn,
             uri=MarkLogicURIs.field_processed(field.resource_id, field.field_id, field.field_type),
             collection=MarkLogicCollections.FIELDS_PROCESSED,
-            content=field.model_dump(mode="json"),
+            content=content,
         )
     if not skip_chunks and chunks:
         await documents.write_many(

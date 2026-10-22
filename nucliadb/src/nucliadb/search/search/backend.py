@@ -23,10 +23,12 @@ from typing import Any, NamedTuple
 
 from google.protobuf.json_format import ParseDict
 from nidx_protos.nodereader_pb2 import (
+    ENTITIES,
     DocumentScored,
     DocumentVectorIdentifier,
     FilterExpression,
     FilterOperator,
+    GraphQuery,
     GraphSearchRequest,
     GraphSearchResponse,
     ParagraphResult,
@@ -44,8 +46,10 @@ from nucliadb.common.maindb.marklogic_schema import STRING_COLLATION
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.marklogic import documents, vector_views
 from nucliadb.common.marklogic.uris import MarkLogicURIs
+from nucliadb.search.search.graph_backend import append_graph_results, graph_expression
 from nucliadb.search.search.keyword_terms import keyword_terms
 from nucliadb.search.search.metrics import semantic_search_mode
+from nucliadb_protos import utils_pb2
 
 # Below this many candidate embeddings, an exact scan is cheaper and more precise than ANN
 EXACT_VECTOR_SEARCH_MAX_CANDIDATES = 1000
@@ -279,6 +283,31 @@ def _prefilter_javascript(
     return " ".join(lines)
 
 
+def _graph_resource_scope(field_filter: FilterExpression | None, groups: list[str] | None) -> str:
+    def resource_expression(expression: FilterExpression) -> str:
+        kind = expression.WhichOneof("expr")
+        if kind in ("bool_and", "bool_or"):
+            operation = "andQuery" if kind == "bool_and" else "orQuery"
+            operands = [resource_expression(item) for item in getattr(expression, kind).operands]
+            return f"cts.{operation}([{', '.join(operands)}])"
+        if kind == "bool_not":
+            return f"cts.notQuery({resource_expression(expression.bool_not)})"
+        if kind == "resource":
+            return f"cts.documentQuery({json.dumps(MarkLogicURIs.resource(expression.resource.resource_id))})"
+        if kind == "facet":
+            return f"facetQuery({json.dumps(expression.facet.facet)})"
+        return "cts.falseQuery()"
+
+    restriction = resource_expression(field_filter) if field_filter is not None else "cts.trueQuery()"
+    security = (
+        f"cts.notQuery(deniedQuery({json.dumps(groups)}))" if groups is not None else "cts.trueQuery()"
+    )
+    return (
+        "const graphResourceQuery = cts.andQuery([cts.collectionQuery(COLLECTIONS.resources), "
+        f"{security}, {restriction}]);"
+    )
+
+
 def _search_javascript(query: SearchRequest, *, lexical: bool, semantic: bool) -> str:
     field_filter = query.field_filter if query.HasField("field_filter") else None
     paragraph_filter = query.paragraph_filter if query.HasField("paragraph_filter") else None
@@ -297,14 +326,22 @@ def _search_javascript(query: SearchRequest, *, lexical: bool, semantic: bool) -
         if semantic
         else "[]"
     )
+    graph_query = GraphSearchRequest(top_k=max(0, query.result_per_page))
+    if query.HasField("graph_search"):
+        graph_query.query.CopyFrom(query.graph_search.query)
+        graph_query.graph_node_vectorset = query.graph_node_vectorset
+        graph_query.graph_edge_vectorset = query.graph_edge_vectorset
+        graph_query.min_score_node_semantic = query.min_score_node_semantic
+        graph_query.min_score_edge_semantic = query.min_score_edge_semantic
     return " ".join(
         [
             "(() => {",
             _CONSTANTS_JS,
             _HELPERS_JS,
             _prefilter_javascript(field_filter, security_groups, paragraph_or=paragraph_or),
+            _graph_resource_scope(field_filter, security_groups),
             f"const paragraphOr = {json.dumps(paragraph_or)};",
-            "if (fieldDirs !== null && !fieldDirs.length && !paragraphOr) return {chunks: [], embeddings: []};",
+            f"if (fieldDirs !== null && !fieldDirs.length && !paragraphOr && {json.dumps(not query.HasField('graph_search'))}) return {{chunks: [], embeddings: []}};",
             f"const paragraphQuery = {paragraph_query.js if paragraph_query else 'null'};",
             "const fieldQuery = fieldDirs === null ? null : dirsQuery(fieldDirs);",
             "const filterQuery = paragraphQuery === null ? fieldQuery : "
@@ -313,7 +350,7 @@ def _search_javascript(query: SearchRequest, *, lexical: bool, semantic: bool) -
             "const chunkScope = filterQuery === null ? securityQuery : cts.andQuery([securityQuery, filterQuery]);",
             "const embeddingScope = !paragraphOr && fieldQuery !== null ? "
             "cts.andQuery([securityQuery, fieldQuery]) : securityQuery;",
-            f"return {{chunks: {chunks}, embeddings: {embeddings}, semantic_mode: semanticMode}};",
+            f"return {{chunks: {chunks}, embeddings: {embeddings}, graph: {graph_expression(graph_query)}, semantic_mode: semanticMode}};",
             "})()",
         ]
     )
@@ -327,7 +364,7 @@ async def hybrid_search(kbid: str, query: SearchRequest) -> SearchResponse:
     response = SearchResponse()
     lexical = query.paragraph and bool(query.body)
     semantic = bool(query.vector)
-    if not lexical and not semantic:
+    if not lexical and not semantic and not query.HasField("graph_search"):
         return response
 
     javascript = _search_javascript(query, lexical=lexical, semantic=semantic)
@@ -339,6 +376,7 @@ async def hybrid_search(kbid: str, query: SearchRequest) -> SearchResponse:
         _append_vector_results(response, _flatten_eval_array(result.get("embeddings", [])))
         if result.get("semantic_mode"):
             semantic_search_mode.inc({"mode": result["semantic_mode"]})
+    append_graph_results(response.graph, _flatten_eval_array(result.get("graph", [])))
     return response
 
 
@@ -480,12 +518,46 @@ def _vector_results_expression(query: SearchRequest, paragraph_filtered: bool) -
 
 
 async def suggest(kbid: str, query: SuggestRequest) -> SuggestResponse:
-    # TODO(Marklogic): Execute the suggestion request against the indexing backend, scoped by
-    # _prefilter_javascript(query.field_filter, query.security.access_groups) like hybrid_search.
-    return SuggestResponse()
+    response = SuggestResponse(query=query.body)
+    if ENTITIES in query.features and query.body.strip():
+        graph_query = GraphSearchRequest(kind=GraphSearchRequest.NODES, top_k=query.top_k or 20)
+        for name in ("security", "field_filter"):
+            if query.HasField(name):
+                getattr(graph_query, name).CopyFrom(getattr(query, name))
+        terms = query.body.split()
+        for start in range(max(0, len(terms) - 3), len(terms)):
+            path = graph_query.query.path.bool_or.operands.add().path
+            path.source.value = " ".join(terms[start:])
+            path.source.node_type = utils_pb2.RelationNode.ENTITY
+            path.source.fuzzy.kind = GraphQuery.Node.PREFIX
+            path.source.fuzzy.distance = 1
+        result = await graph_search(kbid, graph_query)
+        response.entity_results.nodes.extend(result.nodes)
+    return response
 
 
 async def graph_search(kbid: str, query: GraphSearchRequest) -> GraphSearchResponse:
-    # TODO(Marklogic): Execute the graph request against the indexing backend, scoped by
-    # _prefilter_javascript(query.field_filter, query.security.access_groups) like hybrid_search.
-    return GraphSearchResponse()
+    driver = get_driver()
+    response = GraphSearchResponse()
+    if not isinstance(driver, MarkLogicDriver):
+        return response
+    field_filter = query.field_filter if query.HasField("field_filter") else None
+    groups = list(query.security.access_groups) if query.HasField("security") else None
+    javascript = " ".join(
+        [
+            "(() => {",
+            _CONSTANTS_JS,
+            _HELPERS_JS,
+            _prefilter_javascript(field_filter, groups),
+            _graph_resource_scope(field_filter, groups),
+            f"return {graph_expression(query)};",
+            "})()",
+        ]
+    )
+    async with driver.ro_transaction(kbid=kbid) as txn:
+        matches = _flatten_eval_array(await documents.evaluate(txn, javascript))
+    if query.kind == GraphSearchRequest.RELATIONS:
+        for match in matches:
+            match.pop("source_value", None)
+    append_graph_results(response, matches)
+    return response

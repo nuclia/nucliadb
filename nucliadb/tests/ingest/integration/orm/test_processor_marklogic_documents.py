@@ -711,6 +711,11 @@ async def test_writer_persists_resource_and_fields(maindb_driver: MarkLogicDrive
                 resource_id=resource_id,
                 collection=MarkLogicCollections.FIELDS_PROCESSED,
             )
+            assert len(resource["relations"]) == 1
+            classification = resource["relations"][0]
+            assert classification["source_value"] == resource_id
+            assert classification["destination_value"] == "topic/first"
+            assert classification["relation_type"] == utils_pb2.Relation.ABOUT
             assert processed_fields == {
                 MarkLogicURIs.field_processed(resource_id, "summary", "a"): {
                     "resource_id": resource_id,
@@ -779,8 +784,11 @@ async def test_writer_persists_resource_and_fields(maindb_driver: MarkLogicDrive
                 processed_fields[MarkLogicURIs.field_processed(resource_id, "title", "a")][
                     "extracted_text"
                 ]
-                == "MarkLogic integration resource"
+                == "Updated title"
             )
+            assert [relation["destination_value"] for relation in resource["relations"]] == [
+                "topic/second"
+            ]
             assert (
                 processed_fields[MarkLogicURIs.field_processed(resource_id, "summary", "a")][
                     "extracted_text"
