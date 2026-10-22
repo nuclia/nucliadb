@@ -95,3 +95,29 @@ def test_push_scope_no_sentry() -> None:
         with errors.push_scope() as scope:
             scope.set_extra("key", "value")
         mock_sentry_sdk.push_scope.assert_not_called()
+
+
+def test_sentry_logging_integration_only_reports_allowed_loggers() -> None:
+    import logging
+
+    import sentry_sdk
+
+    events: list = []
+
+    def before_send(event, hint):
+        events.append(event)
+        return None
+
+    sentry_sdk.init(
+        dsn="https://key@example.com/1",
+        default_integrations=False,
+        integrations=[errors.SentryLoggingIntegration(["allowed"])],
+        before_send=before_send,
+    )
+    try:
+        logging.getLogger("other").error("ignored")
+        logging.getLogger("allowed.child").error("reported")
+    finally:
+        sentry_sdk.get_client().close(timeout=0)
+
+    assert [e["logentry"]["message"] for e in events] == ["reported"]

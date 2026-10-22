@@ -27,7 +27,6 @@ try:
     import sentry_sdk
     from sentry_sdk import Scope
     from sentry_sdk.integrations.logging import (
-        BreadcrumbHandler,
         EventHandler,
         LoggingIntegration,
     )
@@ -37,10 +36,10 @@ except ImportError:  # pragma: no cover
     Scope = sentry_sdk = None  # type: ignore
 
     class LoggingIntegration:  # type: ignore[no-redef]
-        def __init__(self, level):
+        def __init__(self, *args, **kwargs):
             pass
 
-    EventHandler = BreadcrumbHandler = LoggingIntegration  # type: ignore
+    EventHandler = LoggingIntegration  # type: ignore
     SENTRY = False
 
 
@@ -123,7 +122,9 @@ class SentryHandler(EventHandler):
 
 class SentryLoggingIntegration(LoggingIntegration):  # ty: ignore[unsupported-base]
     def __init__(self, allowed_loggers: list[str], level=logging.INFO, event_level=logging.ERROR):
-        self._breadcrumb_handler = BreadcrumbHandler(level=level)
+        # Let the base class initialize every handler attribute that newer
+        # sentry-sdk versions expect, then swap in our filtered event handler.
+        super().__init__(level=level, event_level=None)
         self._handler = SentryHandler(allowed_loggers, level=event_level)
 
 
