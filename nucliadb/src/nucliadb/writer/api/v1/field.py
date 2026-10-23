@@ -19,10 +19,9 @@
 #
 from collections.abc import Callable
 from inspect import iscoroutinefunction
-from typing import TYPE_CHECKING, Annotated, cast
+from typing import TYPE_CHECKING, Annotated
 
-import pydantic
-from fastapi import HTTPException, Path, Query, Response
+from fastapi import HTTPException, Query, Response
 from fastapi_versioning import version
 from starlette.requests import Request
 
@@ -31,15 +30,12 @@ from nucliadb.common import datamanagers
 from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.common.models_utils import to_proto
-from nucliadb.ingest.fields.conversation import Conversation
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.knowledgebox import Resource as ORMResource
 from nucliadb.models.internal.processing import PushPayload, Source
 from nucliadb.writer import SERVICE_NAME, transaction
 from nucliadb.writer.api.constants import (
     X_FILE_PASSWORD,
     X_NUCLIADB_USER,
-    X_SKIP_STORE,
 )
 from nucliadb.writer.api.v1.resource import (
     get_rid_from_slug_or_raise_error,
@@ -65,7 +61,7 @@ from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import KeyValueField, ResourceFieldAdded, ResourceUpdated
 from nucliadb_protos import resources_pb2
 from nucliadb_protos.resources_pb2 import FieldID, Metadata
-from nucliadb_protos.writer_pb2 import BrokerMessage, DeleteSplits, FieldIDStatus, FieldStatus
+from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
 from nucliadb_utils.utilities import (
@@ -310,254 +306,6 @@ FIELD_PARSERS_MAP: dict[type, Callable] = {
 
 # API endpoints
 
-# Key-value field endpoints — follow the same pattern as text, link, file, conversation.
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/key_value/{{field_id}}",
-    status_code=201,
-    summary="Add resource key-value field (by slug)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_key_value_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: FieldIdString,
-    item: KeyValueField,
-):
-    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, item)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/key_value/{{field_id}}",
-    status_code=201,
-    summary="Add resource key-value field (by id)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_key_value_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    item: KeyValueField,
-):
-    return await add_field_to_resource(request, kbid, rid, field_id, item)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/text/{{field_id}}",
-    status_code=201,
-    summary="Add resource text field (by slug)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_text_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: FieldIdString,
-    field_payload: models.TextField,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field_payload)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/text/{{field_id}}",
-    status_code=201,
-    summary="Add resource text field (by id)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_text_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    field_payload: models.TextField,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource(request, kbid, rid, field_id, field_payload)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/link/{{field_id}}",
-    status_code=201,
-    summary="Add resource link field (by slug)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_link_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: FieldIdString,
-    field_payload: models.LinkField,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(request, kbid, rslug, field_id, field_payload)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/link/{{field_id}}",
-    status_code=201,
-    summary="Add resource link field (by id)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_link_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    field_payload: models.LinkField,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource(request, kbid, rid, field_id, field_payload)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}",
-    status_code=201,
-    summary="Add resource conversation field (by slug)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_conversation_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: FieldIdString,
-    field_payload: models.InputConversationField,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field_payload, replace_field=True
-    )
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}",
-    status_code=201,
-    summary="Add resource conversation field (by id)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_conversation_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    field_payload: models.InputConversationField,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource(request, kbid, rid, field_id, field_payload, replace_field=True)
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field_id}}",
-    status_code=201,
-    summary="Add resource file field (by slug)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_file_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: FieldIdString,
-    field_payload: models.FileField,
-    x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field_payload, skip_store=x_skip_store
-    )
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/file/{{field_id}}",
-    status_code=201,
-    summary="Add resource file field (by id)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def add_resource_field_file_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    field_payload: models.FileField,
-    x_skip_store: Annotated[bool, X_SKIP_STORE] = False,
-) -> ResourceFieldAdded:
-    return await add_field_to_resource(
-        request, kbid, rid, field_id, field_payload, skip_store=x_skip_store
-    )
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}/messages",
-    status_code=200,
-    summary="Append messages to conversation field (by slug)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def append_messages_to_conversation_field_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: FieldIdString,
-    messages: list[models.InputMessage],
-) -> ResourceFieldAdded:
-    try:
-        field = models.InputConversationField(messages=messages)
-    except pydantic.ValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    return await add_field_to_resource_by_slug(
-        request, kbid, rslug, field_id, field, replace_field=False
-    )
-
-
-@api.put(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/messages",
-    status_code=200,
-    summary="Append messages to conversation field (by id)",
-    response_model=ResourceFieldAdded,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def append_messages_to_conversation_field_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    messages: list[models.InputMessage],
-) -> ResourceFieldAdded:
-    try:
-        field = models.InputConversationField(messages=messages)
-    except pydantic.ValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    return await add_field_to_resource(request, kbid, rid, field_id, field, replace_field=False)
-
 
 @api.delete(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/{{field_type}}/{{field_id}}",
@@ -791,56 +539,6 @@ async def _reprocess_resource_field(
     return ResourceUpdated(seqid=processing_info.seqid)
 
 
-DELETE_CONVERSATION_MESSAGES_DESCRIPTION = (
-    "Delete a message from a conversation field by its ident. "
-    "This is a convenience endpoint intended for occasional deletions — "
-    "frequent use on the same conversation may degrade read performance over time. "
-    "Deleted message identifiers are permanently reserved and cannot be reused."
-)
-
-
-MessageIdent = Annotated[str, Path(max_length=128, description="The ident of the message to delete")]
-
-
-@api.delete(
-    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}/messages/{{message_ident}}",
-    status_code=204,
-    summary="Delete conversation message (by slug)",
-    description=DELETE_CONVERSATION_MESSAGES_DESCRIPTION,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def delete_conversation_messages_rslug_prefix(
-    request: Request,
-    kbid: str,
-    rslug: str,
-    field_id: FieldIdString,
-    message_ident: MessageIdent,
-) -> Response:
-    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
-    return await _delete_conversation_messages(kbid, rid, field_id, [message_ident])
-
-
-@api.delete(
-    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}/messages/{{message_ident}}",
-    status_code=204,
-    summary="Delete conversation message (by id)",
-    description=DELETE_CONVERSATION_MESSAGES_DESCRIPTION,
-    tags=["Resource fields"],
-)
-@requires(NucliaDBRoles.WRITER)
-@version(1)
-async def delete_conversation_messages_rid_prefix(
-    request: Request,
-    kbid: str,
-    rid: str,
-    field_id: FieldIdString,
-    message_ident: MessageIdent,
-) -> Response:
-    return await _delete_conversation_messages(kbid, rid, field_id, [message_ident])
-
-
 async def validate_field_exists_or_raise_error(
     kbid: str, rid: str, field_id: str, field_type: resources_pb2.FieldType.ValueType
 ):
@@ -851,48 +549,3 @@ async def validate_field_exists_or_raise_error(
         # Field was found, return early
         return
     raise HTTPException(status_code=404, detail="Field does not exist")
-
-
-async def validate_message_idents(kbid: str, rid: str, field_id: str, idents: list[str]) -> list[str]:
-    """
-    Takes the user provided idents to delete and checks agains the conversation metadata to return
-    only the valid idents that can be deleted (i.e. that exist and haven't been previously deleted).
-    This is to avoid sending to process invalid delete messages that would cause unnecessary load.
-    """
-    async with datamanagers.with_ro_transaction() as txn:
-        resource_obj = await ORMResource.get(txn, kbid=kbid, rid=rid)
-        if resource_obj is None:
-            # Resource not found, nothing to delete
-            return []
-        field = await resource_obj.get_field(field_id, resources_pb2.FieldType.CONVERSATION, load=False)
-        conv = cast(Conversation, field)
-        splits_metadata = await conv.get_splits_metadata()
-        previously_deleted_idents = set(splits_metadata.deleted_splits)
-        valid_idents = set(splits_metadata.metadata.keys()) - previously_deleted_idents
-        return list(set(idents) & valid_idents)
-
-
-async def _delete_conversation_messages(
-    kbid: str,
-    rid: str,
-    field_id: str,
-    message_idents: list[str],
-) -> Response:
-    await validate_rid_exists_or_raise_error(kbid, rid)
-    await validate_field_exists_or_raise_error(kbid, rid, field_id, resources_pb2.FieldType.CONVERSATION)
-    to_delete = await validate_message_idents(kbid, rid, field_id, message_idents)
-    if len(to_delete) == 0:
-        # No valid message idents to delete, return early to avoid unnecessary load
-        return Response(status_code=204)
-
-    writer = BrokerMessage(kbid=kbid, uuid=rid, source=BrokerMessage.MessageSource.WRITER)
-    delete_splits = DeleteSplits(
-        field=FieldID(field=field_id, field_type=resources_pb2.FieldType.CONVERSATION),
-        splits=to_delete,
-    )
-    writer.delete_splits.append(delete_splits)
-
-    partitioning = get_partitioning()
-    partition = partitioning.generate_partition(kbid, rid)
-    await transaction.commit(writer, partition)
-    return Response(status_code=204)
