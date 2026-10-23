@@ -127,6 +127,7 @@ class NucliaDBClientType(str, Enum):
     DESKTOP = "desktop"
     CHROME_EXTENSION = "chrome_extension"
     MCP = "mcp"
+    AGENTIC = "agentic"
 
 
 class Sort(int, Enum):
