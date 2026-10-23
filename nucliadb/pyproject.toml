@@ -18,6 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Programming Language :: Python :: 3 :: Only",
 ]
 requires-python = ">=3.11, <4"
@@ -44,7 +45,7 @@ dependencies = [
     "types-psutil>=5.9.5.17",
     "types-aiofiles>=0.8.3",
     "protobuf>=5",
-    "types-protobuf>=5,<6",
+    "types-protobuf>=5,<8",
     "grpcio>=1.71.0",
     "grpcio-health-checking>=1.71.0",
     "grpcio-channelz>=1.71.0",
