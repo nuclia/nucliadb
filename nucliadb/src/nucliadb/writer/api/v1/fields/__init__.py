@@ -17,18 +17,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
-
-from nucliadb.train.utils import get_shard_manager
-
-
-async def get_kb_partitions(kbid: str, prefix: str | None = None) -> list[str]:
-    shard_manager = get_shard_manager()
-    shards = await shard_manager.get_shards_by_kbid_inner(kbid=kbid)
-    valid_shards = []
-    if prefix is None:
-        prefix = ""
-    for shard in shards.shards:
-        if shard.shard.startswith(prefix):
-            valid_shards.append(shard.shard)
-    return valid_shards
+from . import file  # noqa
+from . import link  # noqa
+from . import conversation  # noqa
+from . import text  # noqa
+from . import key_value  # noqa

@@ -19,8 +19,9 @@
 #
 import contextlib
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Final, TypeVar, cast
+from typing import Final, TypeVar, cast
 
 import psycopg
 import psycopg.sql

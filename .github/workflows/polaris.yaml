@@ -31,6 +31,8 @@ jobs:
             polaris_assessment_types: "SAST"
             polaris_test_sast_type: ${{ github.event_name == 'pull_request' && 'SAST_RAPID' || 'SAST_FULL' }}
             polaris_assessment_mode: CI
+            # Pinned: the 2026.9.0 thin client refuses to capture Rust ("record with source")
+            coverity_version: '2026.6.0'
             project_directory: '.'
             include_diagnostics: false
             polaris_prComment_enabled: true

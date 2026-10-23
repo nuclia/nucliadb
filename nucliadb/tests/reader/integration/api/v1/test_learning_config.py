@@ -115,7 +115,6 @@ async def test_api(
         headers={
             "x-nucliadb-account": "account",
             "x-nucliadb-account-type": "stash-enterprise",
-            "x-allow-access-non-enterprise-models": "true",
         },
     )
     assert resp.status_code == 200
@@ -125,7 +124,6 @@ async def test_api(
         {
             "account-id": "account",
             "account-type": "stash-enterprise",
-            "allow-access-non-enterprise-models": "true",
         },
     )
 

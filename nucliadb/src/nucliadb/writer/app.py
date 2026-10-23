@@ -29,7 +29,6 @@ from starlette.responses import HTMLResponse
 
 from nucliadb.middleware import (
     ClientErrorPayloadLoggerMiddleware,
-    KbVisibilityMiddleware,
     UUIDPathParamsValidationMiddleware,
 )
 from nucliadb.writer import API_PREFIX
@@ -49,7 +48,6 @@ middleware = []
 
 middleware.extend(
     [
-        Middleware(KbVisibilityMiddleware),
         Middleware(UUIDPathParamsValidationMiddleware),
         Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
         Middleware(ClientErrorPayloadLoggerMiddleware),
