@@ -18,7 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +30,15 @@ class MarkLogicServerSettings(BaseSettings):
     password: SecretStr | None = None
     admin_port: int = 8002
     system_port: int = 8000
+    preallocated_partitions: int = Field(
+        default=3,
+        ge=1,
+        description="Number of forests created per database, each placed on a different host when possible.",
+    )
+    replication: bool = Field(
+        default=True,
+        description="Create one replica per forest on a different host. Ignored on single-host clusters.",
+    )
 
 
 class ServerNotFoundError(Exception):

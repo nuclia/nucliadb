@@ -27,6 +27,7 @@ from nidx_protos import nodereader_pb2, noderesources_pb2
 
 from nucliadb.common.datamanagers import fields as field_datamanager
 from nucliadb.common.ids import VectorId
+from nucliadb.common.maindb import marklogic_schema
 from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.marklogic import MarkLogicDriver, MarkLogicTransaction
 from nucliadb.common.marklogic import documents, vector_views
@@ -55,6 +56,51 @@ from nucliadb_utils.storages.storage import Storage
 from tests.utils.broker_messages import BrokerMessageBuilder
 
 VECTOR = [0.1, 0.2, 0.3]
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_kb_database_properties(maindb_driver: MarkLogicDriver, storage: Storage):
+    kbid = KnowledgeBox.new_unique_kbid()
+    await KnowledgeBox.create(
+        maindb_driver,
+        kbid=kbid,
+        slug=f"properties-{uuid.uuid4().hex}",
+        semantic_models={
+            "integration-model": SemanticModelMetadata(
+                similarity_function=utils_pb2.VectorSimilarity.COSINE,
+                vector_dimension=len(VECTOR),
+            )
+        },
+    )
+    database = maindb_driver.kb_database(kbid)
+
+    try:
+        async with maindb_driver.admin_client() as client:
+            properties = await client.get_database_properties(database)
+
+        assert properties["schema-database"] == marklogic_schema.SCHEMAS_DATABASE
+        assert properties["triggers-database"] == "Triggers"
+        for key, value in marklogic_schema.DATABASE_PROPERTIES.items():
+            assert properties[key] == value, key
+
+        path_indexes = {item["path-expression"]: item for item in properties["range-path-index"]}
+        assert set(path_indexes) == set(marklogic_schema.KB_PATH_INDEXES)
+        for index in path_indexes.values():
+            assert index["scalar-type"] == "string"
+            assert index["collation"] == marklogic_schema.STRING_COLLATION
+
+        lexicons = {item["localname"] for item in properties["element-word-lexicon"]}
+        assert lexicons == set(marklogic_schema.KB_WORD_LEXICON_PROPERTIES)
+
+        excluded = {item["excluded-path-expression"] for item in properties["excluded-path"]}
+        assert excluded == set(marklogic_schema.KB_EXCLUDED_PATHS)
+
+        assert set(properties["forest"]) == {
+            f"{database}-forest-{partition}"
+            for partition in range(maindb_driver.preallocated_partitions)
+        }
+    finally:
+        await KnowledgeBox.delete(maindb_driver, kbid)
 
 
 @pytest.mark.deploy_modes("standalone")

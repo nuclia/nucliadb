@@ -55,6 +55,8 @@ def marklogic_maindb_settings() -> dict:
         "password": "admin",
         "port": 8000,
         "admin_port": 8002,
+        "preallocated_partitions": 1,
+        "replication": False,
     }
 
 

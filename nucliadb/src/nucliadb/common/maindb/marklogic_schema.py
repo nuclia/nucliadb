@@ -21,11 +21,14 @@
 
 from __future__ import annotations
 
+import logging
 import zlib
 from collections.abc import Sequence
 
 from nucliadb.common.maindb.index_paths import MarkLogicIndexPaths
 from nucliadb.common.marklogic.admin_client import AdminClient
+
+logger = logging.getLogger(__name__)
 
 STRING_COLLATION = "http://marklogic.com/collation/codepoint"
 SCHEMAS_DATABASE = "Schemas"
@@ -64,6 +67,9 @@ KB_PATH_INDEXES = (
 # Expands fuzzy keyword patterns into indexed words, so fuzzy matches get BM25 scores
 KB_WORD_LEXICON_PROPERTIES = ("text",)
 
+# Kept out of the universal index, so every float of the chunk embeddings is not indexed
+KB_EXCLUDED_PATHS = ("//vector",)
+
 
 def _word_lexicon(prop: str) -> dict:
     return {"namespace-uri": "", "localname": prop, "collation": STRING_COLLATION}
@@ -79,16 +85,37 @@ def _path_index(path: str) -> dict:
     }
 
 
-async def _ensure_forest(client: AdminClient, database: str) -> None:
-    forest_name = f"{database}-forest"
-    if await client.get_forest(forest_name) is not None:
+def _excluded_path(path: str) -> dict:
+    return {"excluded-path-expression": path}
+
+
+async def _ensure_forests(
+    client: AdminClient, database: str, partitions: int, replication: bool
+) -> None:
+    # Databases provisioned before partitioning keep their single forest
+    if await client.get_forest(f"{database}-forest") is not None:
         return
     hosts = sorted(await client.list_hosts())
     if not hosts:
         raise RuntimeError("MarkLogic returned no hosts for forest creation")
+    if replication and len(hosts) < 2:
+        logger.warning(
+            "Forest replication requires at least two hosts, creating forests without replicas",
+            extra={"database": database},
+        )
+        replication = False
     # Stable hash so forests are spread evenly across the cluster instead of piling on one host
-    host = hosts[zlib.crc32(database.encode()) % len(hosts)]
-    await client.create_forest(forest_name, host=host, database=database)
+    offset = zlib.crc32(database.encode())
+    for partition in range(partitions):
+        forest_name = f"{database}-forest-{partition}"
+        if await client.get_forest(forest_name) is not None:
+            continue
+        host = hosts[(offset + partition) % len(hosts)]
+        replica = None
+        if replication:
+            replica_host = hosts[(offset + partition + 1) % len(hosts)]
+            replica = (f"{forest_name}-replica", replica_host)
+        await client.create_forest(forest_name, host=host, database=database, replica=replica)
 
 
 async def _reconcile_properties(
@@ -96,6 +123,7 @@ async def _reconcile_properties(
     database: str,
     path_indexes: Sequence[str],
     word_lexicon_properties: Sequence[str],
+    excluded_paths: Sequence[str],
 ) -> None:
     properties = await client.get_database_properties(database)
     changed: dict = {key: value for key, value in DATABASE_PROPERTIES.items() if not properties.get(key)}
@@ -118,6 +146,17 @@ async def _reconcile_properties(
             *existing_lexicons,
             *(_word_lexicon(prop) for prop in missing_lexicons),
         ]
+    existing_excluded = properties.get("excluded-path", [])
+    missing_excluded = [
+        path
+        for path in excluded_paths
+        if not any(item.get("excluded-path-expression") == path for item in existing_excluded)
+    ]
+    if missing_excluded:
+        changed["excluded-path"] = [
+            *existing_excluded,
+            *(_excluded_path(path) for path in missing_excluded),
+        ]
     if not changed:
         return
     await client.update_database_properties(database, changed)
@@ -128,8 +167,12 @@ async def ensure_database(
     database: str,
     path_indexes: Sequence[str],
     word_lexicon_properties: Sequence[str] = (),
+    excluded_paths: Sequence[str] = (),
+    *,
+    partitions: int,
+    replication: bool,
 ) -> None:
-    """Create the database with its forest and indexes, or reconcile an existing one."""
+    """Create the database with its forests and indexes, or reconcile an existing one."""
     if await client.get_database(database) is None:
         await client.create_database(
             {
@@ -139,8 +182,11 @@ async def ensure_database(
                 **DATABASE_PROPERTIES,
                 "range-path-index": [_path_index(path) for path in path_indexes],
                 "element-word-lexicon": [_word_lexicon(prop) for prop in word_lexicon_properties],
+                "excluded-path": [_excluded_path(path) for path in excluded_paths],
             }
         )
     else:
-        await _reconcile_properties(client, database, path_indexes, word_lexicon_properties)
-    await _ensure_forest(client, database)
+        await _reconcile_properties(
+            client, database, path_indexes, word_lexicon_properties, excluded_paths
+        )
+    await _ensure_forests(client, database, partitions, replication)

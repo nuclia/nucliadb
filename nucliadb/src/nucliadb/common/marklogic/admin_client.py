@@ -120,11 +120,20 @@ class AdminClient:
         _check(response, "inspect forest")
         return response.json()
 
-    async def create_forest(self, forest: str, host: str, database: str) -> None:
+    async def create_forest(
+        self, forest: str, host: str, database: str, replica: tuple[str, str] | None = None
+    ) -> None:
+        """`replica` is an optional (replica forest name, replica host) pair."""
+        payload: dict[str, Any] = {"forest-name": forest, "host": host, "database": database}
+        if replica is not None:
+            replica_name, replica_host = replica
+            payload["forest-replicas"] = {
+                "forest-replica": [{"replica-name": replica_name, "host": replica_host}]
+            }
         response = await self._http.post(
             "/manage/v2/forests",
             params={**_JSON, "wait-for-forest-to-mount": "true"},
-            json={"forest-name": forest, "host": host, "database": database},
+            json=payload,
         )
         _check(response, "create forest")
 

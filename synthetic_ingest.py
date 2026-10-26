@@ -36,6 +36,7 @@ import time
 from collections import Counter
 from pathlib import Path
 
+import backoff
 import httpx
 from faker import Faker
 
@@ -46,7 +47,7 @@ from nucliadb_models.security import ResourceSecurity
 from nucliadb_models.text import TextField, TextFormat
 from nucliadb_models.writer import CreateResourcePayload
 from nucliadb_sdk import NucliaDBAsync
-from nucliadb_sdk.v2.exceptions import ConflictError, RateLimitError
+from nucliadb_sdk.v2.exceptions import AuthError, ConflictError, RateLimitError, UnknownError
 
 # Dev cluster where the MarkLogic implementation is deployed
 NUCLIA_API_URL = "https://gcp-dev-1.dp.gcp-global-dev-1.nuclia.io/api"
@@ -108,6 +109,30 @@ SECURITY_GROUPS = [
 ]
 # Fraction of resources without access groups (visible to everyone)
 PUBLIC_RESOURCE_RATIO = 0.2
+
+
+class InvalidTokenError(RuntimeError):
+    """Raised when the API rejects the configured bearer token with HTTP 401."""
+
+
+def http_status_code(exc: Exception) -> int | None:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code
+    if isinstance(exc, AuthError):
+        message = str(exc)
+        if message.startswith("Auth error "):
+            status = message.removeprefix("Auth error ").partition(":")[0]
+            return int(status) if status.isdigit() else None
+    if isinstance(exc, UnknownError):
+        prefix = "Unknown error connecting to API: "
+        status = str(exc).removeprefix(prefix).partition(":")[0]
+        return int(status) if str(exc).startswith(prefix) and status.isdigit() else None
+    return None
+
+
+def fail_if_token_rejected(exc: Exception) -> None:
+    if http_status_code(exc) == 401:
+        raise InvalidTokenError("Nuclia rejected the bearer token (HTTP 401); stopping the run") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -258,23 +283,70 @@ def build_client(args) -> NucliaDBAsync:
     return NucliaDBAsync(url=NUCLIA_API_URL, headers=auth_headers(args), timeout=args.timeout)
 
 
-async def push_resource(
-    ndb: NucliaDBAsync, kbid: str, payload: CreateResourcePayload, args
-) -> str:
-    for attempt in range(args.retries + 1):
-        try:
-            await ndb.create_resource(kbid=kbid, content=payload)
-            return "created"
-        except ConflictError:
-            # Slug already exists: resource pushed in a previous run
-            return "skipped"
-        except RateLimitError as exc:
-            await asyncio.sleep(exc.try_after or 2**attempt)
-        except (httpx.TransportError, httpx.TimeoutException):
-            if attempt == args.retries:
-                raise
-            await asyncio.sleep(2**attempt)
-    raise RuntimeError("Exhausted retries")
+async def push_resource(ndb: NucliaDBAsync, kbid: str, payload: CreateResourcePayload, args) -> str:
+    if args.retries < 0:
+        raise ValueError("--retries must be non-negative")
+    retryable_statuses = {408, 429, 500, 502, 503, 504}
+    failures = 0
+
+    def status_code(exc):
+        if isinstance(exc, RateLimitError):
+            return 429
+        return http_status_code(exc)
+
+    def giveup(exc):
+        nonlocal failures
+        status = status_code(exc)
+        if isinstance(exc, (UnknownError, httpx.HTTPStatusError)) and status not in retryable_statuses:
+            return True
+        if status == 429:
+            return False
+        failures += 1
+        return failures > args.retries
+
+    def retry_wait():
+        exponential = backoff.expo(max_value=30)
+        next(exponential)
+        exc = yield
+        while True:
+            delay = backoff.full_jitter(next(exponential))
+            if isinstance(exc, RateLimitError):
+                try:
+                    retry_after = float(exc.try_after) if exc.try_after is not None else None
+                except (TypeError, ValueError):
+                    retry_after = None
+                if retry_after is not None and math.isfinite(retry_after) and retry_after >= 0:
+                    delay = max(delay, retry_after)
+            exc = yield delay
+
+    def log_retry(details):
+        error = details["exception"]
+        reason = f"HTTP {status_code(error)}" if status_code(error) else type(error).__name__
+        print(
+            f"[{kbid}][{payload.slug}] {reason}; retry {details['tries']} "
+            f"in {details['wait']:.1f}s ({details['elapsed']:.1f}/300s elapsed)",
+            file=sys.stderr,
+        )
+
+    @backoff.on_exception(
+        retry_wait,
+        (RateLimitError, UnknownError, httpx.TransportError, httpx.HTTPStatusError),
+        max_time=300,
+        jitter=None,
+        giveup=giveup,
+        on_backoff=log_retry,
+    )
+    async def create():
+        await ndb.create_resource(kbid=kbid, content=payload)
+        return "created"
+
+    try:
+        return await create()
+    except ConflictError:
+        return "skipped"
+    except Exception as exc:
+        fail_if_token_rejected(exc)
+        raise
 
 
 async def ingest_kb(
@@ -296,11 +368,9 @@ async def ingest_kb(
                 return
             payload, stats = gen.generate(index)
             try:
-                result = (
-                    "created"
-                    if ndb is None
-                    else await push_resource(ndb, kbid, payload, args)
-                )
+                result = "created" if ndb is None else await push_resource(ndb, kbid, payload, args)
+            except InvalidTokenError:
+                raise
             except Exception as exc:
                 totals["failed"] += 1
                 print(f"[{kbid}][{index}] FAILED: {exc!r}", file=sys.stderr)
@@ -316,12 +386,22 @@ async def ingest_kb(
                     f"skipped={totals['skipped']} failed={totals['failed']} ({rate:.1f} res/s)"
                 )
 
+    async def enqueue_resources():
+        for index in range(start_index, start_index + n_resources):
+            await queue.put(index)
+        for _ in range(args.concurrency):
+            await queue.put(None)
+
     workers = [asyncio.create_task(worker()) for _ in range(args.concurrency)]
-    for index in range(start_index, start_index + n_resources):
-        await queue.put(index)
-    for _ in workers:
-        await queue.put(None)
-    await asyncio.gather(*workers)
+    producer = asyncio.create_task(enqueue_resources())
+    try:
+        await asyncio.gather(producer, *workers)
+    except BaseException:
+        producer.cancel()
+        for task in workers:
+            task.cancel()
+        await asyncio.gather(producer, *workers, return_exceptions=True)
+        raise
 
     elapsed = time.monotonic() - started
     created = totals["created"] or 1
@@ -372,11 +452,23 @@ class AccountAPI:
         return {"x-ndb-client": "admin", **auth_headers(self.args)}
 
     async def list_kbs(self) -> dict[str, str]:
-        resp = await self.client.get(self.kbs_url, headers=self._headers())
-        resp.raise_for_status()
+        try:
+            resp = await self.client.get(self.kbs_url, headers=self._headers())
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            fail_if_token_rejected(exc)
+            raise
         return {kb["slug"]: kb["id"] for kb in resp.json()}
 
-    async def create_kb(self, slug: str) -> str | None:
+    @backoff.on_exception(
+        backoff.expo,
+        httpx.HTTPStatusError,
+        max_tries=6,
+        max_value=30,
+        jitter=backoff.full_jitter,
+        giveup=lambda error: error.response.status_code not in (429, 500, 502, 503, 504),
+    )
+    async def _create_kb(self, slug: str) -> str | None:
         resp = await self.client.post(
             self.kbs_url,
             headers=self._headers(),
@@ -396,6 +488,12 @@ class AccountAPI:
         body = resp.json() if resp.content else {}
         return body.get("id") or body.get("uuid") if isinstance(body, dict) else None
 
+    async def create_kb(self, slug: str) -> str | None:
+        try:
+            return await self._create_kb(slug)
+        except httpx.HTTPStatusError as exc:
+            fail_if_token_rejected(exc)
+            raise
 
     async def delete_kb(self, kbid: str) -> None:
         response = await self.client.delete(
@@ -420,8 +518,8 @@ async def cmd_delete(args):
             (slug, kbid)
             for slug, kbid in existing.items()
             if slug.startswith(prefix)
-            and slug[len(prefix):].isascii()
-            and slug[len(prefix):].isdigit()
+            and slug[len(prefix) :].isascii()
+            and slug[len(prefix) :].isdigit()
         )
         for slug, kbid in matches:
             if args.dry_run:
@@ -430,6 +528,7 @@ async def cmd_delete(args):
             try:
                 await account.delete_kb(kbid)
             except httpx.HTTPError as exc:
+                fail_if_token_rejected(exc)
                 failed += 1
                 print(f"Failed to delete {slug} ({kbid}): {exc}", file=sys.stderr)
             else:
@@ -444,13 +543,15 @@ async def cmd_delete(args):
 
 async def cmd_run(args):
     plan = plan_distribution(args.scale, args.seed, args.sigma, args.kb_prefix)
+    if not 0 <= args.start_kb_index < len(plan):
+        raise ValueError(f"--start-kb-index must be between 0 and {len(plan) - 1}")
     account = AccountAPI(args)
     existing = await account.list_kbs()
     gen = make_generator(args)
     ndb = build_client(args)
     report_file = Path(args.report) if args.report else None
 
-    for i, item in enumerate(plan, 1):
+    for i, item in enumerate(plan[args.start_kb_index :], args.start_kb_index + 1):
         slug = item["kb"]
         kbid = existing.get(slug)
         if kbid is None:
@@ -477,12 +578,18 @@ async def cmd_run(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     plan_args = argparse.ArgumentParser(add_help=False)
-    plan_args.add_argument("--scale", type=float, default=0.1, help="Fraction of production load (default 0.1)")
-    plan_args.add_argument("--seed", type=int, default=42, help="Same seed => same data on both deployments")
+    plan_args.add_argument(
+        "--scale", type=float, default=0.1, help="Fraction of production load (default 0.1)"
+    )
+    plan_args.add_argument(
+        "--seed", type=int, default=42, help="Same seed => same data on both deployments"
+    )
     plan_args.add_argument(
         "--sigma",
         type=float,
@@ -504,7 +611,9 @@ def main():
         default=PARAGRAPHS_PER_FIELD,
         help=f"Mean paragraphs per text field (default {PARAGRAPHS_PER_FIELD:.1f})",
     )
-    push_args.add_argument("--paragraph-sentences", type=int, default=6, help="Mean sentences per paragraph")
+    push_args.add_argument(
+        "--paragraph-sentences", type=int, default=6, help="Mean sentences per paragraph"
+    )
     push_args.add_argument("--concurrency", type=int, default=8)
     push_args.add_argument("--retries", type=int, default=5)
     push_args.add_argument("--timeout", type=float, default=120)
@@ -512,19 +621,33 @@ def main():
 
     sub.add_parser("plan", parents=[plan_args], help="Per-KB resource distribution for a given scale")
 
-    p = sub.add_parser("ingest", parents=[push_args], help="Push synthetic resources into an existing KB")
+    p = sub.add_parser(
+        "ingest", parents=[push_args], help="Push synthetic resources into an existing KB"
+    )
     p.add_argument("--kbid", required=True)
     p.add_argument("--resources", type=int, required=True)
-    p.add_argument("--start-index", type=int, default=0, help="First resource index (for resuming/sharding)")
+    p.add_argument(
+        "--start-index", type=int, default=0, help="First resource index (for resuming/sharding)"
+    )
     p.add_argument("--seed", type=int, default=42, help="Same seed => same data on both deployments")
     p.add_argument("--report", default=None, help="Write the final JSON report to this path")
     p.add_argument("--dry-run", action="store_true", help="Generate payloads without pushing")
 
-    p = sub.add_parser("run", parents=[plan_args, push_args], help="Create KBs from the plan and fill them")
+    p = sub.add_parser(
+        "run", parents=[plan_args, push_args], help="Create KBs from the plan and fill them"
+    )
     p.add_argument("--report", default=None, help="Append one JSON line per KB to this path")
+    p.add_argument(
+        "--start-kb-index",
+        type=int,
+        default=0,
+        help="First KB index to process (zero-based, matches the KB slug suffix; default 0)",
+    )
 
     p = sub.add_parser("delete", help="Delete synthetic KBs matching <prefix>-<number>")
-    p.add_argument("--token", default=os.environ.get("NUCLIA_TOKEN"), required="NUCLIA_TOKEN" not in os.environ)
+    p.add_argument(
+        "--token", default=os.environ.get("NUCLIA_TOKEN"), required="NUCLIA_TOKEN" not in os.environ
+    )
     p.add_argument("--timeout", type=float, default=120)
     p.add_argument("--kb-prefix", default="sizing-kb")
     p.add_argument("--dry-run", action="store_true", help="List matching KBs without deleting")

@@ -281,6 +281,8 @@ class MarkLogicDriver:
         port: int = 8000,
         admin_port: int = 8002,
         kb_database_prefix: str = "nucliadb-kb-",
+        preallocated_partitions: int = 3,
+        replication: bool = True,
     ):
         self.uri = uri
         self.username = username
@@ -289,10 +291,12 @@ class MarkLogicDriver:
         self.port = port
         self.admin_port = admin_port
         self.kb_database_prefix = kb_database_prefix
+        self.preallocated_partitions = preallocated_partitions
+        self.replication = replication
         self._client: Client | None = None
         self._lock = asyncio.Lock()
         self._provisioned: set[str] = set()
-        self._provisioning_lock = asyncio.Lock()
+        self._provisioning_locks: dict[str, asyncio.Lock] = {}
 
     @property
     def client(self) -> Client:
@@ -316,7 +320,11 @@ class MarkLogicDriver:
     async def ensure_system_database(self) -> None:
         async with self.admin_client() as client:
             await marklogic_schema.ensure_database(
-                client, self.system_database, marklogic_schema.SYSTEM_PATH_INDEXES
+                client,
+                self.system_database,
+                marklogic_schema.SYSTEM_PATH_INDEXES,
+                partitions=self.preallocated_partitions,
+                replication=self.replication,
             )
         await self._wait_until_queryable(self.system_database)
 
@@ -360,7 +368,8 @@ class MarkLogicDriver:
         database = self.kb_database(kbid)
         if database in self._provisioned:
             return database
-        async with self._provisioning_lock:
+        provisioning_lock = self._provisioning_locks.setdefault(database, asyncio.Lock())
+        async with provisioning_lock:
             if database in self._provisioned:
                 return database
             async with self.admin_client() as client:
@@ -369,6 +378,9 @@ class MarkLogicDriver:
                     database,
                     marklogic_schema.KB_PATH_INDEXES,
                     marklogic_schema.KB_WORD_LEXICON_PROPERTIES,
+                    marklogic_schema.KB_EXCLUDED_PATHS,
+                    partitions=self.preallocated_partitions,
+                    replication=self.replication,
                 )
             await self._wait_until_queryable(database)
             from nucliadb.common.marklogic.graph import ensure_view
@@ -403,6 +415,7 @@ class MarkLogicDriver:
                 await self._client.aclose()
             self._client = None
             self._provisioned.clear()
+            self._provisioning_locks.clear()
 
     @asynccontextmanager
     async def transaction(

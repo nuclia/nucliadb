@@ -46,6 +46,8 @@ async def setup_driver() -> Driver:
             password=server_settings.password.get_secret_value() if server_settings.password else "",
             port=server_settings.system_port,
             admin_port=server_settings.admin_port,
+            preallocated_partitions=server_settings.preallocated_partitions,
+            replication=server_settings.replication,
         )
         set_utility(Utility.MAINDB_DRIVER, marklogic_driver)
     else:
