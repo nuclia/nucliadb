@@ -16,6 +16,7 @@ enum Service {
     TASK = 3;
     PREDICT_INTERNAL = 4;
     RAO = 5;
+    DATA_PLATFORM = 6;
 }
 
 enum SearchType {
@@ -99,6 +100,24 @@ message Predict {
     uint32 external_requests = 9;
 }
 
+enum MetricAggregation {
+    // Additive over the reporting window (e.g. bytes processed, counts).
+    SUM = 0;
+    // Snapshot value at the end of the reporting window (e.g. stored bytes).
+    LAST = 1;
+}
+
+// Generic usage metric, so new metrics don't require proto changes. Producers and
+// consumers agree on metric names and dimension keys through a shared registry.
+// Dimensions must have low cardinality (never per-item ids).
+message UsageMetric {
+    string name = 1;
+    double value = 2;
+    string unit = 3;
+    MetricAggregation aggregation = 4;
+    map<string, string> dimensions = 5;
+}
+
 enum ActivityLogMatchType {
     TRACE_ID = 0;
     PROCESSING_ID = 1;
@@ -126,11 +145,15 @@ message KbUsage {
 
     optional ActivityLogMatch activity_log_match = 10;
 
+    // Start of the aggregation window for pre-aggregated reports; `timestamp` is the end.
+    optional google.protobuf.Timestamp period_start = 13;
+
     // Data
     repeated Process processes = 6;
     repeated Predict predicts = 7;
     repeated Search searches = 8;
     optional Storage storage = 9;
+    repeated UsageMetric metrics = 14;
 }
 
 message KbUsageAggregated {
