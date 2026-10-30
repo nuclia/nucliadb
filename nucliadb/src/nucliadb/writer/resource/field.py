@@ -228,6 +228,8 @@ async def _to_push_conversationfield(
 
     full_conversation = PushConversation(
         messages=[],
+        extract_strategy=metadata.extract_strategy,
+        split_strategy=metadata.split_strategy,
         classification_labels=classification_labels,
     )
     for page in range(0, metadata.pages):
