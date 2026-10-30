@@ -18,6 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from datetime import datetime, timezone
+
 import pytest
 from httpx import AsyncClient
 
@@ -117,5 +119,56 @@ async def test_update_and_reprocess_text_field(
     assert len(processing_engine.values["send_to_process"]) == 1
     assert (
         processing_engine.values["send_to_process"][0][0].textfield[field_id].extract_strategy
+        == "my-strategy"
+    )
+
+
+@pytest.mark.deploy_modes("component")
+async def test_update_and_reprocess_link_field(
+    nucliadb_writer: AsyncClient,
+    knowledgebox: str,
+    dummy_processing,
+    processing_engine,
+):
+    kbid = knowledgebox
+    field_id = "mylink"
+
+    # Create a link field
+    resp = await nucliadb_writer.post(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCES_PREFIX}",
+        json={
+            "slug": "resource",
+            "title": "My resource",
+            "links": {
+                field_id: {
+                    "added": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "headers": {},
+                    "cookies": {},
+                    "uri": "http://some-link.com",
+                    "language": "en",
+                    "localstorage": {},
+                }
+            },
+        },
+    )
+    assert resp.status_code == 201
+    rid = resp.json()["uuid"]
+
+    processing_engine.send_to_process.reset_mock()
+    processing_engine.values.clear()
+
+    # Patch with a different extract strategy and validate it's sent to process
+    # with the new strategy
+
+    resp = await nucliadb_writer.patch(
+        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/link/{field_id}",
+        json={"extract_strategy": "my-strategy"},
+    )
+    assert resp.status_code == 200
+
+    assert processing_engine.send_to_process.await_count == 1
+    assert len(processing_engine.values["send_to_process"]) == 1
+    assert (
+        processing_engine.values["send_to_process"][0][0].linkfield[field_id].extract_strategy
         == "my-strategy"
     )
