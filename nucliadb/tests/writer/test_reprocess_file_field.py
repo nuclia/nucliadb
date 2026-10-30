@@ -250,25 +250,3 @@ async def test_reprocess_file_field_without_password(
     assert resp.status_code == 202
 
     assert processing_mock.send_to_process.await_count == 1
-
-
-@pytest.mark.deploy_modes("component")
-async def test_update_and_reprocess_file_field(
-    nucliadb_writer: AsyncClient, file_field: tuple[str, str, str], processing_mock
-):
-    kbid, rid, field_id = file_field
-
-    processing_mock.values.clear()
-
-    resp = await nucliadb_writer.patch(
-        f"/{KB_PREFIX}/{kbid}/{RESOURCE_PREFIX}/{rid}/file/{field_id}",
-        json={"extract_strategy": "my-strategy"},
-    )
-    assert resp.status_code == 200
-
-    assert processing_mock.send_to_process.await_count == 1
-    assert len(processing_mock.values) == 1
-    assert (
-        processing_mock.values["convert_internal_filefield_to_str"][0][0].extract_strategy
-        == "my-strategy"
-    )

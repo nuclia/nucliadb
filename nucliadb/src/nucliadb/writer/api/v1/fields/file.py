@@ -99,7 +99,7 @@ async def add_resource_field_file_rid_prefix(
     f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/file/{{field_id}}",
     status_code=200,
     summary="Update resource file field (by slug)",
-    response_model=ResourceFieldAdded,
+    response_model=ResourceFieldUpdated,
     tags=["Resource fields"],
 )
 @requires(NucliaDBRoles.WRITER)
@@ -141,15 +141,13 @@ async def update_and_reprocess_file(
     rid: str,
     field_id: FieldIdString,
     update: nucliadb_models.UpdateFileField,
-):
+) -> ResourceFieldUpdated:
     await maybe_back_pressure(kbid, resource_uuid=rid)
 
     partitioning = get_partitioning()
     partition = partitioning.generate_partition(kbid, rid)
 
-    storage = await get_storage(service_name=SERVICE_NAME)
     driver = get_driver()
-    processing = get_processing()
     storage = await get_storage(service_name=SERVICE_NAME)
 
     async with driver.ro_transaction() as txn:
