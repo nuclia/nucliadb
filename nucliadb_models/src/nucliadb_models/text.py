@@ -93,3 +93,10 @@ If you need to store more text, consider using a file field instead or splitting
         if self.format == TextFormat.JSON:
             validate_json(self.body or "")
         return self
+
+
+class UpdateTextField(BaseModel, extra="forbid"):
+    extract_strategy: str | None = Field(
+        default=None,
+        description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
+    )

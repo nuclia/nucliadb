@@ -55,3 +55,10 @@ class FileField(BaseModel):
         default=None,
         description="Id of the Nuclia split strategy used at processing time. If not set, the default strategy was used. Split strategies are defined at the learning configuration api.",
     )
+
+
+class UpdateFileField(BaseModel, extra="forbid"):
+    extract_strategy: str | None = Field(
+        default=None,
+        description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
+    )
