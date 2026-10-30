@@ -38,13 +38,15 @@ from nucliadb.writer.api.v1.resource import (
 )
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.field import atomic_get_stored_resource_classifications
+from nucliadb.writer.resource.field import (
+    collect_fields_for_reprocessing,
+)
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
 from nucliadb_models.writer import ResourceFieldAdded, ResourceFieldUpdated
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.resources_pb2 import FieldFile, FieldType
+from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -158,38 +160,48 @@ async def update_and_reprocess_file(
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
         field: File = await resource.get_field(field_id, FieldType.FILE, load=True)
-        field_pb = await field.get_value()
-        if field_pb is None:
+        file_field_pb = await field.get_value()
+        if file_field_pb is None:
             raise HTTPException(status_code=404, detail="File field does not exist")
 
-    writer = BrokerMessage()
-    toprocess = PushPayload(
-        uuid=rid,
-        kbid=kbid,
-        partition=partition,
-        userid=request.headers.get("X-NUCLIADB-USER", ""),
-    )
+        writer = BrokerMessage()
+        toprocess = PushPayload(
+            uuid=rid,
+            kbid=kbid,
+            partition=partition,
+            userid=request.headers.get("X-NUCLIADB-USER", ""),
+        )
 
-    writer.kbid = kbid
-    writer.uuid = rid
-    toprocess.kbid = kbid
-    toprocess.uuid = rid
-    toprocess.source = Source.HTTP
-    if resource.basic is not None:
-        toprocess.title = resource.basic.title
-        toprocess.slug = resource.basic.slug
+        writer.kbid = kbid
+        writer.uuid = rid
+        toprocess.kbid = kbid
+        toprocess.uuid = rid
+        toprocess.source = Source.HTTP
+        if resource.basic is not None:
+            toprocess.title = resource.basic.title
+            toprocess.slug = resource.basic.slug
 
-    parse_audit(writer.audit, request)
+        parse_audit(writer.audit, request)
 
-    await parse_file_field(
-        kbid,
-        rid,
-        field_id,
-        field_pb,
-        update,
-        writer,
-        toprocess,
-    )
+        if update.extract_strategy is None:
+            file_field_pb.ClearField("extract_strategy")
+        else:
+            file_field_pb.extract_strategy = update.extract_strategy
+        writer.files[field_id].CopyFrom(file_field_pb)
+
+        # set processing payload from updated field
+        await collect_fields_for_reprocessing(
+            resource,
+            toprocess,
+            selected_fields={(FieldType.FILE, field_id)},
+        )
+
+        writer.field_statuses.append(
+            FieldIDStatus(
+                id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.FILE, field=field_id),
+                status=FieldStatus.Status.PENDING,
+            )
+        )
 
     processing = get_processing()
     await transaction.commit(writer, partition)
@@ -204,40 +216,3 @@ async def update_and_reprocess_file(
         )
     seqid = processing_info.seqid
     return nucliadb_models.ResourceFieldUpdated(seqid=seqid)
-
-
-async def parse_file_field(
-    kbid: str,
-    rid: str,
-    key: str,
-    file_field: FieldFile,
-    update: nucliadb_models.UpdateFileField,
-    writer: BrokerMessage,
-    toprocess: PushPayload,
-):
-    resource_classifications = await atomic_get_stored_resource_classifications(kbid=kbid, rid=rid)
-    classification_labels = resource_classifications.for_field(key, resources_pb2.FieldType.FILE)
-
-    writer.files[key].CopyFrom(file_field)
-    if update.extract_strategy is None:
-        writer.files[key].ClearField("extract_strategy")
-    else:
-        writer.files[key].extract_strategy = update.extract_strategy
-
-    processing = get_processing()
-    if file_field.file.source == resources_pb2.CloudFile.Source.EXTERNAL:
-        toprocess.filefield[key] = processing.generate_file_token_from_fieldfile(
-            writer.files[key], classification_labels
-        )
-    else:
-        storage = await get_storage(service_name=SERVICE_NAME)
-        toprocess.filefield[key] = await processing.convert_internal_filefield_to_str(
-            writer.files[key], storage, classification_labels
-        )
-
-    writer.field_statuses.append(
-        FieldIDStatus(
-            id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.FILE, field=key),
-            status=FieldStatus.Status.PENDING,
-        )
-    )

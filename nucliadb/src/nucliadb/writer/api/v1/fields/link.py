@@ -28,11 +28,7 @@ from nucliadb.common.back_pressure import maybe_back_pressure
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.link import Link
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.models.internal import processing as processing_models
-from nucliadb.models.internal.processing import (
-    PushPayload,
-    Source,
-)
+from nucliadb.models.internal.processing import PushPayload, Source
 from nucliadb.writer import SERVICE_NAME, transaction
 from nucliadb.writer.api.v1.field import add_field_to_resource, add_field_to_resource_by_slug
 from nucliadb.writer.api.v1.resource import (
@@ -41,16 +37,13 @@ from nucliadb.writer.api.v1.resource import (
 )
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
 from nucliadb.writer.resource.audit import parse_audit
-from nucliadb.writer.resource.field import atomic_get_stored_resource_classifications
+from nucliadb.writer.resource.field import collect_fields_for_reprocessing
 from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
-from nucliadb_models.writer import (
-    ResourceFieldAdded,
-    ResourceFieldUpdated,
-)
+from nucliadb_models.writer import ResourceFieldAdded, ResourceFieldUpdated
 from nucliadb_protos import resources_pb2
-from nucliadb_protos.resources_pb2 import FieldLink, FieldType
+from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage, FieldIDStatus, FieldStatus
 from nucliadb_utils.authentication import requires
 from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
@@ -158,38 +151,49 @@ async def update_and_reprocess_link(
             raise HTTPException(status_code=404, detail="Resource does not exist")
 
         field: Link = await resource.get_field(field_id, FieldType.LINK, load=True)
-        field_pb = await field.get_value()
-        if field_pb is None:
-            raise HTTPException(status_code=404, detail="Text field does not exist")
+        link_field_pb = await field.get_value()
+        if link_field_pb is None:
+            raise HTTPException(status_code=404, detail="Link field does not exist")
 
-    writer = BrokerMessage()
-    toprocess = PushPayload(
-        uuid=rid,
-        kbid=kbid,
-        partition=partition,
-        userid=request.headers.get("X-NUCLIADB-USER", ""),
-    )
+        writer = BrokerMessage()
+        toprocess = PushPayload(
+            uuid=rid,
+            kbid=kbid,
+            partition=partition,
+            userid=request.headers.get("X-NUCLIADB-USER", ""),
+        )
 
-    writer.kbid = kbid
-    writer.uuid = rid
-    toprocess.kbid = kbid
-    toprocess.uuid = rid
-    toprocess.source = Source.HTTP
-    if resource.basic is not None:
-        toprocess.title = resource.basic.title
-        toprocess.slug = resource.basic.slug
+        writer.kbid = kbid
+        writer.uuid = rid
+        toprocess.kbid = kbid
+        toprocess.uuid = rid
+        toprocess.source = Source.HTTP
+        if resource.basic is not None:
+            toprocess.title = resource.basic.title
+            toprocess.slug = resource.basic.slug
 
-    parse_audit(writer.audit, request)
+        parse_audit(writer.audit, request)
 
-    await parse_link_field(
-        kbid,
-        rid,
-        field_id,
-        field_pb,
-        update,
-        writer,
-        toprocess,
-    )
+        if update.extract_strategy is None:
+            link_field_pb.ClearField("extract_strategy")
+        else:
+            link_field_pb.extract_strategy = update.extract_strategy
+
+        writer.links[field_id].CopyFrom(link_field_pb)
+
+        # set processing payload from updated field
+        await collect_fields_for_reprocessing(
+            resource,
+            toprocess,
+            selected_fields={(FieldType.LINK, field_id)},
+        )
+
+        writer.field_statuses.append(
+            FieldIDStatus(
+                id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.LINK, field=field_id),
+                status=FieldStatus.Status.PENDING,
+            )
+        )
 
     processing = get_processing()
     await transaction.commit(writer, partition)
@@ -204,41 +208,3 @@ async def update_and_reprocess_link(
         )
     seqid = processing_info.seqid
     return nucliadb_models.ResourceFieldUpdated(seqid=seqid)
-
-
-async def parse_link_field(
-    kbid: str,
-    rid: str,
-    key: str,
-    link_field_pb: FieldLink,
-    update: nucliadb_models.UpdateLinkField,
-    writer: BrokerMessage,
-    toprocess: PushPayload,
-):
-    resource_classifications = await atomic_get_stored_resource_classifications(kbid=kbid, rid=rid)
-    classification_labels = resource_classifications.for_field(key, resources_pb2.FieldType.FILE)
-
-    writer.links[key].CopyFrom(link_field_pb)
-    if update.extract_strategy is None:
-        writer.links[key].ClearField("extract_strategy")
-    else:
-        writer.links[key].extract_strategy = update.extract_strategy
-
-    toprocess.linkfield[key] = processing_models.LinkUpload(
-        link=writer.links[key].uri,
-        headers=dict(writer.links[key].headers),
-        cookies=dict(writer.links[key].cookies),
-        localstorage=dict(writer.links[key].localstorage),
-        css_selector=writer.links[key].css_selector,
-        xpath=writer.links[key].xpath,
-        extract_strategy=writer.links[key].extract_strategy,
-        split_strategy=writer.links[key].split_strategy,
-        classification_labels=classification_labels,
-    )
-
-    writer.field_statuses.append(
-        FieldIDStatus(
-            id=resources_pb2.FieldID(field_type=resources_pb2.FieldType.LINK, field=key),
-            status=FieldStatus.Status.PENDING,
-        )
-    )
