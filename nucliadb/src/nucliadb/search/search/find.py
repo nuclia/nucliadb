@@ -159,9 +159,9 @@ async def _ndb_index_find(
     search_results.shards = queried_shards
 
     ndb_time = metrics["index_search"] + metrics["results_merge"]
-    if metrics["index_search"] > settings.slow_node_query_log_threshold:
+    if metrics["index_search"] > settings.slow_index_query_log_threshold:
         logger.warning(
-            "Slow nidx query",
+            "Slow index query",
             extra={
                 "kbid": kbid,
                 "user": x_nucliadb_user,
