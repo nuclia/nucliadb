@@ -20,3 +20,4 @@ spec:
       port: {{ .Values.serving.port }}
     - name: metrics
       port: {{ .Values.serving.metricsPort}}
+      appProtocol: http
