@@ -29,7 +29,7 @@ from nucliadb_utils.storages.settings import settings as extended_storage_settin
 images.settings = cast(dict[str, Any], images.settings)
 images.settings["s3"] = {
     "image": "localstack/localstack",
-    "version": "0.12.18",
+    "version": "0.13",
     "env": {"SERVICES": "s3"},
     "options": {
         "ports": {"4566": None, "4571": None},
