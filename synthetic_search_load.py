@@ -23,7 +23,6 @@ import json
 import math
 import random
 import time
-import traceback
 import uuid
 from collections import Counter
 from collections.abc import Awaitable, Callable
@@ -35,6 +34,9 @@ from faker import Faker
 
 from nucliadb.common import datamanagers
 from nucliadb.common.context import ApplicationContext
+from nucliadb.common.maindb.collections import MarkLogicCollections
+from nucliadb.common.maindb.marklogic import MarkLogicDriver
+from nucliadb.common.marklogic import documents
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.catalog import catalog
 from nucliadb.search.api.v1.graph import graph_path_search
@@ -48,19 +50,19 @@ from nucliadb_models.retrieval import Query, RawQuery, RetrievalRequest, Semanti
 from nucliadb_models.search import CatalogRequest, FindOptions, FindRequest, NucliaDBClientType
 
 ENDPOINT_PROBABILITIES = {
-    "find_keyword": 0.0,
-    "find_semantic": 0.8,
-    "find_hybrid": 0.0,
-    "catalog": 0.2,
+    # "find_keyword": 0.0,
+    "find_semantic": 1,
+    # "find_hybrid": 0.0,
+    # "catalog": 0.2,
 }
 DEFAULT_REQUEST_POOL_SIZE = 32
 REQUEST_MODELS = {
-    "find_keyword": FindRequest,
+    # "find_keyword": FindRequest,
     "find_semantic": FindRequest,
-    "find_hybrid": FindRequest,
-    "retrieve": RetrievalRequest,
-    "catalog": CatalogRequest,
-    "graph": GraphSearchRequest,
+    # "find_hybrid": FindRequest,
+    # "retrieve": RetrievalRequest,
+    # "catalog": CatalogRequest,
+    # "graph": GraphSearchRequest,
 }
 
 
@@ -85,6 +87,15 @@ async def resolve_kbids(driver: Any, args: argparse.Namespace) -> list[str]:
     return [kb_map[slug] for slug in sorted(kb_map)]
 
 
+def select_active_kbids(kbids: list[str], active_kbs: int | None, seed: int) -> list[str]:
+    if active_kbs is None or active_kbs >= len(kbids):
+        return kbids
+    if active_kbs <= 0:
+        raise ValueError("--active-kbs must be positive")
+    selected = set(random.Random(seed).sample(kbids, active_kbs))
+    return [kbid for kbid in kbids if kbid in selected]
+
+
 def generate_request(operation: str, fake: Faker, rng: random.Random) -> Any:
     nb_words = rng.randint(5, 20)
     query = fake.sentence(nb_words=nb_words).rstrip(".")
@@ -97,10 +108,11 @@ def generate_request(operation: str, fake: Faker, rng: random.Random) -> Any:
         request = {
             "query": query,
             "vectorset": "synthetic-vectors",
-            "min_score": 0.3,
+            "min_score": 0.0,
             "rephrase": False,
             "reranker": "noop",
             "features": features,
+            "top_k": 20,
         }
         if FindOptions.SEMANTIC.value in features:
             request["vector"] = [rng.uniform(-1.0, 1.0) for _ in range(768)]
@@ -190,7 +202,7 @@ async def execute_operation(kbid: str, operation: str, item: Any) -> None:
     }
     with request_caches():
         if operation.startswith("find_"):
-            #breakpoint()
+            breakpoint()
             _, incomplete, _ = await find(kbid, item, **client, metrics=Metrics("search-load"))
             if incomplete:
                 raise RuntimeError("Find returned incomplete results")
@@ -232,6 +244,111 @@ def measurement_summary(
     }
 
 
+def format_latency(seconds: float | None) -> str:
+    return "-" if seconds is None else f"{seconds * 1000:.1f} ms"
+
+
+def format_report_lines(report: dict[str, Any], timestamp: str) -> list[str]:
+    event = report["event"]
+    target_rps = report["target_rps"]
+    phase = report.get("phase", "complete")
+    duration = report.get("window_seconds", report.get("elapsed_seconds", 0.0))
+    overall = (
+        f"{timestamp} {event} ({phase}) target={target_rps:g} req/s "
+        f"actual={report['success_rps']:.2f} success/s "
+        f"completed={report['completed_rps']:.2f}/s "
+        f"latency p50/p90/p95/p99="
+        f"{format_latency(report['latency_p50_seconds'])}/"
+        f"{format_latency(report['latency_p90_seconds'])}/"
+        f"{format_latency(report['latency_p95_seconds'])}/"
+        f"{format_latency(report['latency_p99_seconds'])} "
+        f"ok={report['success']} failed={report['failed']} "
+        f"dropped={report['dropped']} cancelled={report['cancelled']} "
+        f"in-flight={report.get('in_flight', 0)} window={duration:.1f}s"
+    )
+    lines = [overall]
+    lines.extend(
+        f"  {operation:<14} {metrics['success_rps']:>6.2f} success/s "
+        f"(ok={metrics['success']}, failed={metrics['failed']}, dropped={metrics['dropped']}) "
+        f"p50={format_latency(metrics['latency_p50_seconds'])} "
+        f"p95={format_latency(metrics['latency_p95_seconds'])} "
+        f"p99={format_latency(metrics['latency_p99_seconds'])}"
+        for operation, metrics in report["operations"].items()
+    )
+    return lines
+
+
+def format_configuration_line(
+    settings: dict[str, Any], probabilities: dict[str, float]
+) -> str:
+    explicit_kbids = settings.get("kbid") or []
+    if settings.get("kb_prefix"):
+        selection = f"prefix={settings['kb_prefix']} (resolving)"
+    else:
+        selection = f"{len(explicit_kbids)} explicit KBs"
+    active_kbs = settings.get("active_kbs")
+    active_label = str(active_kbs) if active_kbs is not None else "all resolved"
+    operations = ", ".join(
+        f"{name} {probability:.0%}" for name, probability in probabilities.items() if probability
+    )
+    return (
+        f"Search load started: selection={selection} active-kbs={active_label} "
+        f"rate={settings['start_rps']:g}-{settings['max_rps']:g} req/s "
+        f"stage={settings['stage_seconds']:g}s operations={operations}"
+    )
+
+
+def format_final_summary(
+    stages: list[dict[str, Any]], kb_chunk_counts: list[dict[str, int | str]] | None = None
+) -> str:
+    columns = ("Target", "Success/s", "Failure/s", "Dropped/s", "p50", "p95")
+    rows = [
+        (
+            f"{stage['target_rps']:g} req/s",
+            f"{stage['success'] / max(stage['elapsed_seconds'], 1e-9):.2f}",
+            f"{stage['failed'] / max(stage['elapsed_seconds'], 1e-9):.2f}",
+            f"{stage['dropped'] / max(stage['elapsed_seconds'], 1e-9):.2f}",
+            format_latency(stage["latency_p50_seconds"]),
+            format_latency(stage["latency_p95_seconds"]),
+        )
+        for stage in stages
+    ]
+    widths = [
+        max(len(columns[index]), *(len(row[index]) for row in rows))
+        if rows
+        else len(columns[index])
+        for index in range(len(columns))
+    ]
+    header = "  ".join(column.ljust(widths[index]) for index, column in enumerate(columns))
+    separator = "  ".join("-" * width for width in widths)
+    lines = ["Final search load summary"]
+    if kb_chunk_counts is not None:
+        lines.extend(("Active KB sizes by chunk count", "  KBID                                Chunks"))
+        lines.extend(
+            f"  {item['kbid']:<36} {item['chunks']:>12,}"
+            for item in kb_chunk_counts
+        )
+        lines.append("")
+    lines.extend((header, separator))
+    lines.extend("  ".join(value.ljust(widths[index]) for index, value in enumerate(row)) for row in rows)
+    if not rows:
+        lines.append("No completed stages")
+    return "\n".join(lines)
+
+
+async def count_kb_chunks(driver: MarkLogicDriver, kbid: str) -> int:
+    collection = json.dumps(MarkLogicCollections.CHUNKS.value)
+    javascript = (
+        "fn.count(cts.uris('', ['document'], "
+        f"cts.collectionQuery({collection})))"
+    )
+    async with driver.ro_transaction(kbid=kbid) as txn:
+        result = await documents.evaluate(txn, javascript)
+    if len(result) != 1 or type(result[0]) is not int or result[0] < 0:
+        raise ValueError(f"Invalid chunk count for KB {kbid}: {result!r}")
+    return result[0]
+
+
 async def run_stage(
     args: argparse.Namespace,
     target_rps: float,
@@ -271,7 +388,7 @@ async def run_stage(
             outcome = "failed"
             error = f"{type(exc).__name__}: {exc}"
             print(f"Request failed: kbid={kbid} operation={operation} error={error}", flush=True)
-            traceback.print_exc()
+            #traceback.print_exc()
         finally:
             increment(operation, outcome)
             samples.append(
@@ -410,6 +527,7 @@ async def run(args: argparse.Namespace) -> None:
     run_id = uuid.uuid4().hex
     started = time.monotonic()
     stages = []
+    kb_chunk_counts: list[dict[str, int | str]] | None = None
     with Path(args.report_file).open("a") as output:
 
         def emit(report: dict[str, Any]) -> None:
@@ -423,18 +541,23 @@ async def run(args: argparse.Namespace) -> None:
             output.write(json.dumps(record) + "\n")
             output.flush()
             if report["event"] in ("interval", "stage"):
+                for line in format_report_lines(report, timestamp):
+                    print(line, flush=True)
+            elif report["event"] == "configuration":
+                print(format_configuration_line(report["settings"], report["probabilities"]), flush=True)
+            elif report["event"] == "stage_start":
                 print(
-                    f"{timestamp} event={report['event']} target={report['target_rps']:g} req/s "
-                    f"total_success_rps={report['success_rps']:.3f} "
-                    f"p50={report['latency_p50_seconds']}s p95={report['latency_p95_seconds']}s "
-                    f"p99={report['latency_p99_seconds']}s failed={report['failed']} "
-                    f"dropped={report['dropped']} cancelled={report['cancelled']}",
+                    f"Starting stage: target={report['target_rps']:g} req/s "
+                    f"duration={report['stage_seconds']:g}s KBs={len(report['kbids'])}",
                     flush=True,
                 )
-                for operation, metrics in report["operations"].items():
-                    print(f"  {operation}: {json.dumps(metrics)}", flush=True)
+            elif report["event"] == "summary":
+                print(
+                    format_final_summary(report["stages"], report.get("kb_chunk_counts")),
+                    flush=True,
+                )
             else:
-                print(json.dumps(record), flush=True)
+                print(f"{timestamp} {report['event']}", flush=True)
             if report["event"] == "stage":
                 stages.append(report)
 
@@ -448,7 +571,26 @@ async def run(args: argparse.Namespace) -> None:
         try:
             ctx = ApplicationContext(nats_manager=False, partitioning=False, transaction=False)
             await ctx.initialize()
-            args.kbid = await resolve_kbids(ctx.kv_driver, args)
+            resolved_kbids = await resolve_kbids(ctx.kv_driver, args)
+            if args.active_kbs is not None and args.active_kbs > len(resolved_kbids):
+                raise ValueError(
+                    f"--active-kbs ({args.active_kbs}) exceeds the number of resolved KBs "
+                    f"({len(resolved_kbids)})"
+                )
+            args.kbid = select_active_kbids(resolved_kbids, args.active_kbs, args.seed)
+            print(
+                f"Using {len(args.kbid)} active KBs: {', '.join(args.kbid)}",
+                flush=True,
+            )
+            if args.active_kbs is not None:
+                if not isinstance(ctx.kv_driver, MarkLogicDriver):
+                    raise TypeError("--active-kbs chunk counts require MarkLogicDriver")
+                kb_chunk_counts = []
+                print("Counting chunks in selected active KBs", flush=True)
+                for kbid in args.kbid:
+                    chunk_count = await count_kb_chunks(ctx.kv_driver, kbid)
+                    kb_chunk_counts.append({"kbid": kbid, "chunks": chunk_count})
+                    print(f"  KB {kbid}: {chunk_count:,} chunks", flush=True)
             await start_predict_engine()
             rate = args.start_rps
             while True:
@@ -457,7 +599,13 @@ async def run(args: argparse.Namespace) -> None:
                     break
                 rate = min(args.max_rps, rate + args.rps_step)
         finally:
-            emit({"event": "summary", "stages": stages})
+            emit(
+                {
+                    "event": "summary",
+                    "stages": stages,
+                    "kb_chunk_counts": kb_chunk_counts,
+                }
+            )
             try:
                 await stop_predict_engine()
             finally:
@@ -477,6 +625,11 @@ def main() -> None:
     kb_selection.add_argument(
         "--kb-prefix",
         help="Resolve all KBs whose slug starts with this prefix plus a hyphen",
+    )
+    parser.add_argument(
+        "--active-kbs",
+        type=int,
+        help="Select this many KBs from the resolved set; selection is stable for a given seed",
     )
     parser.add_argument("--start-rps", type=float, default=4)
     parser.add_argument("--max-rps", type=float, default=20)
@@ -523,6 +676,8 @@ def main() -> None:
         parser.error("Rates, durations, pool size, and concurrency must be positive and finite")
     if args.max_rps < args.start_rps:
         parser.error("--max-rps must be >= --start-rps")
+    if args.active_kbs is not None and args.active_kbs < 1:
+        parser.error("--active-kbs must be positive")
     if args.kbid and len(set(args.kbid)) != len(args.kbid):
         parser.error("--kbid values must be unique")
     try:

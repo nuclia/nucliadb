@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import math
 import random
@@ -88,6 +89,7 @@ SECURITY_GROUPS = [
 ]
 PUBLIC_RESOURCE_RATIO = 0.2
 DEFAULT_PARAGRAPH_SENTENCES = 6
+SYNTHETIC_CHECKPOINT_COLLECTION = "synthetic_ingest_checkpoints"
 
 
 def plan_distribution(scale: float, seed: int, sigma: float, prefix: str) -> list[dict[str, Any]]:
@@ -448,6 +450,43 @@ async def find_resume_offset(
         flush=True,
     )
     return low
+
+
+def checkpoint_fingerprint(plan: list[dict[str, Any]], seed: int) -> str:
+    plan_key = json.dumps(
+        {
+            "seed": seed,
+            "knowledge_boxes": [
+                {"slug": item["slug"], "resources": item["resources"]} for item in plan
+            ],
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(plan_key.encode()).hexdigest()
+
+
+def checkpoint_uri(fingerprint: str) -> str:
+    return f"/synthetic_marklogic_ingest/checkpoints/{fingerprint}.json"
+
+
+async def load_completed_kb_prefix(driver: MarkLogicDriver, fingerprint: str) -> int:
+    async with driver.ro_transaction(kbid=None) as txn:
+        checkpoint = await documents.read(txn, checkpoint_uri(fingerprint))
+    return int(checkpoint.get("completed_kbs", 0)) if checkpoint else 0
+
+
+async def save_completed_kb_prefix(
+    driver: MarkLogicDriver, fingerprint: str, completed_kbs: int
+) -> None:
+    async with driver.rw_transaction(kbid=None) as txn:
+        await documents.write(
+            txn,
+            uri=checkpoint_uri(fingerprint),
+            collection=SYNTHETIC_CHECKPOINT_COLLECTION,
+            content={"fingerprint": fingerprint, "completed_kbs": completed_kbs},
+        )
+        await txn.commit()
 
 
 async def ensure_synthetic_kb(
@@ -947,6 +986,14 @@ async def run(args):
             )
             worker_stats["reported"] = processed
 
+        checkpoint_id = checkpoint_fingerprint(plan, args.seed)
+        completed_kb_prefix = await load_completed_kb_prefix(driver, checkpoint_id)
+        if args.auto_resume:
+            print(
+                f"Auto-resume checkpoint: {completed_kb_prefix} completed KBs",
+                flush=True,
+            )
+
         async def ingest_worker(worker_id: int):
             worker_started = time.monotonic()
             worker_stats: Counter = Counter()
@@ -956,6 +1003,7 @@ async def run(args):
             while True:
                 task = await queue.get()
                 if task is None:
+                    queue.task_done()
                     print_worker_progress(
                         worker_id, last_kbid, last_slug, worker_stats, worker_started, force=True
                     )
@@ -991,6 +1039,7 @@ async def run(args):
                         stats["failed"] += 1
                         worker_stats["failed"] += 1
                         print_worker_progress(worker_id, kbid, slug, worker_stats, worker_started)
+                        queue.task_done()
                         continue
                     stats["skipped" if not created else "created"] += 1
                     worker_stats["skipped" if not created else "created"] += 1
@@ -1014,15 +1063,32 @@ async def run(args):
                         for group in generated["groups"]:
                             stats[f"group:{group}"] += 1
                     print_worker_progress(worker_id, kbid, slug, worker_stats, worker_started)
+                queue.task_done()
 
         workers = [
             asyncio.create_task(ingest_worker(worker_id)) for worker_id in range(1, args.concurrency + 1)
         ]
         try:
-            for item, local_start, resource_count in kb_resource_ranges(plan, start_resource_offset):
+            all_active_ranges = [
+                resource_range
+                for resource_range in kb_resource_ranges(plan, 0)
+                if resource_range[1] < resource_range[2]
+            ]
+            kb_positions = {
+                item["slug"]: position
+                for position, (item, _, _) in enumerate(all_active_ranges)
+            }
+            active_ranges = [
+                resource_range
+                for resource_range in kb_resource_ranges(plan, start_resource_offset)
+                if resource_range[1] < resource_range[2]
+            ]
+            checkpointable = start_resource_offset == 0
+            for item, local_start, resource_count in active_ranges:
                 slug = item["slug"]
-                if local_start >= resource_count:
-                    print(f"Skipping KB before start resource: {slug}", flush=True)
+                kb_position = kb_positions[slug]
+                if args.auto_resume and kb_position < completed_kb_prefix:
+                    print(f"Skipping checkpointed KB: {slug}", flush=True)
                     continue
                 kbid = await ensure_synthetic_kb(
                     driver,
@@ -1039,11 +1105,28 @@ async def run(args):
                         f"KB {slug} start={local_start} (detected={detected_start})",
                         flush=True,
                     )
+                failed_before_kb = stats["failed"]
                 if local_start >= resource_count:
-                    continue
-                vectorsets = await get_kb_vectorsets(driver, kbid)
+                    vectorsets = []
+                else:
+                    vectorsets = await get_kb_vectorsets(driver, kbid)
                 for resource_index in range(local_start, resource_count):
                     await queue.put((kbid, slug, vectorsets, resource_index))
+                await queue.join()
+                if (
+                    checkpointable
+                    and kb_position == completed_kb_prefix
+                    and stats["failed"] == failed_before_kb
+                ):
+                    completed_kb_prefix += 1
+                    await save_completed_kb_prefix(driver, checkpoint_id, completed_kb_prefix)
+                    print(
+                        f"Checkpointed completed KB {slug}: "
+                        f"{completed_kb_prefix}/{len(active_ranges)}",
+                        flush=True,
+                    )
+                elif stats["failed"] > failed_before_kb:
+                    checkpointable = False
             for _ in workers:
                 await queue.put(None)
             await asyncio.gather(*workers)
@@ -1081,7 +1164,10 @@ def main():
     parser.add_argument(
         "--auto-resume",
         action="store_true",
-        help="Use indexed synthetic slugs to find the first missing resource in each KB",
+        help=(
+            "Skip checkpointed KBs and use indexed slugs to find the first missing resource; "
+            "ramp mode uses per-KB slug search"
+        ),
     )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--sigma", type=float, default=0.4)
