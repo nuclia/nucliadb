@@ -16,5 +16,8 @@ spec:
       metrics: "enabled"
   podMetricsEndpoints:
     - port: metrics
+      # With Istio mTLS the scrape is https; HTTP/2 would reach the HTTP/1.1-only
+      # metrics server undecoded on ports Istio handles as TCP.
+      enableHttp2: false
       interval: {{ ((.Values.podMonitor).interval) | default "60s" }}
       path: /metrics 
