@@ -739,7 +739,7 @@ def prepare_request(
         or inspect.isasyncgen(content)
         or isinstance(content, io.IOBase)
     ):
-        data = content  # type: ignore[ty:invalid-assignment]
+        data = content  # type: ignore[assignment,ty:invalid-assignment]
 
     if len(kwargs) > 0:
         raise TypeError(f"Invalid arguments provided: {kwargs}")
