@@ -18,149 +18,57 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import logging
-import os
-import random
-from collections.abc import AsyncIterator, Iterator
-from typing import Any, cast
-from unittest.mock import patch
-from urllib.parse import urlparse, urlunparse
+from collections.abc import AsyncIterator
 
-import psycopg
-import psycopg.sql
 import pytest
-from pytest_docker_fixtures import images
 
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.maindb.pg import PGDriver, PGTransaction
+from nucliadb.common.maindb.marklogic import MarkLogicDriver
 from nucliadb.ingest.settings import DriverConfig, DriverSettings
-from nucliadb.ingest.settings import settings as ingest_settings
-from nucliadb.migrator.migrator import run_pg_schema_migrations
 from nucliadb_utils.utilities import Utility
 from tests.ndbfixtures.utils import global_utility
 
 logger = logging.getLogger("nucliadb.fixtures:maindb")
 
-images.settings = cast(dict[str, Any], images.settings)
-# Minimum support PostgreSQL version
-# Reason: We want the btree_gin extension to support uuid's (pg11) and `gen_random_uuid()` (pg13)
-images.settings["postgresql"]["version"] = "13"
-images.settings["postgresql"]["env"]["POSTGRES_PASSWORD"] = "postgres"
+
+@pytest.fixture(scope="function")
+def maindb_settings() -> DriverSettings:
+    return DriverSettings(driver=DriverConfig.MARKLOGIC)
 
 
 @pytest.fixture(scope="function")
-def maindb_settings(pg_maindb_settings) -> Iterator[DriverSettings]:
-    yield pg_maindb_settings
-
-
-@pytest.fixture(scope="function")
-async def maindb_driver(pg_maindb_driver) -> AsyncIterator[Driver]:
-    driver: Driver = pg_maindb_driver
+async def maindb_driver(marklogic_maindb_driver) -> AsyncIterator[Driver]:
+    driver: Driver = marklogic_maindb_driver
+    try:
+        await clear_marklogic_system_database(driver)
+    except Exception:
+        logger.exception("Could not cleanup maindb on test teardown")
 
     with global_utility(Utility.MAINDB_DRIVER, driver):
         yield driver
 
     try:
-        await cleanup_maindb(driver)
+        await delete_marklogic_system_database(driver)
+        await delete_marklogic_kb_databases(driver)
     except Exception:
         logger.exception("Could not cleanup maindb on test teardown")
 
 
-async def cleanup_maindb(driver: Driver):
-    if not driver.initialized:
-        return
-
-    async with driver.ro_transaction() as txn:
-        all_keys = [k async for k in txn.keys("")]
-
-    async with driver.rw_transaction() as txn:
-        for key in all_keys:
-            await txn.delete(key)
+async def clear_marklogic_system_database(driver: MarkLogicDriver) -> None:
+    async with driver.rw_transaction(kbid=None) as txn:
+        await txn.delete_by_prefix("/")
         await txn.commit()
 
-        try:
-            if isinstance(txn, PGTransaction):
-                async with txn.connection.cursor() as cur:
-                    await cur.execute("TRUNCATE shards CASCADE")
-        except Exception:
-            pass
 
-        try:
-            if isinstance(txn, PGTransaction):
-                async with txn.connection.cursor() as cur:
-                    await cur.execute("TRUNCATE kbs CASCADE")
-        except Exception:
-            logger.exception("Could not truncate kbs table")
-            pass
+async def delete_marklogic_system_database(driver: MarkLogicDriver) -> None:
+    async with driver.admin_client() as client:
+        await client.delete_database(driver.system_database)
 
 
-async def create_test_database(base_url):
-    async with (
-        await psycopg.AsyncConnection.connect(base_url, autocommit=True) as conn,
-        conn.cursor() as cursor,
-    ):
-        for i in range(10):
-            try:
-                dbname = f"_nucliadb_test_{random.randint(0, 999999)}"
-                await cursor.execute(
-                    psycopg.sql.SQL("CREATE DATABASE {}").format(psycopg.sql.Identifier(dbname))
-                )
-                return dbname
-            except psycopg.errors.DuplicateDatabase:
-                pass
-
-
-@pytest.fixture(scope="function")
-async def pg_maindb_settings(request) -> AsyncIterator[DriverSettings]:
-    if "TESTING_PG_URL" in os.environ.keys():
-        # Connect to a running server and create a new DB
-        base_url = os.environ["TESTING_PG_URL"]
-        dbname = await create_test_database(base_url)
-        parsed = urlparse(base_url)
-        url = urlunparse(parsed._replace(path=f"/{dbname}"))
-    else:
-        # Start a new database server in a docker container
-        pg = request.getfixturevalue("pg")
-        url = f"postgresql://postgres:postgres@{pg[0]}:{pg[1]}/postgres"
-
-    # We want to be sure schema migrations are always run. As some tests use
-    # this fixture and create their own driver, we need to create one here and
-    # run the migrations, so the maindb_settings fixture can still be generic
-    # and pg migrations are run
-    driver = PGDriver(url=url, connection_pool_min_size=2, connection_pool_max_size=2)
-    await driver.initialize()
-    await run_pg_schema_migrations(driver)
-    await driver.finalize()
-
-    yield DriverSettings(
-        driver=DriverConfig.PG,
-        driver_pg_url=url,
-        driver_pg_connection_pool_min_size=2,
-        driver_pg_connection_pool_max_size=10,
-        driver_pg_connection_pool_acquire_timeout_ms=200,
-    )
-
-
-@pytest.fixture(scope="function")
-async def pg_maindb_driver(pg_maindb_settings: DriverSettings) -> AsyncIterator[PGDriver]:
-    url = pg_maindb_settings.driver_pg_url
-    assert url is not None
-    with (
-        patch.object(ingest_settings, "driver", DriverConfig.PG),
-        patch.object(ingest_settings, "driver_pg_url", url),
-    ):
-        async with await psycopg.AsyncConnection.connect(url) as conn, conn.cursor() as cur:
-            await cur.execute("TRUNCATE TABLE resources")
-            await cur.execute("TRUNCATE TABLE catalog CASCADE")
-
-        driver = PGDriver(
-            url=url,
-            connection_pool_min_size=pg_maindb_settings.driver_pg_connection_pool_min_size,
-            connection_pool_max_size=pg_maindb_settings.driver_pg_connection_pool_max_size,
-            acquire_timeout_ms=pg_maindb_settings.driver_pg_connection_pool_acquire_timeout_ms,
-        )
-        await driver.initialize()
-        await run_pg_schema_migrations(driver)
-
-        yield driver
-
-        await driver.finalize()
+async def delete_marklogic_kb_databases(driver: MarkLogicDriver) -> None:
+    """Drop every per-KnowledgeBox database created by the test."""
+    async with driver.admin_client() as client:
+        for name in await client.list_databases():
+            if name.startswith(driver.kb_database_prefix):
+                await client.delete_database(name)
+    driver._provisioned.clear()

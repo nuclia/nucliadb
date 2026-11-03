@@ -88,7 +88,7 @@ class TrainServicer(train_pb2_grpc.TrainServicer):
     async def GetEntities(self, request: GetEntitiesRequest, context=None) -> GetEntitiesResponse:
         kbid = request.kb.uuid
         response = GetEntitiesResponse()
-        async with self.proc.driver.ro_transaction() as txn:
+        async with self.proc.driver.ro_transaction(kbid=kbid) as txn:
             entities_manager = await self.proc.get_kb_entities_manager(txn, kbid)
             if entities_manager is None:
                 await txn.abort()

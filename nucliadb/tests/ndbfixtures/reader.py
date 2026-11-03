@@ -83,7 +83,6 @@ async def reader_api_server(
     storage: Storage,
     maindb_driver: Driver,
     nats_manager: NatsConnectionManager,
-    dummy_nidx_utility,
 ) -> AsyncIterator[FastAPI]:
     application = create_application()
     async with application.router.lifespan_context(application):

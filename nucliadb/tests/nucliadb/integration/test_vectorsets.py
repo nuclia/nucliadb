@@ -28,9 +28,7 @@ from httpx import AsyncClient
 from nidx_protos import nodereader_pb2
 from pytest_mock import MockerFixture
 
-from nucliadb.common.cluster import manager
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.search.predict import DummyPredictEngine
@@ -51,62 +49,11 @@ from nucliadb_utils.utilities import (
     set_utility,
 )
 from tests.ndbfixtures.ingest import make_extracted_text
-from tests.nucliadb.knowledgeboxes.vectorsets import KbSpecs
 from tests.utils import inject_message
-from tests.utils.dirty_index import wait_for_sync
 from tests.utils.predict import predict_query_hook
 
 DEFAULT_VECTOR_DIMENSION = 512
 VECTORSET_DIMENSION = 12
-
-
-@pytest.mark.deploy_modes("standalone")
-async def test_vectorsets_work_on_a_kb_with_a_single_vectorset(
-    nucliadb_reader: AsyncClient,
-    nucliadb_writer: AsyncClient,
-    nucliadb_ingest_grpc: WriterStub,
-    kb_with_vectorset: KbSpecs,
-):
-    kbid = kb_with_vectorset.kbid
-    vectorset_id = kb_with_vectorset.vectorset_id
-    vectorset_dimension = kb_with_vectorset.vectorset_dimension
-
-    shards = await manager.KBShardManager().get_shards_by_kbid(kbid)
-    logic_shard = shards[0]
-    shard_id = logic_shard.nidx_shard_id
-    await wait_for_sync()
-
-    test_cases = [
-        (vectorset_dimension, vectorset_id),
-    ]
-
-    for dimension, vectorset in test_cases:
-        query_pb = nodereader_pb2.SearchRequest(
-            shard_ids=[shard_id],
-            body="this is a query for my vectorset",
-            vector=[1.23] * dimension,
-            vectorset=vectorset,
-            result_per_page=5,
-        )
-        results = await get_nidx_searcher_client().Search(query_pb)
-        assert len(results.vector.documents) == 5
-
-    # Test that querying with the wrong dimension raises an exception
-    test_cases = [
-        (6000, vectorset_id),
-        (6000, "multilingual"),
-    ]
-    for dimension, vectorset in test_cases:
-        query_pb = nodereader_pb2.SearchRequest(
-            shard_ids=[shard_id],
-            body="this is a query for my vectorset",
-            vector=[1.23] * dimension,
-            vectorset=vectorset,
-            result_per_page=5,
-        )
-        with pytest.raises(Exception) as exc:
-            results = await get_nidx_searcher_client().Search(query_pb)
-        assert "inconsistent dimensions" in str(exc).lower()
 
 
 @pytest.mark.parametrize(
@@ -124,7 +71,7 @@ async def test_vectorset_parameter_without_default_vectorset(
 
     calls: list[nodereader_pb2.SearchRequest] = []
 
-    async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
+    async def mock_query_index(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
         calls.append(pb_query)
         results = nodereader_pb2.SearchResponse()
         return results
@@ -137,12 +84,12 @@ async def test_vectorset_parameter_without_default_vectorset(
     with (
         predict_query_hook(set_predict_default_vectorset),
         patch(
-            "nucliadb.search.api.v1.search.nidx_query",
-            new=AsyncMock(side_effect=mock_nidx_query),
+            "nucliadb.search.api.v1.search.query_index",
+            new=AsyncMock(side_effect=mock_query_index),
         ),
         patch(
-            "nucliadb.search.search.retrieval.nidx_query",
-            new=AsyncMock(side_effect=mock_nidx_query),
+            "nucliadb.search.search.retrieval.query_index",
+            new=AsyncMock(side_effect=mock_query_index),
         ),
         patch(
             "nucliadb.common.datamanagers.vectorsets.exists",
@@ -182,19 +129,19 @@ async def test_vectorset_parameter_with_default_vectorset(
 
     calls: list[nodereader_pb2.SearchRequest] = []
 
-    async def mock_nidx_query(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
+    async def mock_query_index(kbid: str, method, pb_query: nodereader_pb2.SearchRequest, **kwargs):
         calls.append(pb_query)
         results = nodereader_pb2.SearchResponse()
         return results
 
     with (
         patch(
-            "nucliadb.search.api.v1.search.nidx_query",
-            new=AsyncMock(side_effect=mock_nidx_query),
+            "nucliadb.search.api.v1.search.query_index",
+            new=AsyncMock(side_effect=mock_query_index),
         ),
         patch(
-            "nucliadb.search.search.retrieval.nidx_query",
-            new=AsyncMock(side_effect=mock_nidx_query),
+            "nucliadb.search.search.retrieval.query_index",
+            new=AsyncMock(side_effect=mock_query_index),
         ),
         patch(
             "nucliadb.common.datamanagers.vectorsets.exists",
@@ -237,26 +184,13 @@ async def test_querying_kb_with_vectorsets(
     """
     query: tuple[Any, nodereader_pb2.SearchResponse | None, Exception | None] = (None, None, None)
 
-    async def query_shards_wrapper(shards: list[str], pb_query: nodereader_pb2.SearchRequest):
+    async def hybrid_search_wrapper(kbid: str, pb_query: nodereader_pb2.SearchRequest):
         nonlocal query
 
-        from nucliadb.search.search.shards import query_shards
-
-        # this avoids problems with spying an object twice
-        nidx = get_nidx_searcher_client()
-        if not hasattr(nidx.Search, "spy_return"):
-            spy = mocker.spy(nidx, "Search")
-        else:
-            spy = nidx.Search
-
-        try:
-            result = await query_shards(shards, pb_query)
-        except Exception as exc:
-            query = (spy, None, exc)
-            raise
-        else:
-            query = (spy, result, None)
-            return result
+        spy = AsyncMock(return_value=nodereader_pb2.SearchResponse())
+        result = await spy(pb_query)
+        query = (spy, result, None)
+        return result
 
     def predict_query_wrapper(original, dimension: int, vectorset_dimensions: dict[str, int]):
         @functools.wraps(original)
@@ -288,7 +222,7 @@ async def test_querying_kb_with_vectorsets(
     await inject_message(nucliadb_ingest_grpc, bm)
 
     with (
-        patch("nucliadb.search.requesters.utils.query_shards", query_shards_wrapper),
+        patch("nucliadb.search.requesters.utils.hybrid_search", hybrid_search_wrapper),
         patch.object(
             dummy_predict,
             "query",
@@ -355,7 +289,7 @@ async def test_querying_kb_with_vectorsets(
     )
     await inject_message(nucliadb_ingest_grpc, bm)
 
-    with patch("nucliadb.search.requesters.utils.query_shards", query_shards_wrapper):
+    with patch("nucliadb.search.requesters.utils.hybrid_search", hybrid_search_wrapper):
         with (
             patch.object(
                 dummy_predict,

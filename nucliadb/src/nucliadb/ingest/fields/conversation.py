@@ -27,6 +27,7 @@ from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.fields.exceptions import FieldAuthorNotFound
 from nucliadb_protos.resources_pb2 import CloudFile, FieldAuthor, FieldConversation, SplitsMetadata
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
+from nucliadb_protos.writer_pb2 import FieldStatus
 from nucliadb_utils.storages.storage import StorageField
 
 MAX_CONVERSATION_MESSAGES = None  # No limit
@@ -64,7 +65,7 @@ class Conversation(Field[PBConversation]):
         self.metadata = None
         self.value.clear()
 
-    async def set_value(self, payload: PBConversation):
+    async def set_value(self, payload: PBConversation, status: FieldStatus | None = None) -> None:
         if payload.replace_field:
             # As we need to overwrite the value of the conversation, first delete any previous data.
             await self.delete_value()
@@ -76,7 +77,6 @@ class Conversation(Field[PBConversation]):
             metadata.size = PAGE_SIZE
             metadata.pages = 0
             metadata.total = 0
-            await self.db_set_metadata(metadata)
             created = True
 
         metadata.extract_strategy = payload.extract_strategy
@@ -139,7 +139,7 @@ class Conversation(Field[PBConversation]):
             last_page.messages.extend(page_messages)
 
             # Save the last page
-            await self.db_set_value(last_page, metadata.pages)
+            await self.db_set_value(last_page, page=metadata.pages)
 
             # If there are still messages, create a new page
             messages = messages[available_space:]
@@ -150,7 +150,7 @@ class Conversation(Field[PBConversation]):
                 break
 
         # Finally, set the metadata
-        await self.db_set_metadata(metadata)
+        await self.db_set_metadata(metadata, status=status)
         await self.set_splits_metadata(self._splits_metadata)
 
     async def get_value(self, page: int | None = None) -> PBConversation | None:
@@ -210,7 +210,14 @@ class Conversation(Field[PBConversation]):
             self.value[page] = pb
         return self.value[page]
 
-    async def db_set_value(self, payload: PBConversation, page: int = 0):
+    async def db_set_value(
+        self,
+        payload: PBConversation,
+        status: FieldStatus | None = None,
+        md5: str | None = None,
+        *,
+        page: int = 0,
+    ) -> None:
         await datamanagers.conversations.set_page(
             self.resource.txn,
             kbid=self.kbid,
@@ -222,13 +229,14 @@ class Conversation(Field[PBConversation]):
         self.value[page] = payload
         self.resource.modified = True
 
-    async def db_set_metadata(self, payload: FieldConversation):
+    async def db_set_metadata(self, payload: FieldConversation, status: FieldStatus | None = None):
         await datamanagers.conversations.set_metadata(
             self.resource.txn,
             kbid=self.kbid,
             rid=self.rid,
             field_id=self.id,
             metadata=payload,
+            status=status,
         )
         self.metadata = payload
         self.resource.modified = True
@@ -291,7 +299,7 @@ class Conversation(Field[PBConversation]):
                     idents_to_delete.remove(message.ident)
             if some_deleted_in_page:
                 # If we deleted a message in this page, we need to update it in the database.
-                await self.db_set_value(page_obj, page)
+                await self.db_set_value(page_obj, page=page)
 
         if len(idents_to_delete) > 0:
             logger.warning(

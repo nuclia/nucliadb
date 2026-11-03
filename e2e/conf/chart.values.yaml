@@ -20,21 +20,3 @@ env:
   DEBUG: "true"
 
 replicas: 2
-
-nidx:
-  env:
-    METADATA__DATABASE_URL: "{{ .Values.pg_url }}"
-
-    INDEXER__OBJECT_STORE: s3
-    INDEXER__ENDPOINT: http://my-minio.default.svc.cluster.local:9000
-    INDEXER__BUCKET: indexer
-    INDEXER__CLIENT_ID: "{{ .Values.minio_user }}"
-    INDEXER__CLIENT_SECRET: "{{ .Values.minio_password }}"
-    INDEXER__REGION_NAME: local
-
-    STORAGE__OBJECT_STORE: s3
-    STORAGE__ENDPOINT: http://my-minio.default.svc.cluster.local:9000
-    STORAGE__BUCKET: nidx
-    STORAGE__CLIENT_ID: "{{ .Values.minio_user }}"
-    STORAGE__CLIENT_SECRET: "{{ .Values.minio_password }}"
-    STORAGE__REGION_NAME: local

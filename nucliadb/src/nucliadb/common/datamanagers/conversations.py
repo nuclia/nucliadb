@@ -17,40 +17,58 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-"""
-Datamanager for the `kb_conversations` PostgreSQL table (migration 0016).
+"""MarkLogic datamanager for conversation field metadata, pages, and splits."""
 
-Each row stores one page of a conversation field, or the SplitsMetadata sentinel:
-  - kbid     - FK → kb_resources.kbid (ON DELETE CASCADE)
-  - rid      - FK → kb_resources.rid  (ON DELETE CASCADE)
-  - field_id - user-defined conversation field name
-  - page     - 1-based page number; the sentinel value 0 stores SplitsMetadata
-  - value    - serialised protobuf bytes:
-                 page = 0  → resources_pb2.SplitsMetadata
-                 page >= 1 → resources_pb2.Conversation (~200 messages each)
+from __future__ import annotations
 
-The FieldConversation metadata (page count, total, page size, extract/split strategy)
-is stored in kb_fields.value for the corresponding 'c'-type field row and is written
-directly here to avoid a cross-module import cycle with fields.
+from typing import Any
 
-NOTE: deleting a kb_resources row (or its parent kbs row) automatically removes all
-related kb_conversations rows via the ON DELETE CASCADE foreign key.
-"""
+from pydantic import BaseModel
 
-from nucliadb.common.datamanagers.utils import _pg_cursor
+from nucliadb.common.datamanagers.utils import observer
+from nucliadb.common.maindb.collections import MarkLogicCollections
 from nucliadb.common.maindb.driver import Transaction
+from nucliadb.common.maindb.marklogic import MarkLogicTransaction
+from nucliadb.common.marklogic import documents
+from nucliadb.common.marklogic.document_deletion import DocumentDeletion
+from nucliadb.common.marklogic.document_update import DocumentUpdate
+from nucliadb.common.marklogic.uris import MarkLogicURIs
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import FieldConversation, SplitsMetadata
+from nucliadb_protos.writer_pb2 import FieldStatus
 
-# Sentinel page number used to store SplitsMetadata in the kb_conversations table.
-# Real conversation pages are 1-based, so 0 is always free.
 _SPLITS_METADATA_PAGE = 0
 
-# ---------------------------------------------------------------------------
-# FieldConversation metadata  (stored in kb_fields, field_type = 'c')
-# ---------------------------------------------------------------------------
+
+class ConversationPageContent(BaseModel):
+    resource_id: str
+    field_id: str
+    conversation_page: int
+    value: dict[str, Any]
 
 
+def _marklogic_txn(
+    txn: Transaction,
+    *,
+    kbid: str,
+    ensure_writes: bool = False,
+) -> MarkLogicTransaction:
+    documents.driver_txn(txn, ensure_writes=ensure_writes)
+    assert txn.kbid == kbid
+    return txn
+
+
+async def create_page(txn: Transaction, data: ConversationPageContent) -> None:
+    documents.driver_txn(txn, ensure_writes=True)
+    await documents.write(
+        txn,
+        uri=MarkLogicURIs.conversation_page(data.resource_id, data.field_id, data.conversation_page),
+        collection=MarkLogicCollections.CONVERSATIONS,
+        content=data.model_dump(mode="json"),
+    )
+
+
+@observer.wrap({"type": "conversation", "op": "get_metadata"})
 async def get_metadata(
     txn: Transaction,
     *,
@@ -58,23 +76,15 @@ async def get_metadata(
     rid: str,
     field_id: str,
 ) -> FieldConversation | None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            SELECT value FROM kb_fields
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_type = 'c' AND field_id = %(field_id)s
-            """,
-            {"kbid": kbid, "rid": rid, "field_id": field_id},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = FieldConversation()
-        pb.ParseFromString(bytes(row[0]))
-        return pb
+    marklogic_txn = _marklogic_txn(txn, kbid=kbid)
+    content = await documents.read(marklogic_txn, MarkLogicURIs.field(rid, "c", field_id))
+    if content is None:
+        return None
+    value = content.get("value")
+    return documents.from_json(value, FieldConversation) if isinstance(value, dict) else None
 
 
+@observer.wrap({"type": "conversation", "op": "set_metadata"})
 async def set_metadata(
     txn: Transaction,
     *,
@@ -82,29 +92,20 @@ async def set_metadata(
     rid: str,
     field_id: str,
     metadata: FieldConversation,
+    status: FieldStatus | None = None,
 ) -> None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_fields (kbid, rid, field_type, field_id, value)
-            VALUES (%(kbid)s, %(rid)s, 'c', %(field_id)s, %(value)s)
-            ON CONFLICT (kbid, rid, field_type, field_id) DO UPDATE SET
-                value = EXCLUDED.value
-            """,
-            {
-                "kbid": kbid,
-                "rid": rid,
-                "field_id": field_id,
-                "value": metadata.SerializeToString(),
-            },
-        )
+    marklogic_txn = _marklogic_txn(txn, kbid=kbid, ensure_writes=True)
+    update = DocumentUpdate(
+        uri=MarkLogicURIs.field(rid, "c", field_id),
+        collection=MarkLogicCollections.FIELDS,
+    )
+    update["value"] = documents.to_json(metadata)
+    if status is not None:
+        update["status"] = documents.to_json(status)
+    await documents.update_document(marklogic_txn, update)
 
 
-# ---------------------------------------------------------------------------
-# Conversation pages  (stored in kb_conversations, page >= 1)
-# ---------------------------------------------------------------------------
-
-
+@observer.wrap({"type": "conversation", "op": "get_page"})
 async def get_page(
     txn: Transaction,
     *,
@@ -113,25 +114,17 @@ async def get_page(
     field_id: str,
     page: int,
 ) -> PBConversation | None:
-    if page <= 0:
+    if page <= _SPLITS_METADATA_PAGE:
         raise ValueError("Conversation pages start at index 1")
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            SELECT value FROM kb_conversations
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_type = 'c' AND field_id = %(field_id)s AND page = %(page)s
-            """,
-            {"kbid": kbid, "rid": rid, "field_id": field_id, "page": page},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = PBConversation()
-        pb.ParseFromString(bytes(row[0]))
-        return pb
+    marklogic_txn = _marklogic_txn(txn, kbid=kbid)
+    content = await documents.read(marklogic_txn, MarkLogicURIs.conversation_page(rid, field_id, page))
+    if content is None:
+        return None
+    value = content.get("value")
+    return documents.from_json(value, PBConversation) if isinstance(value, dict) else None
 
 
+@observer.wrap({"type": "conversation", "op": "set_page"})
 async def set_page(
     txn: Transaction,
     *,
@@ -141,31 +134,20 @@ async def set_page(
     page: int,
     value: PBConversation,
 ) -> None:
-    if page <= 0:
+    if page <= _SPLITS_METADATA_PAGE:
         raise ValueError("Conversation pages start at index 1")
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_conversations (kbid, rid, field_type, field_id, page, value)
-            VALUES (%(kbid)s, %(rid)s, 'c', %(field_id)s, %(page)s, %(value)s)
-            ON CONFLICT (kbid, rid, field_type, field_id, page) DO UPDATE SET
-                value = EXCLUDED.value
-            """,
-            {
-                "kbid": kbid,
-                "rid": rid,
-                "field_id": field_id,
-                "page": page,
-                "value": value.SerializeToString(),
-            },
-        )
+    await create_page(
+        txn,
+        ConversationPageContent(
+            resource_id=rid,
+            field_id=field_id,
+            conversation_page=page,
+            value=documents.to_json(value),
+        ),
+    )
 
 
-# ---------------------------------------------------------------------------
-# SplitsMetadata  (stored in kb_conversations at sentinel page = 0)
-# ---------------------------------------------------------------------------
-
-
+@observer.wrap({"type": "conversation", "op": "get_splits_metadata"})
 async def get_splits_metadata(
     txn: Transaction,
     *,
@@ -173,23 +155,18 @@ async def get_splits_metadata(
     rid: str,
     field_id: str,
 ) -> SplitsMetadata | None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            SELECT value FROM kb_conversations
-            WHERE kbid = %(kbid)s AND rid = %(rid)s
-              AND field_type = 'c' AND field_id = %(field_id)s AND page = %(page)s
-            """,
-            {"kbid": kbid, "rid": rid, "field_id": field_id, "page": _SPLITS_METADATA_PAGE},
-        )
-        row = await cur.fetchone()
-        if row is None or row[0] is None:
-            return None
-        pb = SplitsMetadata()
-        pb.ParseFromString(bytes(row[0]))
-        return pb
+    marklogic_txn = _marklogic_txn(txn, kbid=kbid)
+    content = await documents.read(
+        marklogic_txn,
+        MarkLogicURIs.conversation_page(rid, field_id, _SPLITS_METADATA_PAGE),
+    )
+    if content is None:
+        return None
+    value = content.get("value")
+    return documents.from_json(value, SplitsMetadata) if isinstance(value, dict) else None
 
 
+@observer.wrap({"type": "conversation", "op": "set_splits_metadata"})
 async def set_splits_metadata(
     txn: Transaction,
     *,
@@ -198,29 +175,18 @@ async def set_splits_metadata(
     field_id: str,
     splits_metadata: SplitsMetadata,
 ) -> None:
-    async with _pg_cursor(txn) as cur:
-        await cur.execute(
-            """
-            INSERT INTO kb_conversations (kbid, rid, field_type, field_id, page, value)
-            VALUES (%(kbid)s, %(rid)s, 'c', %(field_id)s, %(page)s, %(value)s)
-            ON CONFLICT (kbid, rid, field_type, field_id, page) DO UPDATE SET
-                value = EXCLUDED.value
-            """,
-            {
-                "kbid": kbid,
-                "rid": rid,
-                "field_id": field_id,
-                "page": _SPLITS_METADATA_PAGE,
-                "value": splits_metadata.SerializeToString(),
-            },
-        )
+    await create_page(
+        txn,
+        ConversationPageContent(
+            resource_id=rid,
+            field_id=field_id,
+            conversation_page=_SPLITS_METADATA_PAGE,
+            value=documents.to_json(splits_metadata),
+        ),
+    )
 
 
-# ---------------------------------------------------------------------------
-# Delete
-# ---------------------------------------------------------------------------
-
-
+@observer.wrap({"type": "conversation", "op": "delete_field"})
 async def delete_field(
     txn: Transaction,
     *,
@@ -228,20 +194,15 @@ async def delete_field(
     rid: str,
     field_id: str,
 ) -> None:
-    async with _pg_cursor(txn) as cur:
-        # Delete all conversation pages for this field (including the sentinel page = 0)
-        await cur.execute(
-            """
-            DELETE FROM kb_conversations
-            WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_type = 'c' AND field_id = %(field_id)s
-            """,
-            {"kbid": kbid, "rid": rid, "field_id": field_id},
-        )
-        # Delete the FieldConversation metadata for this field (if it exists)
-        await cur.execute(
-            """
-            DELETE FROM kb_fields
-            WHERE kbid = %(kbid)s AND rid = %(rid)s AND field_type = 'c' AND field_id = %(field_id)s
-            """,
-            {"kbid": kbid, "rid": rid, "field_id": field_id},
-        )
+    marklogic_txn = _marklogic_txn(txn, kbid=kbid, ensure_writes=True)
+    deletion = DocumentDeletion()
+    deletion.uri(MarkLogicURIs.field(rid, "c", field_id))
+    deletion.directory(
+        MarkLogicURIs.conversation_directory(rid, field_id),
+        (
+            MarkLogicCollections.CONVERSATIONS,
+            MarkLogicCollections.CHUNKS,
+            MarkLogicCollections.EMBEDDINGS,
+        ),
+    )
+    await documents.delete_documents(marklogic_txn, deletion)

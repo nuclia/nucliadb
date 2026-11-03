@@ -32,10 +32,10 @@ class Settings(DriverSettings):
         description="The threshold in seconds for logging slow find queries",
     )
 
-    slow_node_query_log_threshold: float = Field(
+    slow_index_query_log_threshold: float = Field(
         default=2.0,
-        title="Slow node query log threshold",
-        description="The threshold in seconds for logging slow node queries",
+        title="Slow index query log threshold",
+        description="The threshold in seconds for logging slow index queries",
     )
     nidx_address: str | None = Field(default=None)
 

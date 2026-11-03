@@ -21,25 +21,6 @@
 import async_lru
 
 from nucliadb.common import datamanagers
-from nucliadb.common.external_index_providers.base import ExternalIndexManager
-from nucliadb_protos.knowledgebox_pb2 import (
-    StoredExternalIndexProviderMetadata,
-)
-
-
-async def get_external_index_manager(
-    kbid: str, for_rollover: bool = False
-) -> ExternalIndexManager | None:
-    """
-    Returns an ExternalIndexManager for the given kbid.
-    If for_rollover is True, the ExternalIndexManager returned will include the rollover indexes (if any).
-    """
-    return None
-
-
-@async_lru.alru_cache(maxsize=None)
-async def get_external_index_metadata(kbid: str) -> StoredExternalIndexProviderMetadata | None:
-    return await datamanagers.atomic.kb.get_external_index_provider_metadata(kbid=kbid)
 
 
 @async_lru.alru_cache(maxsize=None)
@@ -49,7 +30,7 @@ async def get_default_vectorset_id(kbid: str) -> str | None:
     that KBs that have only one semantic model will have the `vectorset_id` field on BrokerMessage.field_vectors
     set to empty string -- that is the `default` vectorset concept.
     """
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         vss = []
         async for vs_id, vs_config in datamanagers.vectorsets.iter(txn, kbid=kbid):
             vss.append((vs_id, vs_config))
@@ -63,10 +44,3 @@ async def get_default_vectorset_id(kbid: str) -> str | None:
             # If there are multiple vectorsets, we don't have a default
             # and we assume the index messages are explicit about the vectorset
             return None
-
-
-async def get_rollover_external_index_metadata(
-    kbid: str,
-) -> StoredExternalIndexProviderMetadata | None:
-    async with datamanagers.with_ro_transaction() as txn:
-        return await datamanagers.rollover.get_kb_rollover_external_index_metadata(txn, kbid=kbid)

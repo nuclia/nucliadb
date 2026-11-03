@@ -23,8 +23,8 @@ from collections.abc import AsyncGenerator
 from fastapi import HTTPException
 from nidx_protos.nodereader_pb2 import StreamRequest
 
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train.generators.utils import batchify, get_paragraph
+from nucliadb.train.index import stream_paragraphs
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
     Label,
@@ -63,7 +63,7 @@ async def generate_paragraph_classification_payloads(
     request.shard_id.id = shard_replica_id
     request.filter.labels.append(labelset)
 
-    async for paragraph_item in get_nidx_searcher_client().Paragraphs(request):
+    async for paragraph_item in stream_paragraphs(request):
         text_labels = []
         for label in paragraph_item.labels:
             if label.startswith(labelset):

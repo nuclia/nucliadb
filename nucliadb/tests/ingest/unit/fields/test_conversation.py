@@ -24,27 +24,23 @@ import pytest
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver, Transaction
 from nucliadb.ingest.fields.conversation import Conversation
-from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.resources_pb2 import CloudFile, FieldConversation
 from nucliadb_protos.resources_pb2 import Conversation as PBConversation
 from nucliadb_protos.resources_pb2 import Message as PBMessage
 from nucliadb_protos.resources_pb2 import MessageContent as PBMessageContent
+from tests.utils.knowledgebox import create_knowledgebox
 
 
 @pytest.fixture(scope="function")
-async def txn(maindb_driver: Driver):
-    async with maindb_driver.rw_transaction() as txn:
+async def txn(maindb_driver: Driver, kbid: str):
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         yield txn
 
 
 @pytest.fixture(scope="function")
 async def kbid(maindb_driver: Driver):
-    kbid = KnowledgeBox.new_unique_kbid()
-    async with maindb_driver.rw_transaction() as txn:
-        await datamanagers.kb.set_slug(txn, kbid=kbid, slug=f"slug-{kbid}")
-        await txn.commit()
-    return kbid
+    return await create_knowledgebox(maindb_driver)
 
 
 @pytest.fixture(scope="function")
@@ -57,7 +53,7 @@ def storage():
 @pytest.fixture(scope="function")
 async def resource(maindb_driver: Driver, txn: Transaction, storage, kbid: str):
     rid = Resource.new_unique_rid()
-    async with maindb_driver.rw_transaction() as txn:
+    async with maindb_driver.rw_transaction(kbid=kbid) as txn:
         await datamanagers.resources.set_slug(txn, kbid=kbid, rid=rid, slug=f"slug-{rid}")
         await txn.commit()
 

@@ -67,7 +67,7 @@ from nucliadb_models.common import FieldTypeName
 from nucliadb_protos import resources_pb2
 from nucliadb_utils.storages.storage import STORAGE_FILE_EXTRACTED
 
-from .extracted_text import nidx_et_cache
+from .extracted_text import index_et_cache
 
 # Number of messages to pull after a match in a message
 # The hope here is it will be enough to get the answer to the question.
@@ -425,9 +425,9 @@ async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
     # we store all splits unordered inside nidx_text, so nidx can't support yet
     # conversation fields
     if field.type != Conversation.type:
-        nidx_extracted_texts = nidx_et_cache.get()
-        if nidx_extracted_texts is not None:
-            text = await get_field_extracted_text_from_nidx(field.kbid, id)
+        index_extracted_texts = index_et_cache.get()
+        if index_extracted_texts is not None:
+            text = await get_field_extracted_text_from_index(field.kbid, id)
         else:
             # nidx texts not available, either we are not calling from augmentor
             # or something went wrong. In any case, fallback to object storage
@@ -439,10 +439,12 @@ async def get_field_extracted_text(id: FieldId, field: Field) -> str | None:
     return text
 
 
-async def get_field_extracted_text_from_nidx(kbid: str, id: FieldId) -> str | None:
-    nidx_extracted_texts = nidx_et_cache.get()
-    assert nidx_extracted_texts is not None, "this function must be called with the nidx texts cache set"
-    return nidx_extracted_texts.get_field_text(id)
+async def get_field_extracted_text_from_index(kbid: str, id: FieldId) -> str | None:
+    index_extracted_texts = index_et_cache.get()
+    assert index_extracted_texts is not None, (
+        "this function must be called with the index texts cache set"
+    )
+    return index_extracted_texts.get_field_text(id)
 
 
 @augmentor_observer.wrap({"type": "field_text:storage"})

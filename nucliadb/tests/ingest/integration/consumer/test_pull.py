@@ -32,14 +32,12 @@ from uvicorn.server import Server
 
 from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
 from nucliadb.common.back_pressure.settings import BackPressureSettings
-from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.http_clients.processing import (
     InProgressRequest,
     PulledMessage,
     PullRequestV2,
     PullResponseV2,
 )
-from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.consumer.pull import PullV2Worker
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.writer_pb2 import BrokerMessage
@@ -166,8 +164,6 @@ async def wait_for_messages(messages: list[BrokerMessage], max_time: int = 10) -
 
 
 async def test_pull_v2(
-    shard_manager: KBShardManager,
-    dummy_nidx_utility: NidxUtility,
     pull_v2_worker: PullV2Worker,
     pull_processor_api: PullProcessorAPI,
     knowledgebox: str,

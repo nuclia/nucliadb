@@ -25,9 +25,9 @@ from nidx_protos.nodereader_pb2 import DocumentItem, StreamRequest
 
 from nucliadb.common.filter_expression import parse_expression
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+from nucliadb.train.index import stream_documents
 from nucliadb.train.settings import settings
 from nucliadb_models.filters import (
     FilterExpression,
@@ -130,7 +130,7 @@ async def iter_field_split_data(
     request: StreamRequest, kbid: str, trainset: TrainSet, max_parallel: int = 5
 ) -> AsyncIterable[FieldSplitData]:
     tasks: list[asyncio.Task] = []
-    async for document_item in get_nidx_searcher_client().Documents(request):
+    async for document_item in stream_documents(request):
         if len(tasks) >= max_parallel:
             results = await asyncio.gather(*tasks)
             for fsd in results:

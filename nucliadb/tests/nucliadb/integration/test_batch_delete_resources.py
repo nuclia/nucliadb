@@ -29,7 +29,6 @@ from httpx import AsyncClient
 from pytest import LogCaptureFixture
 
 from nucliadb.common.back_pressure.materializer import BackPressureMaterializer
-from nucliadb.common.nidx import NidxUtility
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb.tasks.consumer import NatsTaskConsumer
 from nucliadb.tasks.deleter import DeleteBatch
@@ -47,7 +46,6 @@ def patch_deleter_batch_size():
 async def test_batch_delete_resources_by_rid(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nidx_utility: NidxUtility,
     ingest_batch_resource_deleter_consumer: NatsTaskConsumer[DeleteBatch],
     back_pressure_materializer: BackPressureMaterializer,
     simple_resources: tuple[str, list[str]],
@@ -93,7 +91,6 @@ async def test_batch_delete_resources_by_rid(
 async def test_batch_delete_resources_by_created_date(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nidx_utility: NidxUtility,
     ingest_batch_resource_deleter_consumer: NatsTaskConsumer[DeleteBatch],
     back_pressure_materializer: BackPressureMaterializer,
     simple_resources: tuple[str, list[str]],
@@ -127,7 +124,6 @@ async def test_batch_delete_resources_by_created_date(
 async def test_batch_delete_resources_by_origin_metadata(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nidx_utility: NidxUtility,
     ingest_batch_resource_deleter_consumer: NatsTaskConsumer[DeleteBatch],
     back_pressure_materializer: BackPressureMaterializer,
     simple_resources: tuple[str, list[str]],
@@ -164,7 +160,6 @@ async def test_batch_delete_resources_by_origin_metadata(
 async def test_batch_delete_resources_with_back_pressure(
     nucliadb_reader: AsyncClient,
     nucliadb_writer: AsyncClient,
-    nidx_utility: NidxUtility,
     ingest_batch_resource_deleter_consumer: NatsTaskConsumer[DeleteBatch],
     back_pressure_materializer: BackPressureMaterializer,
     knowledgebox: str,

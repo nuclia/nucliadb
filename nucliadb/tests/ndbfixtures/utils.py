@@ -28,10 +28,8 @@ from unittest.mock import AsyncMock, patch
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
-from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.context import ApplicationContext
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import NidxUtility
 from nucliadb.search import API_PREFIX
 from nucliadb_utils.nats import NatsConnectionManager
 from nucliadb_utils.partition import PartitionUtility
@@ -97,11 +95,9 @@ def application_context(
     *,
     maindb_driver: Driver | None = None,
     storage: Storage | None = None,
-    shard_manager: KBShardManager | None = None,
     partitioning: PartitionUtility | None = None,
     nats_manager: NatsConnectionManager | None = None,
     transaction: TransactionUtility | None = None,
-    nidx: NidxUtility | None = None,
 ) -> ApplicationContext:
     """Manipulated application context to inject utilities created by fixtures.
     This avoid the problem of having multiple fixtures manipulating
@@ -115,20 +111,16 @@ def application_context(
         service_name="nucliadb.tests",
         kv_driver=maindb_driver is not None,
         blob_storage=storage is not None,
-        shard_manager=shard_manager is not None,
         partitioning=partitioning is not None,
         nats_manager=nats_manager is not None,
         transaction=transaction is not None,
-        nidx=nidx is not None,
     )
 
     context._kv_driver = maindb_driver
     context._blob_storage = storage
-    context._shard_manager = shard_manager
     context._partitioning = partitioning
     context._nats_manager = nats_manager
     context._transaction = transaction
-    context._nidx = nidx
 
     # We are injecting already initialized test utilities. Manually mark context
     # as initialized and raise an exception if someone tries to finalize it

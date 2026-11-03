@@ -27,7 +27,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 
 class BlobStore:
     bucket: str
-    source: CloudFile.Source.V
+    source: CloudFile.Source.ValueType
 
     async def initialize(self, *args, **kwargs):
         pass

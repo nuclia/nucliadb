@@ -34,12 +34,11 @@ import pytest
 from grpc import aio
 
 from nucliadb.common import datamanagers
-from nucliadb.common.cluster.manager import KBShardManager
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.ingest.consumer import service as consumer_service
 from nucliadb.ingest.fields.base import Field
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb.ingest.service.writer import WriterServicer
 from nucliadb.standalone.settings import Settings
@@ -109,7 +108,6 @@ async def standalone_nucliadb_ingest_grpc(nucliadb: Settings) -> AsyncIterator[W
 async def ingest_grpc_server(
     maindb_driver: Driver,
     storage: Storage,
-    shard_manager: KBShardManager,
 ) -> AsyncIterator[IngestGrpcServer]:
     """Ingest ORM gRPC server with dummy/mocked index."""
     servicer = WriterServicer()
@@ -148,7 +146,6 @@ async def ingest_consumers(
     maindb_driver: Driver,
     transaction_utility: TransactionUtility,
     storage: Storage,
-    dummy_nidx_utility,
     nats_manager: NatsConnectionManager,
     nats_ingest_stream,
 ):
@@ -165,7 +162,6 @@ async def ingest_processed_consumer(
     maindb_driver: Driver,
     transaction_utility: TransactionUtility,
     storage: Storage,
-    dummy_nidx_utility,
     nats_manager: NatsConnectionManager,
     nats_ingest_processed_stream,
 ):
@@ -548,7 +544,7 @@ def broker_resource(knowledgebox: str, rid: str | None = None, slug: str | None 
 async def create_resource(
     storage: Storage, driver: Driver, knowledgebox: str, slug: str = "slug"
 ) -> Resource:
-    async with driver.rw_transaction() as txn:
+    async with driver.rw_transaction(kbid=knowledgebox) as txn:
         rid = Resource.new_unique_rid()
         kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
         test_resource = await kb_obj.add_resource(uuid=rid, slug=slug)
@@ -712,8 +708,4 @@ async def entities_manager_mock():
     """
     klass = "nucliadb.ingest.service.writer.EntitiesManager"
     with patch(f"{klass}.get_indexed_entities_group", AsyncMock(return_value=None)):
-        with patch(
-            "nucliadb.common.cluster.manager.KBShardManager.apply_for_all_shards",
-            AsyncMock(return_value=[]),
-        ):
-            yield
+        yield

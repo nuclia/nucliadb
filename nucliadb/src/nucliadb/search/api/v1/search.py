@@ -32,7 +32,7 @@ from nucliadb.models.responses import HTTPClientError
 from nucliadb.search import predict
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query, get_injected_security_groups
-from nucliadb.search.requesters.utils import Method, nidx_query
+from nucliadb.search.requesters.utils import Method, query_index
 from nucliadb.search.search import cache
 from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb.search.search.merge import merge_results
@@ -268,7 +268,7 @@ async def search(
     pb_query = convert_retrieval_to_proto(parsed.retrieval)
 
     # We need to query all nodes
-    results = await nidx_query(kbid, Method.SEARCH, pb_query)
+    results = await query_index(kbid, Method.SEARCH, pb_query)
     queried_shards = list(results.shard_ids)
 
     # We need to merge

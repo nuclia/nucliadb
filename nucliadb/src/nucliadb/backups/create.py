@@ -267,7 +267,7 @@ async def backup_kv_schemas(context: ApplicationContext, kbid: str, backup_id: s
 
 
 async def get_metadata(context: ApplicationContext, kbid: str, backup_id: str) -> BackupMetadata | None:
-    async with context.kv_driver.ro_transaction() as txn:
+    async with context.kv_driver.ro_transaction(kbid=kbid) as txn:
         metadata_raw = await txn.get(MaindbKeys.METADATA.format(kbid=kbid, backup_id=backup_id))
         if metadata_raw is None:
             return None
@@ -275,7 +275,7 @@ async def get_metadata(context: ApplicationContext, kbid: str, backup_id: str) -
 
 
 async def set_metadata(context: ApplicationContext, kbid: str, backup_id: str, metadata: BackupMetadata):
-    async with context.kv_driver.rw_transaction() as txn:
+    async with context.kv_driver.rw_transaction(kbid=kbid) as txn:
         await txn.set(
             MaindbKeys.METADATA.format(kbid=kbid, backup_id=backup_id),
             metadata.model_dump_json().encode(),
@@ -284,7 +284,7 @@ async def set_metadata(context: ApplicationContext, kbid: str, backup_id: str, m
 
 
 async def delete_metadata(context: ApplicationContext, kbid: str, backup_id: str):
-    async with context.kv_driver.rw_transaction() as txn:
+    async with context.kv_driver.rw_transaction(kbid=kbid) as txn:
         await txn.delete(MaindbKeys.METADATA.format(kbid=kbid, backup_id=backup_id))
         await txn.commit()
 

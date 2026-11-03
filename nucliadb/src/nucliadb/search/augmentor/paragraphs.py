@@ -43,7 +43,7 @@ from nucliadb.search.search import cache
 from nucliadb_models.search import TextPosition
 from nucliadb_protos import resources_pb2
 
-from .extracted_text import nidx_et_cache
+from .extracted_text import index_et_cache
 
 
 @augmentor_observer.wrap({"type": "paragraph"})
@@ -251,9 +251,9 @@ async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | N
     # we store all splits unordered inside nidx_text, so nidx can't support yet
     # conversation fields
     if field.type != Conversation.type:
-        nidx_extracted_texts = nidx_et_cache.get()
-        if nidx_extracted_texts is not None:
-            text = await get_paragraph_text_from_nidx(paragraph_id)
+        index_extracted_texts = index_et_cache.get()
+        if index_extracted_texts is not None:
+            text = await get_paragraph_text_from_index(paragraph_id)
         else:
             # nidx texts not available, either we are not calling from augmentor
             # or something went wrong. In any case, fallback to object storage
@@ -266,20 +266,17 @@ async def get_paragraph_text(field: Field, paragraph_id: ParagraphId) -> str | N
     return text or None
 
 
-async def get_paragraph_text_from_nidx(id: ParagraphId) -> str | None:
+async def get_paragraph_text_from_index(id: ParagraphId) -> str | None:
     """Obtain a paragraph from the field extracted text.
 
-    This is an expensive operation that requires a gRPC request to nidx to get
-    the paragraph text. However, this is faster than getting the text from
-    object storage alternative.
-
-    It uses a shared cache across the augmentor to avoid too many round trips to
-    the index.
+    Uses the shared extracted-text cache populated by the indexing backend.
 
     """
-    nidx_extracted_texts = nidx_et_cache.get()
-    assert nidx_extracted_texts is not None, "this function must be called with the nidx texts cache set"
-    return nidx_extracted_texts.get_paragraph_text(id)
+    index_extracted_texts = index_et_cache.get()
+    assert index_extracted_texts is not None, (
+        "this function must be called with the index texts cache set"
+    )
+    return index_extracted_texts.get_paragraph_text(id)
 
 
 @augmentor_observer.wrap({"type": "paragraph_text:storage"})

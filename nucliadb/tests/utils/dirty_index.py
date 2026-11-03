@@ -18,22 +18,10 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-from nucliadb.common.nidx import get_nidx
-
-# Set of httpx hooks that wait for nidx to be synced before each reader request, but only if we made
-# a write first (there is no need to wait if we get a sequence of consecutive read requests)
-_nidx_is_dirty = False
-
 
 async def wait_for_sync(*args):
-    global _nidx_is_dirty
-    if _nidx_is_dirty:
-        nidx = get_nidx()
-        if nidx:
-            nidx.wait_for_sync()
-            _nidx_is_dirty = False
+    pass
 
 
 async def mark_dirty(*args):
-    global _nidx_is_dirty
-    _nidx_is_dirty = True
+    pass

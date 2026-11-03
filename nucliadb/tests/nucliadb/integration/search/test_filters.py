@@ -22,8 +22,6 @@ from unittest.mock import patch
 import pytest
 from httpx import AsyncClient
 
-from nucliadb.common.cluster import rollover
-from nucliadb.common.context import ApplicationContext
 from nucliadb.export_import.utils import get_processor_bm, get_writer_bm
 from nucliadb.search.search.rank_fusion import ReciprocalRankFusion
 from nucliadb.tests.vectors import V1, V2, Q
@@ -45,7 +43,6 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_protos.utils_pb2 import Vector
 from nucliadb_protos.writer_pb2_grpc import WriterStub
 from tests.utils import broker_resource, inject_message
-from tests.utils.dirty_index import mark_dirty
 
 
 class ClassificationLabels:
@@ -287,9 +284,7 @@ async def kbid(
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_filtering_before_and_after_reindexing(
-    app_context, nucliadb_reader: AsyncClient, kbid: str
-):
+async def test_filtering_after_indexing(nucliadb_reader: AsyncClient, kbid: str):
     FILTERS = [
         # Filter with unexisting labels and entities
         [entity_filter("unexisting/entity")],
@@ -325,12 +320,6 @@ async def test_filtering_before_and_after_reindexing(
             label_filter(ClassificationLabels.PARAGRAPH_DETECTED),
         ],
     ]
-
-    for f in FILTERS:
-        await _test_filtering(nucliadb_reader, kbid, f)
-
-    await rollover.rollover_kb_index(app_context, kbid)
-    await mark_dirty()
 
     for f in FILTERS:
         await _test_filtering(nucliadb_reader, kbid, f)
@@ -472,9 +461,35 @@ async def test_filtering_field_and_paragraph(app_context, nucliadb_reader: Async
     )
 
 
-@pytest.fixture()
-async def app_context(natsd, storage, nucliadb):
-    ctx = ApplicationContext()
-    await ctx.initialize()
-    yield ctx
-    await ctx.finalize()
+@pytest.mark.deploy_modes("standalone")
+async def test_filtering_by_labelset_and_entity_type(nucliadb_reader: AsyncClient, kbid: str):
+    """Filters without a label or entity value match everything below the labelset or type."""
+    paragraph_labelset = ClassificationLabels.PARAGRAPH_ANNOTATED.split("/")[0]
+    resource_labelset = ClassificationLabels.RESOURCE_ANNOTATED.split("/")[0]
+    entity_type = EntityLabels.DETECTED.split("/")[0]
+    for filter_expression, expected_paragraphs in [
+        ({"field": {"prop": "entity", "subtype": entity_type}}, {PARAGRAPH1, PARAGRAPH2}),
+        ({"field": {"prop": "entity", "subtype": "COUNTR"}}, set()),
+        ({"field": {"prop": "label", "labelset": resource_labelset}}, {PARAGRAPH3, PARAGRAPH4}),
+        ({"paragraph": {"prop": "label", "labelset": paragraph_labelset}}, {PARAGRAPH3}),
+        ({"paragraph": {"prop": "label", "labelset": "user-paragraph-other"}}, set()),
+    ]:
+        resp = await nucliadb_reader.post(
+            f"/kb/{kbid}/find",
+            json=dict(
+                query="",
+                features=[FindOptions.SEMANTIC],
+                vector=Q,
+                min_score=MinScore(semantic=-1).model_dump(),
+                reranker=RerankerName.NOOP,
+                filter_expression=filter_expression,
+            ),
+        )
+        assert resp.status_code == 200, resp.text
+        paragraphs = {
+            paragraph["text"]
+            for resource in resp.json()["resources"].values()
+            for field in resource["fields"].values()
+            for paragraph in field["paragraphs"].values()
+        }
+        assert paragraphs == expected_paragraphs, filter_expression

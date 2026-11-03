@@ -55,11 +55,9 @@ async def test_paragraph_index_deletions(
     standalone_knowledgebox,
 ):
     # Prepare data for a resource with title, summary and a text field
-
-    async with datamanagers.with_ro_transaction() as txn:
-        vectorsets = [
-            vs async for _, vs in datamanagers.vectorsets.iter(txn, kbid=standalone_knowledgebox)
-        ]
+    kbid = standalone_knowledgebox
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
+        vectorsets = [vs async for _, vs in datamanagers.vectorsets.iter(txn, kbid=kbid)]
     assert len(vectorsets) == 1
     vectorset_id = vectorsets[0].vectorset_id
     vector_dimension = vectorsets[0].vectorset_index_config.vector_dimension

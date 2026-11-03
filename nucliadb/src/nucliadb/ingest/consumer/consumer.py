@@ -33,7 +33,8 @@ from nucliadb.common.maindb.driver import Driver
 from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb.ingest import logger
 from nucliadb.ingest.orm.exceptions import DeadletteredError, SequenceOrderViolation
-from nucliadb.ingest.orm.processor import Processor, sequence_manager
+from nucliadb.ingest.orm.processor import sequence_manager
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb_protos.writer_pb2 import BrokerMessage, BrokerMessageBlobReference
 from nucliadb_telemetry import context, errors, metrics
 from nucliadb_utils import const

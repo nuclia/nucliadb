@@ -32,12 +32,11 @@ async def test_find(nucliadb_search: AsyncClient, multiple_search_resource: str)
         f"/{KB_PREFIX}/{kbid}/find?query=own+text",
     )
     assert resp.status_code == 200
-
     data = resp.json()
 
     # TODO: uncomment when we have the total stable in tests
     # assert data["total"] == 65
-
+    assert len(data["resources"]) > 0
     res = next(iter(data["resources"].values()))
     para = next(iter(res["fields"]["/f/file"]["paragraphs"].values()))
     assert para["position"] == {
