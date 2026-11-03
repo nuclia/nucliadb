@@ -21,10 +21,12 @@
 from unittest.mock import patch
 
 import pytest
+from pytest_mock import MockerFixture
 
-from nucliadb_utils.settings import (
-    nuclia_settings,
-)
+from nucliadb.ingest.processing import start_processing_engine, stop_processing_engine
+from nucliadb_utils.settings import nuclia_settings
+from nucliadb_utils.utilities import Utility, get_utility
+from tests.ndbfixtures.utils import global_utility
 
 
 @pytest.fixture(scope="function")
@@ -33,3 +35,17 @@ async def dummy_processing():
         patch.object(nuclia_settings, "dummy_processing", True),
     ):
         yield
+
+
+@pytest.fixture(scope="function")
+async def processing_engine(mocker: MockerFixture):
+    await start_processing_engine()
+    processing = get_utility(Utility.PROCESSING)
+    assert processing is not None
+
+    mocker.spy(processing, "send_to_process")
+
+    with global_utility(Utility.PROCESSING, processing):
+        yield processing
+
+    await stop_processing_engine()

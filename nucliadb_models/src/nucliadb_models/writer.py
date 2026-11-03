@@ -192,6 +192,10 @@ class ResourceFieldAdded(BaseModel):
     seqid: int | None = None
 
 
+class ResourceFieldUpdated(BaseModel, extra="forbid"):
+    seqid: int | None = None
+
+
 class ResourceDeleted(BaseModel):
     seqid: int | None = None
 

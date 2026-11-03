@@ -22,7 +22,7 @@ from datetime import datetime
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobProperties, BlobType, ContentSettings
-from azure.storage.blob.aio import BlobServiceClient
+from azure.storage.blob.aio import BlobClient, BlobServiceClient, ContainerClient
 
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_telemetry import metrics
@@ -446,12 +446,12 @@ class AzureObjectStore(ObjectStore):
     async def upload_multipart_append(
         self, bucket: str, key: str, iterable: AsyncIterator[bytes]
     ) -> int:
-        container_client = self.service_client.get_container_client(bucket)
-        blob_client = container_client.get_blob_client(key)
+        container_client: ContainerClient = self.service_client.get_container_client(bucket)
+        blob_client: BlobClient = container_client.get_blob_client(key)
         bytes_appended = 0
         async for chunk in iterable:
             bytes_appended += len(chunk)
-            await blob_client.append_block(data=chunk)
+            await blob_client.append_block(data=chunk)  # type: ignore[misc]
         return bytes_appended
 
     async def upload_multipart_finish(self, bucket: str, key: str) -> None:

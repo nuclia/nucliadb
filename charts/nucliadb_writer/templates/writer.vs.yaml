@@ -48,6 +48,10 @@ spec:
           method:
             regex: "PUT|DELETE|OPTIONS"
         - uri:
+            regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/(text|file|link|conversation)/[^/]+$'
+          method:
+            regex: "PATCH|OPTIONS"
+        - uri:
             regex: '^/api/v\d+/kb/[^/]+/(resource|slug)/[^/]+/conversation/[^/]+/messages'
           method:
             regex: "PUT|OPTIONS"

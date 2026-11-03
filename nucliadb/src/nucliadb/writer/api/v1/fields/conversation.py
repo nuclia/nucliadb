@@ -24,11 +24,19 @@ from fastapi import HTTPException, Path, Response
 from fastapi_versioning import version
 from starlette.requests import Request
 
+import nucliadb_models
 import nucliadb_models as models
 from nucliadb.common import datamanagers
+from nucliadb.common.back_pressure import maybe_back_pressure
+from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.fields.conversation import Conversation
+from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
 from nucliadb.ingest.orm.knowledgebox import Resource as ORMResource
-from nucliadb.writer import transaction
+from nucliadb.models.internal.processing import (
+    PushPayload,
+    Source,
+)
+from nucliadb.writer import SERVICE_NAME, transaction
 from nucliadb.writer.api.v1.field import (
     add_field_to_resource,
     add_field_to_resource_by_slug,
@@ -39,16 +47,23 @@ from nucliadb.writer.api.v1.resource import (
     validate_rid_exists_or_raise_error,
 )
 from nucliadb.writer.api.v1.router import KB_PREFIX, RESOURCE_PREFIX, RSLUG_PREFIX, api
+from nucliadb.writer.resource.audit import parse_audit
+from nucliadb.writer.resource.field import (
+    collect_fields_for_reprocessing,
+)
+from nucliadb.writer.utilities import get_processing
 from nucliadb_models.resource import NucliaDBRoles
 from nucliadb_models.utils import FieldIdString
-from nucliadb_models.writer import ResourceFieldAdded
-from nucliadb_protos import resources_pb2
-from nucliadb_protos.resources_pb2 import FieldID
-from nucliadb_protos.writer_pb2 import BrokerMessage, DeleteSplits
-from nucliadb_utils.authentication import requires
-from nucliadb_utils.utilities import (
-    get_partitioning,
+from nucliadb_models.writer import (
+    ResourceFieldAdded,
+    ResourceFieldUpdated,
 )
+from nucliadb_protos import resources_pb2
+from nucliadb_protos.resources_pb2 import FieldID, FieldType
+from nucliadb_protos.writer_pb2 import BrokerMessage, DeleteSplits, FieldIDStatus, FieldStatus
+from nucliadb_utils.authentication import requires
+from nucliadb_utils.exceptions import LimitsExceededError, SendToProcessError
+from nucliadb_utils.utilities import get_partitioning, get_storage
 
 
 @api.put(
@@ -139,6 +154,46 @@ async def append_messages_to_conversation_field_rid_prefix(
     return await add_field_to_resource(request, kbid, rid, field_id, field, replace_field=False)
 
 
+@api.patch(
+    f"/{KB_PREFIX}/{{kbid}}/{RSLUG_PREFIX}/{{rslug}}/conversation/{{field_id}}",
+    status_code=200,
+    summary="Update resource conversation field (by slug)",
+    response_model=ResourceFieldUpdated,
+    tags=["Resource fields"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def update_resource_field_conversation_rslug_prefix(
+    request: Request,
+    kbid: str,
+    rslug: str,
+    field_id: FieldIdString,
+    update: nucliadb_models.UpdateConversationField,
+) -> ResourceFieldUpdated:
+    rid = await get_rid_from_slug_or_raise_error(kbid, rslug)
+    return await update_and_reprocess_conversation(request, kbid, rid, field_id, update)
+
+
+@api.patch(
+    f"/{KB_PREFIX}/{{kbid}}/{RESOURCE_PREFIX}/{{rid}}/conversation/{{field_id}}",
+    status_code=200,
+    summary="Update resource conversation field (by id)",
+    response_model=ResourceFieldUpdated,
+    tags=["Resource fields"],
+)
+@requires(NucliaDBRoles.WRITER)
+@version(1)
+async def update_resource_field_conversation_rid_prefix(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: FieldIdString,
+    update: nucliadb_models.UpdateConversationField,
+) -> ResourceFieldUpdated:
+    await validate_rid_exists_or_raise_error(kbid, rid)
+    return await update_and_reprocess_conversation(request, kbid, rid, field_id, update)
+
+
 DELETE_CONVERSATION_MESSAGES_DESCRIPTION = (
     "Delete a message from a conversation field by its ident. "
     "This is a convenience endpoint intended for occasional deletions — "
@@ -187,6 +242,93 @@ async def delete_conversation_messages_rid_prefix(
     message_ident: MessageIdent,
 ) -> Response:
     return await _delete_conversation_messages(kbid, rid, field_id, [message_ident])
+
+
+async def update_and_reprocess_conversation(
+    request: Request,
+    kbid: str,
+    rid: str,
+    field_id: FieldIdString,
+    update: nucliadb_models.UpdateConversationField,
+) -> ResourceFieldUpdated:
+    await maybe_back_pressure(kbid, resource_uuid=rid)
+
+    partitioning = get_partitioning()
+    partition = partitioning.generate_partition(kbid, rid)
+
+    driver = get_driver()
+    storage = await get_storage(service_name=SERVICE_NAME)
+
+    async with driver.ro_transaction() as txn:
+        kb = KnowledgeBox(txn, storage, kbid)
+
+        resource = await kb.get(rid)
+        if resource is None:
+            raise HTTPException(status_code=404, detail="Resource does not exist")
+
+        field: Conversation = await resource.get_field(field_id, FieldType.CONVERSATION, load=True)
+        conversation_metadata_pb = await field.get_metadata()
+        if conversation_metadata_pb is None:
+            raise HTTPException(status_code=404, detail="Conversation field does not exist")
+
+        conversation_field_pb = await field.get_full_conversation()
+
+        writer = BrokerMessage()
+        toprocess = PushPayload(
+            uuid=rid,
+            kbid=kbid,
+            partition=partition,
+            userid=request.headers.get("X-NUCLIADB-USER", ""),
+        )
+
+        writer.kbid = kbid
+        writer.uuid = rid
+        toprocess.kbid = kbid
+        toprocess.uuid = rid
+        toprocess.source = Source.HTTP
+        if resource.basic is not None:
+            toprocess.title = resource.basic.title
+            toprocess.slug = resource.basic.slug
+
+        parse_audit(writer.audit, request)
+
+        if update.extract_strategy is None:
+            conversation_field_pb.ClearField("extract_strategy")
+        else:
+            conversation_field_pb.extract_strategy = update.extract_strategy
+
+        conversation_metadata_pb.extract_strategy = conversation_field_pb.extract_strategy
+        writer.conversations[field_id].CopyFrom(conversation_field_pb)
+
+        # set processing payload from updated field
+        await collect_fields_for_reprocessing(
+            resource,
+            toprocess,
+            selected_fields={(FieldType.CONVERSATION, field_id)},
+        )
+
+        writer.field_statuses.append(
+            FieldIDStatus(
+                id=resources_pb2.FieldID(
+                    field_type=resources_pb2.FieldType.CONVERSATION, field=field_id
+                ),
+                status=FieldStatus.Status.PENDING,
+            )
+        )
+
+    processing = get_processing()
+    await transaction.commit(writer, partition)
+    try:
+        processing_info = await processing.send_to_process(toprocess, partition)
+    except LimitsExceededError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    except SendToProcessError:
+        raise HTTPException(
+            status_code=500,
+            detail="Error while sending to process. Try calling /reprocess",
+        )
+    seqid = processing_info.seqid
+    return nucliadb_models.ResourceFieldUpdated(seqid=seqid)
 
 
 async def validate_message_idents(kbid: str, rid: str, field_id: str, idents: list[str]) -> list[str]:

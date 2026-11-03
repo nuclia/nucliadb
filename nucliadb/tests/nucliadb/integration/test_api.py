@@ -2232,7 +2232,7 @@ async def test_concurrent_patch_operations(
 
     # All operations should succeed
     for status_code, task in zip(results, tasks):
-        identifier = task.__name__
+        identifier = task.__name__  # type: ignore[attr-defined]
         assert status_code == 200, f"Patch operation {identifier} failed with status {status_code}"
 
     # Verify the resource state after all patches

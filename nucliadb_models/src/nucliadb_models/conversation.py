@@ -150,3 +150,10 @@ class InputConversationField(BaseModel):
                 raise ValueError(f'Message ident "{message.ident}" is not unique')
             seen_idents.add(message.ident)
         return value
+
+
+class UpdateConversationField(BaseModel, extra="forbid"):
+    extract_strategy: str | None = Field(
+        default=None,
+        description="Id of the Nuclia extract strategy to use at processing time. If not set, the default strategy will be used. Extract strategies are defined at the learning configuration api.",
+    )
