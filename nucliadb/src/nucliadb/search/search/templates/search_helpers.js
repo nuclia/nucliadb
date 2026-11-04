@@ -101,16 +101,22 @@ function embeddingKey(root) {
 }
 
 function semanticSearch(search) {
-  // Stage 1: Exact is the default, including zero-limit and fallback cases.
-  // Both paths load stored vectors and recompute cosine similarity so returned
-  // scores and threshold decisions use the same calculation, not ANN distance.
   semanticMode = 'exact';
   if (!search.limit) return [];
+  const fields = search.fieldKeys === null ? null : new Set(search.fieldKeys);
+  const paragraphs = search.paragraphKeys === null ? null : new Set(search.paragraphKeys);
+  if ((!search.paragraphOr && fields !== null && !fields.size) ||
+      (paragraphs !== null && !paragraphs.size &&
+       (!search.paragraphOr || (fields !== null && !fields.size)))) return [];
+  const accepts = root => {
+    const field = fields === null || fields.has(fieldDir(root));
+    if (paragraphs === null) return field;
+    const paragraph = paragraphs.has(embeddingKey(root));
+    return search.paragraphOr ? field || paragraph : field && paragraph;
+  };
   const similarity = root => 1 - vec.cosineDistance(vec.vector(root.vector), search.queryVector);
   const keep = (scored, root) => {
-    // Paragraph acceptance runs before the more expensive vector conversion and
-    // cosine calculation. Hydration has already happened in either caller path.
-    if (search.accept !== null && !search.accept(root)) return;
+    if (!accepts(root)) return;
     const score = similarity(root);
     if (score >= search.minScore) scored.push({score, root});
   };
@@ -127,54 +133,60 @@ function semanticSearch(search) {
     return scored;
   }
 
-  // Stage 2b: ANN chooses candidates from the model/dimension view first.
-  // The following where is a postfilter, not an ANN prefilter: collection,
-  // model and directory restrictions can remove nearest neighbors afterward.
-  // Oversampling compensates for that loss, but does not guarantee full recall.
-  function ann(k) {
+  function ranked(k, indexed) {
     const op = require('/MarkLogic/optic');
-    const rows = op.fromView(VECTOR_SCHEMA, search.view, '', op.fragmentIdCol('fid'))
-      .annTopK(k, op.col('vector'), search.queryVector, op.col('distance'), {maxDistance: 1 - search.minScore})
-      .where(search.scope)
+    // Field and paragraph keys are projected by TDE, so eligibility is decided
+    // on rows before scoring rather than after loading embedding documents.
+    const membership = (column, keys) => {
+      const predicates = keys.map(key => op.eq(op.col(column), key));
+      return !predicates.length ? op.eq(1, 0) : predicates.length === 1
+        ? predicates[0] : op.or(...predicates);
+    };
+    let predicate = search.fieldKeys === null ? null : membership('field_key', search.fieldKeys);
+    if (search.paragraphKeys !== null) {
+      const paragraph = membership('paragraph_key', search.paragraphKeys);
+      predicate = predicate === null ? (search.paragraphOr ? null : paragraph) :
+        search.paragraphOr ? op.or(predicate, paragraph) : op.and(predicate, paragraph);
+    }
+    let plan = op.fromView(VECTOR_SCHEMA, search.view, '', op.fragmentIdCol('fid'));
+    if (predicate !== null) plan = plan.where(predicate);
+    plan = plan.where(search.scope);
+    const options = {maxDistance: 1 - search.minScore};
+    // Explicitly disable the ANN index for prefiltered scoring. Merely putting
+    // where before annTopK can still select an indexed, postfiltered plan.
+    if (!indexed) options.noIndex = null;
+    const rows = plan.annTopK(k, op.col('vector'), search.queryVector, op.col('distance'), options)
       .joinDocUri(op.col('uri'), op.fragmentIdCol('fid'))
-      .select(['uri']).result().toArray();
-    // Join fragment ids back to document URIs and hydrate surviving embeddings.
-    // The projected ANN distance is deliberately not returned: keep recomputes
-    // cosine from each stored vector and applies paragraph/score acceptance.
-    const uris = rows.map(row => String(row.uri));
-    const scored = [];
-    for (const uri of uris) keep(scored, cts.doc(uri).toObject());
-    return scored;
+      .select(['uri', 'distance']).result().toArray();
+    return rows.map(row => ({score: 1 - Number(row.distance), uri: String(row.uri)}));
   }
 
   let scored = null;
-  // Stage 3: Estimate scoped candidates from indexes to choose the cheaper path.
-  // cts.estimate is only an estimate, not a verified count or returned-hit count.
-  if (cts.estimate(search.scope) > search.exactMax) {
-    try {
+  try {
+    if (search.unrestricted && cts.estimate(search.scope) > search.exactMax) {
       // Try a minimum of 100 or limit times oversampling, then eight times that
       // base. Count only candidates surviving scope, paragraph and score checks;
       // if neither attempt fills the requested page, fall back to an exact scan.
       const base = Math.max(search.limit * search.oversampling, 100);
       for (const k of [base, base * 8]) {
-        const result = ann(k);
+        const result = ranked(k, true);
         if (result.length >= search.limit) {
           scored = result;
           semanticMode = 'ann';
           break;
         }
       }
-    } catch (error) {
-      // A model/dimension view may not exist yet or may still be reindexing.
-      // Only those table errors trigger exact fallback; all other errors surface.
-      if (!/SQL-TABLE(NOTFOUND|REINDEXING)/.test(String(error.name) + String(error.message))) throw error;
     }
+    if (scored === null) scored = ranked(search.limit, false);
+  } catch (error) {
+    if (!/SQL-TABLE(NOTFOUND|REINDEXING)/.test(String(error.name) + String(error.message))) throw error;
   }
-  // Stage 4: Small scopes, insufficient ANN survivors and the allowed view
-  // failures all reach the exhaustive path. Finally sort by recomputed cosine,
-  // slice to the limit, and expose only the result metadata the caller consumes.
   if (scored === null) scored = exact();
   scored.sort((left, right) => right.score - left.score);
-  return scored.slice(0, search.limit).map(({score, root}) =>
-    ({score, content: {chunk_id: root.chunk_id, facets: root.facets, data: root.data}}));
+  // Optic already selected the winners and computed their distances; only the
+  // limited winning documents need hydration for response metadata.
+  return scored.slice(0, search.limit).map(result => {
+    const root = result.root || cts.doc(result.uri).toObject();
+    return {score: result.score, content: {chunk_id: root.chunk_id, facets: root.facets, data: root.data}};
+  });
 }

@@ -314,6 +314,11 @@ async def hybrid_search(kbid: str, query: SearchRequest) -> SearchResponse:
     )
     # 2. Run prefilters and all enabled branches server-side against the KB database.
     async with driver.ro_transaction(kbid=kbid) as txn:
+        if semantic:
+            _, marklogic_txn = documents.driver_txn(txn)
+            await vector_views.ensure_view(
+                driver, marklogic_txn.database, query.vectorset, len(query.vector)
+            )
         result = _eval_object(await documents.evaluate(txn, javascript, variables=parameters.variables))
     # 3. Translate each result family into its protobuf section without combining scores.
     if lexical:

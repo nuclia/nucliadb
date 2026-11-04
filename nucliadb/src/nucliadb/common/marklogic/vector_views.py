@@ -64,6 +64,14 @@ def template_uri(vectorset_id: str, dimension: int) -> str:
 
 
 def template(vectorset_id: str, dimension: int) -> dict:
+    field_key = "concat('/resources/', resource_id, '/fields/', field_type, '/', field_id, '/')"
+    paragraph_key = (
+        "if (exists(data/position/start) and exists(data/position/end)) then "
+        f"concat({field_key}, "
+        "if (count(tokenize(string(chunk_id), '/')) = 6) "
+        "then concat(tokenize(string(chunk_id), '/')[4], '/') else '', "
+        "data/position/start, '-', data/position/end) else ()"
+    )
     return {
         "template": {
             "context": "/",
@@ -74,6 +82,13 @@ def template(vectorset_id: str, dimension: int) -> dict:
                     "viewName": view_name(vectorset_id, dimension),
                     "viewLayout": "sparse",
                     "columns": [
+                        {"name": "field_key", "scalarType": "string", "val": field_key},
+                        {
+                            "name": "paragraph_key",
+                            "scalarType": "string",
+                            "val": paragraph_key,
+                            "nullable": True,
+                        },
                         {
                             "name": "vector",
                             "scalarType": "vector",
@@ -93,8 +108,11 @@ def template(vectorset_id: str, dimension: int) -> dict:
 
 
 async def ensure_view(driver: MarkLogicDriver, database: str, vectorset_id: str, dimension: int) -> None:
-    """Install the view template of a vectorset. Inserting a template reindexes the databases
-    using it, so it is only inserted when missing."""
+    """Reconcile the shared template once per process, reindexing only when it changes.
+
+    Keep the existing collection/view identity so old embedding documents need no rewrite.
+    Searches use CTS exact scoring while a missing or changed view is reindexing.
+    """
     key = (vectorset_id, dimension)
     if key in _ensured:
         return
@@ -102,16 +120,18 @@ async def ensure_view(driver: MarkLogicDriver, database: str, vectorset_id: str,
         if key in _ensured:
             return
         uri = json.dumps(template_uri(vectorset_id, dimension))
-        exists = await driver.client.eval(
-            javascript=f"fn.docAvailable({uri})", params={"database": SCHEMAS_DATABASE}
+        desired = template(vectorset_id, dimension)
+        existing = await driver.client.eval(
+            javascript=f"fn.docAvailable({uri}) ? fn.doc({uri}).toObject() : null",
+            params={"database": SCHEMAS_DATABASE},
         )
-        if not exists or exists[0] is not True:
+        if not existing or existing[0] != desired:
             # Templates are inserted from a database using the Schemas database
             await driver.client.eval(
                 javascript=(
                     "declareUpdate(); const tde = require('/MarkLogic/tde.xqy'); "
                     f"tde.templateInsert({uri}, "
-                    f"xdmp.toJSON({json.dumps(template(vectorset_id, dimension))}), "
+                    f"xdmp.toJSON({json.dumps(desired)}), "
                     "xdmp.defaultPermissions(), ['tde']);"
                 ),
                 params={"database": database},
