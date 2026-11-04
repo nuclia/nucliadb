@@ -37,6 +37,7 @@ def txn():
     transaction.driver = driver
     transaction.open = True
     transaction.read_only = False
+    transaction.sdk_transaction = AsyncMock(return_value="sdk-tx")
     transaction.params = AsyncMock(return_value={"database": "test", "txid": "tx-1"})
     return transaction
 
@@ -55,6 +56,7 @@ async def test_update_document_without_reading(txn):
             '.remove("node(\\"extra\\")").insertNamedChild(\'.\', "extra", [1, 2, 3]))'
             ".write().select(['uri'])"
         ),
+        tx="sdk-tx",
         params={"database": "test", "txid": "tx-1"},
     )
     txn.driver.client.documents.read.assert_not_awaited()

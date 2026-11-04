@@ -205,7 +205,11 @@ async def write_many(
 async def delete(txn: MarkLogicTransaction, uri: str) -> None:
     driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
     try:
-        await driver.client.documents.delete(uri, params=await marklogic_txn.params())
+        await driver.client.documents.delete(
+            uri,
+            tx=await marklogic_txn.sdk_transaction(),
+            params=await marklogic_txn.params(),
+        )
     except DatabaseDoesNotExist:
         if marklogic_txn.database == driver.system_database:
             raise
@@ -215,7 +219,11 @@ async def evaluate(txn: MarkLogicTransaction, javascript: str) -> list[Any]:
     """Evaluate unrestricted JavaScript; callers must keep read-only queries non-mutating."""
     driver, marklogic_txn = driver_txn(txn)
     try:
-        return await driver.client.eval(javascript=javascript, params=await marklogic_txn.params())
+        return await driver.client.eval(
+            javascript=javascript,
+            tx=await marklogic_txn.sdk_transaction(),
+            params=await marklogic_txn.params(),
+        )
     except DatabaseDoesNotExist:
         if marklogic_txn.database == driver.system_database:
             raise
@@ -225,7 +233,11 @@ async def evaluate(txn: MarkLogicTransaction, javascript: str) -> list[Any]:
 async def update_rows(txn: MarkLogicTransaction, dsl: str) -> None:
     driver, marklogic_txn = driver_txn(txn, ensure_writes=True)
     try:
-        await driver.client.rows.update(dsl=dsl, params=await marklogic_txn.params())
+        await driver.client.rows.update(
+            dsl=dsl,
+            tx=await marklogic_txn.sdk_transaction(),
+            params=await marklogic_txn.params(),
+        )
     except DatabaseDoesNotExist:
         if marklogic_txn.database == driver.system_database:
             raise
@@ -238,7 +250,9 @@ async def update_document(txn: MarkLogicTransaction, update: DocumentUpdate) -> 
         return True
     try:
         rows = await driver.client.rows.update(
-            dsl=update.to_optic(), params=await marklogic_txn.params()
+            dsl=update.to_optic(),
+            tx=await marklogic_txn.sdk_transaction(),
+            params=await marklogic_txn.params(),
         )
     except DatabaseDoesNotExist:
         if marklogic_txn.database == driver.system_database:

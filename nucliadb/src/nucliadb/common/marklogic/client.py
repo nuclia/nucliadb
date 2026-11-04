@@ -31,6 +31,7 @@ from decimal import Decimal
 from email.message import Message
 from email.parser import BytesParser
 from email.policy import default
+from http.cookies import SimpleCookie
 from typing import Any
 
 import httpx
@@ -42,6 +43,7 @@ from nucliadb.common.marklogic.exceptions import (
 )
 
 DEFAULT_TIMEOUT = 60.0
+AFFINITY_COOKIES = ("haproxy", "HostId", "SessionID")
 
 
 @dataclass
@@ -67,6 +69,27 @@ def _with_txid(params: dict[str, Any] | None, tx: Transaction | None) -> dict[st
     if tx is not None:
         params["txid"] = tx.id
     return params
+
+
+async def _request(
+    http: httpx.AsyncClient,
+    method: str,
+    url: str,
+    *,
+    tx: Transaction | None = None,
+    **kwargs: Any,
+) -> httpx.Response:
+    request = http.build_request(method, url, **kwargs)
+    request.headers.pop("cookie", None)
+    if tx is not None and tx._cookies:
+        request.headers["cookie"] = "; ".join(
+            f"{name}={tx._cookies[name]}" for name in AFFINITY_COOKIES if name in tx._cookies
+        )
+
+    response = await http.send(request)
+    if tx is not None:
+        tx._update_cookies(response)
+    return response
 
 
 def _has_no_content(response: httpx.Response) -> bool:
@@ -210,13 +233,32 @@ class Transaction:
         self.id = id
         self._http = http
         self.database = database
+        self._cookies: dict[str, str] = {}
+
+    def _update_cookies(self, response: httpx.Response) -> None:
+        for header in response.headers.get_list("set-cookie"):
+            cookies = SimpleCookie()
+            cookies.load(header)
+            for name in AFFINITY_COOKIES:
+                if name not in cookies:
+                    continue
+                morsel = cookies[name]
+                if not morsel.value or morsel["max-age"] == "0":
+                    self._cookies.pop(name, None)
+                else:
+                    self._cookies[name] = morsel.coded_value
 
     async def _finish(self, result: str) -> None:
         params = {"result": result}
         if self.database is not None:
             params["database"] = self.database
-        response = await self._http.post(f"/v1/transactions/{self.id}", params=params)
-        _check(response, f"{result} transaction")
+        try:
+            response = await _request(
+                self._http, "POST", f"/v1/transactions/{self.id}", tx=self, params=params
+            )
+            _check(response, f"{result} transaction")
+        finally:
+            self._cookies.clear()
 
     async def commit(self) -> None:
         await self._finish("commit")
@@ -231,19 +273,27 @@ class TransactionManager:
 
     async def create(self, database: str | None = None) -> Transaction:
         params = {"database": database} if database else {}
-        response = await self._http.post(
-            "/v1/transactions", params=params, headers={"Accept": "application/json"}
+        response = await _request(
+            self._http,
+            "POST",
+            "/v1/transactions",
+            params=params,
+            headers={"Accept": "application/json"},
         )
         if response.status_code == 303 and "location" in response.headers:
-            return Transaction(
+            transaction = Transaction(
                 response.headers["location"].rstrip("/").rsplit("/", 1)[-1], self._http, database
             )
+            transaction._update_cookies(response)
+            return transaction
         _check(response, "create transaction")
         try:
             transaction_id = response.json()["transaction-status"]["transaction-id"]
         except (ValueError, KeyError, TypeError) as error:
             raise MarkLogicProtocolError("Transaction response without transaction ID") from error
-        return Transaction(str(transaction_id), self._http, database)
+        transaction = Transaction(str(transaction_id), self._http, database)
+        transaction._update_cookies(response)
+        return transaction
 
 
 class DocumentManager:
@@ -265,16 +315,24 @@ class DocumentManager:
         if len(uris) > 1:
             params.pop("uri", None)
             params.update(view="none", start=1, pageLength=len(uris))
-            response = await self._http.post(
+            response = await _request(
+                self._http,
+                "POST",
                 "/v1/search",
+                tx=tx,
                 params=params,
                 json={"query": {"document-query": {"uri": uris}}},
                 headers={"Accept": "multipart/mixed"},
             )
         else:
             params["uri"] = uris
-            response = await self._http.get(
-                "/v1/documents", params=params, headers={"Accept": "multipart/mixed"}
+            response = await _request(
+                self._http,
+                "GET",
+                "/v1/documents",
+                tx=tx,
+                params=params,
+                headers={"Accept": "multipart/mixed"},
             )
         if response.status_code == 404:
             if "No such database" in response.text or "XDMP-NOSUCHDB" in response.text:
@@ -296,8 +354,11 @@ class DocumentManager:
         if not documents:
             return
         data, content_type = _encode_multipart(documents)
-        response = await self._http.post(
+        response = await _request(
+            self._http,
+            "POST",
             "/v1/documents",
+            tx=tx,
             content=data,
             params=_with_txid(params, tx),
             headers={"Content-Type": content_type, "Accept": "application/json"},
@@ -314,7 +375,7 @@ class DocumentManager:
             return
         params = _with_txid(params, tx)
         params["uri"] = uris if isinstance(uris, list) else [uris]
-        response = await self._http.delete("/v1/documents", params=params)
+        response = await _request(self._http, "DELETE", "/v1/documents", tx=tx, params=params)
         _check(response, "delete documents")
 
     async def exists(
@@ -325,10 +386,15 @@ class DocumentManager:
     ) -> bool:
         params = _with_txid(params, tx)
         params["uri"] = [uri]
-        response = await self._http.head("/v1/documents", params=params)
+        response = await _request(self._http, "HEAD", "/v1/documents", tx=tx, params=params)
         if not response.is_success:
-            response = await self._http.get(
-                "/v1/documents", params=params, headers={"Accept": "application/json"}
+            response = await _request(
+                self._http,
+                "GET",
+                "/v1/documents",
+                tx=tx,
+                params=params,
+                headers={"Accept": "application/json"},
             )
         if response.status_code == 404:
             if "No such database" in response.text or "XDMP-NOSUCHDB" in response.text:
@@ -349,8 +415,11 @@ class RowManager:
         params: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Return the rows produced by the plan, e.g. one per document written."""
-        response = await self._http.post(
+        response = await _request(
+            self._http,
+            "POST",
             "/v1/rows/update",
+            tx=tx,
             content=dsl.encode("utf-8"),
             params=_with_txid(params, tx),
             headers={
@@ -395,7 +464,9 @@ class Client:
         data = {"javascript": javascript}
         if vars:
             data["vars"] = json.dumps(vars)
-        response = await self._http.post("/v1/eval", data=data, params=_with_txid(params, tx))
+        response = await _request(
+            self._http, "POST", "/v1/eval", tx=tx, data=data, params=_with_txid(params, tx)
+        )
         _check(response, "evaluate query")
         if _has_no_content(response):
             return []
