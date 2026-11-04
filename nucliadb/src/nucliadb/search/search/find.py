@@ -63,17 +63,6 @@ async def find(
     x_forwarded_for: str,
     metrics: Metrics,
 ) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
-    return await _ndb_index_find(kbid, item, x_ndb_client, x_nucliadb_user, x_forwarded_for, metrics)
-
-
-async def _ndb_index_find(
-    kbid: str,
-    item: FindRequest,
-    x_ndb_client: NucliaDBClientType,
-    x_nucliadb_user: str,
-    x_forwarded_for: str,
-    metrics: Metrics,
-) -> tuple[KnowledgeboxFindResults, bool, ParsedQuery]:
     audit = get_audit()
     start_time = time()
 
@@ -183,5 +172,7 @@ async def _ndb_index_find(
                 "metrics": metrics.to_dict(),
             },
         )
-
+    print(
+        f"Index search time: {metrics['index_search']}, Results merge time: {metrics['results_merge']}"
+    )
     return search_results, incomplete_results, parsed

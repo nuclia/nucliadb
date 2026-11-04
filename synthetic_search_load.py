@@ -13,6 +13,10 @@ Example:
 Requests are generated with Faker and validated through the endpoint request models.
 Run inside a configured NucliaDB container. This includes parsing, retrieval,
 hydration and any configured prediction calls, but excludes HTTP and auth costs.
+
+
+python /synthetic_search_load.py --kbid=e167f6f9-4986-592c-9dd3-81f49b1ca54b --start-rps=1 --max-rps=1 
+
 """
 
 from __future__ import annotations
@@ -202,7 +206,7 @@ async def execute_operation(kbid: str, operation: str, item: Any) -> None:
     }
     with request_caches():
         if operation.startswith("find_"):
-            breakpoint()
+            #breakpoint()
             _, incomplete, _ = await find(kbid, item, **client, metrics=Metrics("search-load"))
             if incomplete:
                 raise RuntimeError("Find returned incomplete results")
