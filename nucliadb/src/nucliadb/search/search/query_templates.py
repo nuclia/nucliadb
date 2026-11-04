@@ -6,7 +6,12 @@ from string import Template
 @cache
 def load_template(name: str) -> str:
     """Read an installed package asset once; raw helper files need no substitution."""
-    return files(__package__).joinpath("templates", name).read_text(encoding="utf-8").rstrip("\n")
+    return (
+        files("nucliadb.search.search")
+        .joinpath("templates", name)
+        .read_text(encoding="utf-8")
+        .rstrip("\n")
+    )
 
 
 def render_template(name: str, **values: object) -> str:
