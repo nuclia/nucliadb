@@ -215,12 +215,15 @@ async def delete(txn: MarkLogicTransaction, uri: str) -> None:
             raise
 
 
-async def evaluate(txn: MarkLogicTransaction, javascript: str) -> list[Any]:
+async def evaluate(
+    txn: MarkLogicTransaction, javascript: str, *, variables: dict[str, Any] | None = None
+) -> list[Any]:
     """Evaluate unrestricted JavaScript; callers must keep read-only queries non-mutating."""
     driver, marklogic_txn = driver_txn(txn)
     try:
         return await driver.client.eval(
             javascript=javascript,
+            vars=variables,
             tx=await marklogic_txn.sdk_transaction(),
             params=await marklogic_txn.params(),
         )

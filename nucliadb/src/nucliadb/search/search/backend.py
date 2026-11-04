@@ -19,6 +19,7 @@
 #
 
 import json
+from collections.abc import Callable
 from typing import Any, NamedTuple
 
 from google.protobuf.json_format import ParseDict
@@ -49,6 +50,7 @@ from nucliadb.common.marklogic.uris import MarkLogicURIs
 from nucliadb.search.search.graph_backend import append_graph_results, graph_expression
 from nucliadb.search.search.keyword_terms import keyword_terms
 from nucliadb.search.search.metrics import semantic_search_mode
+from nucliadb.search.search.query_templates import load_template, render_template
 from nucliadb_protos import utils_pb2
 
 # Below this many candidate embeddings, an exact scan is cheaper and more precise than ANN
@@ -61,137 +63,29 @@ _BM25_OPTIONS = ["score-bm25", "bm25-length-weight=0.5"]
 # Same boost as nidx gives to its fuzzy fallback query
 FUZZY_SCORE_BOOST = 0.5
 
-_CONSTANTS_JS = (
-    "const COLLECTIONS = "
-    + json.dumps(
+_CONSTANTS_JS = render_template(
+    "search_constants.js",
+    collections=json.dumps(
         {
             "resources": MarkLogicCollections.RESOURCES,
             "fieldsProcessed": MarkLogicCollections.FIELDS_PROCESSED,
             "chunks": MarkLogicCollections.CHUNKS,
             "embeddings": MarkLogicCollections.EMBEDDINGS,
         }
-    )
-    + "; const PATHS = "
-    + json.dumps(
+    ),
+    paths=json.dumps(
         {
             "facets": MarkLogicIndexPaths.FACETS,
             "resourceFacets": MarkLogicIndexPaths.RESOURCE_FACETS,
             "accessGroups": MarkLogicIndexPaths.ACCESS_GROUPS,
         }
-    )
-    + "; const VECTOR_SCHEMA = "
-    + json.dumps(vector_views.SCHEMA_NAME)
-    + "; const COLLATION = "
-    + json.dumps(STRING_COLLATION)
-    + ";"
+    ),
+    vector_schema=json.dumps(vector_views.SCHEMA_NAME),
+    collation=json.dumps(STRING_COLLATION),
 )
 
 # Field ids never contain '/', so directory URIs select resources and fields exactly via the URI index
-_HELPERS_JS = r"""
-let semanticMode = null;
-function dirsQuery(dirs) { return dirs.length ? cts.directoryQuery(dirs, 'infinity') : cts.falseQuery(); }
-function matchingUris(query, filtered) {
-  if (!filtered) return cts.uris('', [], query).toArray().map(String);
-  const uris = [];
-  for (const doc of cts.search(query, ['filtered', 'score-zero'])) uris.push(String(xdmp.nodeUri(doc)));
-  return uris;
-}
-// Facets are hierarchical: a labelset or entity type also matches all the facets below it
-function facetValues(path, facet) {
-  const values = [facet];
-  const prefix = facet + '/';
-  const reference = cts.pathReference(path, ['type=string', 'collation=' + COLLATION]);
-  for (const value of cts.values(reference, prefix)) {
-    const text = String(value);
-    if (!text.startsWith(prefix)) break;
-    values.push(text);
-  }
-  return values;
-}
-function facetQuery(facet) { return cts.pathRangeQuery(PATHS.facets, '=', facetValues(PATHS.facets, facet)); }
-// Processed fields hold a copy of their resource facets
-function fieldFacetQuery(facet) {
-  const resourceFacets = facetValues(PATHS.resourceFacets, facet);
-  return cts.orQuery([facetQuery(facet), cts.pathRangeQuery(PATHS.resourceFacets, '=', resourceFacets)]);
-}
-function fieldPrefixQuery(base, prefix) {
-  const start = base + prefix;
-  const uris = cts.uriMatch(start + '*/processed.json').toArray().map(String).filter(uri => uri.startsWith(start));
-  return dirsQuery(uris.map(uri => uri.replace(/processed\.json$/, '')));
-}
-// Documents restricted to access groups, none of them in `groups`
-function deniedQuery(groups) {
-  const restricted = cts.pathRangeQuery(PATHS.accessGroups, '>', '');
-  if (!groups.length) return restricted;
-  return cts.andQuery([restricted, cts.notQuery(cts.pathRangeQuery(PATHS.accessGroups, '=', groups))]);
-}
-function deniedResources(groups) {
-  const query = cts.andQuery([cts.collectionQuery(COLLECTIONS.resources), deniedQuery(groups)]);
-  return cts.uris('', [], query).toArray().map(uri => String(uri).replace(/\.json$/, '/'));
-}
-function fieldDir(root) { return '/resources/' + root.resource_id + '/fields/' + root.field_type + '/' + root.field_id + '/'; }
-function chunkKey(uri) {
-  const match = /^(\/resources\/[^\/]+\/fields\/[^\/]+\/[^\/]+\/)chunks\/(.+)\/data\.json$/.exec(uri);
-  return match ? match[1] + match[2] : null;
-}
-function embeddingKey(root) {
-  // Vector ids are rid/field_type/field_id/[split/]index/start-end
-  const parts = String(root.chunk_id).split('/');
-  const split = parts.length === 6 ? parts[3] + '/' : '';
-  const position = root.data && root.data.position;
-  return position ? fieldDir(root) + split + position.start + '-' + position.end : null;
-}
-function semanticSearch(search) {
-  semanticMode = 'exact';
-  if (!search.limit) return [];
-  const similarity = root => 1 - vec.cosineDistance(vec.vector(root.vector), search.queryVector);
-  const keep = (scored, root) => {
-    if (search.accept !== null && !search.accept(root)) return;
-    const score = similarity(root);
-    if (score >= search.minScore) scored.push({score, root});
-  };
-  function exact() {
-    const scored = [];
-    for (const doc of cts.search(search.scope, ['unfiltered', 'score-zero'])) {
-      const root = doc.root.toObject();
-      if (root.model_id === search.model) keep(scored, root);
-    }
-    return scored;
-  }
-  // Optic filters only apply after the ANN candidates are chosen, so they are oversampled
-  function ann(k) {
-    const op = require('/MarkLogic/optic');
-    const rows = op.fromView(VECTOR_SCHEMA, search.view, '', op.fragmentIdCol('fid'))
-      .annTopK(k, op.col('vector'), search.queryVector, op.col('distance'), {maxDistance: 1 - search.minScore})
-      .joinDocUri(op.col('uri'), op.fragmentIdCol('fid'))
-      .select(['uri']).result().toArray();
-    const uris = rows.map(row => String(row.uri));
-    const allowed = uris.length
-      ? new Set(cts.uris('', [], cts.andQuery([search.scope, cts.documentQuery(uris)])).toArray().map(String))
-      : new Set();
-    const scored = [];
-    for (const uri of uris) if (allowed.has(uri)) keep(scored, cts.doc(uri).toObject());
-    return {scored, saturated: rows.length >= k};
-  }
-  let scored = null;
-  if (cts.estimate(search.scope) > search.exactMax) {
-    try {
-      const base = Math.max(search.limit * search.oversampling, 100);
-      for (const k of [base, base * 8]) {
-        const result = ann(k);
-        if (result.scored.length >= search.limit || !result.saturated) { scored = result.scored; semanticMode = 'ann'; break; }
-      }
-    } catch (error) {
-      // Views of dimensions never written, or still being reindexed
-      if (!/SQL-TABLE(NOTFOUND|REINDEXING)/.test(String(error.name) + String(error.message))) throw error;
-    }
-  }
-  if (scored === null) scored = exact();
-  scored.sort((left, right) => right.score - left.score);
-  return scored.slice(0, search.limit).map(({score, root}) =>
-    ({score, content: {chunk_id: root.chunk_id, facets: root.facets, data: root.data}}));
-}
-"""
+_HELPERS_JS = load_template("search_helpers.js")
 
 
 class _CtsQuery(NamedTuple):
@@ -200,20 +94,51 @@ class _CtsQuery(NamedTuple):
     filtered: bool
 
 
-def _value_query(prop: str, value: str) -> str:
-    return f"cts.jsonPropertyValueQuery({json.dumps(prop)}, {json.dumps(value)}, ['exact'])"
+class _QueryParameters:
+    """Keep request values outside eval source; templates receive array references instead."""
+
+    def __init__(self) -> None:
+        self.values: list[Any] = []
+
+    def literal(self, value: Any) -> str:
+        # Builders share this ordered array, so nested templates use the same bindings.
+        self.values.append(value)
+        return f"searchParams[{len(self.values) - 1}]"
+
+    @property
+    def variables(self) -> dict[str, str]:
+        return {"searchParameters": json.dumps(self.values)}
+
+    @staticmethod
+    def bind(javascript: str) -> str:
+        # REST eval binds the declared external variable to a JSON string, parsed once per request.
+        return "var searchParameters; const searchParams = JSON.parse(searchParameters); " + javascript
 
 
-def _word_query(prop: str, value: str) -> str:
-    return f"cts.jsonPropertyWordQuery({json.dumps(prop)}, {json.dumps(value)}, {_WORD_OPTIONS})"
+def _value_query(prop: str, value: str, literal: Callable[[Any], str] = json.dumps) -> str:
+    return f"cts.jsonPropertyValueQuery({json.dumps(prop)}, {literal(value)}, ['exact'])"
 
 
-def _expression_query(expression: FilterExpression, *, field_level: bool) -> _CtsQuery:
-    """Field level expressions run on processed fields, paragraph level ones on chunks."""
+def _word_query(prop: str, value: str, literal: Callable[[Any], str] = json.dumps) -> str:
+    return f"cts.jsonPropertyWordQuery({json.dumps(prop)}, {literal(value)}, {_WORD_OPTIONS})"
+
+
+def _expression_query(
+    expression: FilterExpression,
+    *,
+    field_level: bool,
+    literal: Callable[[Any], str] = json.dumps,
+) -> _CtsQuery:
+    """Translate protobuf predicates into CTS constructors, not query results.
+
+    Field expressions target processed fields; paragraph expressions target chunks.
+    The filtered flag tells URI enumeration whether index matches need document
+    verification. It propagates through boolean expressions containing text predicates.
+    """
     kind = expression.WhichOneof("expr")
     if kind in ("bool_and", "bool_or"):
         operands = [
-            _expression_query(item, field_level=field_level)
+            _expression_query(item, field_level=field_level, literal=literal)
             for item in getattr(expression, kind).operands
         ]
         operation = "andQuery" if kind == "bool_and" else "orQuery"
@@ -222,28 +147,30 @@ def _expression_query(expression: FilterExpression, *, field_level: bool) -> _Ct
             any(item.filtered for item in operands),
         )
     if kind == "bool_not":
-        inner = _expression_query(expression.bool_not, field_level=field_level)
+        inner = _expression_query(expression.bool_not, field_level=field_level, literal=literal)
         return _CtsQuery(f"cts.notQuery({inner.js})", inner.filtered)
     if kind == "resource":
+        # A resource directory covers its descendant fields, chunks and embeddings.
         directory = MarkLogicURIs.resource_directory(expression.resource.resource_id)
-        return _CtsQuery(f"cts.directoryQuery({json.dumps(directory)}, 'infinity')", False)
+        return _CtsQuery(f"cts.directoryQuery({literal(directory)}, 'infinity')", False)
     if kind == "field":
-        predicates = [_value_query("field_type", expression.field.field_type)]
+        # Type-only predicates select all fields of that type; an optional id narrows them.
+        predicates = [_value_query("field_type", expression.field.field_type, literal)]
         if expression.field.HasField("field_id"):
-            predicates.append(_value_query("field_id", expression.field.field_id))
+            predicates.append(_value_query("field_id", expression.field.field_id, literal))
         return _CtsQuery(f"cts.andQuery([{', '.join(predicates)}])", False)
     if kind == "resource_field_prefix":
         prefix = expression.resource_field_prefix
         base = f"{MarkLogicURIs.fields_directory(prefix.resource_id)}{prefix.field_type}/"
-        return _CtsQuery(
-            f"fieldPrefixQuery({json.dumps(base)}, {json.dumps(prefix.field_id_prefix)})", False
-        )
+        return _CtsQuery(f"fieldPrefixQuery({literal(base)}, {literal(prefix.field_id_prefix)})", False)
     if kind == "facet":
-        facet = json.dumps(expression.facet.facet)
+        # Field predicates also consider copied resource facets; chunks use their own facets.
+        facet = literal(expression.facet.facet)
         return _CtsQuery(f"{'fieldFacetQuery' if field_level else 'facetQuery'}({facet})", False)
     if kind == "keyword":
+        # Processed fields contain full extracted text; chunks contain paragraph text.
         prop = "extracted_text" if field_level else "text"
-        return _CtsQuery(_word_query(prop, expression.keyword.keyword), True)
+        return _CtsQuery(_word_query(prop, expression.keyword.keyword, literal), True)
     raise ValueError(f"Unsupported filter expression type: {kind}")
 
 
@@ -252,38 +179,34 @@ def _prefilter_javascript(
     security_groups: list[str] | None,
     *,
     paragraph_or: bool = False,
+    literal: Callable[[Any], str] = json.dumps,
 ) -> str:
     """Defines `fieldDirs`: null when every allowed field matches, otherwise the directories of the
     matching fields. Also `securityQuery`, the security restriction not already in `fieldDirs`."""
-    lines = [
-        f"const groups = {json.dumps(security_groups)};",
-        "const fieldSecurityQuery = groups === null ? cts.trueQuery() : cts.notQuery(deniedQuery(groups));",
-    ]
+    groups = literal(security_groups)
     if field_filter is None:
-        lines.append("const fieldDirs = null;")
+        field_dirs = "null"
     else:
-        query = _expression_query(field_filter, field_level=True)
-        lines.append(
-            "const fieldDirs = (() => { "
-            "const scope = cts.andQuery([cts.collectionQuery(COLLECTIONS.fieldsProcessed), fieldSecurityQuery]); "
-            f"const uris = matchingUris(cts.andQuery([scope, {query.js}]), {json.dumps(query.filtered)}); "
-            "if (uris.length && uris.length >= cts.estimate(scope)) return null; "
-            "return uris.map(uri => uri.replace(/processed\\.json$/, '')); "
-            "})();"
+        query = _expression_query(field_filter, field_level=True, literal=literal)
+        field_dirs = render_template(
+            "search_field_dirs.js", query=query.js, filtered=json.dumps(query.filtered)
         )
     # Matching field directories already exclude the denied fields, unless they are not applied
-    lines.append(
-        f"const denied = groups !== null && (fieldDirs === null || {json.dumps(paragraph_or)}) "
-        "? deniedResources(groups) : [];"
+    return render_template(
+        "search_prefilter.js",
+        groups=groups,
+        field_dirs=field_dirs,
+        paragraph_or=json.dumps(paragraph_or),
     )
-    lines.append(
-        "const securityQuery = denied.length ? "
-        "cts.notQuery(cts.directoryQuery(denied, 'infinity')) : cts.trueQuery();"
-    )
-    return " ".join(lines)
 
 
-def _graph_resource_scope(field_filter: FilterExpression | None, groups: list[str] | None) -> str:
+def _graph_resource_scope(
+    field_filter: FilterExpression | None,
+    groups: list[str] | None,
+    literal: Callable[[Any], str] = json.dumps,
+) -> str:
+    # Resource-owned relations live on resource documents, outside field directories.
+    # Project resource/facet predicates separately; field-only leaves cannot match them.
     def resource_expression(expression: FilterExpression) -> str:
         kind = expression.WhichOneof("expr")
         if kind in ("bool_and", "bool_or"):
@@ -293,41 +216,56 @@ def _graph_resource_scope(field_filter: FilterExpression | None, groups: list[st
         if kind == "bool_not":
             return f"cts.notQuery({resource_expression(expression.bool_not)})"
         if kind == "resource":
-            return f"cts.documentQuery({json.dumps(MarkLogicURIs.resource(expression.resource.resource_id))})"
+            return (
+                f"cts.documentQuery({literal(MarkLogicURIs.resource(expression.resource.resource_id))})"
+            )
         if kind == "facet":
-            return f"facetQuery({json.dumps(expression.facet.facet)})"
+            return f"facetQuery({literal(expression.facet.facet)})"
         return "cts.falseQuery()"
 
     restriction = resource_expression(field_filter) if field_filter is not None else "cts.trueQuery()"
     security = (
-        f"cts.notQuery(deniedQuery({json.dumps(groups)}))" if groups is not None else "cts.trueQuery()"
+        f"cts.notQuery(deniedQuery({literal(groups)}))" if groups is not None else "cts.trueQuery()"
     )
-    return (
-        "const graphResourceQuery = cts.andQuery([cts.collectionQuery(COLLECTIONS.resources), "
-        f"{security}, {restriction}]);"
-    )
+    return render_template("search_graph_scope.js", security=security, restriction=restriction)
 
 
-def _search_javascript(query: SearchRequest, *, lexical: bool, semantic: bool) -> str:
+def _search_javascript(
+    query: SearchRequest,
+    *,
+    lexical: bool,
+    semantic: bool,
+    parameters: _QueryParameters | None = None,
+) -> str:
+    # Production emits parameter references; the default keeps direct builder calls self-contained.
+    literal = parameters.literal if parameters is not None else json.dumps
     field_filter = query.field_filter if query.HasField("field_filter") else None
     paragraph_filter = query.paragraph_filter if query.HasField("paragraph_filter") else None
     security_groups = list(query.security.access_groups) if query.HasField("security") else None
-    # TODO: Implement proper handling of security groups
+    # Hybrid security filtering is deliberately disabled pending its permission-based replacement.
+    # The templates still support security constraints for callers that supply groups directly.
     security_groups = None
     paragraph_or = (
         field_filter is not None
         and paragraph_filter is not None
         and query.filter_operator == FilterOperator.OR
     )
+    # The OR flag applies only when both sides exist; a lone predicate is not a union.
     paragraph_query = (
-        _expression_query(paragraph_filter, field_level=False) if paragraph_filter is not None else None
+        _expression_query(paragraph_filter, field_level=False, literal=literal)
+        if paragraph_filter is not None
+        else None
     )
-    chunks = _chunk_results_expression(query) if lexical else "[]"
+    # Build branch expressions first; they execute later inside the shared JavaScript scope.
+    chunks = _chunk_results_expression(query, literal=literal) if lexical else "[]"
     embeddings = (
-        _vector_results_expression(query, paragraph_query is not None and paragraph_query.filtered)
+        _vector_results_expression(
+            query, paragraph_query is not None and paragraph_query.filtered, literal=literal
+        )
         if semantic
         else "[]"
     )
+    # Graph retrieval is optional and shares field/resource scoping, not paragraph scoring.
     graph_query = GraphSearchRequest(top_k=max(0, query.result_per_page))
     if query.HasField("graph_search"):
         graph_query.query.CopyFrom(query.graph_search.query)
@@ -335,43 +273,49 @@ def _search_javascript(query: SearchRequest, *, lexical: bool, semantic: bool) -
         graph_query.graph_edge_vectorset = query.graph_edge_vectorset
         graph_query.min_score_node_semantic = query.min_score_node_semantic
         graph_query.min_score_edge_semantic = query.min_score_edge_semantic
-    return " ".join(
-        [
-            "(() => {",
-            _CONSTANTS_JS,
-            _HELPERS_JS,
-            _prefilter_javascript(field_filter, security_groups, paragraph_or=paragraph_or),
-            _graph_resource_scope(field_filter, security_groups),
-            f"const paragraphOr = {json.dumps(paragraph_or)};",
-            f"if (fieldDirs !== null && !fieldDirs.length && !paragraphOr && {json.dumps(not query.HasField('graph_search'))}) return {{chunks: [], embeddings: []}};",
-            f"const paragraphQuery = {paragraph_query.js if paragraph_query else 'null'};",
-            "const fieldQuery = fieldDirs === null ? null : dirsQuery(fieldDirs);",
-            "const filterQuery = paragraphQuery === null ? fieldQuery : "
-            "fieldQuery === null ? (paragraphOr ? null : paragraphQuery) : "
-            "paragraphOr ? cts.orQuery([fieldQuery, paragraphQuery]) : cts.andQuery([fieldQuery, paragraphQuery]);",
-            "const chunkScope = filterQuery === null ? securityQuery : cts.andQuery([securityQuery, filterQuery]);",
-            "const embeddingScope = !paragraphOr && fieldQuery !== null ? "
-            "cts.andQuery([securityQuery, fieldQuery]) : securityQuery;",
-            f"return {{chunks: {chunks}, embeddings: {embeddings}, graph: {graph_expression(graph_query)}, semantic_mode: semanticMode}};",
-            "})()",
-        ]
+    return render_template(
+        "search_hybrid.js",
+        constants=_CONSTANTS_JS,
+        helpers=_HELPERS_JS,
+        prefilter=_prefilter_javascript(
+            field_filter, security_groups, paragraph_or=paragraph_or, literal=literal
+        ),
+        graph_resource_scope=_graph_resource_scope(field_filter, security_groups, literal),
+        paragraph_or=json.dumps(paragraph_or),
+        no_graph=json.dumps(not query.HasField("graph_search")),
+        paragraph_query=paragraph_query.js if paragraph_query else "null",
+        chunks=chunks,
+        embeddings=embeddings,
+        graph=graph_expression(graph_query, literal=literal),
     )
 
 
 async def hybrid_search(kbid: str, query: SearchRequest) -> SearchResponse:
+    """Run lexical, vector and optional graph retrieval in one KB-scoped MarkLogic eval.
+
+    Results remain separate in SearchResponse. Rank fusion and reranking belong to
+    the retrieval layer consuming this response, not this backend.
+    """
     driver = get_driver()
     if not isinstance(driver, MarkLogicDriver):
         return SearchResponse()
 
     response = SearchResponse()
+    # An empty keyword query does not request a match-all lexical scan.
     lexical = query.paragraph and bool(query.body)
     semantic = bool(query.vector)
     if not lexical and not semantic and not query.HasField("graph_search"):
         return response
 
-    javascript = _search_javascript(query, lexical=lexical, semantic=semantic)
+    # 1. Assemble source from templates and bind all request-dependent values separately.
+    parameters = _QueryParameters()
+    javascript = parameters.bind(
+        _search_javascript(query, lexical=lexical, semantic=semantic, parameters=parameters)
+    )
+    # 2. Run prefilters and all enabled branches server-side against the KB database.
     async with driver.ro_transaction(kbid=kbid) as txn:
-        result = _eval_object(await documents.evaluate(txn, javascript))
+        result = _eval_object(await documents.evaluate(txn, javascript, variables=parameters.variables))
+    # 3. Translate each result family into its protobuf section without combining scores.
     if lexical:
         _append_chunk_results(query, response, _flatten_eval_array(result.get("chunks", [])))
     if semantic:
@@ -383,6 +327,7 @@ async def hybrid_search(kbid: str, query: SearchRequest) -> SearchResponse:
 
 
 def _eval_object(value: Any) -> dict:
+    # REST eval can return an object directly or wrap it in one or more result arrays.
     if isinstance(value, dict):
         return value
     value = _flatten_eval_array(value)
@@ -391,10 +336,14 @@ def _eval_object(value: Any) -> dict:
     return {}
 
 
-def _chunk_results_expression(query: SearchRequest) -> str:
+def _chunk_results_expression(
+    query: SearchRequest, *, literal: Callable[[Any], str] = json.dumps
+) -> str:
     limit = max(0, query.result_per_page)
     terms = keyword_terms(query.body)
     exact_terms = [term.strip('"') for term in terms]
+    # Prepare one-edit wildcard patterns only for sufficiently long standalone words.
+    # Quoted phrases are excluded from this fuzzy fallback by the alphanumeric check.
     variants = set()
     for term in terms:
         if not term.isalnum() or len(term) < 4:
@@ -406,40 +355,16 @@ def _chunk_results_expression(query: SearchRequest) -> str:
             if index + 1 < len(term):
                 variants.add(term[:index] + term[index + 1] + term[index] + term[index + 2 :])
         variants.add(term + "?")
-    return (
-        "(() => { "
-        f"const limit = {limit}; "
-        f"const minScore = {json.dumps(query.min_score_bm25)}; "
-        "if (!limit) return []; "
-        "function run(textQuery, fuzzy, boost) { "
-        "const results = []; "
-        "const search = cts.search(cts.andQuery([cts.collectionQuery(COLLECTIONS.chunks), chunkScope, textQuery]), "
-        f"{json.dumps(_BM25_OPTIONS)}); "
-        "for (const doc of search) { "
-        "const score = cts.score(doc) * boost; "
-        "if (score < minScore) break; "
-        "const content = doc.root.toObject(); "
-        "results.push({content: {chunk_id: content.chunk_id, facets: content.facets, data: content.data}, fuzzy, score}); "
-        "if (results.length >= limit) break; "
-        "} "
-        "return results; "
-        "} "
-        f"const exact = run(cts.jsonPropertyWordQuery('text', {json.dumps(exact_terms)}, {_WORD_OPTIONS}), false, 1); "
-        # Like nidx, fuzzy matching is only a fallback for unfiltered scores without keyword matches
-        f"const patterns = {json.dumps(sorted(variants))}; "
-        "if (exact.length || minScore !== 0 || !patterns.length) return exact; "
-        "let fuzzyQuery; "
-        "try { "
-        "const words = patterns.flatMap(pattern => cts.jsonPropertyWordMatch('text', pattern, "
-        f"{json.dumps(['case-insensitive', f'collation={STRING_COLLATION}'])}).toArray().map(String)); "
-        f"fuzzyQuery = words.length ? cts.jsonPropertyWordQuery('text', words, {_WORD_OPTIONS}) : null; "
-        "} catch (error) { "
-        # Without the word lexicon wildcards still match, but BM25 gives them no score
-        "if (!/LXCNNOTFOUND/.test(String(error.name) + String(error.message))) throw error; "
-        "fuzzyQuery = cts.jsonPropertyWordQuery('text', patterns, ['case-insensitive', 'unstemmed', 'wildcarded']); "
-        "} "
-        f"return fuzzyQuery === null ? [] : run(fuzzyQuery, true, {FUZZY_SCORE_BOOST}); "
-        "})()"
+    return render_template(
+        "search_lexical.js",
+        limit=literal(limit),
+        min_score=literal(query.min_score_bm25),
+        bm25_options=json.dumps(_BM25_OPTIONS),
+        exact_terms=literal(exact_terms),
+        word_options=_WORD_OPTIONS,
+        patterns=literal(sorted(variants)),
+        lexicon_options=json.dumps(["case-insensitive", f"collation={STRING_COLLATION}"]),
+        fuzzy_boost=FUZZY_SCORE_BOOST,
     )
 
 
@@ -450,6 +375,7 @@ def _flatten_eval_array(value):
 
 
 def _append_chunk_results(query: SearchRequest, response: SearchResponse, matches) -> None:
+    # Chunk IDs encode resource, field and character offsets; metadata adds paragraph positions.
     response.paragraph.query = query.body
     for match in matches:
         if not isinstance(match, dict):
@@ -472,10 +398,12 @@ def _append_chunk_results(query: SearchRequest, response: SearchResponse, matche
             result.matches.append(query.body)
         ParseDict(content.get("data", {}), result.metadata)
         response.paragraph.results.append(result)
+    # This is the returned, limited result count, not a separate count of every matching chunk.
     response.paragraph.total = len(response.paragraph.results)
 
 
 def _append_vector_results(response: SearchResponse, embeddings) -> None:
+    # Preserve the embedding's vector identifier and cosine score for downstream rank fusion.
     for result in embeddings:
         if not isinstance(result, dict):
             continue
@@ -491,31 +419,27 @@ def _append_vector_results(response: SearchResponse, embeddings) -> None:
         response.vector.documents.append(result)
 
 
-def _vector_results_expression(query: SearchRequest, paragraph_filtered: bool) -> str:
+def _vector_results_expression(
+    query: SearchRequest,
+    paragraph_filtered: bool,
+    *,
+    literal: Callable[[Any], str] = json.dumps,
+) -> str:
+    # Paragraph predicates are evaluated on chunks, then joined to embeddings by
+    # field/split/paragraph offsets in search_vector.js. They cannot be applied
+    # directly to embedding documents, which do not store paragraph facets.
     limit = max(0, query.result_per_page)
-    return (
-        "(() => { "
-        # Embeddings have no paragraph facets: paragraph filters go through the matching chunk keys
-        "let accept = null; "
-        f"if ({limit} && paragraphQuery !== null && !(paragraphOr && fieldQuery === null)) {{ "
-        "const chunkQuery = cts.andQuery([cts.collectionQuery(COLLECTIONS.chunks), securityQuery, "
-        "...(!paragraphOr && fieldQuery !== null ? [fieldQuery] : []), paragraphQuery]); "
-        f"const keys = new Set(matchingUris(chunkQuery, {json.dumps(paragraph_filtered)}).map(chunkKey)); "
-        "const fields = paragraphOr ? new Set(fieldDirs) : null; "
-        "accept = root => (fields !== null && fields.has(fieldDir(root))) || keys.has(embeddingKey(root)); "
-        "} "
-        f"const model = {json.dumps(query.vectorset)}; "
-        "const scope = cts.andQuery([cts.collectionQuery(COLLECTIONS.embeddings), embeddingScope, "
-        "cts.jsonPropertyValueQuery('model_id', model, ['exact'])]); "
-        "return semanticSearch({"
-        f"limit: {limit}, model, scope, accept, "
-        f"queryVector: vec.vector({json.dumps(list(query.vector))}), "
-        f"minScore: {json.dumps(query.min_score_semantic)}, "
-        f"view: {json.dumps(vector_views.view_name(query.vectorset, len(query.vector)))}, "
-        f"exactMax: {EXACT_VECTOR_SEARCH_MAX_CANDIDATES}, "
-        f"oversampling: {ANN_OVERSAMPLING}"
-        "}); "
-        "})()"
+    return render_template(
+        "search_vector.js",
+        filter_limit=literal(limit),
+        paragraph_filtered=json.dumps(paragraph_filtered),
+        model=literal(query.vectorset),
+        limit=literal(limit),
+        vector=literal(list(query.vector)),
+        min_score=literal(query.min_score_semantic),
+        view=literal(vector_views.view_name(query.vectorset, len(query.vector))),
+        exact_max=EXACT_VECTOR_SEARCH_MAX_CANDIDATES,
+        oversampling=ANN_OVERSAMPLING,
     )
 
 
@@ -545,19 +469,21 @@ async def graph_search(kbid: str, query: GraphSearchRequest) -> GraphSearchRespo
         return response
     field_filter = query.field_filter if query.HasField("field_filter") else None
     groups = list(query.security.access_groups) if query.HasField("security") else None
-    javascript = " ".join(
-        [
-            "(() => {",
-            _CONSTANTS_JS,
-            _HELPERS_JS,
-            _prefilter_javascript(field_filter, groups),
-            _graph_resource_scope(field_filter, groups),
-            f"return {graph_expression(query)};",
-            "})()",
-        ]
+    parameters = _QueryParameters()
+    javascript = parameters.bind(
+        render_template(
+            "search_graph.js",
+            constants=_CONSTANTS_JS,
+            helpers=_HELPERS_JS,
+            prefilter=_prefilter_javascript(field_filter, groups, literal=parameters.literal),
+            graph_resource_scope=_graph_resource_scope(field_filter, groups, parameters.literal),
+            graph=graph_expression(query, literal=parameters.literal),
+        )
     )
     async with driver.ro_transaction(kbid=kbid) as txn:
-        matches = _flatten_eval_array(await documents.evaluate(txn, javascript))
+        matches = _flatten_eval_array(
+            await documents.evaluate(txn, javascript, variables=parameters.variables)
+        )
     if query.kind == GraphSearchRequest.RELATIONS:
         for match in matches:
             match.pop("source_value", None)

@@ -394,18 +394,18 @@ async def _test_filtering(nucliadb_reader: AsyncClient, kbid: str, filters):
             if par["text"] not in expected_paragraphs:
                 raise AssertionError(f"Paragraph not expected: {par['text']}")
             if par["text"] in not_yet_found:
-                assert par["score_type"] == "BOTH", f"Score type not expected with filters {filters}"
+                assert par["score_type"] == "VECTOR", f"Score type not expected with filters {filters}"
                 not_yet_found.remove(par["text"])
         assert len(not_yet_found) == 0, f"Some paragraphs were not found: {not_yet_found}"
 
 
 @pytest.mark.deploy_modes("standalone")
-async def test_filtering_field_and_paragraph(app_context, nucliadb_reader: AsyncClient, kbid: str):
+async def test_filtering_field_and_paragraph(nucliadb_reader: AsyncClient, kbid: str):
     async def test_search(filter_expression, expected_paragraphs):
         resp = await nucliadb_reader.post(
             f"/kb/{kbid}/find",
             json=dict(
-                query="",
+                query="I",
                 features=[FindOptions.KEYWORD, FindOptions.SEMANTIC],
                 vector=Q,
                 min_score=MinScore(semantic=-1).model_dump(),

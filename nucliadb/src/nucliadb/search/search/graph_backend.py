@@ -20,11 +20,14 @@
 """Single-hop queries over the relation-occurrence TDE view."""
 
 import json
+from collections.abc import Callable
+from typing import Any
 
 from google.protobuf.json_format import ParseDict
 from nidx_protos import nodereader_pb2
 
 from nucliadb.common.marklogic import graph
+from nucliadb.search.search.query_templates import load_template, render_template
 from nucliadb_protos import utils_pb2
 
 
@@ -92,188 +95,21 @@ def _query(query) -> dict:
     return {"path": content}
 
 
-_EXECUTOR = r"""
-const op = require('/MarkLogic/optic');
-const scope = cts.orQuery([
-  cts.andQuery([cts.collectionQuery(COLLECTIONS.fieldsProcessed), securityQuery,
-    ...(fieldDirs === null ? [] : [dirsQuery(fieldDirs)])]),
-  typeof graphResourceQuery === 'undefined' ? cts.falseQuery() : graphResourceQuery
-]);
-const semanticCache = new Map();
-function semanticValues(kind, vector) {
-  const model = kind === 'node' ? nodeModel : edgeModel;
-  const threshold = kind === 'node' ? nodeThreshold : edgeThreshold;
-  const key = JSON.stringify([kind, model, vector]);
-  if (semanticCache.has(key)) return semanticCache.get(key);
-  const values = new Map();
-  for (const doc of cts.search(scope, ['filtered', 'score-zero'])) {
-    for (const entry of doc.root.toObject().graph_vectors || []) {
-      if (entry.kind !== kind || entry.model_id !== model || entry.vector.length !== vector.length) continue;
-      const score = 1 - vec.cosineDistance(vec.vector(entry.vector), vec.vector(vector));
-      const value = kind === 'node' ? entry.normalized : entry.value;
-      if (score >= threshold) values.set(value, values.has(value) ? Math.max(values.get(value), score) : score);
-    }
-  }
-  semanticCache.set(key, values);
-  return values;
-}
-function distance(left, right, prefix) {
-  const matrix = Array.from({length: left.length + 1}, () => Array(right.length + 1).fill(0));
-  for (let index = 0; index <= left.length; index++) matrix[index][0] = index;
-  for (let index = 0; index <= right.length; index++) matrix[0][index] = index;
-  for (let source = 1; source <= left.length; source++) {
-    for (let target = 1; target <= right.length; target++) {
-      matrix[source][target] = Math.min(matrix[source - 1][target] + 1,
-        matrix[source][target - 1] + 1,
-        matrix[source - 1][target - 1] + (left[source - 1] === right[target - 1] ? 0 : 1));
-      if (source > 1 && target > 1 && left[source - 1] === right[target - 2] && left[source - 2] === right[target - 1]) {
-        matrix[source][target] = Math.min(matrix[source][target], matrix[source - 2][target - 2] + 1);
-      }
-    }
-  }
-  return prefix ? Math.min(...matrix[left.length]) : matrix[left.length][right.length];
-}
-function nodeScore(node, row, position) {
-  if (node.type !== undefined && node.type !== row[position + '_type']) return null;
-  if (node.group !== undefined && node.group !== row[position + '_group']) return null;
-  if (node.value === undefined) return 0;
-  const value = row[position + '_normalized'];
-  if (node.match === 'vector') {
-    const score = semanticValues('node', node.vector).get(value);
-    return score === undefined ? null : score;
-  }
-  const prefix = node.location === 1 || node.location === 3;
-  const words = node.location === 2 || node.location === 3;
-  if (words) {
-    const terms = node.value.match(/[a-z0-9]+/g) || [];
-    const tokens = value.match(/[a-z0-9]+/g) || [];
-    if (!terms.length || !tokens.length) return null;
-    const edits = terms.map(term => Math.min(...tokens.map(token => distance(term, token, prefix))));
-    if (node.match === 'fuzzy') return edits.every(edit => edit <= node.distance) ? 1 / (1 + edits.reduce((sum, edit) => sum + edit, 0)) : null;
-    return edits.some(edit => edit === 0) ? 1 : null;
-  }
-  if (node.match === 'fuzzy') {
-    const edits = distance(node.value, value, prefix);
-    return edits <= node.distance ? 1 / (1 + edits) : null;
-  }
-  return (prefix ? value.startsWith(node.value) : value === node.value) ? 1 : null;
-}
-function relationScore(relation, row) {
-  if (relation.type !== undefined && relation.type !== row.relation_type) return null;
-  if (relation.vector) {
-    const score = semanticValues('edge', relation.vector).get(row.label);
-    return score === undefined ? null : score;
-  }
-  return relation.value === undefined ? 0 : relation.value === row.label ? 1 : null;
-}
-function pathScore(path, row, reverse) {
-  const scores = [path.source ? nodeScore(path.source, row, reverse ? 'destination' : 'source') : 0,
-    path.destination ? nodeScore(path.destination, row, reverse ? 'source' : 'destination') : 0,
-    path.relation ? relationScore(path.relation, row) : 0];
-  return scores.some(score => score === null) ? null : scores.reduce((sum, score) => sum + score, 0);
-}
-function evaluate(query, row, position) {
-  if (query.bool_and) {
-    const scores = query.bool_and.map(operand => evaluate(operand, row, position));
-    return scores.some(score => score === null) ? null : scores.reduce((sum, score) => sum + score, 0);
-  }
-  if (query.bool_or) {
-    const scores = query.bool_or.map(operand => evaluate(operand, row, position)).filter(score => score !== null);
-    return scores.length ? Math.max(...scores) : null;
-  }
-  if (query.bool_not) return evaluate(query.bool_not, row, position) === null ? 0 : null;
-  if (query.facet !== undefined) return JSON.parse(row.facets_json).some(facet => facet === query.facet || facet.startsWith(query.facet + '/')) ? 0 : null;
-  if (!query.path) return null;
-  if (position) return nodeScore(query.path.source || query.path.destination || {}, row, position);
-  const forward = pathScore(query.path, row, false);
-  if (!query.path.undirected) return forward;
-  const reverse = pathScore(query.path, row, true);
-  return forward === null ? reverse : reverse === null ? forward : Math.max(forward, reverse);
-}
-function combine(operation, expressions) {
-  if (!expressions.length) return op.eq(1, operation === 'and' ? 1 : 0);
-  return expressions.reduce((left, right) => operation === 'and' ? op.and(left, right) : op.or(left, right));
-}
-function nodePredicate(node, position) {
-  const predicates = [];
-  if (node.type !== undefined) predicates.push(op.eq(op.col(position + '_type'), node.type));
-  if (node.group !== undefined) predicates.push(op.eq(op.col(position + '_group'), node.group));
-  if (node.value !== undefined && node.match === 'exact' && node.location === 0) predicates.push(op.eq(op.col(position + '_normalized'), node.value));
-  if (node.match === 'fuzzy' && node.distance === 1 && (node.location === 0 || node.location === 1)) {
-    const reference = cts.pathReference('/relations/' + position + '_normalized', ['type=string', 'collation=' + COLLATION]);
-    const values = new Set();
-    for (const pattern of node.patterns) {
-      for (const value of cts.valueMatch(reference, pattern, ['case-sensitive', 'diacritic-sensitive'], scope)) values.add(String(value));
-    }
-    predicates.push(combine('or', Array.from(values).map(value => op.eq(op.col(position + '_normalized'), value))));
-  }
-  if (node.match === 'vector') predicates.push(combine('or', Array.from(semanticValues('node', node.vector).keys()).map(value => op.eq(op.col(position + '_normalized'), value))));
-  return combine('and', predicates);
-}
-function pathPredicate(path, reverse) {
-  const predicates = [];
-  if (path.source) predicates.push(nodePredicate(path.source, reverse ? 'destination' : 'source'));
-  if (path.destination) predicates.push(nodePredicate(path.destination, reverse ? 'source' : 'destination'));
-  if (path.relation) {
-    if (path.relation.type !== undefined) predicates.push(op.eq(op.col('relation_type'), path.relation.type));
-    if (path.relation.vector) predicates.push(combine('or', Array.from(semanticValues('edge', path.relation.vector).keys()).map(value => op.eq(op.col('label'), value))));
-    else if (path.relation.value !== undefined) predicates.push(op.eq(op.col('label'), path.relation.value));
-  }
-  return combine('and', predicates);
-}
-function predicate(query, position) {
-  if (query.bool_and) return combine('and', query.bool_and.map(operand => predicate(operand, position)));
-  if (query.bool_or) return combine('or', query.bool_or.map(operand => predicate(operand, position)));
-  if (!query.path) return op.eq(1, 1);
-  if (position) return nodePredicate(query.path.source || query.path.destination || {}, position);
-  const forward = pathPredicate(query.path, false);
-  return query.path.undirected ? op.or(forward, pathPredicate(query.path, true)) : forward;
-}
-let results = [];
-for (const position of (kind === 1 ? ['source', 'destination'] : [null])) {
-  const rows = op.fromView('nucliadb', 'relations', '', op.fragmentIdCol('fid'))
-    .where(scope).where(predicate(query, position)).select([
-      'resource_field_id', 'occurrence', 'source_value', 'source_normalized', 'source_type', 'source_group',
-      'destination_value', 'destination_normalized', 'destination_type', 'destination_group',
-      'label', 'relation_type', 'facets_json', 'metadata_json'
-    ]).result();
-  for (const row of rows) {
-    const score = evaluate(query, row, position);
-    if (score !== null) results.push(Object.assign({}, row, {score, position}));
-  }
-}
-results.sort((left, right) => right.score - left.score ||
-  String(left.resource_field_id).localeCompare(String(right.resource_field_id)) || left.occurrence - right.occurrence);
-if (kind !== 0) {
-  const seen = new Set();
-  results = results.filter(row => {
-    const key = kind === 1 ? JSON.stringify([row[row.position + '_value'], row[row.position + '_type'], row[row.position + '_group']]) : JSON.stringify([row.label, row.relation_type]);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-return results.slice(0, limit);
-"""
-
-
-def graph_expression(request: nodereader_pb2.GraphSearchRequest) -> str:
+def graph_expression(
+    request: nodereader_pb2.GraphSearchRequest, *, literal: Callable[[Any], str] = json.dumps
+) -> str:
     if not request.HasField("query") or not request.query.HasField("path") or not request.top_k:
         return "[]"
-    return (
-        "(() => {"
-        + " ".join(
-            [
-                f"const query = {json.dumps(_query(request.query.path))};",
-                f"const kind = {request.kind}; const limit = {request.top_k};",
-                f"const nodeModel = {json.dumps(request.graph_node_vectorset)};",
-                f"const edgeModel = {json.dumps(request.graph_edge_vectorset)};",
-                f"const nodeThreshold = {request.min_score_node_semantic};",
-                f"const edgeThreshold = {request.min_score_edge_semantic};",
-                _EXECUTOR,
-            ]
-        )
-        + "})()"
+    return render_template(
+        "graph_expression.js",
+        query=literal(_query(request.query.path)),
+        kind=literal(request.kind),
+        limit=literal(request.top_k),
+        node_model=literal(request.graph_node_vectorset),
+        edge_model=literal(request.graph_edge_vectorset),
+        node_threshold=literal(request.min_score_node_semantic),
+        edge_threshold=literal(request.min_score_edge_semantic),
+        executor=load_template("graph_executor.js"),
     )
 
 
