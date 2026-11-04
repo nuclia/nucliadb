@@ -40,6 +40,7 @@ SERVICE_NAME = "nucliadb.learning_proxy"
 logger = logging.getLogger(SERVICE_NAME)
 
 WHITELISTED_HEADERS = {
+    "content-type",
     "x-nucliadb-user",
     "x-nucliadb-roles",
     "x-nucliadb-account",
