@@ -489,6 +489,22 @@ async def save_completed_kb_prefix(
         await txn.commit()
 
 
+async def resolve_ingest_kb(
+    driver: MarkLogicDriver, item: dict[str, Any], args: argparse.Namespace
+) -> str:
+    if "kbid" in item:
+        async with driver.ro_transaction(kbid=None) as txn:
+            if not await datamanagers.kb.exists(txn, kbid=item["kbid"]):
+                raise ValueError(f"KnowledgeBox {item['kbid']} does not exist")
+        return item["kbid"]
+    return await ensure_synthetic_kb(
+        driver,
+        slug=item["slug"],
+        vectorset_id=args.vectorset_id,
+        vector_dimension=args.vector_dimension,
+    )
+
+
 async def ensure_synthetic_kb(
     driver: MarkLogicDriver,
     *,
@@ -817,12 +833,7 @@ async def run_ramp(
         if local_start >= resource_count:
             print(f"Skipping KB setup before start resource: {item['slug']}", flush=True)
             continue
-        kbid = await ensure_synthetic_kb(
-            driver,
-            slug=item["slug"],
-            vectorset_id=args.vectorset_id,
-            vector_dimension=args.vector_dimension,
-        )
+        kbid = await resolve_ingest_kb(driver, item, args)
         vectorsets = await get_kb_vectorsets(driver, kbid)
         resume_offset = (
             await find_resume_offset(driver, kbid, args.seed, resource_count)
@@ -911,6 +922,15 @@ async def run(args):
         if args.ramp
         else plan_distribution(args.scale, args.seed, args.sigma, args.kb_prefix)
     )
+    if getattr(args, "kbid", None):
+        plan = [
+            {
+                "tier": "single",
+                "slug": args.kbid,
+                "kbid": args.kbid,
+                "resources": round(PROD_RESOURCES * args.scale),
+            }
+        ]
     planned_resources = sum(item["resources"] for item in plan)
     start_resource_offset = args.start_resource_number - 1
     if start_resource_offset > planned_resources:
@@ -957,6 +977,38 @@ async def run(args):
         queue: asyncio.Queue[tuple[str, str, list[tuple[str, int]], int] | None] = asyncio.Queue(
             maxsize=args.concurrency * 2
         )
+        previous_stats: Counter = Counter()
+        previous_time = time.monotonic()
+        interval_latencies: list[float] = []
+
+        def report_progress() -> None:
+            nonlocal previous_stats, previous_time
+            now = time.monotonic()
+            seconds = max(now - previous_time, 1e-9)
+            completed = stats["created"] + stats["skipped"] + stats["failed"]
+            latency_metrics = ramp_report(stats, seconds, interval_latencies)
+            p50 = latency_metrics["write_latency_p50_seconds"]
+            p95 = latency_metrics["write_latency_p95_seconds"]
+            p50_label = "-" if p50 is None else f"{p50:.3f}s"
+            p95_label = "-" if p95 is None else f"{p95:.3f}s"
+            print(
+                f"Ingest elapsed={now - started:.1f}s window={seconds:.1f}s "
+                f"rate={(stats['created'] - previous_stats['created']) / seconds:.2f} res/s "
+                f"chunks={(stats['chunks'] - previous_stats['chunks']) / seconds:.2f}/s "
+                f"documents={(stats['documents'] - previous_stats['documents']) / seconds:.2f}/s "
+                f"write_p50={p50_label} write_p95={p95_label} "
+                f"created={stats['created']} skipped={stats['skipped']} failed={stats['failed']} "
+                f"queued={queue.qsize()} in-flight={stats['attempted'] - completed}",
+                flush=True,
+            )
+            previous_stats = stats.copy()
+            previous_time = now
+            interval_latencies.clear()
+
+        async def reporter() -> None:
+            while True:
+                await asyncio.sleep(args.report_interval)
+                report_progress()
 
         def print_worker_progress(
             worker_id: int,
@@ -982,7 +1034,8 @@ async def run(args):
                 f"resources={processed} rate={processed / elapsed:.2f} res/s "
                 f"created={worker_stats['created']} skipped={worker_stats['skipped']} "
                 f"failed={worker_stats['failed']} | total={global_processed}/{resources_to_run} "
-                f"rate={global_processed / total_elapsed:.2f} res/s"
+                f"rate={global_processed / total_elapsed:.2f} res/s",
+                flush=True,
             )
             worker_stats["reported"] = processed
 
@@ -1009,6 +1062,7 @@ async def run(args):
                     )
                     return
                 kbid, slug, vectorsets, resource_index = task
+                stats["attempted"] += 1
                 last_slug = slug
                 last_kbid = kbid
                 async with semaphore:
@@ -1022,6 +1076,7 @@ async def run(args):
                                 f"kb={slug} resource_index={resource_index}",
                                 flush=True,
                             )
+                        write_started = time.monotonic()
                         async with asyncio.timeout(args.write_timeout):
                             created, fields, chunks, embeddings = await write_resource(
                                 driver,
@@ -1030,6 +1085,7 @@ async def run(args):
                                 vectorsets,
                                 args.seed,
                             )
+                        write_elapsed = time.monotonic() - write_started
                     except Exception as exc:
                         print(
                             f"Failed direct MarkLogic resource processing kbid={kbid} "
@@ -1052,6 +1108,8 @@ async def run(args):
                         )
                         first_resource = False
                     if created:
+                        interval_latencies.append(write_elapsed)
+                        stats["documents"] += committed_document_count(fields, chunks, embeddings)
                         stats["fields"] += fields
                         stats["chunks"] += chunks
                         stats["embeddings"] += embeddings
@@ -1068,6 +1126,7 @@ async def run(args):
         workers = [
             asyncio.create_task(ingest_worker(worker_id)) for worker_id in range(1, args.concurrency + 1)
         ]
+        progress = asyncio.create_task(reporter())
         try:
             all_active_ranges = [
                 resource_range
@@ -1090,12 +1149,7 @@ async def run(args):
                 if args.auto_resume and kb_position < completed_kb_prefix:
                     print(f"Skipping checkpointed KB: {slug}", flush=True)
                     continue
-                kbid = await ensure_synthetic_kb(
-                    driver,
-                    slug=slug,
-                    vectorset_id=args.vectorset_id,
-                    vector_dimension=args.vector_dimension,
-                )
+                kbid = await resolve_ingest_kb(driver, item, args)
                 if args.auto_resume:
                     detected_start = await find_resume_offset(
                         driver, kbid, args.seed, resource_count
@@ -1135,6 +1189,10 @@ async def run(args):
                 worker.cancel()
             await asyncio.gather(*workers, return_exceptions=True)
             raise
+        finally:
+            progress.cancel()
+            await asyncio.gather(progress, return_exceptions=True)
+            report_progress()
         report = {
             "scale": args.scale,
             "seed": args.seed,
@@ -1172,6 +1230,10 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--sigma", type=float, default=0.4)
     parser.add_argument("--kb-prefix", default="ml-sizing-kb")
+    parser.add_argument(
+        "--kbid",
+        help="Ingest the full --scale resource budget into one existing KB using its vectorsets",
+    )
     parser.add_argument("--vectorset-id", default="synthetic-vectors")
     parser.add_argument("--vector-dimension", type=int, default=768)
     parser.add_argument("--paragraph-sentences", type=int, default=DEFAULT_PARAGRAPH_SENTENCES)
@@ -1198,6 +1260,10 @@ def main():
     )
     parser.add_argument("--yes", action="store_true", help="Confirm deletion when using --delete")
     args = parser.parse_args()
+    if args.kbid and args.delete:
+        parser.error("--kbid cannot be combined with --delete")
+    if args.kbid and args.ramp and args.active_kbs != 1:
+        parser.error("--kbid requires --active-kbs 1 in ramp mode")
     if args.concurrency <= 0 or args.log_every <= 0 or args.active_kbs <= 0:
         parser.error("--concurrency, --log-every and --active-kbs must be positive")
     if args.ramp and (args.concurrency_step <= 0 or args.max_concurrency < args.concurrency):

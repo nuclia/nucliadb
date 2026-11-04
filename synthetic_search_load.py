@@ -202,7 +202,7 @@ async def execute_operation(kbid: str, operation: str, item: Any) -> None:
     }
     with request_caches():
         if operation.startswith("find_"):
-            # breakpoint()
+            breakpoint()
             _, incomplete, _ = await find(kbid, item, **client, metrics=Metrics("search-load"))
             if incomplete:
                 raise RuntimeError("Find returned incomplete results")

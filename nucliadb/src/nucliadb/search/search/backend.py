@@ -312,6 +312,8 @@ def _search_javascript(query: SearchRequest, *, lexical: bool, semantic: bool) -
     field_filter = query.field_filter if query.HasField("field_filter") else None
     paragraph_filter = query.paragraph_filter if query.HasField("paragraph_filter") else None
     security_groups = list(query.security.access_groups) if query.HasField("security") else None
+    # TODO: Implement proper handling of security groups
+    security_groups = None
     paragraph_or = (
         field_filter is not None
         and paragraph_filter is not None
