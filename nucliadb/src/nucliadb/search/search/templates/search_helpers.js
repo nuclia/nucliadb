@@ -95,12 +95,6 @@ function deniedResources(groups) {
   return cts.uris('', [], query).toArray().map(uri => String(uri).replace(/\.json$/, '/'));
 }
 
-// Embedding metadata supplies the parent field prefix used by directory scopes
-// and by the paragraph-to-embedding join. Field ids do not contain slashes.
-function fieldDir(root) {
-  return '/resources/' + root.resource_id + '/fields/' + root.field_type + '/' + root.field_id + '/';
-}
-
 // Strip the chunk storage wrapper but preserve its optional split and start-end
 // offsets. The resulting field/split/offset key identifies a paragraph, rather
 // than a particular vector window; unrelated URI shapes cannot produce a key.
@@ -109,103 +103,70 @@ function chunkKey(uri) {
   return match ? match[1] + match[2] : null;
 }
 
-function embeddingKey(root) {
-  // Vector ids are rid/field_type/field_id/[split/]index/start-end. Preserve the
-  // optional split, discard the vector index, and use data.position's paragraph
-  // offsets (not the vector window's trailing offsets) to match chunkKey.
-  const parts = String(root.chunk_id).split('/');
-  const split = parts.length === 6 ? parts[3] + '/' : '';
-  const position = root.data && root.data.position;
-  return position ? fieldDir(root) + split + position.start + '-' + position.end : null;
+function matchingKeyPlan(query, filtered, column) {
+  const op = require('/MarkLogic/optic');
+  const source = filtered ? matchingUris(query, true) : query;
+  const pattern = column === 'field_key' ? 'processed\\.json$' :
+    '^(/resources/[^/]+/fields/[^/]+/[^/]+/)chunks/(.+)/data\\.json$';
+  const replacement = column === 'field_key' ? '' : '$1$2';
+  const qualifier = column === 'field_key' ? 'fields' : 'paragraphs';
+  const uri = op.viewCol(qualifier, 'uri');
+  let plan = op.fromDocUris(source, qualifier);
+  if (column === 'paragraph_key') plan = plan.where(op.fn.matches(uri, pattern));
+  return plan.select([op.as(column, op.fn.replace(uri, pattern, replacement))])
+    .whereDistinct();
 }
 
 function semanticSearch(search) {
   semanticMode = 'exact';
   if (!search.limit) return [];
-  const fields = search.fieldKeys === null ? null : new Set(search.fieldKeys);
-  const paragraphs = search.paragraphKeys === null ? null : new Set(search.paragraphKeys);
-  if ((!search.paragraphOr && fields !== null && !fields.size) ||
-      (paragraphs !== null && !paragraphs.size &&
-       (!search.paragraphOr || (fields !== null && !fields.size)))) return [];
-  const accepts = root => {
-    const field = fields === null || fields.has(fieldDir(root));
-    if (paragraphs === null) return field;
-    const paragraph = paragraphs.has(embeddingKey(root));
-    return search.paragraphOr ? field || paragraph : field && paragraph;
-  };
-  const similarity = root => 1 - vec.cosineDistance(vec.vector(root.vector), search.queryVector);
-  const keep = (scored, root) => {
-    if (!accepts(root)) return;
-    const score = similarity(root);
-    if (score >= search.minScore) scored.push({score, root});
-  };
 
-  function exact() {
-    const scored = [];
-    // Stage 2a: Scan scoped index candidates without text relevance scoring.
-    // "Exact" means exhaustive cosine scoring of those candidates, not document
-    // verification: unfiltered search trusts index resolution of the scope.
-    for (const doc of cts.search(search.scope, ['unfiltered', 'score-zero'])) {
-      const root = doc.root.toObject();
-      keep(scored, root);
-    }
-    return scored;
-  }
-
-  function ranked(k, indexed) {
+  function ranked(k) {
     const op = require('/MarkLogic/optic');
     // Field and paragraph keys are projected by TDE, so eligibility is decided
     // on rows before scoring rather than after loading embedding documents.
-    const membership = (column, keys) => {
-      const predicates = keys.map(key => op.eq(op.col(column), key));
-      return !predicates.length ? op.eq(1, 0) : predicates.length === 1
-        ? predicates[0] : op.or(...predicates);
+    const join = (plan, keys, column, qualifier = 'vectors') => {
+      const matchColumn = 'matched_' + column;
+      const matches = keys.select([op.as(matchColumn, op.col(column))]);
+      return plan.joinInner(matches, op.on(op.viewCol(qualifier, column), op.col(matchColumn)));
     };
-    let predicate = search.fieldKeys === null ? null : membership('field_key', search.fieldKeys);
-    if (search.paragraphKeys !== null) {
-      const paragraph = membership('paragraph_key', search.paragraphKeys);
-      predicate = predicate === null ? (search.paragraphOr ? null : paragraph) :
-        search.paragraphOr ? op.or(predicate, paragraph) : op.and(predicate, paragraph);
+    const base = op.fromView(VECTOR_SCHEMA, search.view, 'vectors', op.fragmentIdCol('fid')).where(search.scope);
+    let plan = base;
+    if (search.paragraphOr && search.fieldPlan !== null && search.paragraphPlan !== null) {
+      const fields = op.fromView(VECTOR_SCHEMA, search.view, 'field_vectors', op.fragmentIdCol('field_fid'))
+        .where(search.scope);
+      const paragraphs = op.fromView(VECTOR_SCHEMA, search.view, 'paragraph_vectors', op.fragmentIdCol('paragraph_fid'))
+        .where(search.scope);
+      const eligible = join(fields, search.fieldPlan, 'field_key', 'field_vectors')
+        .select([op.as('eligible_fid', op.col('field_fid'))])
+        .union(join(paragraphs, search.paragraphPlan, 'paragraph_key', 'paragraph_vectors')
+          .select([op.as('eligible_fid', op.col('paragraph_fid'))])).whereDistinct();
+      plan = base.joinInner(eligible, op.on(op.col('fid'), op.col('eligible_fid')));
+    } else if (!(search.paragraphOr && search.fieldPlan === null && search.paragraphPlan !== null)) {
+      if (search.fieldPlan !== null) plan = join(plan, search.fieldPlan, 'field_key');
+      if (search.paragraphPlan !== null) plan = join(plan, search.paragraphPlan, 'paragraph_key');
     }
-    let plan = op.fromView(VECTOR_SCHEMA, search.view, '', op.fragmentIdCol('fid'));
-    if (predicate !== null) plan = plan.where(predicate);
-    plan = plan.where(search.scope);
+    // Bound the joined eligibility probe, without hydrating documents or counting the full scope.
+    const eligibleSize = plan.select(['fid']).limit(search.exactMax + 1).result().toArray().length;
+    if (!eligibleSize) return [];
+    semanticMode = eligibleSize <= search.exactMax ? 'exact' : 'ann';
     const options = {maxDistance: 1 - search.minScore};
-    // Explicitly disable the ANN index for prefiltered scoring. Merely putting
-    // where before annTopK can still select an indexed, postfiltered plan.
-    if (!indexed) options.noIndex = null;
-    const rows = plan.annTopK(k, op.col('vector'), search.queryVector, op.col('distance'), options)
+    if (semanticMode === 'exact') options.noIndex = null;
+    // ANN is allowed, not forced; physical ANN-index prefilter correctness remains unverified.
+    const rows = plan.annTopK(k, op.viewCol('vectors', 'vector'), search.queryVector, op.col('distance'), options)
       .joinDocUri(op.col('uri'), op.fragmentIdCol('fid'))
       .select(['uri', 'distance']).result().toArray();
     return rows.map(row => ({score: 1 - Number(row.distance), uri: String(row.uri)}));
   }
 
-  let scored = null;
-  try {
-    if (search.unrestricted && cts.estimate(search.scope) > search.exactMax) {
-      // Try a minimum of 100 or limit times oversampling, then eight times that
-      // base. Count only candidates surviving scope, paragraph and score checks;
-      // if neither attempt fills the requested page, fall back to an exact scan.
-      const base = Math.max(search.limit * search.oversampling, 100);
-      for (const k of [base, base * 8]) {
-        const result = ranked(k, true);
-        if (result.length >= search.limit) {
-          scored = result;
-          semanticMode = 'ann';
-          break;
-        }
-      }
-    }
-    if (scored === null) scored = ranked(search.limit, false);
-  } catch (error) {
-    if (!/SQL-TABLE(NOTFOUND|REINDEXING)/.test(String(error.name) + String(error.message))) throw error;
-  }
-  if (scored === null) scored = exact();
+  // The TDE view must exist and be queryable; view errors propagate to the caller.
+  // One scoring call for every scope size; short pages do not trigger retries.
+  const scored = ranked(search.limit);
   scored.sort((left, right) => right.score - left.score);
   // Optic already selected the winners and computed their distances; only the
   // limited winning documents need hydration for response metadata.
   return scored.slice(0, search.limit).map(result => {
-    const root = result.root || cts.doc(result.uri).toObject();
+    const root = cts.doc(result.uri).toObject();
     return {score: result.score, content: {chunk_id: root.chunk_id, facets: root.facets, data: root.data}};
   });
 }

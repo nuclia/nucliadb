@@ -65,6 +65,11 @@ def template_uri(vectorset_id: str, dimension: int) -> str:
 
 def template(vectorset_id: str, dimension: int) -> dict:
     field_key = "concat('/resources/', resource_id, '/fields/', field_type, '/', field_id, '/')"
+    # Match the key derived from a chunk URI: field directory + [split/]paragraph start-end.
+    # Vector IDs are rid/type/field/[split/]index/window-start-end; six components mean
+    # a split is present (XPath token positions are 1-based). Use data.position's parent
+    # paragraph offsets, not the vector window offsets, so all windows share that key.
+    # Missing paragraph offsets yield an empty sequence, stored as a nullable column.
     paragraph_key = (
         "if (exists(data/position/start) and exists(data/position/end)) then "
         f"concat({field_key}, "
@@ -118,7 +123,7 @@ async def ensure_view(
     """Reconcile the shared template once per process, reindexing only when it changes.
 
     Keep the existing collection/view identity so old embedding documents need no rewrite.
-    Searches use CTS exact scoring while a missing or changed view is reindexing.
+    Searches require the view to be present and queryable after reindexing.
     Migrations use force to bypass the process cache, not the template equality check.
     """
     key = (vectorset_id, dimension)

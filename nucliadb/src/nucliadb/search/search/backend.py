@@ -53,15 +53,12 @@ from nucliadb.search.search.metrics import semantic_search_mode
 from nucliadb.search.search.query_templates import load_template, render_template
 from nucliadb_protos import utils_pb2
 
-# Below this many candidate embeddings, an exact scan is cheaper and more precise than ANN
-EXACT_VECTOR_SEARCH_MAX_CANDIDATES = 1000
-ANN_OVERSAMPLING = 4
-
 _WORD_OPTIONS = "['case-insensitive', 'unstemmed', 'unwildcarded']"
 # Results come sorted by descending score, which the min score cut relies on
 _BM25_OPTIONS = ["score-bm25", "bm25-length-weight=0.5"]
 # Same boost as nidx gives to its fuzzy fallback query
 FUZZY_SCORE_BOOST = 0.5
+EXACT_VECTOR_SEARCH_MAX_CANDIDATES = 1000
 
 _CONSTANTS_JS = render_template(
     "search_constants.js",
@@ -179,11 +176,16 @@ def _prefilter_javascript(
     security_groups: list[str] | None,
     *,
     paragraph_or: bool = False,
+    materialize_fields: bool = True,
     literal: Callable[[Any], str] = json.dumps,
 ) -> str:
-    """Defines `fieldDirs`: null when every allowed field matches, otherwise the directories of the
-    matching fields. Also `securityQuery`, the security restriction not already in `fieldDirs`."""
+    """Define field eligibility and optional directories for lexical/graph scoping.
+
+    Vector-only searches keep index-resolvable eligibility query-backed. `securityQuery`
+    holds the security restriction not already represented by materialized directories.
+    """
     groups = literal(security_groups)
+    query = None
     if field_filter is None:
         field_dirs = "null"
     else:
@@ -196,6 +198,9 @@ def _prefilter_javascript(
         "search_prefilter.js",
         groups=groups,
         field_dirs=field_dirs,
+        field_query=query.js if query else "null",
+        field_filtered=json.dumps(query.filtered if query else False),
+        materialize_fields=json.dumps(materialize_fields),
         paragraph_or=json.dumps(paragraph_or),
     )
 
@@ -278,7 +283,11 @@ def _search_javascript(
         constants=_CONSTANTS_JS,
         helpers=_HELPERS_JS,
         prefilter=_prefilter_javascript(
-            field_filter, security_groups, paragraph_or=paragraph_or, literal=literal
+            field_filter,
+            security_groups,
+            paragraph_or=paragraph_or,
+            materialize_fields=lexical or query.HasField("graph_search"),
+            literal=literal,
         ),
         graph_resource_scope=_graph_resource_scope(field_filter, security_groups, literal),
         paragraph_or=json.dumps(paragraph_or),
@@ -438,8 +447,7 @@ def _vector_results_expression(
         vector=literal(list(query.vector)),
         min_score=literal(query.min_score_semantic),
         view=literal(vector_views.view_name(query.vectorset, len(query.vector))),
-        exact_max=EXACT_VECTOR_SEARCH_MAX_CANDIDATES,
-        oversampling=ANN_OVERSAMPLING,
+        exact_max=literal(EXACT_VECTOR_SEARCH_MAX_CANDIDATES),
     )
 
 

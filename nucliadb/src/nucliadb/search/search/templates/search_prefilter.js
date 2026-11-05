@@ -23,9 +23,14 @@
 // This is path-index filtering, not an implementation of native permissions.
 const groups = ${groups};
 const fieldSecurityQuery = groups === null ? cts.trueQuery() : cts.notQuery(deniedQuery(groups));
-// Resolve field predicates once. null means every allowed field is eligible
-// (or there was no field predicate); [] means no processed fields matched.
-const fieldDirs = ${field_dirs};
+// Lexical/graph branches need directory scopes; vector-only searches leave
+// those unmaterialized and use the eligibility query instead. When materialized,
+// null means unrestricted and [] means no processed fields matched.
+const fieldEligibilityQuery = ${field_query};
+const fieldEligibilityFiltered = ${field_filtered};
+const materializeFieldDirs = ${materialize_fields};
+const fieldDirs = materializeFieldDirs ? ${field_dirs} : null;
+const fieldsUnrestricted = fieldEligibilityQuery === null || (materializeFieldDirs && fieldDirs === null);
 // Explicit field directories already exclude denied fields in an AND search.
 // With no directory restriction, or with an OR paragraph branch that can bypass
 // it, exclude denied resource subtrees separately. securityQuery is only the

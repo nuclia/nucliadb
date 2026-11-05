@@ -47,12 +47,10 @@
     fieldQuery === null ? (paragraphOr ? null : paragraphQuery) :
     paragraphOr ? cts.orQuery([fieldQuery, paragraphQuery]) : cts.andQuery([fieldQuery, paragraphQuery]);
   // Chunk predicates apply directly to chunk documents. Embeddings cannot use
-  // paragraph text/facet predicates directly: the vector branch maps matching
-  // chunks to embedding keys. With OR, do not reapply the field prefilter here,
-  // since it would discard matches admitted only by the paragraph side.
+  // paragraph text/facet predicates directly: the vector branch joins matching
+  // fields and chunks to embedding keys before scoring.
   const chunkScope = filterQuery === null ? securityQuery : cts.andQuery([securityQuery, filterQuery]);
-  const embeddingScope = !paragraphOr && fieldQuery !== null
-    ? cts.andQuery([securityQuery, fieldQuery]) : securityQuery;
+  const embeddingScope = securityQuery;
 
   // Stage 5: Execute the enabled branches and return separate result families.
   // Scores are not fused here. The vector helper sets semanticMode to report

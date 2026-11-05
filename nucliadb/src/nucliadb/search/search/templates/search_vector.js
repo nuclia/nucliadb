@@ -18,17 +18,17 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 //
 (() => {
-  let paragraphKeys = null;
-  if (${filter_limit} && paragraphQuery !== null && !(paragraphOr && fieldQuery === null)) {
-    // AND can narrow chunks by field first. OR must find paragraph matches
-    // outside those fields too; security remains common to both alternatives.
+  const fieldPlan = fieldsUnrestricted ? null : matchingKeyPlan(cts.andQuery([
+    cts.collectionQuery(COLLECTIONS.fieldsProcessed), fieldSecurityQuery, fieldEligibilityQuery
+  ]), fieldEligibilityFiltered, 'field_key');
+  let paragraphPlan = null;
+  if (${filter_limit} && paragraphQuery !== null && !(paragraphOr && fieldsUnrestricted)) {
     const chunkQuery = cts.andQuery([
       cts.collectionQuery(COLLECTIONS.chunks),
       securityQuery,
-      ...(!paragraphOr && fieldQuery !== null ? [fieldQuery] : []),
       paragraphQuery
     ]);
-    paragraphKeys = matchingUris(chunkQuery, ${paragraph_filtered}).map(chunkKey).filter(key => key !== null);
+    paragraphPlan = matchingKeyPlan(chunkQuery, ${paragraph_filtered}, 'paragraph_key');
   }
   const model = ${model};
   const scope = cts.andQuery([
@@ -39,14 +39,12 @@
   return semanticSearch({
     limit: ${limit},
     scope,
-    fieldKeys: fieldDirs,
-    paragraphKeys,
+    fieldPlan,
+    paragraphPlan,
     paragraphOr,
-    unrestricted: fieldDirs === null && paragraphKeys === null && groups === null,
     queryVector: vec.vector(${vector}),
     minScore: ${min_score},
-    view: ${view},
     exactMax: ${exact_max},
-    oversampling: ${oversampling}
+    view: ${view}
   });
 })()
