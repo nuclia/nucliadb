@@ -48,8 +48,17 @@ from nucliadb_models.kv_schemas import KBKVSchemas
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
+from nucliadb_telemetry import metrics
+from nucliadb_telemetry.metrics import INF
 
 logger = logging.getLogger(__name__)
+
+
+restore_resource_observer = metrics.Observer(
+    "nucliadb_backup_restore_resource_duration_seconds",
+    labels={},
+    buckets=[0.05, 0.1, 0.2, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 2.5 * 60.0, 5 * 60, 10 * 60, INF],
+)
 
 
 async def restore_kb_task(context: ApplicationContext, msg: RestoreBackupRequest):
@@ -116,6 +125,8 @@ async def restore_resources(context: ApplicationContext, kbid: str, backup_id: s
         await asyncio.gather(*tasks)
         tasks = []
         await set_last_restored(context, kbid, backup_id, key)
+
+    logger.info(f"Restore resources: completed", extra={"kbid": kbid, "backup_id": backup_id})
 
 
 async def get_last_restored(context: ApplicationContext, kbid: str, backup_id: str) -> str | None:
@@ -231,6 +242,7 @@ class ResourceBackupReader:
             raise ValueError(f"Unknown tar entry: {tarinfo.name}")
 
 
+@restore_resource_observer.wrap({})
 async def restore_resource(context: ApplicationContext, kbid: str, backup_id: str, resource_id: str):
     download_stream = context.blob_storage.download(
         bucket=settings.backups_bucket,
