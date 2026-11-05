@@ -14,8 +14,9 @@ Requests are generated with Faker and validated through the endpoint request mod
 Run inside a configured NucliaDB container. This includes parsing, retrieval,
 hydration and any configured prediction calls, but excludes HTTP and auth costs.
 
-
-python /synthetic_search_load.py --kbid=e167f6f9-4986-592c-9dd3-81f49b1ca54b --start-rps=1 --max-rps=1 
+###
+python /synthetic_search_load.py --kbid=28d547f3-5a11-5d7f-928e-ead1615d4b5e --start-rps=2 --max-rps=20 --stage-seconds=60
+###
 
 """
 

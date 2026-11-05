@@ -95,13 +95,19 @@ async def _extracted_texts(kbid: str, request: ExtractedTextsRequest) -> Extract
             paragraph_id,
             MarkLogicURIs.chunk(field_id.rid, field_id.type, field_id.key, paragraph_id.full()),
         )
-        field_uris[field_id.full_without_subfield()] = MarkLogicURIs.field_processed(
-            field_id.rid, field_id.key, field_id.type
-        )
 
     uris = set(field_uris.values()) | {uri for _, uri in paragraph_uris.values()}
     async with get_driver().ro_transaction(kbid=kbid) as txn:
         contents = await documents.read_many(txn, list(uris))
+        fallback_uris = {
+            MarkLogicURIs.field_processed(
+                paragraph_id.field_id.rid, paragraph_id.field_id.key, paragraph_id.field_id.type
+            )
+            for paragraph_id, uri in paragraph_uris.values()
+            if contents.get(uri) is None
+        } - uris
+        if fallback_uris:
+            contents.update(await documents.read_many(txn, list(fallback_uris)))
 
     response = ExtractedTextsResponse()
     for field in request.field_ids:
@@ -114,7 +120,10 @@ async def _extracted_texts(kbid: str, request: ExtractedTextsRequest) -> Extract
         if content is not None:
             response.paragraphs[key] = content["text"]
         else:
-            field_content = contents.get(field_uris[paragraph_id.field_id.full_without_subfield()])
+            field_id = paragraph_id.field_id
+            field_content = contents.get(
+                MarkLogicURIs.field_processed(field_id.rid, field_id.key, field_id.type)
+            )
             if field_content is not None:
                 response.paragraphs[key] = field_content["extracted_text"][
                     paragraph_id.paragraph_start : paragraph_id.paragraph_end

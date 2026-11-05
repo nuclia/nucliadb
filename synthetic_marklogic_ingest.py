@@ -25,6 +25,15 @@ client CPU as well as cluster CPU, disk, merges, and indexing; synthetic
 text/vector generation and the client connection pool can limit load.
 
 MarkLogic connection uses the normal MARKLOGIC_SERVER_* and DRIVER settings.
+
+
+###
+
+python /synthetic_marklogic_ingest.py --scale 0.2 --kb-prefix ml-sizing-kb --concurrency=20  --auto-resume
+
+###
+
+
 """
 
 from __future__ import annotations
