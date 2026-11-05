@@ -113,6 +113,31 @@ class AdminClient:
             return
         _check(response, "delete database")
 
+    async def reindex_database(self, database: str) -> None:
+        """Start an asynchronous reindex of every document in the database."""
+        response = await self._http.post(
+            f"/manage/v2/databases/{quote(database, safe='')}",
+            params=_JSON,
+            json={"operation": "reindex-database"},
+        )
+        _check(response, "reindex database")
+
+    async def get_database_status(self, database: str) -> dict[str, Any]:
+        """Return the `status-properties` of the database status view."""
+        response = await self._http.get(
+            f"/manage/v2/databases/{quote(database, safe='')}",
+            params={**_JSON, "view": "status"},
+        )
+        _check(response, "read database status")
+        return response.json().get("database-status", {}).get("status-properties", {})
+
+    async def get_database_reindex_count(self, database: str) -> int:
+        """Number of forests of the database that are still reindexing."""
+        reindex_count = (await self.get_database_status(database)).get("reindex-count", 0)
+        if isinstance(reindex_count, dict):
+            reindex_count = reindex_count.get("value", 0)
+        return int(reindex_count)
+
     async def get_forest(self, forest: str) -> dict[str, Any] | None:
         response = await self._http.get(f"/manage/v2/forests/{quote(forest, safe='')}", params=_JSON)
         if response.status_code == 404:
