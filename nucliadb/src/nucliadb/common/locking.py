@@ -18,27 +18,20 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 import asyncio
-import contextlib
 import logging
 import random
 import time
 import uuid
-from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import cast
 
 from nucliadb.common.maindb.exceptions import ConflictError
 from nucliadb_telemetry.metrics import Counter, Gauge, Histogram
-
-from .maindb.pg import PGDriver, PGTransaction
-from .maindb.utils import get_driver
 
 logger = logging.getLogger(__name__)
 
 NEW_SHARD_LOCK = "new-shard-{kbid}"
 RESOURCE_LOCK = "resource-{kbid}-{resource_id}"
 RESOURCE_CREATION_SLUG_LOCK = "resource-creation-{kbid}-{resource_slug}"
-KB_SHARDS_LOCK = "shards-kb-{kbid}"
 MIGRATIONS_LOCK = "migration"
 KB_MIGRATIONS_LOCK = "migration-{kbid}"
 
@@ -116,8 +109,6 @@ def _get_lock_type(key: str) -> str:
         return RESOURCE_CREATION_SLUG_LOCK
     elif key.startswith("resource-"):
         return RESOURCE_LOCK
-    elif key.startswith("shards-kb-"):
-        return KB_SHARDS_LOCK
     elif key.startswith("migration-"):
         return KB_MIGRATIONS_LOCK
     elif key == "migration":
@@ -139,7 +130,7 @@ class LockValue:
 
 
 class _Lock:
-    """PostgreSQL table-based distributed lock implementation."""
+    """Distributed lock with pending MarkLogic persistence."""
 
     task: asyncio.Task
 
@@ -158,23 +149,10 @@ class _Lock:
         self.value = uuid.uuid4().hex
         self.lock_type = _get_lock_type(self.user_key)
         self.acquired_at: float | None = None
-        self.driver = cast(PGDriver, get_driver())
-
-    @contextlib.asynccontextmanager
-    async def transaction(self) -> AsyncGenerator[PGTransaction, None]:
-        async with self.driver._transaction(read_only=False) as txn:
-            txn = cast(PGTransaction, txn)
-            yield txn
 
     async def _cleanup_expired_locks(self) -> None:
-        """Clean up expired locks older than 1 day."""
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    "DELETE FROM distributed_locks "
-                    "WHERE expires_at < EXTRACT(EPOCH FROM NOW() - INTERVAL '1 day')::DOUBLE PRECISION"
-                )
-            await txn.commit()
+        # TODO(Marklogic): Delete expired distributed locks.
+        return
 
     async def _maybe_cleanup_expired_locks(self) -> None:
         # Probabilistically run cleanup (1% chance) to distribute cleanup load
@@ -187,47 +165,20 @@ class _Lock:
                 logger.warning("Failed to cleanup expired locks", exc_info=True)
 
     async def _get_lock_data(self) -> LockValue | None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    "SELECT lock_value, expires_at FROM distributed_locks WHERE lock_key = %s FOR UPDATE",
-                    (self.user_key,),
-                )
-                row = await cur.fetchone()
-                if row is None:
-                    return None
-                else:
-                    return LockValue(value=row[0], expires_at=row[1])
+        # TODO(Marklogic): Read distributed lock data with concurrency protection.
+        return None
 
     async def _set_lock_value(self) -> None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                try:
-                    await cur.execute(
-                        "INSERT INTO distributed_locks (lock_key, lock_value, expires_at) VALUES (%s, %s, %s)",
-                        (self.user_key, self.value, time.time() + self.expire_timeout),
-                    )
-                except Exception as e:
-                    # If there's a unique constraint violation, it means the lock already exists
-                    if "duplicate key value" in str(e).lower() or "unique constraint" in str(e).lower():
-                        raise ConflictError() from e
-                    raise
-            await txn.commit()
+        # TODO(Marklogic): Create a lock atomically, raising ConflictError if it exists.
+        return
 
     async def _update_lock_value(self) -> None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    "UPDATE distributed_locks SET lock_value = %s, expires_at = %s WHERE lock_key = %s",
-                    (self.value, time.time() + self.expire_timeout, self.user_key),
-                )
-            await txn.commit()
+        # TODO(Marklogic): Refresh or take over a lock atomically.
+        return
 
     async def _delete_lock(self) -> None:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute("DELETE FROM distributed_locks WHERE lock_key = %s", (self.user_key,))
-            await txn.commit()
+        # TODO(Marklogic): Release the distributed lock.
+        return
 
     async def __aenter__(self) -> "_Lock":
         await self._maybe_cleanup_expired_locks()
@@ -290,13 +241,8 @@ class _Lock:
         await self._delete_lock()
 
     async def is_locked(self) -> bool:
-        async with self.transaction() as txn:
-            async with txn.connection.cursor() as cur:
-                await cur.execute(
-                    "SELECT expires_at FROM distributed_locks WHERE lock_key = %s", (self.user_key,)
-                )
-                row = await cur.fetchone()
-        return row is not None and time.time() < row[0]
+        # TODO(Marklogic): Check whether a non-expired distributed lock exists.
+        return False
 
 
 def distributed_lock(

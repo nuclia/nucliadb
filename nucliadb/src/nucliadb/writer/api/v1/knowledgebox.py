@@ -25,9 +25,6 @@ from starlette.requests import Request
 
 from nucliadb import learning_proxy
 from nucliadb.common import datamanagers
-from nucliadb.common.external_index_providers.exceptions import (
-    ExternalIndexCreationError,
-)
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb.ingest.orm.exceptions import KnowledgeBoxConflict
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
@@ -41,7 +38,6 @@ from nucliadb_models.resource import (
     KnowledgeBoxObjID,
     NucliaDBRoles,
 )
-from nucliadb_protos import knowledgebox_pb2
 from nucliadb_utils.authentication import requires
 
 
@@ -60,8 +56,6 @@ async def create_kb_endpoint(request: Request, item: KnowledgeBoxConfig) -> Know
         kbid, slug = await create_kb(item)
     except KnowledgeBoxConflict:
         raise HTTPException(status_code=419, detail="Knowledge box already exists")
-    except ExternalIndexCreationError as exc:
-        raise HTTPException(status_code=512, detail=str(exc))
     except Exception:
         logger.exception("Could not create KB")
         raise HTTPException(status_code=500, detail="Error creating knowledge box")
@@ -113,9 +107,6 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
     rollback_learning_config = partial(_rollback_learning_config, kbid)
     semantic_models = learning_config.into_semantic_models_metadata()
 
-    external_index_provider = knowledgebox_pb2.CreateExternalIndexProviderMetadata(
-        type=knowledgebox_pb2.ExternalIndexProviderType.UNSET,
-    )
     try:
         (kbid, slug) = await KnowledgeBox.create(
             driver,
@@ -126,7 +117,6 @@ async def create_kb(item: KnowledgeBoxConfig) -> tuple[str, str]:
             semantic_models=semantic_models,
             semantic_graph_node_models=learning_config.into_semantic_graph_node_models_metadata(),
             semantic_graph_edge_models=learning_config.into_semantic_graph_edge_models_metadata(),
-            external_index_provider=external_index_provider,
             hidden_resources_enabled=item.hidden_resources_enabled,
             hidden_resources_hide_on_creation=item.hidden_resources_hide_on_creation,
             enforce_security=item.enforce_security,

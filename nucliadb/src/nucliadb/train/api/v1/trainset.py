@@ -55,16 +55,8 @@ async def get_partitions_by_prefix(request: Request, kbid: str, prefix: str) -> 
 
 
 async def get_partitions(kbid: str, prefix: str | None = None) -> TrainSetPartitions:
-    shards = await datamanagers.atomic.kb.get_shards(kbid=kbid)
-
-    if shards is None:
-        # Most likely, KB doesn't exist
+    if not await datamanagers.atomic.kb.exists(kbid=kbid):
         raise HTTPException(status_code=404, detail=f"No shards found for kb")
 
-    selected = []
-    prefix = prefix or ""
-    for shard in shards.shards:
-        if shard.shard.startswith(prefix):
-            selected.append(shard.shard)
-
-    return TrainSetPartitions(partitions=selected)
+    # TODO(Marklogic): train partitions are not implemented yet
+    return TrainSetPartitions(partitions=[])

@@ -28,7 +28,7 @@ from nucliadb.common.exceptions import InvalidQueryError
 from nucliadb.models.responses import HTTPClientError
 from nucliadb.search.api.v1.router import KB_PREFIX, api
 from nucliadb.search.api.v1.utils import fastapi_query, get_injected_security_groups
-from nucliadb.search.requesters.utils import Method, nidx_query
+from nucliadb.search.requesters.utils import Method, query_index
 from nucliadb.search.search import cache
 from nucliadb.search.search.merge import merge_suggest_results
 from nucliadb.search.search.query_parser.parsers import parse_suggest
@@ -190,7 +190,7 @@ async def suggest(
             range_modification_end,
             security_groups,
         )
-        results = await nidx_query(kbid, Method.SUGGEST, pb_query)
+        results = await query_index(kbid, Method.SUGGEST, pb_query)
         queried_shards = list(results.shard_ids)
 
         # We need to merge

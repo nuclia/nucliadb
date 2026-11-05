@@ -80,7 +80,7 @@ async def serialize(
     max_parallel_field_serializations: int = 16,
 ) -> Resource | None:
     driver = get_driver()
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         return await managed_serialize(
             txn,
             kbid,
@@ -699,7 +699,7 @@ async def serialize_extracted_large_metadata(field: Field) -> LargeComputedMetad
 async def serialize_extracted_vectors(field: Field, vectorset: str | None = None) -> VectorObject | None:
     vectorset_id = None
     vs = None
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=field.kbid) as txn:
         if vectorset is None:
             # Get the first vectorset for this field's KB, if any
             async for vectorset_id, vs in datamanagers.vectorsets.iter(txn=txn, kbid=field.kbid):
@@ -717,7 +717,7 @@ async def serialize_extracted_vectors(field: Field, vectorset: str | None = None
 
 async def serialize_relation_node_vectors(field: Field) -> dict[str, list[RelationNodeVector]]:
     vectors: dict[str, list[RelationNodeVector]] = {}
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=field.kbid) as txn:
         for vs in await datamanagers.graph_vectorsets.node.get_all(txn, kbid=field.kbid):
             data_vec = await field.get_relation_node_vectors(vs.vectorset_id)
             if data_vec is None:
@@ -729,7 +729,7 @@ async def serialize_relation_node_vectors(field: Field) -> dict[str, list[Relati
 
 async def serialize_relation_edge_vectors(field: Field) -> dict[str, list[RelationEdgeVector]]:
     vectors: dict[str, list[RelationEdgeVector]] = {}
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=field.kbid) as txn:
         for vs in await datamanagers.graph_vectorsets.edge.get_all(txn, kbid=field.kbid):
             data_vec = await field.get_relation_edge_vectors(vs.vectorset_id)
             if data_vec is None:

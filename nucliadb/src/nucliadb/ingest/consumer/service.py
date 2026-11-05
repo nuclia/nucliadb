@@ -38,7 +38,6 @@ from nucliadb_utils.utilities import (
 
 from .auditing import IndexAuditHandler, ResourceWritesAuditHandler
 from .materializer import MaterializerHandler
-from .shard_creator import ShardCreatorHandler
 
 
 def _handle_task_result(task: asyncio.Task) -> None:
@@ -136,17 +135,6 @@ async def start_auditor() -> Callable[[], Awaitable[None]]:
         )
 
     return _finalize
-
-
-async def start_shard_creator() -> Callable[[], Awaitable[None]]:
-    driver = await setup_driver()
-    pubsub = await get_pubsub()
-    assert pubsub is not None, "Pubsub is not configured"
-
-    shard_creator = ShardCreatorHandler(driver=driver, pubsub=pubsub)
-    await shard_creator.initialize()
-
-    return shard_creator.finalize
 
 
 async def start_materializer() -> Callable[[], Awaitable[None]]:

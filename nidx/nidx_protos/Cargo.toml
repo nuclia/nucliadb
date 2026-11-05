@@ -5,6 +5,8 @@ edition = "2024"
 build = "build.rs"
 license = "Apache-2.0"
 
+[workspace]
+
 [build-dependencies]
 tonic-build = "0.14.2"
 tonic-prost-build = "0.14.2"

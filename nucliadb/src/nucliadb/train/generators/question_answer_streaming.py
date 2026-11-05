@@ -23,13 +23,13 @@ from collections.abc import AsyncGenerator
 from nidx_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.common.ids import FIELD_TYPE_PB_TO_STR, FIELD_TYPE_STR_TO_PB
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import (
     batchify,
     get_paragraph,
     get_resource_from_cache_or_db,
 )
+from nucliadb.train.index import stream_documents
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
     QuestionAnswerStreamingBatch,
@@ -62,7 +62,7 @@ async def generate_question_answer_streaming_payloads(
     request = StreamRequest()
     request.shard_id.id = shard_replica_id
 
-    async for document_item in get_nidx_searcher_client().Documents(request):
+    async for document_item in stream_documents(request):
         field_id = f"{document_item.uuid}{document_item.field}"
         rid, field_type, field = field_id.split("/")
 

@@ -21,6 +21,7 @@ from typing import Any
 
 from nucliadb.ingest.fields.base import Field
 from nucliadb_protos.resources_pb2 import CloudFile, FieldLink, LinkExtractedData
+from nucliadb_protos.writer_pb2 import FieldStatus
 from nucliadb_utils.storages.storage import StorageField
 
 LINK_METADATA = "link_metadata"
@@ -36,8 +37,8 @@ class Link(Field[FieldLink]):
         super().__init__(id, resource)
         self.link_extracted_data = None
 
-    async def set_value(self, payload: FieldLink):
-        await self.db_set_value(payload)
+    async def set_value(self, payload: FieldLink, status: FieldStatus | None = None) -> None:
+        await self.db_set_value(payload, status=status)
 
     async def get_value(self) -> FieldLink | None:
         return await self.db_get_value()

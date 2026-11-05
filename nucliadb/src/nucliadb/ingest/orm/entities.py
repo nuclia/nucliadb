@@ -20,22 +20,12 @@
 
 from collections.abc import AsyncGenerator
 
-from nidx_protos.nodereader_pb2 import (
-    Faceted,
-    GraphSearchRequest,
-    SearchRequest,
-)
-
 from nucliadb.common.maindb.driver import Transaction
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.settings import settings
-from nucliadb.search.requesters.utils import Method, nidx_query
 from nucliadb_protos.knowledgebox_pb2 import (
     EntitiesGroup,
     EntitiesGroupSummary,
-    Entity,
 )
-from nucliadb_protos.utils_pb2 import RelationNode
 from nucliadb_protos.writer_pb2 import GetEntitiesResponse
 
 MAX_DUPLICATES = 300
@@ -79,27 +69,8 @@ class EntitiesManager:
         return await self.get_indexed_entities_group(group)
 
     async def get_indexed_entities_group(self, group: str) -> EntitiesGroup | None:
-
-        # Entities search
-        request = GraphSearchRequest()
-        # XXX: this is a wild guess. Are those enough or too many?
-        request.top_k = 500
-        request.kind = GraphSearchRequest.QueryKind.NODES
-        request.query.path.path.source.node_type = RelationNode.NodeType.ENTITY
-        request.query.path.path.source.node_subtype = group
-        request.query.path.path.undirected = True
-
-        result = await nidx_query(
-            self.kbid, Method.GRAPH, request, timeout=settings.relation_search_timeout
-        )
-
-        entities = {}
-        entities.update({node.value: Entity(value=node.value) for node in result.nodes})
-
-        if not entities:
-            return None
-        eg = EntitiesGroup(entities=entities)
-        return eg
+        # TODO(Marklogic): Read indexed entities for this group.
+        return None
 
     async def iterate_entities_groups(
         self, exclude_deleted: bool
@@ -125,21 +96,5 @@ class EntitiesManager:
     async def get_indexed_entities_groups_names(
         self,
     ) -> set[str]:
-        # search all relation types
-        request = SearchRequest(
-            result_per_page=0,
-            body="",
-            document=True,
-            paragraph=False,
-            faceted=Faceted(labels=["/e"]),
-        )
-        response = await nidx_query(
-            self.kbid, Method.SEARCH, request, timeout=settings.relation_types_timeout
-        )
-        try:
-            facetresults = response.document.facets["/e"].facetresults
-        except KeyError:
-            # No entities found
-            return set()
-        else:
-            return {facet.tag.split("/")[-1] for facet in facetresults}
+        # TODO(Marklogic): Read indexed entity group names.
+        return set()

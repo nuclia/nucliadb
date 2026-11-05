@@ -24,9 +24,9 @@ from fastapi import HTTPException
 from nidx_protos.nodereader_pb2 import StreamRequest
 
 from nucliadb.common.ids import FIELD_TYPE_STR_TO_PB
-from nucliadb.common.nidx import get_nidx_searcher_client
 from nucliadb.train import logger
 from nucliadb.train.generators.utils import batchify, get_resource_from_cache_or_db
+from nucliadb.train.index import stream_paragraphs
 from nucliadb_models.filters import FilterExpression
 from nucliadb_protos.dataset_pb2 import (
     Label,
@@ -67,7 +67,7 @@ async def generate_sentence_classification_payloads(
         labelsets.append(labelset)
         request.filter.labels.append(labelset)
 
-    async for paragraph_item in get_nidx_searcher_client().Paragraphs(request):
+    async for paragraph_item in stream_paragraphs(request):
         text_labels: list[str] = []
         for label in paragraph_item.labels:
             for labelset in labelsets:

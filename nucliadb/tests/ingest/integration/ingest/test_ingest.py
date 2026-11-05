@@ -42,7 +42,7 @@ from nucliadb.ingest.consumer.auditing import (
 from nucliadb.ingest.consumer.consumer import IngestConsumer
 from nucliadb.ingest.orm.exceptions import DeadletteredError
 from nucliadb.ingest.orm.knowledgebox import KnowledgeBox
-from nucliadb.ingest.orm.processor import Processor
+from nucliadb.ingest.orm.processor.processor_marklogic import ProcessorMarkLogic as Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_protos.audit_pb2 import AuditField, AuditRequest
 from nucliadb_protos.resources_pb2 import (
@@ -106,14 +106,13 @@ def kbid(
     txn,
     cache,
     shard_manager,
-    dummy_nidx_utility,
     processor,
     knowledgebox,
 ):
     yield knowledgebox
 
 
-async def test_ingest_messages_autocommit(kbid: str, processor, dummy_nidx_utility):
+async def test_ingest_messages_autocommit(kbid: str, processor):
     rid = Resource.new_unique_rid()
     message1: BrokerMessage = BrokerMessage(
         kbid=kbid,
@@ -207,7 +206,9 @@ async def test_ingest_messages_autocommit(kbid: str, processor, dummy_nidx_utili
 
     storage = await get_storage(service_name=SERVICE_NAME)
 
-    pb = await storage.get_indexing(dummy_nidx_utility.index.mock_calls[0][1][0])
+    from tests.utils.indexing import build_index_message
+
+    pb = await build_index_message(processor.driver, storage, message1, resource_created=True)
     assert pb.texts["a/summary"].text == "My summary"
 
 
@@ -233,7 +234,7 @@ async def test_ingest_error_message(kbid: str, storage: Storage, processor, main
 
     await processor.process(message=message1, seqid=2)
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         r = await kb_obj.get(message1.uuid)
         assert r is not None
@@ -257,7 +258,6 @@ async def test_ingest_messages_origin(
     local_files,
     storage: Storage,
     shard_manager,
-    dummy_nidx_utility,
     processor,
     knowledgebox,
 ):
@@ -271,7 +271,7 @@ async def test_ingest_messages_origin(
     message1.source = BrokerMessage.MessageSource.WRITER
     await processor.process(message=message1, seqid=1)
 
-    async with processor.driver.ro_transaction() as txn:
+    async with processor.driver.ro_transaction(kbid=knowledgebox) as txn:
         storage = await get_storage(service_name=SERVICE_NAME)
         res = Resource(txn, storage, knowledgebox, rid)
         origin = await res.get_origin()
@@ -289,7 +289,7 @@ async def test_ingest_messages_origin(
     )
     await processor.process(message=message1, seqid=2)
 
-    async with processor.driver.ro_transaction() as txn:
+    async with processor.driver.ro_transaction(kbid=knowledgebox) as txn:
         res = Resource(txn, storage, knowledgebox, rid)
         origin = await res.get_origin()
 
@@ -358,7 +358,6 @@ async def test_ingest_audit_stream_files_only(
     storage: Storage,
     txn,
     cache,
-    dummy_nidx_utility,
     knowledgebox,
     processor,
     stream_audit: StreamAuditStorage,
@@ -488,7 +487,6 @@ async def test_qa(
     local_files,
     storage: Storage,
     cache,
-    dummy_nidx_utility,
     shard_manager,
     processor,
     stream_audit: StreamAuditStorage,
@@ -525,7 +523,7 @@ async def test_qa(
 
     await processor.process(message=message, seqid=1)
 
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         r = await kb_obj.get(message.uuid)
         assert r is not None
@@ -544,7 +542,6 @@ async def test_ingest_audit_stream_mixed(
     storage: Storage,
     cache,
     shard_manager,
-    dummy_nidx_utility,
     processor,
     stream_audit: StreamAuditStorage,
     test_resource: Resource,
@@ -611,7 +608,6 @@ async def test_ingest_account_seq_stored(
     local_files,
     storage: Storage,
     shard_manager,
-    dummy_nidx_utility,
     processor,
     test_resource: Resource,
 ):
@@ -624,7 +620,7 @@ async def test_ingest_account_seq_stored(
     add_filefields(message, [("file_1", "file.png")])
     await processor.process(message=message, seqid=1)
 
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         r = await kb_obj.get(message.uuid)
         assert r is not None
@@ -638,7 +634,6 @@ async def test_ingest_account_seq_stored(
 async def test_ingest_processor_handles_missing_kb(
     local_files,
     storage: Storage,
-    dummy_nidx_utility,
     processor,
     test_resource: Resource,
 ):
@@ -663,7 +658,7 @@ async def test_ingest_autocommit_deadletter_marks_resource(
         mock_notify.side_effect = Exception("test")
         await processor.process(message=message, seqid=1)
 
-    async with maindb_driver.ro_transaction() as txn:
+    async with maindb_driver.ro_transaction(kbid=kbid) as txn:
         kb_obj = KnowledgeBox(txn, storage, kbid=kbid)
         resource = await kb_obj.get(message.uuid)
 
@@ -725,7 +720,6 @@ async def test_ingest_delete_field(
     storage: Storage,
     txn,
     cache,
-    dummy_nidx_utility,
     knowledgebox,
     processor,
     stream_audit: StreamAuditStorage,
@@ -779,7 +773,6 @@ async def test_ingest_update_labels(
     storage: Storage,
     txn,
     cache,
-    dummy_nidx_utility,
     knowledgebox,
     processor,
     stream_audit: StreamAuditStorage,

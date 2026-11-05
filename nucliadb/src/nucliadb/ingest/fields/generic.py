@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 from nucliadb.ingest.fields.base import Field
+from nucliadb_protos.writer_pb2 import FieldStatus
 
 VALID_GENERIC_FIELDS = ("title", "summary")
 
@@ -27,7 +28,7 @@ class Generic(Field):
     value: str
     type: str = "a"
 
-    async def set_value(self, payload: str):
+    async def set_value(self, payload: str, status: FieldStatus | None = None) -> None:
         if self.id not in VALID_GENERIC_FIELDS:
             raise AttributeError(self.id)
 
@@ -35,6 +36,8 @@ class Generic(Field):
             await self.resource.get_basic()
 
         setattr(self.resource.basic, self.id, payload)
+        if status is not None:
+            await self.set_status(status)
 
     async def get_value(self) -> str:
         if self.id not in VALID_GENERIC_FIELDS:

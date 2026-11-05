@@ -17,12 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import HTTPException
-from grpc import StatusCode
-from grpc.aio import AioRpcError
 
 from nucliadb.search.requesters import utils
 from nucliadb_protos import writer_pb2
@@ -52,35 +50,6 @@ def shard_manager():
         set_utility(Utility.SHARD_MANAGER, original)
 
 
-def test_validate_nidx_query_results_unhandled_error():
-    error = utils.handle_nidx_exception(Exception(), extra={})
+def test_validate_query_results_unhandled_error():
+    error = utils.handle_index_exception(Exception(), extra={})
     assert isinstance(error, HTTPException)
-
-
-def test_validate_nidx_query_results_invalid_query():
-    error = AioRpcError(
-        code=StatusCode.INTERNAL,
-        initial_metadata=Mock(),
-        trailing_metadata=Mock(),
-        details="An invalid argument was passed: 'Query is invalid. AllButQueryForbidden'",
-        debug_error_string="",
-    )
-    result = utils.handle_nidx_exception(error, extra={})
-
-    assert isinstance(result, HTTPException)
-    assert result.status_code == 412
-    assert result.detail == "Query is invalid. AllButQueryForbidden"
-
-
-def test_validate_nidx_query_results_internal_unhandled():
-    error = AioRpcError(
-        code=StatusCode.INTERNAL,
-        initial_metadata=Mock(),
-        trailing_metadata=Mock(),
-        details="There is something wrong with your query, my friend!",
-        debug_error_string="This query is simply wrong",
-    )
-    result = utils.handle_nidx_exception(error, extra={})
-    assert isinstance(result, HTTPException)
-    assert result.status_code == 500
-    assert result.detail == "There is something wrong with your query, my friend!"

@@ -33,9 +33,7 @@ from nucliadb_protos.resources_pb2 import (
 from nucliadb_utils.storages.storage import Storage
 
 
-async def test_create_resource_orm_extracted(
-    storage: Storage, txn: Transaction, dummy_nidx_utility, knowledgebox: str
-):
+async def test_create_resource_orm_extracted(storage: Storage, txn: Transaction, knowledgebox: str):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
@@ -60,7 +58,6 @@ async def test_create_resource_orm_extracted_file(
     local_files,
     storage: Storage,
     txn: Transaction,
-    dummy_nidx_utility,
     knowledgebox: str,
 ):
     uuid = str(uuid4())
@@ -98,7 +95,7 @@ async def test_create_resource_orm_extracted_file(
 
 
 async def test_create_resource_orm_extracted_delta(
-    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn: Transaction, cache, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)

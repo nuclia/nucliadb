@@ -82,8 +82,6 @@ jobs:
         run: |
           docker build -t localhost:32000/nucliadb:test . -f Dockerfile
           docker push localhost:32000/nucliadb:test
-          docker build -t localhost:32000/nidx:test . -f Dockerfile.nidx
-          docker push localhost:32000/nidx:test
 
       - name: Install NucliaDB with Helm
         run: |

@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import asyncio
 import random
 import re
 from collections.abc import AsyncIterable
@@ -26,15 +25,13 @@ import pytest
 from httpx import AsyncClient
 
 from nucliadb.common import datamanagers
-from nucliadb.common.nidx import NidxBindingUtility, NidxServiceUtility, get_nidx
 from nucliadb.search.api.v1.router import KB_PREFIX
 from nucliadb_protos.resources_pb2 import FieldType
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_protos.writer_pb2_grpc import WriterStub
-from tests.ndbfixtures.nidx import SEARCHER_REFRESH_INTERVAL_SECONDS
 from tests.utils import inject_message
 from tests.utils.broker_messages import BrokerMessageBuilder
-from tests.utils.dirty_index import mark_dirty, wait_for_sync
+from tests.utils.dirty_index import wait_for_sync
 
 
 # Used by: nucliadb writer tests
@@ -64,17 +61,6 @@ async def simple_resources(
         await create_simple_resource(kbid, f"my simple {i}", nucliadb_writer, nucliadb_ingest_grpc)
         for i in range(10)
     ]
-
-    nidx = get_nidx()
-    if isinstance(nidx, NidxServiceUtility):
-        # wait_for_sync is not useful, we wait for the searcher to reload the indexed data
-        await asyncio.sleep(SEARCHER_REFRESH_INTERVAL_SECONDS)
-    elif isinstance(nidx, NidxBindingUtility):
-        await mark_dirty()
-        await wait_for_sync()
-    else:
-        # dummy/mocked nidx
-        pass
 
     yield kbid, rids
 
@@ -110,7 +96,7 @@ async def create_simple_resource(
     rid = resp.json()["uuid"]
 
     vectorsets = {}
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kbid):
             vectorsets[vectorset_id] = vs
     # use a controlled random seed for vector generation

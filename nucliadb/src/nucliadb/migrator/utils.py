@@ -30,20 +30,6 @@ logger = logging.getLogger(__name__)
 MIGRATION_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "migrations")
 
 
-def get_pg_migrations() -> list[tuple[int, types.ModuleType]]:
-    output = []
-    for filename in os.listdir(os.path.join(MIGRATION_DIR, "pg")):
-        if filename.endswith(".py") and filename != "__init__.py":
-            module_name = filename[:-3]
-            version = int(module_name.split("_")[0])
-            module = importlib.import_module(f"migrations.pg.{module_name}")
-            if not hasattr(module, "migrate"):
-                raise Exception(f"Missing `migrate` function in {module_name}")
-            output.append((version, module))
-    output.sort()
-    return output
-
-
 def get_migration_modules() -> list[tuple[types.ModuleType, int]]:
     output = []
     for filename in os.listdir(MIGRATION_DIR):

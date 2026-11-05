@@ -42,7 +42,7 @@ async def adjust_kb_vectorsets(kbid: str, bm: BrokerMessage):
 
     """
     new = []
-    async with datamanagers.with_ro_transaction() as txn:
+    async with datamanagers.with_ro_transaction(kbid=kbid) as txn:
         async for vectorset_id, vs in datamanagers.vectorsets.iter(txn, kbid=kbid):
             for field_vectors in bm.field_vectors:
                 ev = ExtractedVectorsWrapper()

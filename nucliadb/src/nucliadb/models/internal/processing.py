@@ -33,7 +33,7 @@ from nucliadb_models.resource import QueueType
 from nucliadb_protos.resources_pb2 import CloudFile
 
 if TYPE_CHECKING:  # pragma: no cover
-    SourceValue = CloudFile.Source.V
+    SourceValue = CloudFile.Source.ValueType
 else:
     SourceValue = int
 

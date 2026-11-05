@@ -169,7 +169,9 @@ class Field(Generic[PbType]):
             self.value.ParseFromString(payload)
         return self.value
 
-    async def db_set_value(self, payload: Any):
+    async def db_set_value(
+        self, payload: Any, status: FieldStatus | None = None, md5: str | None = None
+    ) -> None:
         await datamanagers.fields.set(
             self.resource.txn,
             kbid=self.kbid,
@@ -177,6 +179,8 @@ class Field(Generic[PbType]):
             field_type=self.type,
             field_id=self.id,
             value=payload,
+            status=status,
+            md5=md5,
         )
         self.value = payload
         self.resource.modified = True
@@ -676,7 +680,7 @@ class Field(Generic[PbType]):
         author.user.SetInParent()
         return author
 
-    async def set_value(self, payload: Any):
+    async def set_value(self, payload: Any, status: FieldStatus | None = None) -> None:
         raise NotImplementedError()
 
     async def get_value(self) -> Any:

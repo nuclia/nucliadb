@@ -19,17 +19,12 @@
 #
 import contextlib
 import logging
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from typing import Final, TypeVar, cast
+from typing import Final, TypeVar
 
-import psycopg
-import psycopg.sql
 from google.protobuf.message import Message
 
 from nucliadb.common.datamanagers.exceptions import KnowledgeBoxConflict
 from nucliadb.common.maindb.driver import Transaction
-from nucliadb.common.maindb.pg import PGTransaction, ReadOnlyPGTransaction
 from nucliadb.common.maindb.utils import get_driver
 from nucliadb_telemetry.metrics import Observer
 
@@ -67,9 +62,9 @@ async def get_kv_pb(
 
 
 @contextlib.asynccontextmanager
-async def with_rw_transaction():
+async def with_rw_transaction(kbid: str | None = None):
     driver = get_driver()
-    async with driver.rw_transaction() as txn:
+    async with driver.rw_transaction(kbid=kbid) as txn:
         yield txn
 
 
@@ -78,23 +73,7 @@ with_transaction = with_rw_transaction
 
 
 @contextlib.asynccontextmanager
-async def with_ro_transaction():
+async def with_ro_transaction(kbid: str | None = None):
     driver = get_driver()
-    async with driver.ro_transaction() as ro_txn:
+    async with driver.ro_transaction(kbid=kbid) as ro_txn:
         yield ro_txn
-
-
-def _pg(txn: Transaction) -> PGTransaction:
-    return cast(PGTransaction, txn)
-
-
-@asynccontextmanager
-async def _pg_cursor(txn: Transaction) -> AsyncGenerator[psycopg.AsyncCursor]:
-    if isinstance(txn, PGTransaction):
-        async with _pg(txn).connection.cursor() as cur:
-            yield cur
-    elif isinstance(txn, ReadOnlyPGTransaction):
-        async with txn.driver._get_connection() as conn, conn.cursor() as cur:
-            yield cur
-    else:
-        raise TypeError(f"Unsupported transaction type: {type(txn)}")

@@ -83,3 +83,44 @@ async def test_migrations_validation_with_errors():
     with patch("nucliadb.migrator.command.get_migrations", return_value=migrations):
         with pytest.raises(MigrationValidationError):
             command.validate()
+
+
+@pytest.mark.parametrize("outcome", [Mock(failed=0), Mock(failed=1), RuntimeError("disrupted")])
+async def test_run_rollovers_only_cleans_up_successful_jobs(outcome):
+    context = Mock()
+    context.settings.max_concurrent_migrations = 1
+    context.data_manager.get_kbs_to_rollover = AsyncMock(return_value=["kb"])
+    context.data_manager.delete_kb_rollover = AsyncMock()
+    rollover = AsyncMock(
+        side_effect=outcome if isinstance(outcome, Exception) else None,
+        return_value=outcome,
+    )
+    with patch.object(migrator, "rollover_kb", rollover):
+        if isinstance(outcome, Exception) or outcome.failed:
+            with pytest.raises(RuntimeError, match="Failed to rollover KBs"):
+                await migrator.run_rollovers(context)
+            context.data_manager.delete_kb_rollover.assert_not_awaited()
+        else:
+            await migrator.run_rollovers(context)
+            context.data_manager.delete_kb_rollover.assert_awaited_once_with(kbid="kb")
+    rollover.assert_awaited_once_with("kb")
+
+
+async def test_run_rollovers_before_managed_migrations():
+    context = Mock()
+    context.data_manager.get_global_info = AsyncMock(
+        return_value=Mock(current_version=53, target_version=None)
+    )
+    calls = Mock()
+    calls.attach_mock(context.data_manager.get_global_info, "global_info")
+    with (
+        patch.object(migrator, "run_rollovers", new_callable=AsyncMock) as rollovers,
+        patch.object(migrator, "get_migrations", return_value=[]),
+        patch.object(migrator.locking, "distributed_lock") as lock,
+    ):
+        lock.return_value.__aenter__ = AsyncMock()
+        lock.return_value.__aexit__ = AsyncMock(return_value=False)
+        calls.attach_mock(rollovers, "rollovers")
+        await migrator.run(context)
+
+    assert [call[0] for call in calls.mock_calls] == ["rollovers", "global_info"]

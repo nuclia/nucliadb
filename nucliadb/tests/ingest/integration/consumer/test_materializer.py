@@ -22,7 +22,6 @@ import asyncio
 
 from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.common.nidx import NidxUtility
 from nucliadb.ingest.consumer import materializer
 from nucliadb_protos import writer_pb2
 from nucliadb_protos.kb_usage_pb2 import KbUsage, Service
@@ -36,7 +35,6 @@ async def test_materialize_kb_data(
     maindb_driver: Driver,
     pubsub: PubSubDriver,
     storage,
-    dummy_nidx_utility: NidxUtility,
     knowledgebox: str,
     stream_audit: StreamAuditStorage,
 ):

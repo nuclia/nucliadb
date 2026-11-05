@@ -50,7 +50,7 @@ async def get_kbs(
     x_nucliadb_account: str = Header(default="", include_in_schema=False),
 ) -> KnowledgeBoxList:
     driver = get_driver()
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=None) as txn:
         response = KnowledgeBoxList()
         async for kbid, slug in datamanagers.kb.iter(txn, slug_prefix=prefix):
             response.kbs.append(
@@ -74,7 +74,7 @@ async def get_kb(
     request: Request, kbid: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
 ) -> KnowledgeBoxObj:
     driver = get_driver()
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=kbid) as txn:
         kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
         if kb_config is None:
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
@@ -99,15 +99,16 @@ async def get_kb_by_slug(
     request: Request, slug: str, x_nucliadb_account: str = Header(default="", include_in_schema=False)
 ) -> KnowledgeBoxObj:
     driver = get_driver()
-    async with driver.ro_transaction() as txn:
+    async with driver.ro_transaction(kbid=None) as system_txn:
         # For cloud, the account id is prepended in order to be able to reuse the same slug in different accounts.
-        kbid = await datamanagers.kb.get_kbid(txn, slug=f"{x_nucliadb_account}:{slug}")
+        kbid = await datamanagers.kb.get_kbid(system_txn, slug=f"{x_nucliadb_account}:{slug}")
         if kbid is None:
             # For onprem, the slug is fully controlled by the user
-            kbid = await datamanagers.kb.get_kbid(txn, slug=slug)
+            kbid = await datamanagers.kb.get_kbid(system_txn, slug=slug)
             if kbid is None:
                 raise HTTPException(status_code=404, detail="Knowledge Box does not exist")
 
+    async with driver.ro_transaction(kbid=kbid) as txn:
         kb_config = await datamanagers.kb.get_config(txn, kbid=kbid)
         if kb_config is None:
             raise HTTPException(status_code=404, detail="Knowledge Box does not exist")

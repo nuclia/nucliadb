@@ -24,7 +24,6 @@ This migration is leaning up leftover junk metadata from previous rollover migra
 
 """
 
-from nucliadb.common.cluster.rollover import clean_rollover_status
 from nucliadb.migrator.context import ExecutionContext
 
 
@@ -32,4 +31,5 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    await clean_rollover_status(context, kbid)
+    # Rollover metadata is no longer used by the MarkLogic backend.
+    return None

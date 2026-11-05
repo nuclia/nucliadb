@@ -52,7 +52,7 @@ from nucliadb.search.search.hydrator import ResourceHydrationOptions
 from nucliadb_models.common import FieldTypeName
 from nucliadb_models.resource import Resource
 
-from .extracted_text import extracted_texts, nidx_et_cache
+from .extracted_text import extracted_texts, index_et_cache
 from .fields import augment_field
 from .paragraphs import augment_paragraph
 from .resources import augment_resource, augment_resource_deep
@@ -242,15 +242,15 @@ class AugmentorOps:
         *,
         concurrency_control: asyncio.Semaphore | None = None,
     ) -> Augmented:
-        nidx_extracted_texts = await extracted_texts(self.kbid, self.field_texts, self.paragraph_texts)
+        index_extracted_texts = await extracted_texts(self.kbid, self.field_texts, self.paragraph_texts)
 
         # we don't care here if nidx has been available or not as the fallback
         # is on the augmentors logic (paragraph and fields)
-        token = nidx_et_cache.set(nidx_extracted_texts)
+        token = index_et_cache.set(index_extracted_texts)
         try:
             augmented = await self._run_augmentations(concurrency_control=concurrency_control)
         finally:
-            nidx_et_cache.reset(token)
+            index_et_cache.reset(token)
 
         return augmented
 

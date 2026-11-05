@@ -47,9 +47,7 @@ from nucliadb_utils.storages.s3 import S3Storage
 from nucliadb_utils.storages.storage import Storage
 
 
-async def test_create_resource_orm_vector(
-    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
-):
+async def test_create_resource_orm_vector(storage: Storage, txn: Transaction, cache, knowledgebox: str):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
     r = await kb_obj.add_resource(uuid=uuid, slug="slug")
@@ -74,7 +72,7 @@ async def test_create_resource_orm_vector(
 
 
 async def test_create_resource_orm_vector_file(
-    local_files, storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    local_files, storage: Storage, txn: Transaction, cache, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -114,7 +112,7 @@ async def test_create_resource_orm_vector_file(
 
 
 async def test_create_resource_orm_vector_split(
-    storage: Storage, txn: Transaction, cache, dummy_nidx_utility, knowledgebox: str
+    storage: Storage, txn: Transaction, cache, knowledgebox: str
 ):
     uuid = str(uuid4())
     kb_obj = KnowledgeBox(txn, storage, kbid=knowledgebox)
@@ -190,7 +188,6 @@ async def test_create_resource_with_cloud_file_vectors(
     destination_path: str,
     storage: Storage,
     txn: Transaction,
-    dummy_nidx_utility,
     knowledgebox: str,
 ):
     vectorset_id = "en-2024-04-24"
@@ -234,7 +231,6 @@ async def test_create_resource_with_cloud_file_vectors_already_moved(
     found_in_storage: bool,
     storage: Storage,
     txn: Transaction,
-    dummy_nidx_utility,
     knowledgebox: str,
 ):
     vectorset_id = "en-2024-04-24"
