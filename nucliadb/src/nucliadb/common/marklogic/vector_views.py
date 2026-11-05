@@ -107,17 +107,25 @@ def template(vectorset_id: str, dimension: int) -> dict:
     }
 
 
-async def ensure_view(driver: MarkLogicDriver, database: str, vectorset_id: str, dimension: int) -> None:
+async def ensure_view(
+    driver: MarkLogicDriver,
+    database: str,
+    vectorset_id: str,
+    dimension: int,
+    *,
+    force: bool = False,
+) -> None:
     """Reconcile the shared template once per process, reindexing only when it changes.
 
     Keep the existing collection/view identity so old embedding documents need no rewrite.
     Searches use CTS exact scoring while a missing or changed view is reindexing.
+    Migrations use force to bypass the process cache, not the template equality check.
     """
     key = (vectorset_id, dimension)
-    if key in _ensured:
+    if not force and key in _ensured:
         return
     async with _lock:
-        if key in _ensured:
+        if not force and key in _ensured:
             return
         uri = json.dumps(template_uri(vectorset_id, dimension))
         desired = template(vectorset_id, dimension)
