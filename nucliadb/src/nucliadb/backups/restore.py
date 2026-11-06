@@ -123,11 +123,12 @@ async def restore_resources(context: ApplicationContext, kbid: str, backup_id: s
             restored_count += len(tasks)
             tasks = []
             await set_last_restored(context, kbid, backup_id, key)
-        if restored_count % (settings.restore_resources_concurrency * 10) == 0:
-            logger.info(
-                f"Restored {restored_count} resources",
-                extra={"kbid": kbid, "backup_id": backup_id},
-            )
+
+            if restored_count % (settings.restore_resources_concurrency * 10) == 0:
+                logger.info(
+                    f"Restored {restored_count} resources",
+                    extra={"kbid": kbid, "backup_id": backup_id},
+                )
 
     if len(tasks) > 0:
         await asyncio.gather(*tasks)
