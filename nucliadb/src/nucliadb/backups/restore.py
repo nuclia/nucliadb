@@ -118,7 +118,7 @@ async def restore_resources(context: ApplicationContext, kbid: str, backup_id: s
         key = object_info.name
         resource_id = key.split("/")[-1].split(".tar")[0]
         tasks.append(asyncio.create_task(restore_resource(context, kbid, backup_id, resource_id)))
-        if len(tasks) > settings.restore_resources_concurrency:
+        if len(tasks) >= settings.restore_resources_concurrency:
             await asyncio.gather(*tasks)
             restored_count += len(tasks)
             tasks = []
