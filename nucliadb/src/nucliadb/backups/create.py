@@ -44,11 +44,20 @@ from nucliadb.export_import.utils import (
 )
 from nucliadb.tasks.retries import TaskRetryHandler
 from nucliadb_protos import backups_pb2, resources_pb2, writer_pb2
+from nucliadb_telemetry import metrics
+from nucliadb_telemetry.metrics import INF
 from nucliadb_utils.audit.stream import StreamAuditStorage
 from nucliadb_utils.storages.storage import StorageField
 from nucliadb_utils.utilities import get_audit
 
 logger = logging.getLogger(__name__)
+
+
+backup_resource_observer = metrics.Observer(
+    "nucliadb_backup_resource_duration_seconds",
+    labels={},
+    buckets=[0.05, 0.1, 0.2, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 2.5 * 60.0, 5 * 60, 10 * 60, INF],
+)
 
 
 async def backup_kb_task(context: ApplicationContext, msg: CreateBackupRequest):
@@ -121,6 +130,9 @@ async def backup_resources(context: ApplicationContext, kbid: str, backup_id: st
         tasks = []
         backing_up = []
         logger.info(f"Backup resources: completed", extra={"kbid": kbid, "backup_id": backup_id})
+
+
+backup_resource_observer.wrap({})
 
 
 async def backup_resource(context: ApplicationContext, backup_id: str, kbid: str, rid: str) -> int:
