@@ -178,10 +178,11 @@ class ResourceBackupReader:
         self.cloud_files: dict[int, CloudFile] = {}
 
     async def read(self, size: int) -> bytes:
-        async for chunk in self.download_stream:
-            self.buffer += chunk
-            if len(self.buffer) >= size:
-                break
+        if size > len(self.buffer):
+            async for chunk in self.download_stream:
+                self.buffer += chunk
+                if len(self.buffer) >= size:
+                    break
         result = self.buffer[:size]
         self.buffer = self.buffer[size:]
         return result
