@@ -32,13 +32,35 @@ from nucliadb.tasks.logger import logger
 from nucliadb.tasks.models import Callback, MsgType
 from nucliadb.tasks.utils import NatsConsumer, NatsStream, create_nats_stream_if_not_exists
 from nucliadb_telemetry import errors, metrics
+from nucliadb_telemetry.metrics import INF
 from nucliadb_utils.nats import NatsMessageProgressUpdater
 from nucliadb_utils.settings import nats_consumer_settings
 
 REDELIVERY_AFTER_NAK_DELAY_SECONDS = 2
 
 
-task_observer = metrics.Histogram("nucliadb_task_duration_seconds", labels={"name": "", "status": ""})
+task_observer = metrics.Histogram(
+    "nucliadb_task_duration_seconds",
+    labels={"name": "", "status": ""},
+    buckets=[
+        0.1,
+        0.5,
+        1.0,
+        2.5,
+        5.0,
+        10.0,
+        30.0,
+        60.0,
+        5 * 60.0,
+        10 * 60.0,
+        30 * 60.0,
+        60 * 60,
+        2 * 60 * 60,
+        INF,
+    ],
+)
+
+running_tasks = metrics.Gauge("nucliadb_running_tasks", labels={"name": ""})
 
 
 class NatsTaskConsumer(Generic[MsgType]):
@@ -132,6 +154,7 @@ class NatsTaskConsumer(Generic[MsgType]):
             f"Message received: subject:{subject}, seqid: {seqid}, reply: {reply}",
             extra={"consumer_name": self.name},
         )
+        running_tasks.inc(1, labels={"name": self.name})
         _task_start = time.monotonic()
         async with NatsMessageProgressUpdater(msg, nats_consumer_settings.nats_ack_wait * 0.66):
             try:
@@ -148,6 +171,7 @@ class NatsTaskConsumer(Generic[MsgType]):
                 task_observer.observe(
                     time.monotonic() - _task_start, labels={"name": self.name, "status": "invalid"}
                 )
+                running_tasks.dec(1, labels={"name": self.name})
                 return
 
             logger.info(f"Starting task consumption", extra={"consumer_name": self.name})
@@ -163,6 +187,7 @@ class NatsTaskConsumer(Generic[MsgType]):
                 task_observer.observe(
                     time.monotonic() - _task_start, labels={"name": self.name, "status": "cancelled"}
                 )
+                running_tasks.dec(1, labels={"name": self.name})
                 await msg.nak()
             except Exception as e:
                 errors.capture_exception(e)
@@ -176,6 +201,7 @@ class NatsTaskConsumer(Generic[MsgType]):
                 task_observer.observe(
                     time.monotonic() - _task_start, labels={"name": self.name, "status": "failed"}
                 )
+                running_tasks.dec(1, labels={"name": self.name})
                 # Nak the message to retry
                 await msg.nak(delay=REDELIVERY_AFTER_NAK_DELAY_SECONDS)
             else:
@@ -188,6 +214,7 @@ class NatsTaskConsumer(Generic[MsgType]):
                 task_observer.observe(
                     time.monotonic() - _task_start, labels={"name": self.name, "status": "successful"}
                 )
+                running_tasks.dec(1, labels={"name": self.name})
                 await msg.ack()
 
 
