@@ -16,6 +16,8 @@ hydration and any configured prediction calls, but excludes HTTP and auth costs.
 
 ###
 python /synthetic_search_load.py --kbid=28d547f3-5a11-5d7f-928e-ead1615d4b5e --start-rps=2 --max-rps=20 --stage-seconds=60
+
+python /synthetic_search_load.py --kbid=28d547f3-5a11-5d7f-928e-ead1615d4b5e --start-rps=6 --max-rps=6 --stage-seconds=600
 ###
 
 """
@@ -199,7 +201,7 @@ def create_request_pool(
     }
 
 
-async def execute_operation(kbid: str, operation: str, item: Any) -> int | float | None:
+async def execute_operation(kbid: str, operation: str, item: Any) -> dict[str, int | float | None] | None:
     client = {
         "x_ndb_client": NucliaDBClientType.API,
         "x_nucliadb_user": "search-load-test",
@@ -211,7 +213,7 @@ async def execute_operation(kbid: str, operation: str, item: Any) -> int | float
             _, incomplete, _ = await find(kbid, item, **client, metrics=metrics)
             if incomplete:
                 raise RuntimeError("Find returned incomplete results")
-            return metrics.get("index_search")
+            return dict(metrics.to_dict())
         if operation == "retrieve":
             result = await retrieve_endpoint(kbid, item, **client)
         elif operation == "catalog":
@@ -228,16 +230,27 @@ def measurement_summary(
     counts: Counter, samples: list[dict[str, Any]], seconds: float
 ) -> dict[str, Any]:
     successful = sorted(sample["seconds"] for sample in samples if sample["outcome"] == "success")
-    index_search = sorted(
-        sample["index_search_seconds"]
-        for sample in samples
-        if sample.get("index_search_seconds") is not None
-    )
+    metric_names = sorted({name for sample in samples for name in sample.get("metrics", {})})
 
     def percentile(values: list[float], fraction: float) -> float | None:
         if not values:
             return None
         return round(values[max(0, math.ceil(len(values) * fraction) - 1)], 6)
+
+    metric_latencies = {}
+    for name in metric_names:
+        values = sorted(
+            sample["metrics"][name]
+            for sample in samples
+            if sample.get("metrics", {}).get(name) is not None
+        )
+        metric_latencies[name] = {
+            "mean_seconds": round(sum(values) / len(values), 6) if values else None,
+            **{
+                f"p{percent}_seconds": percentile(values, percent / 100)
+                for percent in (50, 90, 95, 99)
+            },
+        }
 
     return {
         **{
@@ -251,18 +264,20 @@ def measurement_summary(
         "latency_p90_seconds": percentile(successful, 0.90),
         "latency_p95_seconds": percentile(successful, 0.95),
         "latency_p99_seconds": percentile(successful, 0.99),
-        "index_search_mean_seconds": (
-            round(sum(index_search) / len(index_search), 6) if index_search else None
-        ),
-        "index_search_p50_seconds": percentile(index_search, 0.50),
-        "index_search_p90_seconds": percentile(index_search, 0.90),
-        "index_search_p95_seconds": percentile(index_search, 0.95),
-        "index_search_p99_seconds": percentile(index_search, 0.99),
+        "metric_latencies": metric_latencies,
     }
 
 
 def format_latency(seconds: float | None) -> str:
     return "-" if seconds is None else f"{seconds * 1000:.1f} ms"
+
+
+def format_metric_latencies(report: dict[str, Any]) -> str:
+    return " ".join(
+        f"{name} p50/p95/p99="
+        + "/".join(format_latency(values.get(f"p{percent}_seconds")) for percent in (50, 95, 99))
+        for name, values in sorted(report.get("metric_latencies", {}).items())
+    )
 
 
 def format_report_lines(report: dict[str, Any], timestamp: str) -> list[str]:
@@ -279,10 +294,7 @@ def format_report_lines(report: dict[str, Any], timestamp: str) -> list[str]:
         f"{format_latency(report['latency_p90_seconds'])}/"
         f"{format_latency(report['latency_p95_seconds'])}/"
         f"{format_latency(report['latency_p99_seconds'])} "
-        f"index_search p50/p95/p99="
-        f"{format_latency(report.get('index_search_p50_seconds'))}/"
-        f"{format_latency(report.get('index_search_p95_seconds'))}/"
-        f"{format_latency(report.get('index_search_p99_seconds'))} "
+        f"{format_metric_latencies(report)} "
         f"ok={report['success']} failed={report['failed']} "
         f"dropped={report['dropped']} cancelled={report['cancelled']} "
         f"in-flight={report.get('in_flight', 0)} window={duration:.1f}s"
@@ -294,10 +306,7 @@ def format_report_lines(report: dict[str, Any], timestamp: str) -> list[str]:
         f"p50={format_latency(metrics['latency_p50_seconds'])} "
         f"p95={format_latency(metrics['latency_p95_seconds'])} "
         f"p99={format_latency(metrics['latency_p99_seconds'])} "
-        f"index_search p50/p95/p99="
-        f"{format_latency(metrics.get('index_search_p50_seconds'))}/"
-        f"{format_latency(metrics.get('index_search_p95_seconds'))}/"
-        f"{format_latency(metrics.get('index_search_p99_seconds'))}"
+        f"{format_metric_latencies(metrics)}"
         for operation, metrics in report["operations"].items()
     )
     return lines
@@ -326,7 +335,10 @@ def format_configuration_line(
 def format_final_summary(
     stages: list[dict[str, Any]], kb_chunk_counts: list[dict[str, int | str]] | None = None
 ) -> str:
-    columns = ("Target", "Success/s", "Failure/s", "Dropped/s", "p50", "p95", "Index p50", "Index p95")
+    metric_names = sorted({name for stage in stages for name in stage.get("metric_latencies", {})})
+    columns = ("Target", "Success/s", "Failure/s", "Dropped/s", "p50", "p95") + tuple(
+        f"{name} p{percent}" for name in metric_names for percent in (50, 95)
+    )
     rows = [
         (
             f"{stage['target_rps']:g} req/s",
@@ -335,8 +347,13 @@ def format_final_summary(
             f"{stage['dropped'] / max(stage['elapsed_seconds'], 1e-9):.2f}",
             format_latency(stage["latency_p50_seconds"]),
             format_latency(stage["latency_p95_seconds"]),
-            format_latency(stage.get("index_search_p50_seconds")),
-            format_latency(stage.get("index_search_p95_seconds")),
+            *(
+                format_latency(
+                    stage.get("metric_latencies", {}).get(name, {}).get(f"p{percent}_seconds")
+                )
+                for name in metric_names
+                for percent in (50, 95)
+            ),
         )
         for stage in stages
     ]
@@ -382,7 +399,7 @@ async def run_stage(
     rng: random.Random,
     request_pool: dict[str, list[Any]],
     emit: Callable[[dict[str, Any]], None],
-    execute: Callable[[str, str, Any], Awaitable[int | float | None]] = execute_operation,
+    execute: Callable[[str, str, Any], Awaitable[dict[str, int | float | None] | None]] = execute_operation,
 ) -> dict[str, Any]:
     started = time.monotonic()
     deadline = started + args.stage_seconds
@@ -405,10 +422,10 @@ async def run_stage(
         request_started = time.monotonic()
         outcome = "success"
         error = None
-        index_search_seconds = None
+        timings = {}
         try:
             async with asyncio.timeout(args.request_timeout):
-                index_search_seconds = await execute(kbid, operation, item)
+                timings = dict(await execute(kbid, operation, item) or {})
         except asyncio.CancelledError:
             outcome = "cancelled"
             raise
@@ -426,7 +443,7 @@ async def run_stage(
                     "seconds": time.monotonic() - request_started,
                     "stage_elapsed_seconds": time.monotonic() - started,
                     "error": error,
-                    "index_search_seconds": index_search_seconds,
+                    "metrics": timings,
                 }
             )
 
