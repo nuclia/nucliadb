@@ -109,6 +109,7 @@ async def restore_kb(context: ApplicationContext, kbid: str, backup_id: str):
 async def restore_resources(context: ApplicationContext, kbid: str, backup_id: str):
     last_restored = await get_last_restored(context, kbid, backup_id)
     tasks = []
+    restored_count = 0
     async for object_info in context.blob_storage.iterate_objects(
         bucket=settings.backups_bucket,
         prefix=StorageKeys.RESOURCES_PREFIX.format(backup_id=backup_id),
@@ -119,8 +120,15 @@ async def restore_resources(context: ApplicationContext, kbid: str, backup_id: s
         tasks.append(asyncio.create_task(restore_resource(context, kbid, backup_id, resource_id)))
         if len(tasks) > settings.restore_resources_concurrency:
             await asyncio.gather(*tasks)
+            restored_count += len(tasks)
             tasks = []
             await set_last_restored(context, kbid, backup_id, key)
+        if restored_count % (settings.restore_resources_concurrency * 10) == 0:
+            logger.info(
+                f"Restored {restored_count} resources",
+                extra={"kbid": kbid, "backup_id": backup_id},
+            )
+
     if len(tasks) > 0:
         await asyncio.gather(*tasks)
         tasks = []
