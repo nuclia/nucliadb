@@ -21,7 +21,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from nidx_protos.nodereader_pb2 import SearchRequest
 
-from nucliadb_protos.audit_pb2 import AuditRequest
+from nucliadb_protos.audit_pb2 import AuditRequest, ClientType
+from nucliadb_protos.kb_usage_pb2 import ClientType as UsageClientType
 from nucliadb_utils.audit.stream import (
     AuditedEndpoint,
     RequestContext,
@@ -113,10 +114,20 @@ async def test_delete_kb(audit_storage: StreamAuditStorage, nats):
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 1))
 
 
-async def test_search(audit_storage: StreamAuditStorage, nats):
+@pytest.mark.parametrize("client_type", [ClientType.API, ClientType.AGENTIC])
+async def test_search(audit_storage: StreamAuditStorage, nats, client_type):
     context = RequestContext()
     request_context_var.set(context)
-    audit_storage.search("kbid", "user", 0, "origin", SearchRequest(), -1, 1, "foobar")
+    with patch.object(
+        audit_storage.kb_usage_utility,
+        "send_kb_usage",
+        wraps=audit_storage.kb_usage_utility.send_kb_usage,
+    ) as send_kb_usage:
+        audit_storage.search("kbid", "user", client_type, "origin", SearchRequest(), -1, 1, "foobar")
+    assert context.audit_request.client_type == client_type
+    assert send_kb_usage.call_args.kwargs["searches"][0].client == UsageClientType.Value(
+        ClientType.Name(client_type)
+    )
     audit_storage.send(context.audit_request)
     await wait_until(partial(stream_audit_finish_condition, audit_storage, 2))
 
