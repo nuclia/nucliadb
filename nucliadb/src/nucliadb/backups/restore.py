@@ -174,7 +174,7 @@ class CloudFileBinary:
 class ResourceBackupReader:
     def __init__(self, download_stream: AsyncIterator[bytes]):
         self.download_stream = download_stream
-        self.buffer = b""
+        self.buffer = bytearray()
         self.cloud_files: dict[int, CloudFile] = {}
 
     async def read(self, size: int) -> bytes:
@@ -183,7 +183,8 @@ class ResourceBackupReader:
                 self.buffer += chunk
                 if len(self.buffer) >= size:
                     break
-        result = self.buffer[:size]
+        # NOTE: this can be further optimized in Python 3.15 using take_bytes
+        result = bytes(self.buffer[:size])
         self.buffer = self.buffer[size:]
         return result
 
