@@ -17,6 +17,32 @@ Ramp concurrent resource transactions across 15 KB databases:
         --concurrency 4 --max-concurrency 64 --concurrency-step 4 \
         --stage-seconds 180 --report-file ml-load.jsonl
 
+Write continuously to one KB, creating it if needed (stop with Ctrl+C):
+    python synthetic_marklogic_ingest.py --continuous --kb-slug ml-load-test \
+        --concurrency 8
+
+    Stop after the KB reaches 100000 total chunks (including chunks already present):
+        python synthetic_marklogic_ingest.py --continuous --kb-slug ml-load-test \
+            --max-chunks 100000 --concurrency 8
+
+    Continuous mode uses random resource IDs and slugs without duplicate checks.
+    It ignores --scale and --auto-resume.
+
+    Ramp the target resource rate from 5 to 100 resources/s over 300 seconds, then stop:
+        python synthetic_marklogic_ingest.py --continuous --kb-slug ml-load-test \
+            --rate-start 5 --rate-end 100 --duration-seconds 300 --concurrency 32
+
+    The duration excludes KB setup. Workers are paced before resource generation;
+    --concurrency limits in-flight work. Slow writes can limit the achieved rate.
+    At the deadline no new work starts, and already-started resources are drained.
+
+    Ramp across 10 randomly selected existing KBs with matching slug prefixes:
+        python synthetic_marklogic_ingest.py --continuous --random-kbs 10 \
+            --kb-prefix ml-sizing-kb --rate-start 5 --rate-end 100 \
+            --duration-seconds 300 --concurrency 32
+
+    Rates and concurrency are shared across the selected KBs, not applied per KB.
+
 Use a fresh KB prefix or seed to avoid measuring skipped resources. Ramp mode
 prepares all configured KBs before timing, distributes resources evenly, and
 interleaves writes across the databases. It drains each stage and measures the
@@ -49,7 +75,7 @@ import uuid
 from collections import Counter
 from collections.abc import Callable, Iterator
 from datetime import datetime, timezone
-from itertools import zip_longest
+from itertools import count, cycle, zip_longest
 from pathlib import Path
 from typing import Any
 
@@ -99,6 +125,37 @@ SECURITY_GROUPS = [
 PUBLIC_RESOURCE_RATIO = 0.2
 DEFAULT_PARAGRAPH_SENTENCES = 6
 SYNTHETIC_CHECKPOINT_COLLECTION = "synthetic_ingest_checkpoints"
+
+
+class ContinuousRateRamp:
+    def __init__(self, start_rate: float, end_rate: float, duration: float):
+        self.start_rate = start_rate
+        self.end_rate = end_rate
+        self.duration = duration
+        self.started = time.monotonic()
+        self.deadline = self.started + duration
+        self.next_start = self.started
+        self.lock = asyncio.Lock()
+
+    def target_rate(self) -> float:
+        fraction = min(1.0, max(0.0, (time.monotonic() - self.started) / self.duration))
+        return self.start_rate + (self.end_rate - self.start_rate) * fraction
+
+    async def acquire(self) -> bool:
+        async with self.lock:
+            now = time.monotonic()
+            scheduled = max(now, self.next_start)
+            if scheduled >= self.deadline:
+                return False
+            if scheduled > now:
+                await asyncio.sleep(scheduled - now)
+            if time.monotonic() >= self.deadline:
+                return False
+            rate = self.target_rate()
+            slope = (self.end_rate - self.start_rate) / self.duration
+            delay = 2 / (rate + math.sqrt(rate * rate + 2 * slope))
+            self.next_start = time.monotonic() + delay
+            return True
 
 
 def plan_distribution(scale: float, seed: int, sigma: float, prefix: str) -> list[dict[str, Any]]:
@@ -324,10 +381,12 @@ async def write_resource(
     generated: dict[str, Any],
     vectorsets: list[tuple[str, int]],
     seed: int,
+    *,
+    check_existing: bool = True,
 ) -> tuple[bool, int, int, int]:
     rid = generated["rid"]
     async with driver.rw_transaction(kbid=kbid) as txn:
-        if await datamanagers.resources.exists(txn, kbid=kbid, rid=rid):
+        if check_existing and await datamanagers.resources.exists(txn, kbid=kbid, rid=rid):
             return False, 0, 0, 0
         basic, security, facets = build_basic_and_security(
             slug=generated["slug"],
@@ -506,6 +565,11 @@ async def resolve_ingest_kb(
             if not await datamanagers.kb.exists(txn, kbid=item["kbid"]):
                 raise ValueError(f"KnowledgeBox {item['kbid']} does not exist")
         return item["kbid"]
+    if getattr(args, "kb_slug", None):
+        async with driver.ro_transaction(kbid=None) as txn:
+            kbid = await datamanagers.kb.get_kbid(txn, slug=item["slug"])
+        if kbid is not None:
+            return kbid
     return await ensure_synthetic_kb(
         driver,
         slug=item["slug"],
@@ -626,6 +690,24 @@ async def ensure_synthetic_kb(
     return kbid
 
 
+async def select_random_kbs(
+    driver: MarkLogicDriver, prefix: str, amount: int
+) -> list[dict[str, Any]]:
+    async with driver.ro_transaction(kbid=None) as txn:
+        matches = [
+            (kbid, slug)
+            async for kbid, slug in datamanagers.kb.iter(txn, slug_prefix=prefix)
+        ]
+    if len(matches) < amount:
+        raise ValueError(
+            f"Requested {amount} KBs but only {len(matches)} match slug prefix {prefix!r}"
+        )
+    return [
+        {"tier": "existing", "kbid": kbid, "slug": slug, "resources": math.inf}
+        for kbid, slug in random.sample(matches, amount)
+    ]
+
+
 async def delete_synthetic_kbs(
     driver: MarkLogicDriver, prefix: str, *, confirm: bool, concurrency: int
 ) -> int:
@@ -657,6 +739,23 @@ async def delete_synthetic_kbs(
 
 def committed_document_count(fields: int, chunks: int, embeddings: int) -> int:
     return 3 + 2 * fields + chunks + embeddings
+
+
+def generated_chunk_count(generated: dict[str, Any]) -> int:
+    text_chunks = sum(len(field_data["paragraphs"]) for field_data in generated["fields"].values())
+    attribute_chunks = sum(
+        len(generated[field_id].split("\n\n")) for field_id in ("title", "summary")
+    )
+    return text_chunks + attribute_chunks
+
+
+async def count_kb_chunks(driver: MarkLogicDriver, kbid: str) -> int:
+    javascript = (
+        "fn.count(cts.uris('', ['document'], "
+        f"cts.collectionQuery({json.dumps(MarkLogicCollections.CHUNKS.value)})))"
+    )
+    result = await driver.client.eval(javascript, params={"database": driver.kb_database(kbid)})
+    return int(result[0]) if result else 0
 
 
 def ramp_report(
@@ -926,6 +1025,8 @@ async def run_ramp(
 
 
 async def run(args):
+    continuous = getattr(args, "continuous", False)
+    random_kbs = getattr(args, "random_kbs", None)
     plan = (
         make_ramp_plan(round(PROD_RESOURCES * args.scale), args.active_kbs, args.kb_prefix)
         if args.ramp
@@ -940,7 +1041,21 @@ async def run(args):
                 "resources": round(PROD_RESOURCES * args.scale),
             }
         ]
+    if getattr(args, "kb_slug", None):
+        plan = [
+            {
+                "tier": "single",
+                "slug": args.kb_slug,
+                "resources": round(PROD_RESOURCES * args.scale),
+            }
+        ]
+    if continuous and not random_kbs:
+        plan[0]["resources"] = math.inf
+    if random_kbs:
+        plan = []
     planned_resources = sum(item["resources"] for item in plan)
+    if random_kbs:
+        planned_resources = math.inf
     start_resource_offset = args.start_resource_number - 1
     if start_resource_offset > planned_resources:
         raise ValueError(
@@ -952,17 +1067,26 @@ async def run(args):
             {
                 "scale": args.scale,
                 "knowledge_boxes": len(plan),
-                "planned_resources": planned_resources,
+                "planned_resources": None if continuous else planned_resources,
                 "start_resource_number": args.start_resource_number,
-                "resources_to_run": resources_to_run,
-                "planned_fields": round(planned_resources * PROD_FIELDS / PROD_RESOURCES),
-                "planned_paragraphs": round(planned_resources * PROD_TEXT_BLOCKS / PROD_RESOURCES),
-                "plan": plan,
+                "resources_to_run": None if continuous else resources_to_run,
+                "planned_fields": None if continuous else round(planned_resources * PROD_FIELDS / PROD_RESOURCES),
+                "planned_paragraphs": None if continuous else round(planned_resources * PROD_TEXT_BLOCKS / PROD_RESOURCES),
+                "continuous": continuous,
+                "rate_ramp": (
+                    {
+                        "start_resources_per_second": args.rate_start,
+                        "end_resources_per_second": args.rate_end,
+                        "duration_seconds": args.duration_seconds,
+                    }
+                    if continuous and getattr(args, "rate_start", None) is not None else None
+                ),
+                "plan": [{**item, "resources": None} for item in plan] if continuous else plan,
             },
             indent=2,
         )
     )
-    if args.dry_run:
+    if args.dry_run and not random_kbs:
         return
     driver = await setup_driver()
     if not isinstance(driver, MarkLogicDriver):
@@ -979,6 +1103,19 @@ async def run(args):
     generator = SyntheticResourceFactory(args.seed, args.paragraph_sentences)
     started = time.monotonic()
     try:
+        if random_kbs:
+            plan = await select_random_kbs(driver, args.kb_prefix, random_kbs)
+            print(
+                json.dumps(
+                    {"selected_knowledge_boxes": [
+                        {"slug": item["slug"], "kbid": item["kbid"]} for item in plan
+                    ]},
+                    indent=2,
+                ),
+                flush=True,
+            )
+            if args.dry_run:
+                return
         if args.ramp:
             await run_ramp(driver, args, plan, start_resource_offset)
             return
@@ -989,7 +1126,12 @@ async def run(args):
         previous_stats: Counter = Counter()
         previous_time = time.monotonic()
         interval_latencies: list[float] = []
-
+        rate_ramp: ContinuousRateRamp | None = None
+        chunk_limit_reached = asyncio.Event()
+        chunk_budget_lock = asyncio.Lock()
+        reserved_chunks = 0
+        committed_chunks = 0
+        max_chunks = getattr(args, "max_chunks", None)
         def report_progress() -> None:
             nonlocal previous_stats, previous_time
             now = time.monotonic()
@@ -1000,8 +1142,12 @@ async def run(args):
             p95 = latency_metrics["write_latency_p95_seconds"]
             p50_label = "-" if p50 is None else f"{p50:.3f}s"
             p95_label = "-" if p95 is None else f"{p95:.3f}s"
+            target_label = (
+                f"target={rate_ramp.target_rate():.2f} res/s " if rate_ramp is not None else ""
+            )
             print(
                 f"Ingest elapsed={now - started:.1f}s window={seconds:.1f}s "
+                f"{target_label}"
                 f"rate={(stats['created'] - previous_stats['created']) / seconds:.2f} res/s "
                 f"chunks={(stats['chunks'] - previous_stats['chunks']) / seconds:.2f}/s "
                 f"documents={(stats['documents'] - previous_stats['documents']) / seconds:.2f}/s "
@@ -1042,21 +1188,25 @@ async def run(args):
                 f"worker={worker_id}/{args.concurrency} kb={slug} kbid={kbid} "
                 f"resources={processed} rate={processed / elapsed:.2f} res/s "
                 f"created={worker_stats['created']} skipped={worker_stats['skipped']} "
-                f"failed={worker_stats['failed']} | total={global_processed}/{resources_to_run} "
+                f"failed={worker_stats['failed']} | total={global_processed}/"
+                f"{'unbounded' if continuous else resources_to_run} "
                 f"rate={global_processed / total_elapsed:.2f} res/s",
                 flush=True,
             )
             worker_stats["reported"] = processed
 
-        checkpoint_id = checkpoint_fingerprint(plan, args.seed)
-        completed_kb_prefix = await load_completed_kb_prefix(driver, checkpoint_id)
-        if args.auto_resume:
+        checkpoint_id = checkpoint_fingerprint(plan, args.seed) if not continuous else ""
+        completed_kb_prefix = (
+            await load_completed_kb_prefix(driver, checkpoint_id) if not continuous else 0
+        )
+        if args.auto_resume and not continuous:
             print(
                 f"Auto-resume checkpoint: {completed_kb_prefix} completed KBs",
                 flush=True,
             )
 
         async def ingest_worker(worker_id: int):
+            nonlocal reserved_chunks, committed_chunks
             worker_started = time.monotonic()
             worker_stats: Counter = Counter()
             last_slug = "-"
@@ -1071,14 +1221,42 @@ async def run(args):
                     )
                     return
                 kbid, slug, vectorsets, resource_index = task
+                if chunk_limit_reached.is_set():
+                    queue.task_done()
+                    continue
+                if rate_ramp is not None and not await rate_ramp.acquire():
+                    queue.task_done()
+                    continue
                 stats["attempted"] += 1
                 last_slug = slug
                 last_kbid = kbid
                 async with semaphore:
+                    resource_chunk_reservation = 0
                     try:
                         generated = await asyncio.to_thread(
                             generator.make, kbid, resource_index
                         )
+                        if continuous:
+                            generated["rid"] = uuid.uuid4().hex
+                            generated["slug"] = f"synth-{generated['rid']}"
+                        if max_chunks is not None:
+                            resource_chunk_reservation = generated_chunk_count(generated)
+                            async with chunk_budget_lock:
+                                if (
+                                    chunk_limit_reached.is_set()
+                                    or committed_chunks
+                                    + reserved_chunks
+                                    + resource_chunk_reservation
+                                    > max_chunks
+                                ):
+                                    chunk_limit_reached.set()
+                                    admitted = False
+                                else:
+                                    reserved_chunks += resource_chunk_reservation
+                                    admitted = True
+                            if not admitted:
+                                queue.task_done()
+                                continue
                         if first_resource:
                             print(
                                 f"Worker {worker_id} starting first resource write "
@@ -1093,9 +1271,13 @@ async def run(args):
                                 generated,
                                 vectorsets,
                                 args.seed,
+                                **({"check_existing": False} if continuous else {}),
                             )
                         write_elapsed = time.monotonic() - write_started
                     except Exception as exc:
+                        if resource_chunk_reservation:
+                            async with chunk_budget_lock:
+                                reserved_chunks -= resource_chunk_reservation
                         print(
                             f"Failed direct MarkLogic resource processing kbid={kbid} "
                             f"resource_index={resource_index}: {exc!r}",
@@ -1106,6 +1288,13 @@ async def run(args):
                         print_worker_progress(worker_id, kbid, slug, worker_stats, worker_started)
                         queue.task_done()
                         continue
+                    if resource_chunk_reservation:
+                        async with chunk_budget_lock:
+                            reserved_chunks -= resource_chunk_reservation
+                            if created:
+                                committed_chunks += chunks
+                                if committed_chunks >= max_chunks:
+                                    chunk_limit_reached.set()
                     stats["skipped" if not created else "created"] += 1
                     worker_stats["skipped" if not created else "created"] += 1
                     if first_resource:
@@ -1151,15 +1340,33 @@ async def run(args):
                 for resource_range in kb_resource_ranges(plan, start_resource_offset)
                 if resource_range[1] < resource_range[2]
             ]
-            checkpointable = start_resource_offset == 0
-            for item, local_start, resource_count in active_ranges:
+            checkpointable = start_resource_offset == 0 and not continuous
+            continuous_configs = []
+            if continuous:
+                for item, _, _ in active_ranges:
+                    kbid = await resolve_ingest_kb(driver, item, args)
+                    vectorsets = await get_kb_vectorsets(driver, kbid)
+                    continuous_configs.append((kbid, item["slug"], vectorsets))
+            if max_chunks is not None:
+                if len(continuous_configs) != 1:
+                    raise ValueError("--max-chunks requires exactly one continuous-mode KB")
+                committed_chunks = await count_kb_chunks(driver, continuous_configs[0][0])
+                print(
+                    f"Chunk limit KB={continuous_configs[0][1]} existing={committed_chunks} "
+                    f"target={max_chunks}",
+                    flush=True,
+                )
+                if committed_chunks >= max_chunks:
+                    chunk_limit_reached.set()
+            targets = cycle(continuous_configs)
+            for item, local_start, resource_count in (active_ranges[:1] if continuous else active_ranges):
                 slug = item["slug"]
                 kb_position = kb_positions[slug]
                 if args.auto_resume and kb_position < completed_kb_prefix:
                     print(f"Skipping checkpointed KB: {slug}", flush=True)
                     continue
-                kbid = await resolve_ingest_kb(driver, item, args)
-                if args.auto_resume:
+                kbid = continuous_configs[0][0] if continuous else await resolve_ingest_kb(driver, item, args)
+                if args.auto_resume and not continuous:
                     detected_start = await find_resume_offset(
                         driver, kbid, args.seed, resource_count
                     )
@@ -1169,12 +1376,37 @@ async def run(args):
                         flush=True,
                     )
                 failed_before_kb = stats["failed"]
-                if local_start >= resource_count:
+                if continuous:
+                    vectorsets = continuous_configs[0][2]
+                elif local_start >= resource_count:
                     vectorsets = []
                 else:
                     vectorsets = await get_kb_vectorsets(driver, kbid)
-                for resource_index in range(local_start, resource_count):
-                    await queue.put((kbid, slug, vectorsets, resource_index))
+                if continuous and getattr(args, "rate_start", None) is not None:
+                    rate_ramp = ContinuousRateRamp(
+                        args.rate_start, args.rate_end, args.duration_seconds
+                    )
+                    print(
+                        f"Rate ramp KBs={len(continuous_configs)}: {args.rate_start} -> {args.rate_end} res/s "
+                        f"over {args.duration_seconds}s; concurrency={args.concurrency}",
+                        flush=True,
+                    )
+                resource_indexes = count(local_start) if continuous else range(local_start, resource_count)
+                for resource_index in resource_indexes:
+                    if chunk_limit_reached.is_set():
+                        break
+                    if continuous:
+                        kbid, slug, vectorsets = next(targets)
+                    if rate_ramp is None:
+                        await queue.put((kbid, slug, vectorsets, resource_index))
+                    else:
+                        if time.monotonic() >= rate_ramp.deadline:
+                            break
+                        try:
+                            async with asyncio.timeout_at(rate_ramp.deadline):
+                                await queue.put((kbid, slug, vectorsets, resource_index))
+                        except TimeoutError:
+                            break
                 await queue.join()
                 if (
                     checkpointable
@@ -1206,9 +1438,19 @@ async def run(args):
             "scale": args.scale,
             "seed": args.seed,
             "knowledge_boxes": len(plan),
-            "planned_resources": planned_resources,
+            "planned_resources": None if continuous else planned_resources,
             "start_resource_number": args.start_resource_number,
-            "resources_to_run": resources_to_run,
+            "resources_to_run": None if continuous else resources_to_run,
+            "rate_ramp": (
+                {
+                    "start_resources_per_second": rate_ramp.start_rate,
+                    "end_resources_per_second": rate_ramp.end_rate,
+                    "duration_seconds": rate_ramp.duration,
+                    "load_elapsed_seconds": round(time.monotonic() - rate_ramp.started, 3),
+                    "drain_seconds": round(max(0.0, time.monotonic() - rate_ramp.deadline), 3),
+                }
+                if rate_ramp is not None else None
+            ),
             "elapsed_seconds": round(time.monotonic() - started, 1),
             "stats": dict(stats),
         }
@@ -1240,6 +1482,27 @@ def main():
     parser.add_argument("--sigma", type=float, default=0.4)
     parser.add_argument("--kb-prefix", default="ml-sizing-kb")
     parser.add_argument(
+        "--random-kbs", type=int,
+        help="Randomly select this many existing KBs whose slugs start with --kb-prefix; requires --continuous",
+    )
+    parser.add_argument(
+        "--kb-slug", help="Write to one KB by slug, creating it if it does not exist"
+    )
+    parser.add_argument(
+        "--continuous", action="store_true", help="Write indefinitely to --kb-slug or --kbid until interrupted; ignores --scale"
+    )
+    parser.add_argument("--rate-start", type=float, help="Initial target resources/s in continuous mode")
+    parser.add_argument("--rate-end", type=float, help="Final target resources/s in continuous mode")
+    parser.add_argument(
+        "--duration-seconds", type=float,
+        help="Ramp duration after KB setup; stop starting resources at the deadline, then drain",
+    )
+    parser.add_argument(
+        "--max-chunks",
+        type=int,
+        help="Stop continuous single-KB ingestion at this total chunk count",
+    )
+    parser.add_argument(
         "--kbid",
         help="Ingest the full --scale resource budget into one existing KB using its vectorsets",
     )
@@ -1269,6 +1532,38 @@ def main():
     )
     parser.add_argument("--yes", action="store_true", help="Confirm deletion when using --delete")
     args = parser.parse_args()
+    if args.random_kbs is not None:
+        if args.random_kbs <= 0:
+            parser.error("--random-kbs must be positive")
+        if not args.continuous:
+            parser.error("--random-kbs requires --continuous")
+        if args.kbid or args.kb_slug:
+            parser.error("--random-kbs cannot be combined with --kbid or --kb-slug")
+        if not args.kb_prefix:
+            parser.error("--random-kbs requires a nonempty --kb-prefix")
+    rate_options = (args.rate_start, args.rate_end, args.duration_seconds)
+    if any(value is not None for value in rate_options):
+        if not args.continuous or any(value is None for value in rate_options):
+            parser.error("--rate-start, --rate-end and --duration-seconds require each other and --continuous")
+        if any(not math.isfinite(value) or value <= 0 for value in rate_options):
+            parser.error("--rate-start, --rate-end and --duration-seconds must be finite and positive")
+        if args.rate_end < args.rate_start:
+            parser.error("--rate-end must be at least --rate-start")
+    if args.kb_slug and args.kbid:
+        parser.error("--kb-slug cannot be combined with --kbid")
+    if args.kb_slug and args.delete:
+        parser.error("--kb-slug cannot be combined with --delete")
+    if args.kb_slug and args.ramp and args.active_kbs != 1:
+        parser.error("--kb-slug requires --active-kbs 1 in ramp mode")
+    if args.continuous and not (args.kb_slug or args.kbid or args.random_kbs):
+        parser.error("--continuous requires --kb-slug, --kbid or --random-kbs")
+    if args.continuous and (args.ramp or args.delete):
+        parser.error("--continuous cannot be combined with --ramp or --delete")
+    if args.max_chunks is not None:
+        if args.max_chunks <= 0:
+            parser.error("--max-chunks must be positive")
+        if not args.continuous or args.random_kbs or not (args.kb_slug or args.kbid):
+            parser.error("--max-chunks requires --continuous with --kb-slug or --kbid")
     if args.kbid and args.delete:
         parser.error("--kbid cannot be combined with --delete")
     if args.kbid and args.ramp and args.active_kbs != 1:
@@ -1296,7 +1591,10 @@ def main():
         parser.error("--yes can only be used with --delete")
     if args.delete and args.dry_run:
         parser.error("--delete performs its own preview; do not combine it with --dry-run")
-    asyncio.run(run(args))
+    try:
+        asyncio.run(run(args))
+    except KeyboardInterrupt:
+        print("Ingestion interrupted", flush=True)
 
 
 if __name__ == "__main__":

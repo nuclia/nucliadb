@@ -18,7 +18,18 @@ hydration and any configured prediction calls, but excludes HTTP and auth costs.
 python /synthetic_search_load.py --kbid=28d547f3-5a11-5d7f-928e-ead1615d4b5e --start-rps=2 --max-rps=20 --stage-seconds=60
 
 python /synthetic_search_load.py --kbid=28d547f3-5a11-5d7f-928e-ead1615d4b5e --start-rps=6 --max-rps=6 --stage-seconds=600
+
+rps=6
+kb=28d547f3-5a11-5d7f-928e-ead1615d4b5e
+python /synthetic_search_load.py --kbid=$kb --start-rps=$rps --max-rps=$rps --stage-seconds=600
 ###
+
+
+###
+Small (30k): 6914526d-624a-56b5-b16c-2e687407e55d
+Medium (610k):65e9cc1c-94ea-5909-a036-c4156d9d9967
+Large (1.5M): 5c202bd5-d3ce-5583-a67b-1da3a38e0d44
+Very Large (8.6M):28d547f3-5a11-5d7f-928e-ead1615d4b5e
 
 """
 
@@ -34,6 +45,7 @@ import uuid
 from collections import Counter
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -201,7 +213,13 @@ def create_request_pool(
     }
 
 
-async def execute_operation(kbid: str, operation: str, item: Any) -> dict[str, int | float | None] | None:
+async def execute_operation(
+    kbid: str,
+    operation: str,
+    item: Any,
+    *,
+    breakpoint_enabled: bool = False,
+) -> dict[str, int | float | None] | None:
     client = {
         "x_ndb_client": NucliaDBClientType.API,
         "x_nucliadb_user": "search-load-test",
@@ -210,6 +228,8 @@ async def execute_operation(kbid: str, operation: str, item: Any) -> dict[str, i
     with request_caches():
         if operation.startswith("find_"):
             metrics = Metrics("search-load")
+            if breakpoint_enabled:
+                breakpoint()
             _, incomplete, _ = await find(kbid, item, **client, metrics=metrics)
             if incomplete:
                 raise RuntimeError("Find returned incomplete results")
@@ -640,7 +660,14 @@ async def run(args: argparse.Namespace) -> None:
             await start_predict_engine()
             rate = args.start_rps
             while True:
-                await run_stage(args, rate, rng, request_pool, emit)
+                await run_stage(
+                    args,
+                    rate,
+                    rng,
+                    request_pool,
+                    emit,
+                    execute=partial(execute_operation, breakpoint_enabled=args.breakpoint),
+                )
                 if rate >= args.max_rps:
                     break
                 rate = min(args.max_rps, rate + args.rps_step)
@@ -685,6 +712,11 @@ def main() -> None:
     parser.add_argument("--request-timeout", type=float, default=30)
     parser.add_argument("--report-interval", type=float, default=10)
     parser.add_argument("--report-file", default="search-load.jsonl")
+    parser.add_argument(
+        "--breakpoint",
+        action="store_true",
+        help="Enter the debugger before each find operation",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--request-pool-size",
