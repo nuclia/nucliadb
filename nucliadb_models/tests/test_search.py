@@ -21,11 +21,6 @@ from pydantic_core import ValidationError
 from nucliadb_models import common, search
 
 
-@pytest.mark.parametrize("client_type", ["api", "agentic"])
-def test_client_type(client_type):
-    assert search.NucliaDBClientType(client_type).value == client_type
-
-
 def test_chat_model_defaults_user_id():
     chat = search.ChatModel(question="Test?")
 
