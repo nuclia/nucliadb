@@ -136,13 +136,20 @@ async def restore_broker_message(
         # loop. Better to run it outside
         loop = asyncio.get_event_loop()
         writer_bm = await loop.run_in_executor(None, get_writer_bm, bm)
-        processor_bm = await loop.run_in_executor(None, get_processor_bm, bm)
     else:
         writer_bm = get_writer_bm(bm)
-        processor_bm = get_processor_bm(bm)
-
     await processor.process(writer_bm, -1, partition="-1", transaction_check=False)
+    del writer_bm
+
+    if bm.ByteSize() > 10 * 1024 * 1024:
+        # Copying big protos is a CPU-heavy operation that may block the event
+        # loop. Better to run it outside
+        loop = asyncio.get_event_loop()
+        processor_bm = await loop.run_in_executor(None, get_processor_bm, bm)
+    else:
+        processor_bm = get_processor_bm(bm)
     await processor.process(processor_bm, -1, partition="-1", transaction_check=False)
+    del processor_bm
 
 
 def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
