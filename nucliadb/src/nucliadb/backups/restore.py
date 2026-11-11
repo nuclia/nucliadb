@@ -22,6 +22,7 @@ import asyncio
 import functools
 import json
 import logging
+import sys
 import tarfile
 from collections.abc import AsyncIterator, Callable
 from typing import Any
@@ -183,10 +184,23 @@ class ResourceBackupReader:
                 self.buffer += chunk
                 if len(self.buffer) >= size:
                     break
-        # NOTE: this can be further optimized in Python 3.15 using take_bytes
-        result = bytes(self.buffer[:size])
-        del self.buffer[:size]
-        return result
+        return self._take_bytes(size)
+
+    # From Python 3.15, this is a zero-copy operation. When slicing chunks of MB
+    # sizes, the difference is quite noticeable.
+    #
+    # See https://docs.python.org/3/whatsnew/3.15.html#whatsnew315-bytearray-take-bytes
+    # for more details about this optimization
+    if sys.version_info >= (3, 15):
+
+        def _take_bytes(self, size: int) -> bytes:
+            return self.buffer.take_bytes(size)
+    else:
+
+        def _take_bytes(self, size: int) -> bytes:
+            result = bytes(self.buffer[:size])
+            del self.buffer[:size]
+            return result
 
     async def iter_data(self, total_bytes: int, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
         padding_bytes = 0
