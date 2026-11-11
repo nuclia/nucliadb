@@ -105,6 +105,8 @@ class ContextMock:
     def __init__(self, transaction, partitioning):
         self.transaction = transaction
         self.partitioning = partitioning
+        self.kv_driver = AsyncMock()
+        self.blob_storage = AsyncMock()
 
 
 async def test_restore_broker_message(broker_message, transaction, partitioning):
@@ -113,23 +115,27 @@ async def test_restore_broker_message(broker_message, transaction, partitioning)
     import_kbid = "import_kbid"
     assert broker_message.kbid != import_kbid
 
-    with patch("nucliadb.export_import.utils.process_bm_grpc", AsyncMock()) as mock_process:
+    processor = AsyncMock()
+    with (
+        patch("nucliadb.export_import.utils.Processor", Mock(return_value=processor)),
+        patch("nucliadb.export_import.utils.get_pubsub", AsyncMock()),
+    ):
         await restore_broker_message(context, import_kbid, broker_message)  # ty:ignore[invalid-argument-type]
 
     # Sends two messages
-    assert mock_process.call_count == 2
+    assert processor.process.call_count == 2
 
-    for call in mock_process.call_args_list:
+    for call in processor.process.call_args_list:
         # Message contains import kbid
-        assert call[0][1].kbid == import_kbid
+        assert call[0][0].kbid == import_kbid
 
     # First one is writer
-    writer = mock_process.call_args_list[0][0][1]
+    writer = processor.process.call_args_list[0][0][0]
     assert writer.source == writer_pb2.BrokerMessage.MessageSource.WRITER
     assert not writer.field_metadata
 
     # Second one is processor
-    processor = mock_process.call_args_list[1][0][1]
+    processor = processor.process.call_args_list[1][0][0]
     assert processor.source == writer_pb2.BrokerMessage.MessageSource.PROCESSOR
     assert processor.field_metadata
 
