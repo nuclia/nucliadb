@@ -23,7 +23,8 @@ import functools
 import json
 import logging
 import tarfile
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
+from contextlib import aclosing
 from typing import Any
 
 from pydantic import TypeAdapter
@@ -50,6 +51,7 @@ from nucliadb_protos.resources_pb2 import CloudFile
 from nucliadb_protos.writer_pb2 import BrokerMessage
 from nucliadb_telemetry import metrics
 from nucliadb_telemetry.metrics import INF
+from nucliadb_utils.storages.utils import Range
 
 logger = logging.getLogger(__name__)
 
@@ -172,62 +174,44 @@ class CloudFileBinary:
 
 
 class ResourceBackupReader:
-    def __init__(self, download_stream: AsyncIterator[bytes]):
+    def __init__(self, download_stream: Callable[[Range], AsyncGenerator[bytes]]):
         self.download_stream = download_stream
-        self.buffer = bytearray()
+        self.offset = 0
         self.cloud_files: dict[int, CloudFile] = {}
 
     async def read(self, size: int) -> bytes:
-        if size > len(self.buffer):
-            async for chunk in self.download_stream:
-                self.buffer += chunk
-                if len(self.buffer) >= size:
-                    break
-        # NOTE: this can be further optimized in Python 3.15 using take_bytes
-        result = bytes(self.buffer[:size])
-        self.buffer = self.buffer[size:]
-        return result
+        data = bytearray()
+        async for chunk in self.iter_data(self.offset, size):
+            data.extend(chunk)
+        self.offset += size
+        return bytes(data)
 
-    async def iter_data(self, total_bytes: int, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
-        padding_bytes = 0
-        if total_bytes % 512 != 0:
-            # We need to read the padding bytes and then discard them
-            padding_bytes = 512 - (total_bytes % 512)
-        read_bytes = 0
-        padding_reached = False
-        async for chunk in self._iter(total_bytes + padding_bytes, chunk_size):
-            if padding_reached:
-                # Skip padding bytes. We can't break here because we need
-                # to read the padding bytes from the stream
-                continue
-            padding_reached = read_bytes + len(chunk) >= total_bytes
-            if padding_reached:
-                chunk = chunk[: total_bytes - read_bytes]
-            else:
-                read_bytes += len(chunk)
-            yield chunk
-
-    async def _iter(self, total_bytes: int, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
+    async def iter_data(
+        self, offset: int, total_bytes: int, chunk_size: int = 1024 * 1024
+    ) -> AsyncIterator[bytes]:
+        if total_bytes == 0:
+            return
         remaining_bytes = total_bytes
-        while remaining_bytes > 0:
-            to_read = min(chunk_size, remaining_bytes)
-            chunk = await self.read(to_read)
-            yield chunk
-            remaining_bytes -= len(chunk)
-        assert remaining_bytes == 0
+        async with aclosing(
+            self.download_stream(Range(start=offset, end=offset + total_bytes - 1))
+        ) as stream:
+            async for chunk in stream:
+                if len(chunk) > remaining_bytes:
+                    raise ValueError("Backup range returned more bytes than requested")
+                remaining_bytes -= len(chunk)
+                for start in range(0, len(chunk), chunk_size):
+                    yield chunk[start : start + chunk_size]
+        if remaining_bytes:
+            raise ValueError("Truncated resource backup")
 
     async def read_tarinfo(self):
         raw_tar_header = await self.read(512)
         return tarfile.TarInfo.frombuf(raw_tar_header, encoding="utf-8", errors="strict")
 
     async def read_data(self, tarinfo: tarfile.TarInfo) -> bytes:
-        tarinfo_size = tarinfo.size
-        padding_bytes = 0
-        if tarinfo_size % 512 != 0:
-            # We need to read the padding bytes and then discard them
-            padding_bytes = 512 - (tarinfo_size % 512)
-        data = await self.read(tarinfo_size + padding_bytes)
-        return data[:tarinfo_size]
+        data = await self.read(tarinfo.size)
+        self.offset += -tarinfo.size % 512
+        return data
 
     async def read_item(self) -> BrokerMessage | CloudFile | CloudFileBinary:
         tarinfo = await self.read_tarinfo()
@@ -246,8 +230,9 @@ class ResourceBackupReader:
         elif tarinfo.name.startswith("binaries"):
             bin_index = int(tarinfo.name.split("binaries/")[-1])
             size = tarinfo.size
-            download_stream = functools.partial(self.iter_data, size)
-            cf = self.cloud_files[bin_index]
+            download_stream = functools.partial(self.iter_data, self.offset, size)
+            self.offset += size + (-size % 512)
+            cf = self.cloud_files.pop(bin_index)
             return CloudFileBinary(cf.uri, download_stream)
         else:  # pragma: no cover
             raise ValueError(f"Unknown tar entry: {tarinfo.name}")
@@ -255,33 +240,40 @@ class ResourceBackupReader:
 
 @restore_resource_observer.wrap({})
 async def restore_resource(context: ApplicationContext, kbid: str, backup_id: str, resource_id: str):
-    download_stream = context.blob_storage.download(
+    download_stream = functools.partial(
+        context.blob_storage.download,
         bucket=settings.backups_bucket,
         key=StorageKeys.RESOURCE.format(backup_id=backup_id, resource_id=resource_id),
     )
-    reader = ResourceBackupReader(download_stream)
+    reader = ResourceBackupReader(lambda byte_range: download_stream(range=byte_range))
     bm = None
-    while True:
-        item = await reader.read_item()
-        if isinstance(item, BrokerMessage):
-            # When the broker message is read, this means all cloud files
-            # and binaries of that resource have been read and imported
-            bm = item
-            bm.kbid = kbid
-            break
-        elif isinstance(item, CloudFile):
-            # Read its binary and import it
-            cf = item
-            cf_binary = await reader.read_item()
-            assert isinstance(cf_binary, CloudFileBinary)
-            assert cf.uri == cf_binary.uri
-            await import_binary(context, kbid, cf, cf_binary.read)
-        else:
-            logger.error(
-                "Unexpected item in resource backup. Backup may be corrupted",
-                extra={"item_type": type(item), kbid: kbid, resource_id: resource_id},
-            )
-            continue
+    tasks: set[asyncio.Task[None]] = set()
+    try:
+        while True:
+            if len(tasks) >= settings.restore_binaries_concurrency:
+                done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                for task in done:
+                    task.result()
+                tasks.difference_update(done)
+            item = await reader.read_item()
+            if isinstance(item, BrokerMessage):
+                bm = item
+                bm.kbid = kbid
+                break
+            elif isinstance(item, CloudFile):
+                cf = item
+                cf_binary = await reader.read_item()
+                if not isinstance(cf_binary, CloudFileBinary) or cf.uri != cf_binary.uri:
+                    raise ValueError("Cloud file does not match binary in resource backup")
+                tasks.add(asyncio.create_task(import_binary(context, kbid, cf, cf_binary.read)))
+            else:
+                raise ValueError("Unexpected binary in resource backup")
+        await asyncio.gather(*tasks)
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
     if bm is not None:
         await restore_broker_message(context, kbid, bm)
 

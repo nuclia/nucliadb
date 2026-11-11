@@ -93,7 +93,7 @@ class LocalStorageField(StorageField):
                     if bytes_read >= bytes_to_read:
                         # Reached the end of the range
                         break
-                    chunk_size = min(CHUNK_SIZE, bytes_to_read)
+                    chunk_size = min(CHUNK_SIZE, bytes_to_read - bytes_read)
 
                 if chunk_size <= 0:
                     # No more data to read

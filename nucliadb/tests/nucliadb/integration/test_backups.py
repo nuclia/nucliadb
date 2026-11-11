@@ -17,7 +17,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import base64
+import hashlib
+import statistics
+import time
 import uuid
 from datetime import datetime
 
@@ -37,6 +41,7 @@ from nucliadb.backups.models import (
 from nucliadb.backups.restore import (
     get_last_restored,
     restore_kb_task,
+    restore_resource,
     set_last_restored,
 )
 from nucliadb.backups.settings import BackupSettings
@@ -214,6 +219,81 @@ async def test_backup(
     await delete_backup_task(context, DeleteBackupRequest(backup_id=backup_id))
 
     assert await exists_backup(context.blob_storage, backup_id) is False
+
+
+@pytest.mark.deploy_modes("standalone")
+async def test_restore_single_resource_many_binaries(
+    nucliadb_writer: AsyncClient,
+    nucliadb_writer_manager: AsyncClient,
+    nucliadb_reader: AsyncClient,
+    context: ApplicationContext,
+    record_property,
+):
+    binary_count = 50
+    binary_size = 1024 * 1024
+    source_kbid = await create_kb(nucliadb_writer_manager)
+    response = await nucliadb_writer.post(
+        f"/kb/{source_kbid}/resources", json={"title": "Many binaries", "slug": "many-binaries"}
+    )
+    assert response.status_code == 201
+    resource_id = response.json()["uuid"]
+    expected_hashes = {}
+    for index in range(binary_count):
+        field_id = f"file-{index}"
+        payload = hashlib.sha256(field_id.encode()).digest() * (binary_size // 32)
+        expected_hashes[field_id] = hashlib.sha256(payload).hexdigest()
+        response = await nucliadb_writer.post(
+            f"/kb/{source_kbid}/resource/{resource_id}/file/{field_id}/upload",
+            headers={
+                "X-Filename": base64.b64encode(field_id.encode()).decode(),
+                "Content-Type": "application/octet-stream",
+            },
+            content=payload,
+        )
+        assert response.status_code == 201
+
+    backup_id = str(uuid.uuid4())
+    await backup_kb_task(context, CreateBackupRequest(kb_id=source_kbid, backup_id=backup_id))
+    durations = []
+    try:
+        for attempt in range(3):
+            destination_kbid = await create_kb(nucliadb_writer_manager)
+            started = time.perf_counter()
+            await asyncio.wait_for(
+                restore_resource(context, destination_kbid, backup_id, resource_id), timeout=120
+            )
+            elapsed = time.perf_counter() - started
+            durations.append(elapsed)
+            print(f"\nRESTORE_ATTEMPT attempt={attempt + 1} seconds={elapsed:.3f}", flush=True)
+            record_property(f"restore_seconds_{attempt + 1}", elapsed)
+            response = await nucliadb_reader.get(f"/kb/{destination_kbid}/resources")
+            assert response.status_code == 200
+            assert [resource["id"] for resource in response.json()["resources"]] == [resource_id]
+            for field_id, expected_hash in expected_hashes.items():
+                response = await nucliadb_reader.get(
+                    f"/kb/{destination_kbid}/resource/{resource_id}/file/{field_id}"
+                )
+                assert response.status_code == 200
+                cloud_file = response.json()["value"]["file"]
+                assert cloud_file["size"] == binary_size
+                assert destination_kbid in cloud_file["uri"]
+                response = await nucliadb_reader.get(cloud_file["uri"])
+                assert response.status_code == 200
+                assert hashlib.sha256(response.content).hexdigest() == expected_hash
+        median = statistics.median(durations)
+        record_property("restore_median_seconds", median)
+        record_property("binary_count", binary_count)
+        record_property("binary_size_bytes", binary_size)
+        record_property("storage_backend", type(context.blob_storage).__name__)
+        print(
+            f"\nRESTORE_BENCHMARK storage={type(context.blob_storage).__name__} "
+            f"binaries={binary_count} binary_bytes={binary_size} "
+            f"seconds={','.join(f'{duration:.3f}' for duration in durations)} "
+            f"median_seconds={median:.3f}",
+            flush=True,
+        )
+    finally:
+        await delete_backup_task(context, DeleteBackupRequest(backup_id=backup_id))
 
 
 async def check_kb(nucliadb_reader: AsyncClient, kbid: str):

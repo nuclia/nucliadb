@@ -29,6 +29,11 @@ class BackupSettings(BaseSettings):
     restore_resources_concurrency: int = Field(
         default=10, description="The number of concurrent resource restores."
     )
+    restore_binaries_concurrency: int = Field(
+        default=4,
+        ge=1,
+        description="Concurrent binary imports per resource, multiplied by restore_resources_concurrency.",
+    )
     backup_resources_concurrency: int = Field(
         default=10, description="The number of concurrent resource backups."
     )
