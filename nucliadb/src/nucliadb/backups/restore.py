@@ -198,7 +198,11 @@ class ResourceBackupReader:
                 # re-allocations as chunks we read. Thus, we eagerly pre-allocate the whole size we
                 # need and avoid any further re-allocation
                 cursor = len(self.buffer)
-                self._resize(size)
+                self._resize(
+                    # amount of chunks necesasry to reach >= size, taking into account we already
+                    # have some data in the buffer
+                    ((size - len(self.buffer)) // self._chunk_size + 1) * self._chunk_size
+                )
                 async for chunk in self.download_stream:
                     self.buffer[cursor : cursor + len(chunk)] = chunk
                     cursor += len(chunk)
