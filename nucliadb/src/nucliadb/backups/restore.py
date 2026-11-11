@@ -185,7 +185,7 @@ class ResourceBackupReader:
                     break
         # NOTE: this can be further optimized in Python 3.15 using take_bytes
         result = bytes(self.buffer[:size])
-        self.buffer = self.buffer[size:]
+        del self.buffer[:size]
         return result
 
     async def iter_data(self, total_bytes: int, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
