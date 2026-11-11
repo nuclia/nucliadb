@@ -205,6 +205,8 @@ class ResourceBackupReader:
                     self._chunk_size = len(chunk)  # update with accurate value from used storage
                     if cursor >= size:
                         break
+                # We have resized the buffer to the exact size we're going to read
+                assert cursor >= size, "stream ended returning less data than expected"
             else:
                 async for chunk in self.download_stream:
                     self.buffer += chunk
