@@ -57,6 +57,7 @@ enum ClientType {
     DASHBOARD = 4;
     CHROME_EXTENSION = 5;
     INTERNAL = 6;
+    AGENTIC = 7;
 }
 
 message Process {
