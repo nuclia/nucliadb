@@ -22,8 +22,10 @@ import asyncio
 import functools
 import json
 import logging
+import sys
 import tarfile
 from collections.abc import AsyncIterator, Callable
+from itertools import repeat
 from typing import Any
 
 from pydantic import TypeAdapter
@@ -175,18 +177,73 @@ class ResourceBackupReader:
     def __init__(self, download_stream: AsyncIterator[bytes]):
         self.download_stream = download_stream
         self.buffer = bytearray()
+        self._chunk_size = 1 * 1024 * 1024  # 1 MB
         self.cloud_files: dict[int, CloudFile] = {}
 
     async def read(self, size: int) -> bytes:
+        """Buffered read from a download stream. This function uses multiple
+        tricks and techniques to be more performant, avoid costly memory
+        allocations and memory copies.
+
+        The usual workload are small reads compared to object storage chunk
+        sizes. Further optimizations could be implemented with a ring buffer
+        reusing the same allocation, avoiding re-allocations on `+= chunk`.
+        However, the current amount of memory manipulation already seems enough
+        for Python.
+
+        """
         if size > len(self.buffer):
-            async for chunk in self.download_stream:
-                self.buffer += chunk
-                if len(self.buffer) >= size:
-                    break
-        # NOTE: this can be further optimized in Python 3.15 using take_bytes
-        result = bytes(self.buffer[:size])
-        self.buffer = self.buffer[size:]
-        return result
+            if size - len(self.buffer) > 2 * self._chunk_size:
+                # As chunk sizes are big (~MB), adding chunks will probably require as many
+                # re-allocations as chunks we read. Thus, we eagerly pre-allocate the whole size we
+                # need and avoid any further re-allocation
+                cursor = len(self.buffer)
+                self._resize(
+                    # amount of chunks necesasry to reach >= size, taking into account we already
+                    # have some data in the buffer
+                    ((size - len(self.buffer)) // self._chunk_size + 1) * self._chunk_size
+                )
+                async for chunk in self.download_stream:
+                    self.buffer[cursor : cursor + len(chunk)] = chunk
+                    cursor += len(chunk)
+                    self._chunk_size = len(chunk)  # update with accurate value from used storage
+                    if cursor >= size:
+                        break
+                # We have resized the buffer to the exact size we're going to read
+                assert cursor >= size, "stream ended returning less data than expected"
+            else:
+                async for chunk in self.download_stream:
+                    self.buffer += chunk
+                    self._chunk_size = len(chunk)  # update with accurate value from used storage
+                    if len(self.buffer) >= size:
+                        break
+        return self._take_bytes(size)
+
+    if sys.version_info >= (3, 14):
+
+        def _resize(self, size: int):
+            assert size > len(self.buffer)
+            self.buffer.resize(size)
+    else:
+
+        def _resize(self, size: int):
+            self.buffer.extend(repeat(0, size - len(self.buffer)))
+
+    # From Python 3.15, this is a zero-copy operation. When slicing chunks of MB sizes, the
+    # difference is quite noticeable.
+    #
+    # See https://docs.python.org/3/whatsnew/3.15.html#whatsnew315-bytearray-take-bytes
+    # for more details about this optimization
+    if sys.version_info >= (3, 15):
+
+        def _take_bytes(self, size: int) -> bytes:
+            return self.buffer.take_bytes(size)
+    else:
+
+        def _take_bytes(self, size: int) -> bytes:
+            result = bytes(self.buffer[:size])
+            del self.buffer[:size]
+            return result
 
     async def iter_data(self, total_bytes: int, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]:
         padding_bytes = 0

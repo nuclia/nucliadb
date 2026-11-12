@@ -17,10 +17,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import asyncio
 import functools
 from collections.abc import AsyncGenerator, AsyncIterator, Callable
 
-import backoff
 from google.protobuf.message import DecodeError as ProtobufDecodeError
 
 from nucliadb import learning_proxy
@@ -35,14 +35,14 @@ from nucliadb.export_import.exceptions import (
 )
 from nucliadb.export_import.models import ExportedItemType, ExportItem, Metadata
 from nucliadb.ingest.orm.broker_message import generate_broker_message
+from nucliadb.ingest.orm.processor import Processor
 from nucliadb.ingest.orm.resource import Resource
 from nucliadb_models.configuration import SearchConfiguration
 from nucliadb_models.export_import import Status
 from nucliadb_models.kv_schemas import KBKVSchemas
 from nucliadb_protos import knowledgebox_pb2 as kb_pb2
 from nucliadb_protos import resources_pb2, writer_pb2
-from nucliadb_protos.writer_pb2_grpc import WriterStub
-from nucliadb_utils.utilities import get_ingest
+from nucliadb_utils.utilities import get_pubsub
 
 BinaryStream = AsyncIterator[bytes]
 BinaryStreamGenerator = Callable[[int], BinaryStream]
@@ -111,27 +111,45 @@ BM_FIELDS = {
 async def restore_broker_message(
     context: ApplicationContext, kbid: str, bm: writer_pb2.BrokerMessage
 ) -> None:
+    """Restore a resource by ingesting a broker message.
+
+    This is done directly using a processor to skip a gRPC call to
+    ingest-orm-grpc (previously used). The gRPC interface doesn't maintain
+    sequence numbers nor partitions, so there was no point on paying the
+    de/serialization cost when no other guarantee is provided.
+
+    A better approach for ordering would be using broker message references and
+    only ingesting through NATS consumers, but processing messages (pull),
+    import/exports and backups/restore are already breaking this.
+
+    """
+
+    pubsub = await get_pubsub()
+    processor = Processor(
+        driver=context.kv_driver, storage=context.blob_storage, pubsub=pubsub, partition="-1"
+    )
+
     bm.kbid = kbid
-    await send_writer_bm(context, bm)
-    await send_processor_bm(context, bm)
 
+    if bm.ByteSize() > 10 * 1024 * 1024:
+        # Copying big protos is a CPU-heavy operation that may block the event
+        # loop. Better to run it outside
+        loop = asyncio.get_event_loop()
+        writer_bm = await loop.run_in_executor(None, get_writer_bm, bm)
+    else:
+        writer_bm = get_writer_bm(bm)
+    await processor.process(writer_bm, -1, partition="-1", transaction_check=False)
+    del writer_bm
 
-async def send_writer_bm(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
-    await process_bm_grpc(context, get_writer_bm(bm))
-
-
-async def send_processor_bm(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
-    await process_bm_grpc(context, get_processor_bm(bm))
-
-
-@backoff.on_exception(backoff.expo, (Exception,), jitter=backoff.random_jitter, max_tries=8)
-async def process_bm_grpc(context: ApplicationContext, bm: writer_pb2.BrokerMessage) -> None:
-    async def _iterator() -> AsyncIterator[writer_pb2.BrokerMessage]:
-        yield bm
-
-    ingest_grpc: WriterStub = get_ingest()
-    response: writer_pb2.OpStatusWriter = await ingest_grpc.ProcessMessage(_iterator())  # type: ignore
-    assert response.status == writer_pb2.OpStatusWriter.Status.OK, "Failed to process broker message"
+    if bm.ByteSize() > 10 * 1024 * 1024:
+        # Copying big protos is a CPU-heavy operation that may block the event
+        # loop. Better to run it outside
+        loop = asyncio.get_event_loop()
+        processor_bm = await loop.run_in_executor(None, get_processor_bm, bm)
+    else:
+        processor_bm = get_processor_bm(bm)
+    await processor.process(processor_bm, -1, partition="-1", transaction_check=False)
+    del processor_bm
 
 
 def get_writer_bm(bm: writer_pb2.BrokerMessage) -> writer_pb2.BrokerMessage:
