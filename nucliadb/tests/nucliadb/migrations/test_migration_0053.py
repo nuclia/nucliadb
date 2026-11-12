@@ -18,52 +18,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-import uuid
-from unittest.mock import Mock
+import pytest
 
-from nucliadb.common import datamanagers
 from nucliadb.common.maindb.driver import Driver
 from nucliadb.migrator.models import Migration
-from nucliadb_models.configuration import (
-    AskConfig,
-    AskSearchConfiguration,
-    FindConfig,
-    FindSearchConfiguration,
-    SearchConfiguration,
-)
 from tests.nucliadb.migrations import get_migration
+
+from .utils import _test_model_deprecation_migration
 
 migration: Migration = get_migration(53)
 
 
-async def test_migration_0053(maindb_driver: Driver):
-    execution_context = Mock()
-    execution_context.kv_driver = maindb_driver
-    execution_context.blob_storage = Mock()
-    kbid = str(uuid.uuid4())
-
-    async with maindb_driver.rw_transaction() as txn:
-        find: SearchConfiguration = FindSearchConfiguration(
-            kind="find", config=FindConfig(generative_model="aws-claude-4-1-opus")
-        )
-        await datamanagers.search_configurations.set(txn, kbid=kbid, name="find", config=find)
-        ask: SearchConfiguration = AskSearchConfiguration(
-            kind="ask", config=AskConfig(generative_model="aws-claude-4-1-opus")
-        )
-        await datamanagers.search_configurations.set(txn, kbid=kbid, name="ask", config=ask)
-        custom: SearchConfiguration = AskSearchConfiguration(
-            kind="ask", config=AskConfig(generative_model="aws-claude-4-1-opus/custom-id")
-        )
-        await datamanagers.search_configurations.set(txn, kbid=kbid, name="custom", config=custom)
-        await txn.commit()
-
-    await migration.module.migrate_kb(execution_context, kbid)
-
-    async with maindb_driver.ro_transaction() as txn:
-        for name in ("find", "ask"):
-            migrated = await datamanagers.search_configurations.get(txn, kbid=kbid, name=name)
-            assert migrated is not None
-            assert migrated.config.generative_model == "aws-claude-4-8-opus"  # type: ignore[attr-defined]
-        preserved = await datamanagers.search_configurations.get(txn, kbid=kbid, name="custom")
-        assert preserved is not None
-        assert preserved.config.generative_model == "aws-claude-4-1-opus/custom-id"  # type: ignore[attr-defined]
+@pytest.mark.parametrize("deprecated,replacement", [("aws-claude-4-1-opus", "aws-claude-4-8-opus")])
+async def test_migration_0053(maindb_driver: Driver, deprecated: str, replacement: str):
+    await _test_model_deprecation_migration(
+        maindb_driver, migration, deprecated_model=deprecated, replacement_model=replacement
+    )
