@@ -166,7 +166,7 @@ function semanticSearch(search) {
   // Optic already selected the winners and computed their distances; only the
   // limited winning documents need hydration for response metadata.
   return scored.slice(0, search.limit).map(result => {
-    const root = cts.doc(result.uri).toObject();
+    const root = cts.doc(result.uri).root;
     return {score: result.score, content: {chunk_id: root.chunk_id, facets: root.facets, data: root.data}};
   });
 }

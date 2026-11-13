@@ -19,7 +19,7 @@ python /synthetic_search_load.py --kbid=28d547f3-5a11-5d7f-928e-ead1615d4b5e --s
 
 python /synthetic_search_load.py --kbid=28d547f3-5a11-5d7f-928e-ead1615d4b5e --start-rps=6 --max-rps=6 --stage-seconds=600
 
-rps=6
+rps=4
 kb=28d547f3-5a11-5d7f-928e-ead1615d4b5e
 python /synthetic_search_load.py --kbid=$kb --start-rps=$rps --max-rps=$rps --stage-seconds=600
 ###
@@ -89,15 +89,18 @@ async def resolve_kbids(driver: Any, args: argparse.Namespace) -> list[str]:
     if args.kbid:
         return args.kbid
 
+    slug_prefix = f"{args.kb_prefix}-" if args.kb_prefix else ""
     async with driver.ro_transaction(kbid=None) as txn:
         kb_map = {
             slug: kbid
             async for kbid, slug in datamanagers.kb.iter(
-                txn, slug_prefix=f"{args.kb_prefix}-"
+                txn, slug_prefix=slug_prefix
             )
         }
     if not kb_map:
-        raise ValueError(f"No Knowledge Boxes found with slug prefix {args.kb_prefix!r}")
+        if args.kb_prefix:
+            raise ValueError(f"No Knowledge Boxes found with slug prefix {args.kb_prefix!r}")
+        raise ValueError("No Knowledge Boxes found")
     print(
         "Resolved Knowledge Boxes: "
         + ", ".join(f"{slug} ({kb_map[slug]})" for slug in sorted(kb_map)),
@@ -689,7 +692,7 @@ async def run(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    kb_selection = parser.add_mutually_exclusive_group(required=True)
+    kb_selection = parser.add_mutually_exclusive_group()
     kb_selection.add_argument(
         "--kbid",
         action="append",
