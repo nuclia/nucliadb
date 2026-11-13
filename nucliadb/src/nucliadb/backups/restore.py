@@ -28,6 +28,7 @@ from collections.abc import AsyncIterator, Callable
 from itertools import repeat
 from typing import Any
 
+import backoff
 from pydantic import TypeAdapter
 
 from nucliadb.backups.const import MaindbKeys, StorageKeys
@@ -61,6 +62,12 @@ restore_resource_observer = metrics.Observer(
     labels={},
     buckets=[0.05, 0.1, 0.2, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0, 2.5 * 60.0, 5 * 60, 10 * 60, INF],
 )
+
+
+class EndOfStream(Exception):
+    """When reading a download stream, it returns less data than requested."""
+
+    pass
 
 
 async def restore_kb_task(context: ApplicationContext, msg: RestoreBackupRequest):
@@ -217,6 +224,10 @@ class ResourceBackupReader:
                     self._chunk_size = len(chunk)  # update with accurate value from used storage
                     if len(self.buffer) >= size:
                         break
+        if size > len(self.buffer):
+            raise EndOfStream(
+                f"stream yield less data than requested (missing {len(self.buffer) - size} bytes)"
+            )
         return self._take_bytes(size)
 
     if sys.version_info >= (3, 14):
@@ -311,6 +322,13 @@ class ResourceBackupReader:
 
 
 @restore_resource_observer.wrap({})
+@backoff.on_exception(
+    # Sometimes reading from object storage fails, we retry to mitigate transient issues
+    backoff.expo,
+    EndOfStream,
+    jitter=backoff.random_jitter,
+    max_tries=3,
+)
 async def restore_resource(context: ApplicationContext, kbid: str, backup_id: str, resource_id: str):
     download_stream = context.blob_storage.download(
         bucket=settings.backups_bucket,
