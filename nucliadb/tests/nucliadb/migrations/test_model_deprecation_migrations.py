@@ -21,16 +21,25 @@
 import pytest
 
 from nucliadb.common.maindb.driver import Driver
-from nucliadb.migrator.models import Migration
 from tests.nucliadb.migrations import get_migration
 
 from .utils import _test_model_deprecation_migration
 
-migration: Migration = get_migration(53)
 
-
-@pytest.mark.parametrize("deprecated,replacement", [("aws-claude-4-1-opus", "aws-claude-4-8-opus")])
-async def test_migration_0053(maindb_driver: Driver, deprecated: str, replacement: str):
+@pytest.mark.parametrize(
+    "migration_number,deprecated,replacement",
+    [
+        (53, "aws-claude-4-1-opus", "aws-claude-4-8-opus"),
+        (54, "chatgpt-o3-mini", "chatgpt-5.6-sol"),
+        (55, "chatgpt-o1", "chatgpt-5.6-sol"),
+    ],
+)
+async def test_model_deprecation_migration(
+    maindb_driver: Driver, migration_number: int, deprecated: str, replacement: str
+):
     await _test_model_deprecation_migration(
-        maindb_driver, migration, deprecated_model=deprecated, replacement_model=replacement
+        maindb_driver,
+        get_migration(migration_number),
+        deprecated_model=deprecated,
+        replacement_model=replacement,
     )
