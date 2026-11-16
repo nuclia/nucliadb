@@ -32,6 +32,9 @@ from .utils import _test_model_deprecation_migration
         (53, "aws-claude-4-1-opus", "aws-claude-4-8-opus"),
         (54, "chatgpt-o3-mini", "chatgpt-5.6-sol"),
         (55, "chatgpt-o1", "chatgpt-5.6-sol"),
+        (56, "chatgpt-azure-o1", "chatgpt-azure-5.6-sol"),
+        (56, "chatgpt-azure-o3", "chatgpt-azure-5.6-sol"),
+        (56, "chatgpt-azure-o4-mini", "chatgpt-azure-5.6-terra"),
     ],
 )
 async def test_model_deprecation_migration(
