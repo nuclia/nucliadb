@@ -299,6 +299,11 @@ jobs:
                 },
                 {
                   "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
+                  "component": "nidx-chord",
+                  "component-type": "regional"
+                },
+                {
+                  "chart-version": "${{ needs.upload-charts-nucliadb-component.outputs.version_number }}",
                   "component": "nucliadb-shared",
                   "component-type": "regional"
                 },
