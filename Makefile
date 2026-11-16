@@ -29,7 +29,7 @@ python-code-lint:
 
 rust-code-lint:
 	cargo fmt --all --manifest-path nidx/Cargo.toml
-	cargo clippy --all-features --manifest-path nidx/Cargo.toml
+	cargo clippy --all-targets --all-features --manifest-path nidx/Cargo.toml
 
 install:
 	uv sync
