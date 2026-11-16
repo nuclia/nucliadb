@@ -55,13 +55,14 @@ pub struct KubernetesCluster {
 
 impl KubernetesCluster {
     pub async fn new_cluster_and_task(
+        namespace: String,
         shutdown: CancellationToken,
     ) -> anyhow::Result<(Self, impl Future<Output = anyhow::Result<()>>)> {
         let my_address = Self::pod_address(&std::env::var("POD_IP")?);
 
         // Create a store that keeps an updated view of `nidx-searcher` pods
         let client = kube::Client::try_default().await?;
-        let pods: kube::Api<Pod> = kube::Api::namespaced(client, "nucliadb");
+        let pods: kube::Api<Pod> = kube::Api::namespaced(client, &namespace);
         let watcher_config = kube::runtime::watcher::Config::default().labels("app=nidx-searcher");
         let (store_reader, store_writer) = kube::runtime::reflector::store();
         let stream = kube::runtime::reflector::reflector(store_writer, kube::runtime::watcher(pods, watcher_config));

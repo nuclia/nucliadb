@@ -190,7 +190,11 @@ pub async fn run(settings: Settings, shutdown: CancellationToken) -> anyhow::Res
         match searcher_settings.shard_partitioning.method {
             crate::settings::ShardPartitioningMethod::Single => (Arc::new(SingleNodeCluster), None),
             crate::settings::ShardPartitioningMethod::Kubernetes => {
-                let (node_lister, task) = KubernetesCluster::new_cluster_and_task(shutdown.clone()).await?;
+                let (node_lister, task) = KubernetesCluster::new_cluster_and_task(
+                    searcher_settings.shard_partitioning.kubernetes.namespace.clone(),
+                    shutdown.clone(),
+                )
+                .await?;
                 let task_id = tasks.spawn(task).id();
                 // Now that the reader task is started, we can wait until we are ready
                 info!("Initializing kubernetes API");

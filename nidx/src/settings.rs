@@ -320,6 +320,9 @@ pub struct SearcherSettings {
 pub struct ShardPartitioningSettings {
     pub method: ShardPartitioningMethod,
     pub replicas: usize,
+    // only used when method is kubernetes
+    #[serde(default)]
+    pub kubernetes: KubernetesSettings,
 }
 
 impl Default for ShardPartitioningSettings {
@@ -327,6 +330,7 @@ impl Default for ShardPartitioningSettings {
         Self {
             method: ShardPartitioningMethod::Single,
             replicas: 1,
+            kubernetes: KubernetesSettings::default(),
         }
     }
 }
@@ -346,6 +350,16 @@ impl Default for SearcherSettings {
             metadata_refresh_interval: 1.0,
         }
     }
+}
+
+fn default_kubernetes_namespace() -> String {
+    "nucliadb".to_string()
+}
+
+#[derive(Deserialize, Clone, Debug, Default)]
+pub struct KubernetesSettings {
+    #[serde(default = "default_kubernetes_namespace")]
+    pub namespace: String,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -458,6 +472,33 @@ mod tests {
             settings.merge.log.min_number_of_segments,
             LogMergeSettings::default().min_number_of_segments
         );
+    }
+
+    #[test]
+    fn test_shard_partitioning_settings() {
+        let env = [
+            ("SEARCHER__SHARD_PARTITIONING__METHOD", "single"),
+            ("SEARCHER__SHARD_PARTITIONING__REPLICAS", "1"),
+        ];
+        let settings = EnvSettings::from_map(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string()))));
+        match settings.searcher.unwrap().shard_partitioning.method {
+            ShardPartitioningMethod::Single => {}
+            _ => assert!(false),
+        }
+
+        let env = [
+            ("SEARCHER__SHARD_PARTITIONING__METHOD", "kubernetes"),
+            ("SEARCHER__SHARD_PARTITIONING__REPLICAS", "2"),
+            ("SEARCHER__SHARD_PARTITIONING__KUBERNETES__NAMESPACE", "special"),
+        ];
+        let settings = EnvSettings::from_map(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string()))));
+        let searcher_settings = settings.searcher.unwrap();
+        assert_eq!(searcher_settings.shard_partitioning.replicas, 2);
+        assert!(matches!(
+            searcher_settings.shard_partitioning.method,
+            ShardPartitioningMethod::Kubernetes
+        ));
+        assert_eq!(searcher_settings.shard_partitioning.kubernetes.namespace, "special");
     }
 
     #[test]
