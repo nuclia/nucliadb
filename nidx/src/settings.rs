@@ -481,10 +481,12 @@ mod tests {
             ("SEARCHER__SHARD_PARTITIONING__REPLICAS", "1"),
         ];
         let settings = EnvSettings::from_map(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string()))));
-        match settings.searcher.unwrap().shard_partitioning.method {
-            ShardPartitioningMethod::Single => {}
-            _ => assert!(false),
-        }
+        let searcher_settings = settings.searcher.unwrap();
+        assert!(matches!(
+            searcher_settings.shard_partitioning.method,
+            ShardPartitioningMethod::Single
+        ));
+        assert_eq!(searcher_settings.shard_partitioning.replicas, 1);
 
         let env = [
             ("SEARCHER__SHARD_PARTITIONING__METHOD", "kubernetes"),
