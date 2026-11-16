@@ -356,10 +356,17 @@ fn default_kubernetes_namespace() -> String {
     "nucliadb".to_string()
 }
 
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct KubernetesSettings {
-    #[serde(default = "default_kubernetes_namespace")]
     pub namespace: String,
+}
+
+impl Default for KubernetesSettings {
+    fn default() -> Self {
+        Self {
+            namespace: default_kubernetes_namespace(),
+        }
+    }
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -487,6 +494,19 @@ mod tests {
             ShardPartitioningMethod::Single
         ));
         assert_eq!(searcher_settings.shard_partitioning.replicas, 1);
+
+        let env = [
+            ("SEARCHER__SHARD_PARTITIONING__METHOD", "kubernetes"),
+            ("SEARCHER__SHARD_PARTITIONING__REPLICAS", "2"),
+        ];
+        let settings = EnvSettings::from_map(HashMap::from(env.map(|(k, v)| (k.to_string(), v.to_string()))));
+        let searcher_settings = settings.searcher.unwrap();
+        assert_eq!(searcher_settings.shard_partitioning.replicas, 2);
+        assert!(matches!(
+            searcher_settings.shard_partitioning.method,
+            ShardPartitioningMethod::Kubernetes
+        ));
+        assert_eq!(searcher_settings.shard_partitioning.kubernetes.namespace, "nucliadb");
 
         let env = [
             ("SEARCHER__SHARD_PARTITIONING__METHOD", "kubernetes"),
