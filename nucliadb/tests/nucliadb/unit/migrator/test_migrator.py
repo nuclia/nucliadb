@@ -22,9 +22,16 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from nucliadb.migrator import command, migrator
+from nucliadb.migrator import command, migrator, search_configurations
 from nucliadb.migrator.exceptions import MigrationValidationError
 from nucliadb.migrator.models import Migration
+from nucliadb_models.configuration import (
+    AskConfig,
+    AskSearchConfiguration,
+    FindConfig,
+    FindSearchConfiguration,
+    SearchConfiguration,
+)
 
 
 def test_get_migrations():
@@ -83,3 +90,28 @@ async def test_migrations_validation_with_errors():
     with patch("nucliadb.migrator.command.get_migrations", return_value=migrations):
         with pytest.raises(MigrationValidationError):
             command.validate()
+
+
+@pytest.mark.parametrize("models", [[], [None], ["unrelated", "deprecated/custom"]])
+async def test_migrate_search_configurations_without_affected_models(models: list[str | None]):
+    configs: dict[str, SearchConfiguration] = {}
+    for index, model in enumerate(models):
+        configs[f"ask-{index}"] = AskSearchConfiguration(
+            kind="ask", config=AskConfig(generative_model=model)
+        )
+        configs[f"find-{index}"] = FindSearchConfiguration(
+            kind="find", config=FindConfig(generative_model=model)
+        )
+
+    with (
+        patch.object(search_configurations.datamanagers, "with_ro_transaction"),
+        patch.object(search_configurations.datamanagers, "with_rw_transaction") as rw_transaction,
+        patch.object(
+            search_configurations.datamanagers.search_configurations,
+            "list",
+            new=AsyncMock(return_value=configs),
+        ),
+    ):
+        await search_configurations.migrate_search_configurations("kbid", {"deprecated": "replacement"})
+
+    rw_transaction.assert_not_called()

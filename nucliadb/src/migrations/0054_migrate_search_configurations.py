@@ -20,15 +20,8 @@
 
 """Migration #54: replace plain ChatGPT o3-mini in search configurations."""
 
-import logging
-from typing import cast
-
-from nucliadb.common import datamanagers
 from nucliadb.migrator.context import ExecutionContext
-from nucliadb_models.configuration import SearchConfiguration
-from nucliadb_models.search import AskRequest, FindRequest
-
-logger = logging.getLogger(__name__)
+from nucliadb.migrator.search_configurations import migrate_search_configurations
 
 REPLACEMENTS = {"chatgpt-o3-mini": "chatgpt-5.6-sol"}
 
@@ -37,36 +30,4 @@ async def migrate(context: ExecutionContext) -> None: ...
 
 
 async def migrate_kb(context: ExecutionContext, kbid: str) -> None:
-    affected = await get_affected_search_configurations(kbid)
-    if not affected:
-        return
-
-    async with datamanagers.with_rw_transaction() as txn:
-        for name, config in affected.items():
-            logger.info(
-                "Migrating search config for kb",
-                extra={
-                    "kbid": kbid,
-                    "search_config": name,
-                    "generative_model": config.config.generative_model,  # type: ignore[attr-defined]
-                },
-            )
-            config.config.generative_model = REPLACEMENTS[config.config.generative_model]  # type: ignore[attr-defined]
-            await datamanagers.search_configurations.set(txn, kbid=kbid, name=name, config=config)
-        await txn.commit()
-
-
-async def get_affected_search_configurations(kbid: str) -> dict[str, SearchConfiguration]:
-    result: dict[str, SearchConfiguration] = {}
-    async with datamanagers.with_ro_transaction() as txn:
-        search_configs = await datamanagers.search_configurations.list(txn, kbid=kbid)
-        for name, config in search_configs.items():
-            if config.kind == "find":
-                find_config = cast(FindRequest, config.config)
-                if find_config.generative_model in REPLACEMENTS:
-                    result[name] = config
-            elif config.kind == "ask":
-                ask_config = cast(AskRequest, config.config)
-                if ask_config.generative_model in REPLACEMENTS:
-                    result[name] = config
-    return result
+    await migrate_search_configurations(kbid, REPLACEMENTS)
