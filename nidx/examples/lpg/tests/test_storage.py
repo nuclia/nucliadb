@@ -1,8 +1,27 @@
+# Copyright (C) 2021 Bosutech XXI S.L.
+#
+# nucliadb is offered under the AGPL v3.0 and as commercial software.
+# For commercial licensing, contact us at info@nuclia.com.
+#
+# AGPL:
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
 import os
 import subprocess
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from uuid import uuid4
 
@@ -142,6 +161,246 @@ def test_parallel_edges_typed_graph_prefilter_and_replacement(nidx: EmbeddedNidx
     assert graph.find("edge") == [second]
     assert graph.topology() == [second]
     graph.delete_edge("E1")  # Repeated deletion is safe.
+
+
+def test_text_vector_and_hybrid_chunk_search(nidx: EmbeddedNidx) -> None:
+    graph = Graph.create(nidx, str(uuid4()))
+    product = graph.upsert_node(
+        "P1",
+        ["Product"],
+        {"category": "fruit"},
+        text_chunks={
+            "description": ["red apple from Spain", "quiet green orchard"],
+            "features": ["crisp sweet fruit"],
+        },
+        embeddings={
+            "description": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            "features": [[0.0, 0.0, 1.0]],
+        },
+    )
+    vegetable = graph.upsert_node(
+        "P2",
+        ["Product"],
+        {"category": "vegetable"},
+        text_chunks={"description": ["red pepper from France"]},
+        embeddings={"description": [[1.0, 0.0, 0.0]]},
+    )
+    edge = graph.upsert_edge(
+        "E1",
+        "P1",
+        "STOCKED_AT",
+        "P2",
+        {"quantity": 5},
+        text_chunks={
+            "note": ["inspected at warehouse", "cold storage"],
+            "inspection": ["sealed package"],
+        },
+        embeddings={
+            "note": [[0.0, 0.0, 1.0], [0.0, 0.8, 0.2]],
+            "inspection": [[1.0, 0.0, 0.0]],
+        },
+    )
+
+    general_property_hits = graph.search(text="crisp sweet", kind="node")
+    assert [(hit.property, hit.text) for hit in general_property_hits] == [
+        ("features", "crisp sweet fruit")
+    ]
+    specific_property_hits = graph.search(
+        text="crisp sweet", kind="node", text_property="features"
+    )
+    assert [(hit.property, hit.text) for hit in specific_property_hits] == [
+        ("features", "crisp sweet fruit")
+    ]
+    general_property_vector_hits = graph.search(vector=[0.0, 0.0, 1.0])
+    assert {hit.property for hit in general_property_vector_hits} == {
+        "description",
+        "features",
+        "inspection",
+        "note",
+    }
+    specific_property_vector_hits = graph.search(
+        vector=[0.0, 0.0, 1.0], kind="node", text_property="features"
+    )
+    assert specific_property_vector_hits[0].property == "features"
+
+    text_hits = graph.search(
+        text="red apple",
+        kind="node",
+        text_property="description",
+        filters=[PropertyFilter("category", "eq", value="fruit")],
+    )
+    assert len(text_hits) == 1
+    assert (text_hits[0].record, text_hits[0].property, text_hits[0].chunk_index) == (
+        product,
+        "description",
+        0,
+    )
+    assert text_hits[0].text == "red apple from Spain"
+    assert text_hits[0].text_rank == 1
+    assert text_hits[0].vector_rank is None
+
+    vector_hits = graph.search(
+        vector=[0.0, 1.0, 0.0],
+        kind="node",
+        text_property="description",
+        filters=[PropertyFilter("category", "eq", value="fruit")],
+    )
+    assert vector_hits[0].record == product
+    assert vector_hits[0].chunk_index == 1
+    assert vector_hits[0].text == "quiet green orchard"
+    assert vector_hits[0].text_rank is None
+    assert vector_hits[0].vector_rank == 1
+
+    hybrid_hits = graph.search(
+        text="red apple",
+        vector=[0.0, 1.0, 0.0],
+        kind="node",
+        text_property="description",
+        filters=[PropertyFilter("category", "eq", value="fruit")],
+    )
+    assert {(hit.record.id, hit.chunk_index) for hit in hybrid_hits} == {("P1", 0), ("P1", 1)}
+    by_chunk = {hit.chunk_index: hit for hit in hybrid_hits}
+    assert by_chunk[0].text_rank == 1 and by_chunk[0].vector_rank is not None
+    assert by_chunk[1].text_rank is None and by_chunk[1].vector_rank == 1
+    assert by_chunk[0].score == pytest.approx(
+        1 / (60 + by_chunk[0].text_rank) + 1 / (60 + by_chunk[0].vector_rank)
+    )
+    assert by_chunk[1].score == pytest.approx(1 / (60 + by_chunk[1].vector_rank))
+
+    edge_hits = graph.search(vector=[0.0, 0.0, 1.0], kind="edge", text_property="note", top_k=5)
+    assert edge_hits[0].record == edge
+    assert edge_hits[0].property == "note"
+    assert edge_hits[0].chunk_index == 0
+    all_edge_property_hits = graph.search(text="sealed package", kind="edge")
+    assert [(hit.property, hit.text) for hit in all_edge_property_hits] == [
+        ("inspection", "sealed package")
+    ]
+    specific_edge_property_hits = graph.search(
+        vector=[1.0, 0.0, 0.0], kind="edge", text_property="inspection"
+    )
+    assert specific_edge_property_hits[0].property == "inspection"
+
+    other_tenant = Graph.create(nidx, str(uuid4()))
+    other = other_tenant.upsert_node(
+        "P1",
+        ["Product"],
+        {"category": "fruit"},
+        text_chunks={"description": ["red apple from Spain"]},
+        embeddings={"description": [[1.0, 0.0, 0.0]]},
+    )
+    isolated = other_tenant.search(vector=[1.0, 0.0, 0.0], kind="node", text_property="description")
+    assert [hit.record for hit in isolated] == [other]
+    main_tenant_hits = graph.search(vector=[1.0, 0.0, 0.0], kind="node", text_property="description")
+    assert main_tenant_hits
+    assert {hit.record.tenant for hit in main_tenant_hits} == {graph.tenant}
+
+    changed = graph.upsert_node(
+        "P1",
+        ["Product"],
+        {"category": "fruit"},
+        text_chunks={"description": ["mellow blue berry"]},
+        embeddings={"description": [[0.0, 1.0, 0.0]]},
+    )
+    assert graph.get("node", "P1") == changed
+    replaced_text_hits = graph.search(text="red apple", kind="node", text_property="description")
+    assert [hit.record.id for hit in replaced_text_hits] == ["P2"]
+    assert replaced_text_hits[0].text == "red pepper from France"
+    old_vector_results = graph.search(vector=[1.0, 0.0, 0.0], kind="node", text_property="description")
+    assert old_vector_results[0].record == vegetable
+
+
+def test_text_chunks_and_embeddings_can_be_added_independently(nidx: EmbeddedNidx) -> None:
+    graph = Graph.create(nidx, str(uuid4()))
+    with pytest.raises(ValueError, match="missing node"):
+        graph.update_text_properties("node", "missing", text_chunks={"description": ["text"]})
+    node = graph.upsert_node("P1", ["Product"], {"category": "fruit"})
+    graph.upsert_node("W1", ["Warehouse"], {"country": "Spain"})
+    edge = graph.upsert_edge("E1", "P1", "STOCKED_AT", "W1", {"quantity": 5})
+
+    node = graph.update_text_properties(
+        "node",
+        "P1",
+        text_chunks={
+            "description": ["red apple from Spain"],
+            "features": ["crisp sweet fruit"],
+        },
+    )
+    edge = graph.update_text_properties(
+        "edge",
+        "E1",
+        text_chunks={
+            "note": ["inspected at warehouse"],
+            "inspection": ["sealed package"],
+        },
+    )
+    assert node.properties == {"category": "fruit"}
+    assert edge.properties == {"quantity": 5}
+    assert graph.search(text="crisp sweet", kind="node", text_property="features")[0].record == node
+    assert graph.search(text="sealed package", kind="edge", text_property="inspection")[0].record == edge
+    assert graph.search(vector=[1.0, 0.0, 0.0], kind="node", text_property="description") == []
+    with pytest.raises(ValueError, match="non-text property"):
+        graph.update_text_properties("node", "P1", embeddings={"unknown": [[1.0, 0.0, 0.0]]})
+
+    node = graph.update_text_properties(
+        "node",
+        "P1",
+        embeddings={
+            "description": [[1.0, 0.0, 0.0]],
+            "features": [[0.0, 1.0, 0.0]],
+        },
+    )
+    edge = graph.update_text_properties(
+        "edge",
+        "E1",
+        embeddings={
+            "note": [[0.0, 0.0, 1.0]],
+            "inspection": [[1.0, 0.0, 0.0]],
+        },
+    )
+    assert graph.search(vector=[1.0, 0.0, 0.0], kind="node", text_property="description")[0].record == node
+    assert graph.search(vector=[1.0, 0.0, 0.0], kind="edge", text_property="inspection")[0].record == edge
+
+    graph.update_text_properties("node", "P1", text_chunks={"tagline": ["limited edition"]})
+    assert graph.search(vector=[1.0, 0.0, 0.0], kind="node", text_property="description")
+    assert graph.search(vector=[0.0, 1.0, 0.0], kind="node", text_property="features")
+    assert graph.search(text="limited edition", kind="node", text_property="tagline")
+
+    graph.update_text_properties("node", "P1", text_chunks={"description": ["blue berry"]})
+    assert graph.search(vector=[1.0, 0.0, 0.0], kind="node", text_property="description") == []
+    assert graph.search(vector=[0.0, 1.0, 0.0], kind="node", text_property="features")
+
+
+@pytest.mark.parametrize(
+    "chunks,vectors",
+    [
+        ({}, {"description": [[1.0, 0.0, 0.0]]}),
+        ({"description": ["one", "two"]}, {"description": [[1.0, 0.0, 0.0]]}),
+        ({"description": ["one"]}, {"missing": [[1.0, 0.0, 0.0]]}),
+        ({"description": ["one"]}, {"description": [[1.0, 0.0]]}),
+        ({"description": ["one"]}, {"description": [[0.0, 0.0, 0.0]]}),
+        ({"description": ["one"]}, {"description": [[float("inf"), 0.0, 0.0]]}),
+    ],
+)
+def test_invalid_text_chunk_embeddings(
+    nidx: EmbeddedNidx,
+    chunks: dict[str, list[str]],
+    vectors: Mapping[str, Sequence[Sequence[float]]],
+) -> None:
+    graph = Graph.create(nidx, str(uuid4()))
+    with pytest.raises(ValueError):
+        graph.upsert_node("P1", ["Product"], {}, text_chunks=chunks, embeddings=vectors)
+
+
+def test_invalid_hybrid_search_queries(nidx: EmbeddedNidx) -> None:
+    graph = Graph.create(nidx, str(uuid4()))
+    with pytest.raises(ValueError, match="Provide"):
+        graph.search()
+    with pytest.raises(ValueError, match="exactly 3"):
+        graph.search(vector=[1.0, 0.0])
+    with pytest.raises(ValueError, match="Zero vectors"):
+        graph.search(vector=[0.0, 0.0, 0.0])
+    with pytest.raises(ValueError, match="top_k"):
+        graph.search(text="query", top_k=0)
 
 
 def test_node_replacement_and_tenant_isolation(nidx: EmbeddedNidx) -> None:

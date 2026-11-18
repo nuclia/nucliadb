@@ -1,8 +1,9 @@
-# LPG storage spike (milestone 1)
+# LPG storage and hybrid-search spike
 
 A Python experiment using **real embedded nidx**, PostgreSQL metadata, and
 file-backed object storage. There is no Python record database or persistent
-in-memory graph. No Rust changes are required.
+in-memory graph. The storage and property-level hybrid-search milestones use
+existing nidx APIs; no Rust changes are required.
 
 ## Run
 
@@ -69,6 +70,115 @@ finally:
     nidx.close()
 ```
 
+### Text and vector search
+
+Text properties are stored as ordered chunks. Supply one embedding per chunk
+when vector search is desired:
+
+```python
+product = graph.upsert_node(
+    "P2",
+    ["Product"],
+    {"category": "fruit"},
+    text_chunks={
+        "description": ["red apple from Spain", "quiet green orchard"],
+        "features": ["crisp sweet fruit"],
+    },
+    embeddings={
+        "description": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+        "features": [[0.0, 0.0, 1.0]],
+    },
+)
+
+edge = graph.upsert_edge(
+    "E2",
+    "P2",
+    "STOCKED_AT",
+    "W1",
+    {"quantity": 1},
+    text_chunks={
+        "note": ["inspected at warehouse"],
+        "inspection": ["sealed package"],
+    },
+    embeddings={
+        "note": [[0.0, 0.0, 1.0]],
+        "inspection": [[1.0, 0.0, 0.0]],
+    },
+)
+
+feature_hits = graph.search(
+    text="crisp sweet",
+    vector=[0.0, 0.0, 1.0],
+    kind="node",
+    text_property="features",
+    filters=[PropertyFilter("category", "eq", value="fruit")],
+    top_k=10,
+)
+
+all_property_hits = graph.search(vector=[0.0, 0.0, 1.0])
+inspection_hits = graph.search(
+    vector=[1.0, 0.0, 0.0], kind="edge", text_property="inspection"
+)
+```
+
+`Graph.search` accepts text, a vector, or both. Text uses nidx paragraph search;
+vectors use the configured cosine vectorset. When both are supplied, results
+from both ranked lists are combined per chunk using reciprocal-rank fusion
+(RRF), `sum(1 / (rrf_k + rank))`, with `rrf_k=60` by default. Results identify
+the owning record, text property, chunk index and text, plus each modality's
+rank. Text and vector search can also be run separately. A record can have
+multiple embedded text properties, as can an edge; the `embeddings` mapping
+uses the same property keys as `text_chunks`. Set `text_property` to limit
+search to one property, or omit it to search across all indexed text properties.
+Every hit's `property` field identifies which property matched, including when
+searching across both node and edge properties.
+
+### Adding chunks and embeddings later
+
+Chunks and embeddings can be attached in separate steps after creating a node
+or edge. This fits an ingestion flow where text extraction or embedding
+generation runs asynchronously:
+
+```python
+graph.upsert_node("P3", ["Product"], {"category": "fruit"})
+
+graph.update_text_properties(
+    "node",
+    "P3",
+    text_chunks={"description": ["fresh pear from Italy"]},
+)
+
+graph.update_text_properties(
+    "node",
+    "P3",
+    embeddings={"description": [[0.0, 0.0, 1.0]]},
+)
+```
+
+The method also accepts both arguments together and works for edges. It patches
+only the named text properties; the rest of the record and other properties'
+vectors remain unchanged. Embeddings-only updates must target existing text
+chunks and provide one vector per chunk. Replacing a property's chunks without
+new embeddings clears that property's old vectors, avoiding stale matches.
+
+`text_chunks` maps a property to a nonempty ordered list of nonempty strings.
+If `embeddings` includes that property, its vector list must have exactly one
+finite, nonzero vector per chunk, all with the configured dimension. The
+default vectorset is `lpg-property-v1`, with dimension 3 for this synthetic
+demo; configure the vectorset and its dimension on `Graph.create`, and use the
+same values when reopening `Graph`. The caller supplies embeddings; this layer
+does not select or validate a model. Use one vectorset only for compatible
+embedding models and dimensions.
+
+`kind`, typed JSON `filters`, and `text_property` constrain candidates. Property
+filters apply to the owning node/edge record; they do not filter on endpoint
+properties. Search returns chunk-level results, and `top_k` limits the final
+ranked list. Each modality's candidate retrieval is capped by `max_records`
+(1,000 by default) and raises if nidx reports more candidates rather than
+silently truncating.
+Replacements remove prior text, paragraph, JSON, relation, and configured
+vectorset projections before writing the new record.
+
 - `Graph.create` creates one shard with the tenant UUID as its `kbid`.
   `Graph(nidx, tenant, shard_id)` reopens it and verifies shard ownership.
   Keep the tenant/shard mapping outside the `Graph` object; this spike does not
@@ -105,9 +215,12 @@ Each node/edge is one resource:
 | Canonical record | Versioned JSON envelope in text field `a/lpg`, retrieved using `ExtractedTexts` |
 | Property predicates | JSON field `a/lpg`, with UTF-8/hex encoded property keys to avoid JSON path ambiguity |
 | Record candidates | One envelope paragraph, allowing JSON prefiltering to return resource IDs |
+| Text properties | Encoded text fields and one paragraph per supplied property chunk |
+| Property embeddings | One paragraph vector per chunk in the configured vectorset |
+| Search results | Text/vector ranked chunk IDs hydrated to owning records and chunk text |
 | Edge topology | One triple in relation field `a/metadata`; endpoints contain stable node resource UUIDs |
 | Edge identity | Path `resource_field_id` maps back to the edge resource, including parallel edges |
-| Visibility probe | Revision in the JSON index plus envelope retrieval and per-edge owner facet `/lpg/edge/<uuid>` |
+| Visibility probe | Revision in the JSON index plus envelope retrieval, expected vector IDs, and per-edge owner facet `/lpg/edge/<uuid>` |
 
 Using `a/metadata` is intentional: the current relation prefilter adapter maps
 resource-level JSON matches to this field, not to all relation fields.
@@ -121,8 +234,9 @@ Replacement supplies deletion keys for every projection; edge relation deletion
 keys use the fixed relation field, while text/paragraph/JSON/vector deletion keys
 use the resource UUID. Deletion submits a `DELETION` message.
 
-nidx currently requires at least one vector index at shard creation. This spike
-creates an unused 3-dimensional vectorset; it does not ingest embeddings.
+nidx requires a vector index at shard creation. This spike configures a
+cosine-similarity vectorset and indexes supplied paragraph embeddings; it does
+not generate embeddings or manage model compatibility.
 
 ## Verified by integration tests
 
@@ -138,6 +252,12 @@ creates an unused 3-dimensional vectorset; it does not ingest embeddings.
 - Reopening both the Python graph layer and the entire embedded nidx binding
   against the same PostgreSQL database and storage directory.
 - Explicit candidate-limit failures and a successful standalone demo subprocess.
+- Text-only, vector-only, and RRF hybrid chunk search with multiple embedded
+  properties on nodes and edges; property-scoped and all-property searches
+  report the matched property. Also covers typed-property and tenant filters,
+  and replacement removing stale chunks and vectors.
+- Adding chunks and embeddings independently to existing nodes and edges;
+  partial updates preserve unrelated properties and vectors.
 
 ## Python workarounds and production gaps
 
@@ -158,6 +278,6 @@ needs authentication, routing, quotas, observability, and a tenant registry.
 The binding's startup can panic on invalid configuration/unavailable PostgreSQL;
 it is a local harness, not a production service lifecycle.
 
-Cypher parsing/execution, multi-hop joins, property-level chunks/embeddings,
-multi-shard tenants, performance claims, and graph transactions are deliberately
-outside milestone 1. See the [proposal](../../../lpg-proposal.md).
+Cypher parsing/execution, endpoint-property joins, multi-shard tenants,
+performance claims, and graph transactions remain outside this spike. See the
+[proposal](../../../lpg-proposal.md).

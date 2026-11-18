@@ -25,9 +25,9 @@ multi-tenant LPG service, not just its secondary search index.
 | --- | --- | --- |
 | Cloud infrastructure | Object-store segments, mmap search, compaction, metadata, separately deployable components | Measure graph workloads, small-record ingestion overhead, cold starts, and tenant cost |
 | Tenancy | `kbid` metadata and shard-scoped operations | Authentication, authorization, tenant-to-shard routing, quotas; `kbid` alone is not an authorization boundary |
-| Properties | Schemaless JSON indexing with typed equality/range and Boolean filters | Typed record retrieval, missing/null semantics, mixed numeric types, arbitrary property-key encoding |
-| Text | Stored field text and `ExtractedTexts`; paragraph full-text search | Map properties/chunks to fields and hydrate results |
-| Embeddings | Paragraph vectors, vectorsets, filtering; existing graph node/edge semantic indexes | Stable property/chunk identity, model/dimension configuration, lifecycle and query semantics |
+| Properties | Schemaless JSON indexing with typed equality/range and Boolean filters; Python spike hydrates and filters records | Native direct record retrieval, nested values, missing/null semantics, mixed numeric types |
+| Text | Stored field text, `ExtractedTexts`, and paragraph full-text search; Python spike maps text properties to fields/chunks and hydrates results | Native property/chunk API and measured production query behavior |
+| Embeddings | Paragraph vectors and vectorsets; the Python spike assigns stable chunk IDs, stores supplied embeddings, and supports text-only/vector-only/RRF hybrid search | Model generation/compatibility, production lifecycle, measured ranking/latency, and multi-shard search |
 | Topology | Directed/undirected single-hop triple search | Independent node/edge identity, endpoint-property joins, multi-hop execution, complete adjacency enumeration |
 | Online mutations | Resource ingestion, deletion keys, background index synchronization | Graph-level validation, cascading deletion, retry ordering, visibility tracking, concurrency semantics |
 | Cypher | No Cypher execution API in the inspected nidx interfaces | Parser, validation, logical plan, execution, result semantics, and explicit unsupported-feature errors |
@@ -114,9 +114,13 @@ service if that boundary proves useful.
    `MATCH / WHERE / RETURN`, with node and edge property filters; then a two-hop
    join. Evaluate parser reuse before implementing a grammar. Reject unsupported
    syntax explicitly.
-3. **Hybrid search:** supplied synthetic embeddings on a node property and an
-   edge property; property-specific text/vector retrieval with tenant isolation.
-   Define any vector procedure as an extension, not standard Cypher.
+3. **Hybrid search:** implemented in the Python spike for supplied embeddings on
+   multiple text properties of nodes and edges. It supports text-only/vector-only
+   search and per-chunk reciprocal-rank fusion, typed record filters,
+   property-scoped or all-property retrieval (each hit identifies its property),
+   tenant isolation, and attaching chunks and embeddings in separate updates.
+   Embedding generation/model selection is caller-owned; this is not a Cypher
+   procedure or production model lifecycle.
 4. **Mutations:** demonstrate Python API upserts/deletes and cascading deletion;
    then incrementally add Cypher `CREATE`, `SET`, `DELETE`/`DETACH DELETE`, and
    finally `MERGE` with clearly bounded uniqueness semantics.
@@ -137,15 +141,16 @@ The initial implementation uses a persisted node deletion marker and requires
 externally serialized writes; it supports explicitly resuming a cascade, not
 automatic recovery or concurrent writers.
 
-## Milestone 1 validation
+## Milestones 1 and 3 validation
 
 The [implementation and run instructions](nidx/examples/lpg/README.md) include a
 standalone enterprise-data demo. Validation used real embedded nidx and dedicated,
 temporary PostgreSQL containers:
 
-- `.venv/bin/python -m pytest nidx/examples/lpg/tests/test_storage.py -q -x`:
-  **13 passed**, including a demo subprocess and persistent-storage restart.
-- `.venv/bin/ruff check --fix nidx/examples/lpg`: **passed**.
+- `.venv/bin/python -m pytest nidx/examples/lpg/tests/test_storage.py -vv --tb=long`:
+  **21 passed**, including hybrid search, a demo subprocess, and
+  persistent-storage restart.
+- `.venv/bin/ruff check nidx/examples/lpg`: **passed**.
 - `.venv/bin/mypy --explicit-package-bases --follow-untyped-imports nidx/examples/lpg`:
   **passed**.
 
