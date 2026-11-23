@@ -376,6 +376,8 @@ pub struct AuditSettings {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct EnvSettings {
+    /// Optional LPG service clients, configured with absolute gRPC endpoint URIs.
+    pub lpg: Option<LpgSettings>,
     /// Connection to the metadata database
     /// Mandatory for all components
     pub metadata: Option<MetadataSettings>,
@@ -409,6 +411,12 @@ pub struct EnvSettings {
 
     /// Path to a UNIX socket to control the nidx process
     pub control_socket: Option<PathBuf>,
+}
+
+#[derive(Clone, Deserialize, Debug)]
+pub struct LpgSettings {
+    pub indexer_address: String,
+    pub searcher_address: String,
 }
 
 impl EnvSettings {

@@ -1,7 +1,11 @@
 # LPG service on nidx: proposed experiment
 
-Status: milestone 1 implemented as an isolated
-[Python storage spike](nidx/examples/lpg/README.md). Later milestones remain proposals.
+Status: the Python storage and hybrid-search spikes are implemented. A first
+Rust `NidxLPG` service is implemented on the Nidx API listener, including a
+single batched write RPC and separate read/search RPCs. The experimental
+`GraphV2` facade targets that contract, but its parity tests mock the service
+and do not yet verify live Rust-service interoperability. The original Python
+spike and Rust service still use different record formats.
 
 ## Goal and agreed boundaries
 
@@ -110,6 +114,13 @@ service if that boundary proves useful.
    isolated nodes, parallel edges, replacements, and deletion. Reopen the Python
    layer and recover records without relying on process-local state.
    Implemented and tested, including a full embedded nidx binding restart.
+   The Rust `NidxLPG` service provides one ordered `LPGOperation` write RPC
+   for batches of upserts, deletes, cascades, and text-property patches, plus
+   separate record lookup, filtering, and hybrid-search RPCs. A write batch
+   stops at its first failure; earlier operations remain applied, so batches
+   are not transactions. The service uses a versioned Resource text-field
+   envelope and existing Indexer/Searcher services. GraphV2 targets this
+   contract, but live interoperability tests remain to be added.
 2. **Read queries:** parameterized single-node and one-hop
    `MATCH / WHERE / RETURN`, with node and edge property filters; then a two-hop
    join. Evaluate parser reuse before implementing a grammar. Reject unsupported
@@ -154,8 +165,19 @@ temporary PostgreSQL containers:
 - `.venv/bin/mypy --explicit-package-bases --follow-untyped-imports nidx/examples/lpg`:
   **passed**.
 
-No native nidx code was changed. The spike intentionally bounds candidate counts
-and raises on overflow instead of silently truncating results.
+The Rust record-lifecycle slice has focused unit tests and integration tests.
+From `nidx/`, validation results were:
+
+- `SQLX_OFFLINE=true cargo test -p nidx --no-default-features --lib api::lpg::tests`:
+  **2 passed**.
+- `SQLX_OFFLINE=true cargo check -p nidx --no-default-features --test test_integration`:
+  **passed**.
+- `SQLX_OFFLINE=true cargo test -p nidx --no-default-features --test test_integration integration::lpg:: -- --test-threads=1`:
+  **3 passed** with `DATABASE_URL` pointing to a dedicated disposable
+  PostgreSQL 16 container on a dynamically assigned loopback port.
+
+The Python spike intentionally bounds candidate counts and raises on overflow
+instead of silently truncating results.
 
 ## Decision after the experiment
 

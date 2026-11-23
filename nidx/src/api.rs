@@ -14,6 +14,7 @@
 //
 
 pub mod grpc;
+pub mod lpg;
 pub mod shards;
 
 use tokio_util::sync::CancellationToken;

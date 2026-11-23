@@ -37,7 +37,11 @@ def main() -> None:
     nidx = EmbeddedNidx(database_url, args.directory)
     try:
         graph = Graph.create(nidx, str(uuid4()))
-        graph.upsert_node("P1", ["Product"], {"name": "Laptop", "price": 1200, "available": True})
+        graph.upsert_node(
+            "P1",
+            ["Product", "Sellable"],
+            {"name": "Laptop", "price": 1200, "available": True},
+        )
         graph.upsert_node("W1", ["Warehouse"], {"country": "Spain"})
         graph.upsert_node("C1", ["Client"], {"name": "Acme"})
         graph.upsert_edge("E1", "P1", "STOCKED_AT", "W1", {"quantity": 10})

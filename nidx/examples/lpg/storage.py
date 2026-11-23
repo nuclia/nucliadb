@@ -26,7 +26,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
-from typing import Literal, TypeAlias
+from typing import Literal, Protocol, TypeAlias
 from uuid import UUID, uuid4, uuid5
 
 import grpc
@@ -96,6 +96,11 @@ class Record:
             _scalar(value)
         for label in self.labels:
             _nonempty(label)
+        if self.kind == "node":
+            if not self.labels:
+                raise ValueError("Nodes require at least one label/type")
+            if len(set(self.labels)) != len(self.labels):
+                raise ValueError("Node labels/types must be unique")
         if not isinstance(self.text_chunks, dict):
             raise ValueError("Text chunks must be a property-to-chunks mapping")
         for key, chunks in self.text_chunks.items():
@@ -105,6 +110,8 @@ class Record:
             if any(not isinstance(chunk, str) or not chunk.strip() for chunk in chunks):
                 raise ValueError("Text chunks must be nonempty strings")
         if self.kind == "edge":
+            if self.labels:
+                raise ValueError("Edges use edge_type and cannot have node labels")
             if self.source is None or self.target is None or self.edge_type is None:
                 raise ValueError("Edges require source, target, and edge_type")
             for value in (self.source, self.target, self.edge_type):
@@ -253,6 +260,24 @@ def _validate_embeddings(
     return vectors_by_property
 
 
+class NidxLpgClient(Protocol):
+    def LPGOperation(
+        self, request: nidx_pb2.LpgOperationRequest, timeout: float | None = None
+    ) -> nidx_pb2.LpgOperationResponse: ...
+
+    def GetRecords(
+        self, request: nidx_pb2.GetRecordsRequest, timeout: float | None = None
+    ) -> nidx_pb2.GetRecordsResponse: ...
+
+    def FindRecords(
+        self, request: nidx_pb2.FindRecordsRequest, timeout: float | None = None
+    ) -> nidx_pb2.FindRecordsResponse: ...
+
+    def SearchChunks(
+        self, request: nidx_pb2.SearchChunksRequest, timeout: float | None = None
+    ) -> nidx_pb2.SearchChunksResponse: ...
+
+
 class EmbeddedNidx:
     """Local harness. Use a dedicated PostgreSQL database: nidx runs migrations."""
 
@@ -277,6 +302,7 @@ class EmbeddedNidx:
         grpc.channel_ready_future(self._search_channel).result(timeout=RPC_TIMEOUT)
         self.api = nidx_pb2_grpc.NidxApiStub(self._api_channel)
         self.searcher = nidx_pb2_grpc.NidxSearcherStub(self._search_channel)
+        self.lpg_client: NidxLpgClient = nidx_pb2_grpc.NidxLPGStub(self._api_channel)
 
     def close(self) -> None:
         self._api_channel.close()
@@ -621,6 +647,8 @@ class Graph:
             raise ValueError("Finish the pending node deletion before replacing it")
         chunks = text_chunks or {}
         record = Record(self.tenant, "node", id, properties, labels=labels, text_chunks=chunks)
+        if current is not None and set(current.labels) != set(record.labels):
+            raise ValueError("Node labels/types are immutable; delete and recreate the node")
         vectors = _validate_embeddings(chunks, embeddings, self.vector_dimension)
         self._put(record, vectors)
         return record
@@ -647,6 +675,9 @@ class Graph:
             edge_type=edge_type,
             text_chunks=chunks,
         )
+        current = self.get("edge", id)
+        if current is not None and current.edge_type != record.edge_type:
+            raise ValueError("Edge type is immutable; delete and recreate the edge")
         vectors = _validate_embeddings(chunks, embeddings, self.vector_dimension)
         for endpoint in (source, target):
             node = self.get("node", endpoint)
@@ -996,4 +1027,506 @@ class Graph:
                 return
             if time.monotonic() >= deadline:
                 raise TimeoutError(f"Timed out waiting for nidx visibility: {description}")
+            time.sleep(0.05)
+
+
+def _lpg_kind(kind: Kind) -> nidx_pb2.LpgRecordKind.ValueType:
+    if kind == "node":
+        return nidx_pb2.LPG_NODE
+    if kind == "edge":
+        return nidx_pb2.LPG_EDGE
+    raise ValueError(f"Unknown record kind: {kind}")
+
+
+def _kind_name(value: nidx_pb2.LpgRecordKind.ValueType) -> Kind:
+    if value == nidx_pb2.LPG_NODE:
+        return "node"
+    if value == nidx_pb2.LPG_EDGE:
+        return "edge"
+    raise ValueError(f"Unknown NidxLPG record kind: {value}")
+
+
+def _to_lpg_property(value: Scalar) -> nidx_pb2.LpgProperty:
+    result = nidx_pb2.LpgProperty()
+    if value is None:
+        result.null_value = True
+    elif type(value) is str:
+        result.text = value
+    elif type(value) is bool:
+        result.boolean = value
+    elif type(value) is int:
+        result.integer = value
+    elif type(value) is float:
+        result.float = value
+    else:
+        raise ValueError("Unsupported LPG property value")
+    return result
+
+
+def _from_lpg_property(value: nidx_pb2.LpgProperty) -> Scalar:
+    kind = value.WhichOneof("value")
+    if kind == "text":
+        return value.text
+    if kind == "integer":
+        return value.integer
+    if kind == "float":
+        return value.float
+    if kind == "boolean":
+        return value.boolean
+    if kind == "null_value":
+        if not value.null_value:
+            raise ValueError("Invalid NidxLPG null property")
+        return None
+    raise ValueError(f"Property type {kind!r} is not supported by the Python LPG facade")
+
+
+def _to_lpg_filter(predicate: PropertyFilter) -> nidx_pb2.LpgPropertyFilter:
+    predicate.expression()
+    result = nidx_pb2.LpgPropertyFilter(property=predicate.key)
+    if predicate.op == "eq":
+        if type(predicate.value) is bool:
+            result.boolean = predicate.value
+        elif type(predicate.value) is int:
+            result.integer = predicate.value
+        elif type(predicate.value) is float:
+            result.float = predicate.value
+        elif isinstance(predicate.value, str):
+            result.text = predicate.value
+        else:
+            raise ValueError("Null equality is not supported")
+    else:
+        bounds = [bound for bound in (predicate.lower, predicate.upper) if bound is not None]
+        if type(bounds[0]) is int:
+            if predicate.lower is not None:
+                result.integer_range.lower = predicate.lower
+            if predicate.upper is not None:
+                result.integer_range.upper = predicate.upper
+        else:
+            if predicate.lower is not None:
+                result.float_range.lower = predicate.lower
+            if predicate.upper is not None:
+                result.float_range.upper = predicate.upper
+    return result
+
+
+def _from_lpg_record(record: nidx_pb2.LpgRecord, tenant: str) -> Record:
+    if not record.HasField("key"):
+        raise RuntimeError("NidxLPG returned a record without a key")
+    kind = _kind_name(record.key.kind)
+    return Record(
+        tenant=tenant,
+        kind=kind,
+        id=record.key.id,
+        properties={key: _from_lpg_property(value) for key, value in record.properties.items()},
+        labels=list(record.labels),
+        source=record.source if record.HasField("source") else None,
+        target=record.target if record.HasField("target") else None,
+        edge_type=record.edge_type if record.HasField("edge_type") else None,
+        deleting=record.deleting,
+        revision=record.revision,
+        text_chunks={name: list(value.chunks) for name, value in record.text_properties.items()},
+    )
+
+
+class GraphV2:
+    """Python facade for the NidxLPG record and property APIs."""
+
+    def __init__(
+        self,
+        nidx: EmbeddedNidx,
+        tenant: str,
+        shard_id: str,
+        *,
+        vectorset: str = DEFAULT_VECTORSET,
+        vector_dimension: int = DEFAULT_VECTOR_DIMENSION,
+        max_records: int = 1000,
+    ) -> None:
+        self.nidx = nidx
+        self.lpg: NidxLpgClient = nidx.lpg_client
+        self.tenant = str(UUID(tenant))
+        self.shard_id = str(UUID(shard_id))
+        _nonempty(vectorset)
+        if not 1 <= vector_dimension <= 4096:
+            raise ValueError("vector_dimension must be between 1 and 4096")
+        if not 1 <= max_records <= 100_000:
+            raise ValueError("max_records must be between 1 and 100000")
+        self.vectorset = vectorset
+        self.vector_dimension = vector_dimension
+        self.max_records = max_records
+        shard = nidx.api.GetShard(
+            reader.GetShardRequest(shard_id=resources.ShardId(id=self.shard_id)),
+            timeout=RPC_TIMEOUT,
+        )
+        if UUID(shard.metadata.kbid) != UUID(self.tenant):
+            raise ValueError("Shard does not belong to this tenant")
+        vectorsets = nidx.api.ListVectorSets(resources.ShardId(id=self.shard_id), timeout=RPC_TIMEOUT)
+        if self.vectorset not in vectorsets.vectorsets:
+            raise ValueError(f"Shard is missing LPG property vectorset {self.vectorset!r}")
+
+    @classmethod
+    def create(
+        cls,
+        nidx: EmbeddedNidx,
+        tenant: str,
+        *,
+        vectorset: str = DEFAULT_VECTORSET,
+        vector_dimension: int = DEFAULT_VECTOR_DIMENSION,
+        max_records: int = 1000,
+    ) -> GraphV2:
+        tenant = str(UUID(tenant))
+        _nonempty(vectorset)
+        if not 1 <= vector_dimension <= 4096:
+            raise ValueError("vector_dimension must be between 1 and 4096")
+        created = nidx.api.NewShard(
+            writer.NewShardRequest(
+                kbid=tenant,
+                vectorsets_configs={
+                    vectorset: writer.VectorIndexConfig(
+                        similarity=utils_pb2.COSINE,
+                        vector_dimension=vector_dimension,
+                    )
+                },
+            ),
+            timeout=RPC_TIMEOUT,
+        )
+        return cls(
+            nidx,
+            tenant,
+            created.id,
+            vectorset=vectorset,
+            vector_dimension=vector_dimension,
+            max_records=max_records,
+        )
+
+    def _key(self, kind: Kind, id: str) -> nidx_pb2.LpgRecordKey:
+        if kind not in ("node", "edge"):
+            raise ValueError(f"Unknown record kind: {kind}")
+        _nonempty(id)
+        return nidx_pb2.LpgRecordKey(kind=_lpg_kind(kind), id=id)
+
+    def _operation(self, operation: nidx_pb2.LpgOperation) -> nidx_pb2.LpgOperationResult:
+        response = self.lpg.LPGOperation(
+            nidx_pb2.LpgOperationRequest(graph_id=self.shard_id, operations=[operation]),
+            timeout=RPC_TIMEOUT,
+        )
+        if len(response.results) != 1:
+            raise RuntimeError("NidxLPG returned an invalid operation result count")
+        result = response.results[0]
+        if result.status != nidx_pb2.LPG_OPERATION_STATUS_APPLIED:
+            raise RuntimeError(
+                f"NidxLPG operation failed ({result.error_code}): {result.error_message}"
+            )
+        return result
+
+    def _get_proto(self, kind: Kind, id: str) -> nidx_pb2.LpgRecord | None:
+        response = self.lpg.GetRecords(
+            nidx_pb2.GetRecordsRequest(graph_id=self.shard_id, keys=[self._key(kind, id)]),
+            timeout=RPC_TIMEOUT,
+        )
+        if not response.records:
+            return None
+        record = response.records[0]
+        if record.key.kind != _lpg_kind(kind) or record.key.id != id:
+            raise RuntimeError("NidxLPG returned a record for a different key")
+        return record
+
+    def get(self, kind: Kind, external_id: str) -> Record | None:
+        proto = self._get_proto(kind, external_id)
+        return None if proto is None else _from_lpg_record(proto, self.tenant)
+
+    def _to_proto(
+        self,
+        record: Record,
+        embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
+        *,
+        preserve: nidx_pb2.LpgRecord | None = None,
+    ) -> nidx_pb2.LpgRecord:
+        if record.tenant != self.tenant:
+            raise ValueError("Record belongs to a different tenant")
+        vectors = _validate_embeddings(record.text_chunks, embeddings, self.vector_dimension)
+        proto = nidx_pb2.LpgRecord(
+            key=self._key(record.kind, record.id),
+            labels=record.labels,
+            properties={key: _to_lpg_property(value) for key, value in record.properties.items()},
+            vectorset=self.vectorset,
+            revision=record.revision,
+            deleting=record.deleting,
+        )
+        if record.kind == "edge":
+            assert record.source is not None and record.target is not None and record.edge_type is not None
+            proto.source = record.source
+            proto.target = record.target
+            proto.edge_type = record.edge_type
+        for name, chunks in record.text_chunks.items():
+            text_property = nidx_pb2.LpgTextProperty(chunks=chunks)
+            if name in vectors:
+                text_property.embeddings.extend(nidx_pb2.LpgVector(values=vector) for vector in vectors[name])
+            elif preserve is not None:
+                old_property = preserve.text_properties.get(name)
+                if old_property is not None and list(old_property.chunks) == chunks:
+                    text_property.embeddings.extend(old_property.embeddings)
+            proto.text_properties[name].CopyFrom(text_property)
+        return proto
+
+    def _put(
+        self,
+        record: Record,
+        embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
+        *,
+        delete_vectors: bool = True,
+        vector_delete_prefixes: Sequence[str] | None = None,
+    ) -> None:
+        del vector_delete_prefixes
+        preserve = None
+        if not delete_vectors:
+            preserve = self._get_proto(record.kind, record.id)
+        proto = self._to_proto(record, embeddings, preserve=preserve)
+        self._operation(nidx_pb2.LpgOperation(upsert_record=proto))
+        self._wait(lambda: self.get(record.kind, record.id) == record, f"record {record.kind}/{record.id}")
+
+    def upsert_node(
+        self,
+        id: str,
+        labels: list[str],
+        properties: dict[str, Scalar],
+        *,
+        text_chunks: dict[str, list[str]] | None = None,
+        embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
+    ) -> Record:
+        current = self.get("node", id)
+        if current is not None and current.deleting:
+            raise ValueError("Finish the pending node deletion before replacing it")
+        chunks = text_chunks or {}
+        record = Record(self.tenant, "node", id, properties, labels=labels, text_chunks=chunks)
+        if current is not None and set(current.labels) != set(record.labels):
+            raise ValueError("Node labels/types are immutable; delete and recreate the node")
+        vectors = _validate_embeddings(chunks, embeddings, self.vector_dimension)
+        self._put(record, vectors)
+        return record
+
+    def upsert_edge(
+        self,
+        id: str,
+        source: str,
+        edge_type: str,
+        target: str,
+        properties: dict[str, Scalar],
+        *,
+        text_chunks: dict[str, list[str]] | None = None,
+        embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
+    ) -> Record:
+        chunks = text_chunks or {}
+        record = Record(
+            self.tenant,
+            "edge",
+            id,
+            properties,
+            source=source,
+            target=target,
+            edge_type=edge_type,
+            text_chunks=chunks,
+        )
+        current = self.get("edge", id)
+        if current is not None and current.edge_type != record.edge_type:
+            raise ValueError("Edge type is immutable; delete and recreate the edge")
+        vectors = _validate_embeddings(chunks, embeddings, self.vector_dimension)
+        for endpoint_id in (source, target):
+            node = self.get("node", endpoint_id)
+            if node is None or node.deleting:
+                raise ValueError(f"Endpoint {endpoint_id!r} is missing or being deleted")
+        self._put(record, vectors)
+        return record
+
+    def _find(
+        self,
+        kind: Kind,
+        filters: Sequence[PropertyFilter] = (),
+        *,
+        incident_node: str | None = None,
+    ) -> list[Record]:
+        token = ""
+        seen_tokens: set[str] = set()
+        records: list[Record] = []
+        page_size = min(1000, self.max_records + 1)
+        while True:
+            request = nidx_pb2.FindRecordsRequest(
+                graph_id=self.shard_id,
+                kind=_lpg_kind(kind),
+                filters=[_to_lpg_filter(predicate) for predicate in filters],
+                page_size=page_size,
+                page_token=token,
+            )
+            if incident_node is not None:
+                request.incident_node = incident_node
+            response = self.lpg.FindRecords(request, timeout=RPC_TIMEOUT)
+            records.extend(_from_lpg_record(record, self.tenant) for record in response.records)
+            if len(records) > self.max_records:
+                raise RuntimeError("Prototype candidate limit exceeded; result would be incomplete")
+            token = response.next_page_token
+            if not token:
+                return sorted(records, key=lambda record: record.id)
+            if token in seen_tokens:
+                raise RuntimeError("NidxLPG repeated a pagination token")
+            seen_tokens.add(token)
+
+    def find(self, kind: Kind, *filters: PropertyFilter) -> list[Record]:
+        if kind not in ("node", "edge"):
+            raise ValueError(f"Unknown record kind: {kind}")
+        return self._find(kind, filters)
+
+    def topology(self, *filters: PropertyFilter) -> list[Record]:
+        return self._find("edge", filters)
+
+    def search(
+        self,
+        *,
+        text: str | None = None,
+        vector: Sequence[float] | None = None,
+        kind: Kind | None = None,
+        text_property: str | None = None,
+        filters: Sequence[PropertyFilter] = (),
+        top_k: int = 10,
+        rrf_k: int = 60,
+    ) -> list[SearchHit]:
+        if (text is None or not text.strip()) and vector is None:
+            raise ValueError("Provide nonempty text, an embedding, or both")
+        if text is not None and not text.strip():
+            raise ValueError("Text query cannot be empty")
+        if vector is not None:
+            if len(vector) != self.vector_dimension:
+                raise ValueError(f"Query vector must have exactly {self.vector_dimension} dimensions")
+            if any(type(value) not in (int, float) or not math.isfinite(value) for value in vector):
+                raise ValueError("Query vector values must be finite numbers")
+            if not any(value != 0 for value in vector):
+                raise ValueError("Zero vectors are not supported with cosine similarity")
+        if kind is not None and kind not in ("node", "edge"):
+            raise ValueError(f"Unknown record kind: {kind}")
+        if text_property is not None:
+            _property_key(text_property)
+        if not 1 <= top_k <= self.max_records:
+            raise ValueError(f"top_k must be between 1 and {self.max_records}")
+        if rrf_k < 1:
+            raise ValueError("rrf_k must be positive")
+
+        request = nidx_pb2.SearchChunksRequest(
+            graph_id=self.shard_id,
+            vector=list(vector) if vector is not None else [],
+            filters=[_to_lpg_filter(predicate) for predicate in filters],
+            top_k=top_k,
+            vectorset=self.vectorset,
+            rrf_k=rrf_k,
+            candidate_limit=self.max_records,
+        )
+        if text_property is not None:
+            request.property = text_property
+        if text is not None:
+            request.text = text
+        if kind is not None:
+            request.kind = _lpg_kind(kind)
+        response = self.lpg.SearchChunks(request, timeout=RPC_TIMEOUT)
+        hits = []
+        for hit in response.hits:
+            if not hit.HasField("record"):
+                raise RuntimeError("NidxLPG returned a search hit without a record")
+            hits.append(
+                SearchHit(
+                    record=_from_lpg_record(hit.record, self.tenant),
+                    property=hit.property,
+                    chunk_index=hit.chunk_index,
+                    text=hit.text,
+                    score=hit.score,
+                    text_rank=hit.text_rank if hit.HasField("text_rank") else None,
+                    vector_rank=hit.vector_rank if hit.HasField("vector_rank") else None,
+                )
+            )
+        return hits
+
+    def update_text_properties(
+        self,
+        kind: Kind,
+        id: str,
+        *,
+        text_chunks: Mapping[str, Sequence[str]] | None = None,
+        embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
+    ) -> Record:
+        if not text_chunks and not embeddings:
+            raise ValueError("Provide text chunks, embeddings, or both")
+        current = self.get(kind, id)
+        if current is None:
+            raise ValueError(f"Cannot update text properties for missing {kind} {id!r}")
+        if current.deleting:
+            raise ValueError("Finish the pending deletion before updating text properties")
+        if text_chunks is not None and not isinstance(text_chunks, Mapping):
+            raise ValueError("Text chunks must map property names to chunk sequences")
+        updated_chunks = {name: list(chunks) for name, chunks in current.text_chunks.items()}
+        for name, chunks in (text_chunks or {}).items():
+            if not isinstance(chunks, Sequence) or isinstance(chunks, (str, bytes)):
+                raise ValueError("Each text property must contain a sequence of chunks")
+            updated_chunks[name] = list(chunks)
+        replace(current, text_chunks=updated_chunks)
+        vectors = _validate_embeddings(updated_chunks, embeddings, self.vector_dimension)
+        patches: dict[str, nidx_pb2.LpgTextPropertyPatch] = {}
+        for name, chunks in (text_chunks or {}).items():
+            patch = nidx_pb2.LpgTextPropertyPatch()
+            patch.chunks.CopyFrom(nidx_pb2.LpgTextChunks(chunks=list(chunks)))
+            if name in vectors:
+                patch.embeddings.CopyFrom(
+                    nidx_pb2.LpgEmbeddings(
+                        vectors=[nidx_pb2.LpgVector(values=vector) for vector in vectors[name]]
+                    )
+                )
+            patches[name] = patch
+        for name, property_vectors in vectors.items():
+            if name not in patches:
+                patches[name] = nidx_pb2.LpgTextPropertyPatch(
+                    embeddings=nidx_pb2.LpgEmbeddings(
+                        vectors=[nidx_pb2.LpgVector(values=vector) for vector in property_vectors]
+                    )
+                )
+        result = self._operation(
+            nidx_pb2.LpgOperation(
+                patch_text_properties=nidx_pb2.LpgTextPropertyUpdate(
+                    key=self._key(kind, id),
+                    properties=patches,
+                    vectorset=self.vectorset,
+                )
+            ),
+        )
+        if not result.HasField("record"):
+            raise RuntimeError("NidxLPG returned no record after a text-property patch")
+        record = _from_lpg_record(result.record, self.tenant)
+        self._wait(lambda: self.get(kind, id) == record, f"text properties for {kind}/{id}")
+        return record
+
+    def delete_edge(self, id: str) -> None:
+        self._delete("edge", id)
+
+    def delete_node(self, id: str, *, detach: bool = False) -> None:
+        record = self.get("node", id)
+        if record is None:
+            return
+        incident_edges = self._find("edge", incident_node=id)
+        if incident_edges and not detach:
+            raise ValueError("Node has incident edges; use detach=True")
+        self._operation(
+            nidx_pb2.LpgOperation(
+                delete_node=nidx_pb2.LpgNodeDeletion(id=id, detach=detach)
+            )
+        )
+        self._wait(lambda: self.get("node", id) is None, f"deletion node/{id}")
+
+    def _delete(self, kind: Kind, id: str) -> None:
+        self._operation(
+            nidx_pb2.LpgOperation(delete_record=self._key(kind, id))
+        )
+        self._wait(lambda: self.get(kind, id) is None, f"deletion {kind}/{id}")
+
+    @staticmethod
+    def _wait(check: Callable[[], bool], description: str, timeout: float = 15) -> None:
+        deadline = time.monotonic() + timeout
+        while True:
+            if check():
+                return
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"Timed out waiting for NidxLPG visibility: {description}")
             time.sleep(0.05)

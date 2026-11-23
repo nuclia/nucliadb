@@ -20,65 +20,13 @@
 import os
 import subprocess
 import sys
-import time
 from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from uuid import uuid4
 
-import psycopg
 import pytest
 
 from nidx.examples.lpg.storage import EmbeddedNidx, Graph, PropertyFilter, Record
-
-
-@pytest.fixture
-def database_url() -> Iterator[str]:
-    name = f"nidx-lpg-test-{uuid4().hex}"
-    subprocess.run(
-        [
-            "docker",
-            "run",
-            "--rm",
-            "-d",
-            "--name",
-            name,
-            "-e",
-            "POSTGRES_HOST_AUTH_METHOD=trust",
-            "-p",
-            "127.0.0.1::5432",
-            "postgres:16-alpine",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-    try:
-        port = (
-            subprocess.run(
-                ["docker", "port", name, "5432/tcp"],
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            .stdout.strip()
-            .rsplit(":", 1)[1]
-        )
-        url = f"postgresql://postgres@127.0.0.1:{port}/postgres"
-        deadline = time.monotonic() + 30
-        while True:
-            try:
-                with psycopg.connect(url, connect_timeout=1) as connection:
-                    connection.execute("SELECT 1")
-                break
-            except psycopg.OperationalError as error:
-                if time.monotonic() >= deadline:
-                    raise TimeoutError("Dedicated LPG test PostgreSQL did not become ready") from error
-                time.sleep(0.1)
-        yield url
-    finally:
-        subprocess.run(["docker", "rm", "-f", name], check=True, capture_output=True, timeout=15)
 
 
 @pytest.fixture
@@ -139,6 +87,24 @@ def test_records_filters_and_reopen(nidx: EmbeddedNidx) -> None:
     assert not list(nidx.inbox.iterdir())
 
 
+def test_node_and_edge_type_cardinality() -> None:
+    with pytest.raises(ValueError, match="at least one label/type"):
+        Record(str(uuid4()), "node", "untyped", {})
+    with pytest.raises(ValueError, match="unique"):
+        Record(str(uuid4()), "node", "duplicate", {}, labels=["Product", "Product"])
+    with pytest.raises(ValueError, match="cannot have node labels"):
+        Record(
+            str(uuid4()),
+            "edge",
+            "typed",
+            {},
+            labels=["Relationship"],
+            source="a",
+            target="b",
+            edge_type="LINKS",
+        )
+
+
 def test_parallel_edges_typed_graph_prefilter_and_replacement(nidx: EmbeddedNidx) -> None:
     graph = Graph.create(nidx, str(uuid4()))
     graph.upsert_node("P1", ["Product"], {"category": "electronics"})
@@ -151,11 +117,13 @@ def test_parallel_edges_typed_graph_prefilter_and_replacement(nidx: EmbeddedNidx
     assert graph.topology(PropertyFilter("quantity", "range", lower=20)) == [second]
     assert graph.topology(PropertyFilter("country", "eq", value="Spain")) == []
 
-    changed = graph.upsert_edge("E1", "P1", "SUPPLIES", "W2", {"quantity": 5})
+    changed = graph.upsert_edge("E1", "P1", "STOCKED_AT", "W2", {"quantity": 5})
     assert graph.get("edge", "E1") == changed
     assert graph.topology() == [changed, second]
     assert ids(graph.topology(PropertyFilter("old", "eq", value=True))) == []
     assert ids(graph.find("edge", PropertyFilter("quantity", "eq", value=10))) == []
+    with pytest.raises(ValueError, match="Edge type is immutable"):
+        graph.upsert_edge("E1", "P1", "SUPPLIES", "W2", {"quantity": 5})
     graph.delete_edge("E1")
     assert graph.get("edge", "E1") is None
     assert graph.find("edge") == [second]
@@ -408,11 +376,13 @@ def test_node_replacement_and_tenant_isolation(nidx: EmbeddedNidx) -> None:
     second = Graph.create(nidx, str(uuid4()))
     first.upsert_node("P1", ["Product"], {"price": 150, "old": "remove me"})
     other = second.upsert_node("P1", ["Client"], {"price": 999})
-    updated = first.upsert_node("P1", ["Discounted"], {"price": 80})
+    updated = first.upsert_node("P1", ["Product"], {"price": 80})
     assert first.find("node") == [updated]
     assert first.find("node", PropertyFilter("old", "eq", value="remove me")) == []
     assert first.find("node", PropertyFilter("price", "eq", value=150)) == []
     assert second.find("node") == [other]
+    with pytest.raises(ValueError, match="Node labels/types are immutable"):
+        first.upsert_node("P1", ["Discounted"], {"price": 80})
     with pytest.raises(ValueError, match="does not belong"):
         Graph(nidx, first.tenant, second.shard_id)
     first.upsert_node("W1", ["Warehouse"], {})

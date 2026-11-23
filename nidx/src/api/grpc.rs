@@ -23,6 +23,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use nidx_protos::nidx::nidx_api_server::*;
+use nidx_protos::nidx::nidx_lpg_server::NidxLpgServer;
 use nidx_protos::*;
 use nidx_vector::config::VectorConfig;
 use object_store::DynObjectStore;
@@ -42,6 +43,7 @@ use crate::{NidxMetadata, Settings, import_export};
 pub struct ApiServer {
     meta: NidxMetadata,
     storage: Arc<DynObjectStore>,
+    lpg_settings: Option<crate::settings::LpgSettings>,
 }
 
 impl ApiServer {
@@ -49,13 +51,16 @@ impl ApiServer {
         Self {
             meta: settings.metadata.clone(),
             storage: settings.storage.as_ref().unwrap().object_store.clone(),
+            lpg_settings: settings.lpg.clone(),
         }
     }
 
     pub fn into_router(self) -> axum::Router {
         let myself = self.clone();
         let myself2 = self.clone();
+        let lpg = crate::api::lpg::LpgServer::new(self.meta.clone(), self.lpg_settings.clone());
         Routes::new(NidxApiServer::new(self))
+            .add_service(NidxLpgServer::new(lpg))
             .into_axum_router()
             .route(
                 "/api/shard/{shard_id}/download",
