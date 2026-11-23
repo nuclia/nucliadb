@@ -89,7 +89,7 @@ impl ParagraphSchema {
         let paragraph = sb.add_text_field("paragraph", STRING | STORED);
         // NOTE: review search query tokenization if we change how are we tokenizing this field
 
-        let text = if let Some(tokenizer) = &config.custom_tokenizer {
+        let text = if let Some(tokenizer) = &config.custom_indexing_tokenizer {
             let indexing = TextFieldIndexing::default()
                 .set_tokenizer(tokenizer.tokenizer_name())
                 .set_fieldnorms(true)

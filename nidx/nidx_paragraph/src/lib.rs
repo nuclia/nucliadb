@@ -49,9 +49,10 @@ pub use request_types::*;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ParagraphConfig {
+    /// Custom tokenizer used *only* for indexing
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub custom_tokenizer: Option<CustomTokenizer>,
+    pub custom_indexing_tokenizer: Option<CustomTokenizer>,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -70,12 +71,14 @@ impl CustomTokenizer {
 
 impl ParagraphConfig {
     pub fn from_proto(proto: ParagraphIndexConfig) -> Self {
-        let custom_tokenizer = match proto.tokenizer() {
+        let custom_indexing_tokenizer = match proto.indexing_tokenizer() {
             nidx_protos::paragraph_index_config::Tokenizer::Default => None,
             nidx_protos::paragraph_index_config::Tokenizer::MagicChar => Some(CustomTokenizer::MagicChar),
         };
 
-        Self { custom_tokenizer }
+        Self {
+            custom_indexing_tokenizer,
+        }
     }
 }
 
@@ -118,7 +121,7 @@ impl ParagraphIndexer {
 
         let indexer_options = TantivyIndexerOptions {
             // enable custom tokenizers if we are using one
-            use_custom_tokenizers: config.custom_tokenizer.is_some(),
+            use_custom_tokenizers: config.custom_indexing_tokenizer.is_some(),
         };
         let field_schema = ParagraphSchema::new(&config);
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone(), indexer_options)?;

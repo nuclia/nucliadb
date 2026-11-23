@@ -51,7 +51,7 @@ message ParagraphIndexConfig {
         DEFAULT = 0;
         MAGIC_CHAR = 1;
     }
-    Tokenizer tokenizer = 1;
+    Tokenizer indexing_tokenizer = 1;
 }
 
 message VectorIndexConfig {

@@ -87,7 +87,7 @@ pub fn test_reader() -> ParagraphSearcher {
     let dir = TempDir::new().unwrap();
     let resource = create_resource("shard".to_string());
     let config = ParagraphConfig {
-        custom_tokenizer: Some(CustomTokenizer::MagicChar),
+        custom_indexing_tokenizer: Some(CustomTokenizer::MagicChar),
     };
     let segment_meta = ParagraphIndexer
         .index_resource(dir.path(), config.clone(), &resource)
