@@ -33,10 +33,14 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 PROCESS_TIME_HEADER = "X-PROCESS-TIME"
 ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
-account_id_context = ContextVar[str | None]("account_id", default=None)
+_account_id_context = ContextVar[str | None]("account_id", default=None)
 
 
 logger = logging.getLogger("nucliadb.middleware")
+
+
+def get_account_id() -> str | None:
+    return _account_id_context.get()
 
 
 class ProcessTimeHeaderMiddleware(BaseHTTPMiddleware):
@@ -74,11 +78,11 @@ class AccountContextMiddleware:
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
 
-        token = account_id_context.set(Headers(scope=scope).get("x-nucliadb-account"))
+        token = _account_id_context.set(Headers(scope=scope).get("x-nucliadb-account"))
         try:
             await self.app(scope, receive, send)
         finally:
-            account_id_context.reset(token)
+            _account_id_context.reset(token)
 
 
 class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):

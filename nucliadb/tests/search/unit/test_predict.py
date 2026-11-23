@@ -32,7 +32,6 @@ from nuclia_models.predict.generative_responses import (
 )
 from yarl import URL
 
-from nucliadb.middleware import account_id_context
 from nucliadb.search.predict import (
     DummyPredictEngine,
     PredictEngine,
@@ -59,11 +58,8 @@ from tests.utils.aiohttp_session import get_mocked_session
 
 @pytest.fixture(autouse=True)
 def account_context():
-    token = account_id_context.set("account")
-    try:
-        yield
-    finally:
-        account_id_context.reset(token)
+    with patch("nucliadb.search.predict.get_account_id", return_value="account") as get_account:
+        yield get_account
 
 
 async def test_dummy_predict_engine():
@@ -367,14 +363,11 @@ async def test_get_predict_headers_hosterd():
     }
 
 
-def test_predict_rejects_missing_account():
+def test_predict_rejects_missing_account(account_context):
     pe = PredictEngine(onprem=False)
-    token = account_id_context.set(None)
-    try:
-        with pytest.raises(SendToPredictError, match="Missing X-NUCLIADB-ACCOUNT"):
-            pe.get_predict_headers("kbid")
-    finally:
-        account_id_context.reset(token)
+    account_context.return_value = None
+    with pytest.raises(SendToPredictError, match="Missing X-NUCLIADB-ACCOUNT"):
+        pe.get_predict_headers("kbid")
 
 
 async def test_get_answer_generator():

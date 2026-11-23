@@ -34,7 +34,7 @@ from nuclia_models.predict.generative_responses import GenerativeChunk
 from pydantic import ValidationError
 
 from nucliadb.common import datamanagers
-from nucliadb.middleware import account_id_context
+from nucliadb.middleware import get_account_id
 from nucliadb.search import logger
 from nucliadb.search.predict_models import (
     AppliedDataAugmentation,
@@ -245,7 +245,7 @@ class PredictEngine:
             if self.local_predict_headers is not None:
                 headers.update(self.local_predict_headers)
         else:
-            account_id = account_id_context.get()
+            account_id = get_account_id()
             if not account_id:
                 raise SendToPredictError(
                     "Missing X-NUCLIADB-ACCOUNT header for internal Predict request"

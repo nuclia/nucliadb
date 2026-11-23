@@ -35,29 +35,31 @@ from nucliadb.middleware import (
     EventCounter,
     ProcessTimeHeaderMiddleware,
     UUIDPathParamsValidationMiddleware,
-    account_id_context,
+    get_account_id,
 )
 
 
 @pytest.mark.parametrize("fail", [False, True])
 async def test_account_context_is_restored(fail):
     async def endpoint(scope, receive, send):
-        assert account_id_context.get() == "request-account"
+        assert get_account_id() == "request-account"
         if fail:
             raise RuntimeError("request failed")
 
     middleware = AccountContextMiddleware(endpoint)
-    scope: Scope = {"type": "http", "headers": [(b"x-nucliadb-account", b"request-account")]}
-    token = account_id_context.set("outer-account")
-    try:
+    request_scope: Scope = {"type": "http", "headers": [(b"x-nucliadb-account", b"request-account")]}
+
+    async def outer_endpoint(scope, receive, send):
         if fail:
             with pytest.raises(RuntimeError, match="request failed"):
-                await middleware(scope, AsyncMock(), AsyncMock())
+                await middleware(request_scope, AsyncMock(), AsyncMock())
         else:
-            await middleware(scope, AsyncMock(), AsyncMock())
-        assert account_id_context.get() == "outer-account"
-    finally:
-        account_id_context.reset(token)
+            await middleware(request_scope, AsyncMock(), AsyncMock())
+        assert get_account_id() == "outer-account"
+
+    outer_scope: Scope = {"type": "http", "headers": [(b"x-nucliadb-account", b"outer-account")]}
+    await AccountContextMiddleware(outer_endpoint)(outer_scope, AsyncMock(), AsyncMock())
+    assert get_account_id() is None
 
 
 async def test_account_context_isolated_between_requests():
@@ -65,12 +67,12 @@ async def test_account_context_isolated_between_requests():
     accounts = []
 
     async def endpoint(scope, receive, send):
-        account = account_id_context.get()
+        account = get_account_id()
         accounts.append(account)
         if len(accounts) == 2:
             ready.set()
         await ready.wait()
-        assert account_id_context.get() == account
+        assert get_account_id() == account
 
     middleware = AccountContextMiddleware(endpoint)
     await asyncio.gather(
