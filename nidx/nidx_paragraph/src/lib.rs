@@ -24,15 +24,17 @@ mod search_query;
 mod search_response;
 mod set_query;
 
-use nidx_protos::{ParagraphItem, ParagraphSearchResponse, StreamRequest};
+use nidx_protos::{ParagraphIndexConfig, ParagraphItem, ParagraphSearchResponse, StreamRequest};
+use nidx_tantivy::tokenizers::magic_char::MAGIC_CHAR_TOKENIZER_NAME;
 use nidx_tantivy::{
-    TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
+    TantivyIndexer, TantivyIndexerOptions, TantivyMeta, TantivySegmentMetadata,
     index_reader::{DeletionQueryBuilder, open_index_with_deletions},
 };
 use nidx_types::{OpenIndexMetadata, prefilter::PrefilterResult};
 use reader::ParagraphReaderService;
 use resource_indexer::index_paragraphs;
 use schema::ParagraphSchema;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tantivy::{
     Term,
@@ -44,6 +46,38 @@ use tantivy::{
 use tracing::instrument;
 
 pub use request_types::*;
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct ParagraphConfig {
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_tokenizer: Option<CustomTokenizer>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum CustomTokenizer {
+    MagicChar,
+}
+
+impl CustomTokenizer {
+    pub fn tokenizer_name(&self) -> &'static str {
+        match self {
+            Self::MagicChar => MAGIC_CHAR_TOKENIZER_NAME,
+        }
+    }
+}
+
+impl ParagraphConfig {
+    pub fn from_proto(proto: ParagraphIndexConfig) -> Self {
+        let custom_tokenizer = match proto.tokenizer() {
+            nidx_protos::paragraph_index_config::Tokenizer::Default => None,
+            nidx_protos::paragraph_index_config::Tokenizer::MagicChar => Some(CustomTokenizer::MagicChar),
+        };
+
+        Self { custom_tokenizer }
+    }
+}
 
 pub struct ParagraphIndexer;
 
@@ -75,13 +109,19 @@ impl ParagraphIndexer {
     pub fn index_resource(
         &self,
         output_dir: &Path,
+        config: ParagraphConfig,
         resource: &nidx_protos::Resource,
     ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
         if resource.skip_paragraphs {
             return Ok(None);
         }
-        let field_schema = ParagraphSchema::new();
-        let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
+
+        let indexer_options = TantivyIndexerOptions {
+            // enable custom tokenizers if we are using one
+            use_custom_tokenizers: config.custom_tokenizer.is_some(),
+        };
+        let field_schema = ParagraphSchema::new(&config);
+        let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone(), indexer_options)?;
 
         index_paragraphs(&mut indexer, resource, field_schema)?;
         indexer.finalize()
@@ -95,9 +135,10 @@ impl ParagraphIndexer {
     pub fn merge(
         &self,
         work_dir: &Path,
+        config: ParagraphConfig,
         open_index: impl OpenIndexMetadata<TantivyMeta>,
     ) -> anyhow::Result<TantivySegmentMetadata> {
-        let schema = ParagraphSchema::new().schema;
+        let schema = ParagraphSchema::new(&config).schema;
         let deletions_query = ParagraphDeletionQueryBuilder::new(&schema);
         let index = open_index_with_deletions(schema, open_index, deletions_query)?;
 
@@ -120,14 +161,14 @@ pub struct ParagraphSearcher {
 
 impl ParagraphSearcher {
     #[instrument(name = "paragraph::open", skip_all)]
-    pub fn open(open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
-        let schema = ParagraphSchema::new().schema;
+    pub fn open(config: ParagraphConfig, open_index: impl OpenIndexMetadata<TantivyMeta>) -> anyhow::Result<Self> {
+        let schema = ParagraphSchema::new(&config.clone()).schema;
         let index = open_index_with_deletions(schema.clone(), open_index, ParagraphDeletionQueryBuilder::new(&schema))?;
 
         Ok(Self {
             reader: ParagraphReaderService {
                 index: index.clone(),
-                schema: ParagraphSchema::new(),
+                schema: ParagraphSchema::new(&config),
                 reader: index
                     .reader_builder()
                     .reload_policy(tantivy::ReloadPolicy::Manual)

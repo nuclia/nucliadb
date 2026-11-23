@@ -2635,6 +2635,7 @@ dependencies = [
  "nom",
  "once_cell",
  "regex",
+ "serde",
  "serde_json",
  "tantivy",
  "tantivy-common",

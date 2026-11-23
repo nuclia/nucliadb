@@ -31,6 +31,7 @@ use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::{
     GraphSearchRequest, GraphSearchResponse, RelationNode, relation_node::NodeType, resource::ResourceStatus,
 };
+use nidx_tantivy::TantivyIndexerOptions;
 use nidx_tantivy::{
     TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
     index_reader::{DeletionQueryBuilder, open_index_with_deletions},
@@ -131,7 +132,11 @@ impl RelationIndexer {
             return Err(anyhow!("Unsupported nidx_relation version"));
         }
         let field_schema = RelationSchema::new(config.version);
-        let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
+        let mut indexer = TantivyIndexer::new(
+            output_dir.to_path_buf(),
+            field_schema.schema.clone(),
+            TantivyIndexerOptions::default(),
+        )?;
 
         if resource.status == ResourceStatus::Delete as i32 {
             return Err(anyhow::anyhow!("This is a deletion, not a set resource"));

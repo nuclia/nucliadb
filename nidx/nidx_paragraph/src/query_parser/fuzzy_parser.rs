@@ -21,6 +21,7 @@ use tantivy::query::Query;
 use tantivy::query::TermQuery;
 use tantivy::schema::IndexRecordOption;
 
+use crate::ParagraphConfig;
 use crate::fuzzy_query::FuzzyTermQuery;
 use crate::schema::ParagraphSchema;
 use crate::search_query::SharedTermC;
@@ -63,7 +64,7 @@ pub fn parse_fuzzy_query(
     };
 
     let mut subqueries = vec![];
-    let schema = ParagraphSchema::new();
+    let schema = ParagraphSchema::new(&ParagraphConfig::default());
 
     for (i, item) in query.iter().enumerate() {
         match item {

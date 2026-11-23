@@ -15,11 +15,8 @@
 
 use std::cmp::min;
 
-use tantivy::schema::DateOptions;
-use tantivy::{
-    DateTime,
-    schema::{FAST, FacetOptions, Field, INDEXED, NumericOptions, STORED, Schema, TEXT},
-};
+use tantivy::DateTime;
+use tantivy::schema::{DateOptions, FAST, FacetOptions, Field, INDEXED, NumericOptions, STORED, Schema, TEXT};
 
 #[derive(Debug, Clone)]
 pub struct TextSchema {

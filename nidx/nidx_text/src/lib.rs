@@ -27,7 +27,7 @@ use std::path::Path;
 
 use nidx_protos::{DocumentItem, DocumentSearchResponse, StreamRequest};
 use nidx_tantivy::index_reader::{DeletionQueryBuilder, open_index_with_deletions};
-use nidx_tantivy::{TantivyIndexer, TantivyMeta, TantivySegmentMetadata};
+use nidx_tantivy::{TantivyIndexer, TantivyIndexerOptions, TantivyMeta, TantivySegmentMetadata};
 use nidx_types::OpenIndexMetadata;
 use nidx_types::prefilter::PrefilterResult;
 use prefilter::PreFilterRequest;
@@ -140,7 +140,11 @@ impl TextIndexer {
         }
 
         let field_schema = TextSchema::new(config.version);
-        let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
+        let mut indexer = TantivyIndexer::new(
+            output_dir.to_path_buf(),
+            field_schema.schema.clone(),
+            TantivyIndexerOptions::default(),
+        )?;
 
         index_document(&mut indexer, resource, field_schema)?;
         indexer.finalize()

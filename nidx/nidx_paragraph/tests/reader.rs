@@ -16,7 +16,7 @@
 mod common;
 
 use common::test_reader;
-use nidx_paragraph::ParagraphSearchRequest;
+use nidx_paragraph::{ParagraphConfig, ParagraphSearchRequest};
 use nidx_protos::order_by::OrderField;
 use nidx_protos::prost_types::Timestamp;
 use nidx_protos::resource::ResourceStatus;
@@ -167,7 +167,7 @@ fn create_resource_with_fields(shard_id: String, rid: String, fields: Vec<Field>
 fn test_total_number_of_results() -> anyhow::Result<()> {
     let shard_id = "shard1".to_string();
     let (rid, resource) = create_resource(shard_id.clone());
-    let paragraph_reader_service = test_reader(&resource);
+    let paragraph_reader_service = test_reader(ParagraphConfig::default(), &resource);
 
     let mut request = ParagraphSearchRequest {
         uuid: rid,
@@ -195,7 +195,7 @@ fn test_total_number_of_results() -> anyhow::Result<()> {
 fn test_filtering_formula() -> anyhow::Result<()> {
     let shard_id = "shard1".to_string();
     let (rid, resource) = create_resource(shard_id.clone());
-    let paragraph_reader_service = test_reader(&resource);
+    let paragraph_reader_service = test_reader(ParagraphConfig::default(), &resource);
 
     // Only one paragraph matches
     let mut request = ParagraphSearchRequest {
@@ -248,7 +248,7 @@ fn test_filtering_formula() -> anyhow::Result<()> {
 fn test_keyword_and_fuzzy_queries() -> anyhow::Result<()> {
     let shard_id = "shard1".to_string();
     let (rid, resource) = create_resource(shard_id.clone());
-    let paragraph_reader_service = test_reader(&resource);
+    let paragraph_reader_service = test_reader(ParagraphConfig::default(), &resource);
 
     let paragraph_search = |query: &str| {
         let request = ParagraphSearchRequest {
@@ -316,7 +316,7 @@ fn test_keyword_and_fuzzy_queries() -> anyhow::Result<()> {
 fn test_min_score_filter() -> anyhow::Result<()> {
     let shard_id = "shard1".to_string();
     let (rid, resource) = create_resource(shard_id.clone());
-    let paragraph_reader_service = test_reader(&resource);
+    let paragraph_reader_service = test_reader(ParagraphConfig::default(), &resource);
 
     let mut request = ParagraphSearchRequest {
         uuid: rid,
@@ -345,7 +345,7 @@ fn test_min_score_filter() -> anyhow::Result<()> {
 fn test_faceted_search() -> anyhow::Result<()> {
     let shard_id = "shard1".to_string();
     let (rid, resource) = create_resource(shard_id.clone());
-    let paragraph_reader_service = test_reader(&resource);
+    let paragraph_reader_service = test_reader(ParagraphConfig::default(), &resource);
     let faceted = Faceted {
         labels: vec!["".to_string(), "/l".to_string(), "/e".to_string(), "/c".to_string()],
     };
@@ -373,7 +373,7 @@ fn test_faceted_search() -> anyhow::Result<()> {
 fn test_order_by() -> anyhow::Result<()> {
     let shard_id = "shard1".to_string();
     let (_, resource) = create_resource(shard_id.clone());
-    let paragraph_reader_service = test_reader(&resource);
+    let paragraph_reader_service = test_reader(ParagraphConfig::default(), &resource);
 
     let order = OrderBy {
         sort_by: OrderField::Created as i32,
@@ -403,7 +403,7 @@ fn test_order_by() -> anyhow::Result<()> {
 fn test_paragraph_streaming() {
     let shard_id = "shard1".to_string();
     let (_, resource) = create_resource(shard_id.clone());
-    let paragraph_reader_service = test_reader(&resource);
+    let paragraph_reader_service = test_reader(ParagraphConfig::default(), &resource);
 
     let request = StreamRequest {
         shard_id: None,
@@ -424,7 +424,7 @@ fn test_query_parsing() -> anyhow::Result<()> {
     //
     let shard_id = "shard1".to_string();
     let (rid, resource) = create_resource(shard_id.clone());
-    let paragraph_reader_service = test_reader(&resource);
+    let paragraph_reader_service = test_reader(ParagraphConfig::default(), &resource);
 
     // Only one paragraph  matches
     let mut search = ParagraphSearchRequest {
@@ -452,7 +452,7 @@ fn test_query_parsing() -> anyhow::Result<()> {
 fn test_query_parsing_weird_stuff() -> anyhow::Result<()> {
     let shard_id = "shard1".to_string();
     let (rid, resource) = create_tricky_resource(shard_id.clone());
-    let paragraph_reader_service = test_reader(&resource);
+    let paragraph_reader_service = test_reader(ParagraphConfig::default(), &resource);
 
     let mut search = ParagraphSearchRequest {
         uuid: rid,

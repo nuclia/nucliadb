@@ -16,6 +16,21 @@
 //! Custom tantivy tokenizers
 //!
 
+use tantivy::tokenizer::{LowerCaser, TextAnalyzer, TokenizerManager};
+
+use crate::tokenizers::magic_char::MagicCharTokenizer;
+
+pub fn custom_tokenizer_manager() -> TokenizerManager {
+    let manager = TokenizerManager::default();
+    manager.register(
+        magic_char::MAGIC_CHAR_TOKENIZER_NAME,
+        TextAnalyzer::builder(MagicCharTokenizer::default())
+            .filter(LowerCaser)
+            .build(),
+    );
+    manager
+}
+
 pub mod magic_char {
     //! A `MagicCharTokenizer` splits text by a predefined magic character.
 
@@ -25,7 +40,8 @@ pub mod magic_char {
     use tantivy::tokenizer::TokenStream;
     use tantivy::tokenizer::Tokenizer;
 
-    const MAGIC_CHAR: char = '\0';
+    pub const MAGIC_CHAR: char = '\0';
+    pub const MAGIC_CHAR_TOKENIZER_NAME: &str = "magic_char";
 
     /// Tokenize text by splitting on a magic character.
     ///

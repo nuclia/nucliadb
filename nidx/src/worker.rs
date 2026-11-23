@@ -177,7 +177,9 @@ pub async fn run_job(
             IndexKind::Text => TextIndexer
                 .merge(&work_path, index2.config().unwrap(), merge_inputs)
                 .map(|x| x.into()),
-            IndexKind::Paragraph => ParagraphIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
+            IndexKind::Paragraph => ParagraphIndexer
+                .merge(&work_path, index2.config().unwrap(), merge_inputs)
+                .map(|x| x.into()),
             IndexKind::Json => nidx_json::JsonIndexer.merge(&work_path, merge_inputs).map(|x| x.into()),
             IndexKind::Relation => RelationIndexer
                 .merge(&work_path, index2.config().unwrap(), merge_inputs)
