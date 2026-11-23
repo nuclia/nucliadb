@@ -363,11 +363,16 @@ async def test_get_predict_headers_hosterd():
     }
 
 
-def test_predict_rejects_missing_account(account_context):
+def test_predict_rejects_missing_account(account_context, caplog):
     pe = PredictEngine(onprem=False)
     account_context.return_value = None
     with pytest.raises(SendToPredictError, match="Missing X-NUCLIADB-ACCOUNT"):
         pe.get_predict_headers("kbid")
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == "WARNING"
+    assert caplog.records[0].message == (
+        "Missing X-NUCLIADB-ACCOUNT header for internal Predict request"
+    )
 
 
 async def test_get_answer_generator():

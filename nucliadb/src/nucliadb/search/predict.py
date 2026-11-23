@@ -247,9 +247,9 @@ class PredictEngine:
         else:
             account_id = get_account_id()
             if not account_id:
-                raise SendToPredictError(
-                    "Missing X-NUCLIADB-ACCOUNT header for internal Predict request"
-                )
+                error = "Missing X-NUCLIADB-ACCOUNT header for internal Predict request"
+                logger.warning(error)
+                raise SendToPredictError(error)
             headers = {"X-STF-KBID": kbid, "X-STF-ACCOUNT": account_id}
         return headers
 
