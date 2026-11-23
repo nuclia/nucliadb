@@ -32,6 +32,7 @@ from nuclia_models.predict.generative_responses import (
 )
 from yarl import URL
 
+from nucliadb.middleware import account_id_context
 from nucliadb.search.predict import (
     DummyPredictEngine,
     PredictEngine,
@@ -54,6 +55,15 @@ from nucliadb_models.search import (
 )
 from nucliadb_utils.exceptions import LimitsExceededError
 from tests.utils.aiohttp_session import get_mocked_session
+
+
+@pytest.fixture(autouse=True)
+def account_context():
+    token = account_id_context.set("account")
+    try:
+        yield
+    finally:
+        account_id_context.reset(token)
 
 
 async def test_dummy_predict_engine():
@@ -105,6 +115,8 @@ async def test_detect_entities_ok(onprem, expected_url, expected_header, expecte
     path = expected_url.format(public_url=pe.public_url, cluster=pe.cluster_url)
 
     headers = {expected_header: expected_header_value.format(kbid=kbid, service_account=service_account)}
+    if not onprem:
+        headers["X-STF-ACCOUNT"] = "account"
     pe.session.get.assert_awaited_once_with(
         url=path,
         params={"text": sentence},
@@ -197,7 +209,7 @@ async def test_rephrase():
     pe.session.post.assert_awaited_once_with(
         url="cluster/api/internal/predict/rephrase",
         json=item.model_dump(),
-        headers={"X-STF-KBID": "kbid"},
+        headers={"X-STF-KBID": "kbid", "X-STF-ACCOUNT": "account"},
     )
 
 
@@ -296,7 +308,7 @@ async def test_summarize():
     pe.session.post.assert_awaited_once_with(
         url="cluster/api/internal/predict/summarize",
         json=item.model_dump(),
-        headers={"X-STF-KBID": "kbid"},
+        headers={"X-STF-KBID": "kbid", "X-STF-ACCOUNT": "account"},
         timeout=None,
     )
 
@@ -349,7 +361,20 @@ async def test_get_predict_headers_hosterd():
         zone="europe1",
         onprem=False,
     )
-    assert pe.get_predict_headers("kbid") == {"X-STF-KBID": "kbid"}
+    assert pe.get_predict_headers("kbid") == {
+        "X-STF-KBID": "kbid",
+        "X-STF-ACCOUNT": "account",
+    }
+
+
+def test_predict_rejects_missing_account():
+    pe = PredictEngine(onprem=False)
+    token = account_id_context.set(None)
+    try:
+        with pytest.raises(SendToPredictError, match="Missing X-NUCLIADB-ACCOUNT"):
+            pe.get_predict_headers("kbid")
+    finally:
+        account_id_context.reset(token)
 
 
 async def test_get_answer_generator():

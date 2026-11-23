@@ -18,7 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
 import time
+from unittest.mock import AsyncMock
 
 import pytest
 from starlette.applications import Starlette
@@ -26,12 +28,60 @@ from starlette.middleware import Middleware
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
+from starlette.types import Scope
 
 from nucliadb.middleware import (
+    AccountContextMiddleware,
     EventCounter,
     ProcessTimeHeaderMiddleware,
     UUIDPathParamsValidationMiddleware,
+    account_id_context,
 )
+
+
+@pytest.mark.parametrize("fail", [False, True])
+async def test_account_context_is_restored(fail):
+    async def endpoint(scope, receive, send):
+        assert account_id_context.get() == "request-account"
+        if fail:
+            raise RuntimeError("request failed")
+
+    middleware = AccountContextMiddleware(endpoint)
+    scope: Scope = {"type": "http", "headers": [(b"x-nucliadb-account", b"request-account")]}
+    token = account_id_context.set("outer-account")
+    try:
+        if fail:
+            with pytest.raises(RuntimeError, match="request failed"):
+                await middleware(scope, AsyncMock(), AsyncMock())
+        else:
+            await middleware(scope, AsyncMock(), AsyncMock())
+        assert account_id_context.get() == "outer-account"
+    finally:
+        account_id_context.reset(token)
+
+
+async def test_account_context_isolated_between_requests():
+    ready = asyncio.Event()
+    accounts = []
+
+    async def endpoint(scope, receive, send):
+        account = account_id_context.get()
+        accounts.append(account)
+        if len(accounts) == 2:
+            ready.set()
+        await ready.wait()
+        assert account_id_context.get() == account
+
+    middleware = AccountContextMiddleware(endpoint)
+    await asyncio.gather(
+        middleware(
+            {"type": "http", "headers": [(b"x-nucliadb-account", b"first-account")]},
+            AsyncMock(),
+            AsyncMock(),
+        ),
+        middleware({"type": "http", "headers": []}, AsyncMock(), AsyncMock()),
+    )
+    assert accounts == ["first-account", None]
 
 
 class TestCaseProcessTimeHeaderMiddleware:
