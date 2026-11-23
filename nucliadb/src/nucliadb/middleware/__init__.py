@@ -21,19 +21,26 @@ import logging
 import time
 import uuid
 from collections import deque
+from contextvars import ContextVar
 from typing import Callable, ClassVar
 
+from starlette.datastructures import Headers
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import BaseRoute, Match, Mount
-from starlette.types import Scope
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 PROCESS_TIME_HEADER = "X-PROCESS-TIME"
 ACCESS_CONTROL_EXPOSE_HEADER = "Access-Control-Expose-Headers"
+_account_id_context = ContextVar[str | None]("account_id", default=None)
 
 
 logger = logging.getLogger("nucliadb.middleware")
+
+
+def get_account_id() -> str | None:
+    return _account_id_context.get()
 
 
 class ProcessTimeHeaderMiddleware(BaseHTTPMiddleware):
@@ -59,6 +66,23 @@ class ProcessTimeHeaderMiddleware(BaseHTTPMiddleware):
                 duration = time.perf_counter() - start
                 self.capture_process_time(response, duration)
                 self.expose_process_time_header(response)
+
+
+class AccountContextMiddleware:
+    """Propagate the gateway-authenticated account without sharing it between requests."""
+
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        token = _account_id_context.set(Headers(scope=scope).get("x-nucliadb-account"))
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            _account_id_context.reset(token)
 
 
 class ClientErrorPayloadLoggerMiddleware(BaseHTTPMiddleware):

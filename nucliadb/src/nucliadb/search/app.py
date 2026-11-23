@@ -28,6 +28,7 @@ from starlette.requests import ClientDisconnect, Request
 from starlette.responses import HTMLResponse
 
 from nucliadb.middleware import (
+    AccountContextMiddleware,
     ClientErrorPayloadLoggerMiddleware,
     ProcessTimeHeaderMiddleware,
     UUIDPathParamsValidationMiddleware,
@@ -52,6 +53,7 @@ middleware.extend(
     [
         Middleware(UUIDPathParamsValidationMiddleware),
         Middleware(AuthenticationMiddleware, backend=NucliaCloudAuthenticationBackend()),
+        Middleware(AccountContextMiddleware),
         Middleware(AuditMiddleware, audit_utility_getter=get_audit),
         Middleware(ClientErrorPayloadLoggerMiddleware),
     ]

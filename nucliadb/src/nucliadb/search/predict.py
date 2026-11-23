@@ -34,6 +34,7 @@ from nuclia_models.predict.generative_responses import GenerativeChunk
 from pydantic import ValidationError
 
 from nucliadb.common import datamanagers
+from nucliadb.middleware import get_account_id
 from nucliadb.search import logger
 from nucliadb.search.predict_models import (
     AppliedDataAugmentation,
@@ -238,12 +239,18 @@ class PredictEngine:
             return f"{self.cluster_url}{PRIVATE_PREDICT}{endpoint}"
 
     def get_predict_headers(self, kbid: str) -> dict[str, str]:
+        """Use the authenticated request account for hosted calls, and NUA auth on-prem."""
         if self.onprem:
             headers = {"X-STF-NUAKEY": f"Bearer {self.nuclia_service_account}"}
             if self.local_predict_headers is not None:
                 headers.update(self.local_predict_headers)
         else:
-            headers = {"X-STF-KBID": kbid}
+            account_id = get_account_id()
+            if not account_id:
+                error = "Missing X-NUCLIADB-ACCOUNT header for internal Predict request"
+                logger.warning(error)
+                raise SendToPredictError(error)
+            headers = {"X-STF-KBID": kbid, "X-STF-ACCOUNT": account_id}
         return headers
 
     async def check_response(

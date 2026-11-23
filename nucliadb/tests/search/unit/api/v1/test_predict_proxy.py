@@ -22,6 +22,7 @@ from unittest import mock
 from unittest.mock import Mock
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from starlette.requests import Request
 
 from nucliadb.models.responses import HTTPClientError
@@ -29,8 +30,51 @@ from nucliadb.search import predict
 from nucliadb.search.api.v1.predict_proxy import predict_proxy_endpoint
 from nucliadb.search.search.predict_proxy import PredictProxiedEndpoints
 from nucliadb_utils.exceptions import LimitsExceededError
+from tests.utils.aiohttp_session import get_mocked_session
 
 MODULE = "nucliadb.search.api.v1.predict_proxy"
+
+
+async def test_remi_proxy_sends_authenticated_account():
+    from nucliadb.search.app import application
+
+    kbid = "bc717c30-010f-490f-ad22-b8ecbbeb4587"
+    engine = predict.PredictEngine(cluster_url="http://predict", onprem=False)
+    engine.session = get_mocked_session(
+        "POST",
+        200,
+        read='{"context_relevance":[5],"groundedness":[5]}',
+        headers={"Content-Type": "application/json"},
+        context_manager=False,
+    )
+    with (
+        mock.patch("nucliadb.search.search.predict_proxy.exists_kb", return_value=True),
+        mock.patch("nucliadb.search.search.predict_proxy.get_predict", return_value=engine),
+    ):
+        async with AsyncClient(
+            transport=ASGITransport(app=application), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                f"/api/v1/kb/{kbid}/predict/remi",
+                headers={
+                    "X-NUCLIADB-ROLES": "READER",
+                    "X-NUCLIADB-ACCOUNT": "authenticated-account",
+                    "X-STF-ACCOUNT": "untrusted-account",
+                },
+                json={
+                    "user_id": "test-user",
+                    "question": "What is the capital of France?",
+                    "answer": "Paris.",
+                    "contexts": ["Paris is the capital of France."],
+                },
+            )
+
+    assert response.status_code == 200
+    assert engine.session.post.call_args.kwargs["headers"] == {
+        "X-STF-KBID": kbid,
+        "X-STF-ACCOUNT": "authenticated-account",
+        "accept": "*/*",
+    }
 
 
 class DummyTestRequest(Request):

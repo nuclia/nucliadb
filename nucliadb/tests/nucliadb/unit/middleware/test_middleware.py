@@ -18,7 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+import asyncio
 import time
+from unittest.mock import AsyncMock
 
 import pytest
 from starlette.applications import Starlette
@@ -26,12 +28,62 @@ from starlette.middleware import Middleware
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
+from starlette.types import Scope
 
 from nucliadb.middleware import (
+    AccountContextMiddleware,
     EventCounter,
     ProcessTimeHeaderMiddleware,
     UUIDPathParamsValidationMiddleware,
+    get_account_id,
 )
+
+
+@pytest.mark.parametrize("fail", [False, True])
+async def test_account_context_is_restored(fail):
+    async def endpoint(scope, receive, send):
+        assert get_account_id() == "request-account"
+        if fail:
+            raise RuntimeError("request failed")
+
+    middleware = AccountContextMiddleware(endpoint)
+    request_scope: Scope = {"type": "http", "headers": [(b"x-nucliadb-account", b"request-account")]}
+
+    async def outer_endpoint(scope, receive, send):
+        if fail:
+            with pytest.raises(RuntimeError, match="request failed"):
+                await middleware(request_scope, AsyncMock(), AsyncMock())
+        else:
+            await middleware(request_scope, AsyncMock(), AsyncMock())
+        assert get_account_id() == "outer-account"
+
+    outer_scope: Scope = {"type": "http", "headers": [(b"x-nucliadb-account", b"outer-account")]}
+    await AccountContextMiddleware(outer_endpoint)(outer_scope, AsyncMock(), AsyncMock())
+    assert get_account_id() is None
+
+
+async def test_account_context_isolated_between_requests():
+    ready = asyncio.Event()
+    accounts = []
+
+    async def endpoint(scope, receive, send):
+        account = get_account_id()
+        accounts.append(account)
+        if len(accounts) == 2:
+            ready.set()
+        await ready.wait()
+        assert get_account_id() == account
+
+    middleware = AccountContextMiddleware(endpoint)
+    await asyncio.gather(
+        middleware(
+            {"type": "http", "headers": [(b"x-nucliadb-account", b"first-account")]},
+            AsyncMock(),
+            AsyncMock(),
+        ),
+        middleware({"type": "http", "headers": []}, AsyncMock(), AsyncMock()),
+    )
+    assert accounts == ["first-account", None]
 
 
 class TestCaseProcessTimeHeaderMiddleware:

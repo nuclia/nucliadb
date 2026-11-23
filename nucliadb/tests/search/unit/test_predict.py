@@ -56,6 +56,12 @@ from nucliadb_utils.exceptions import LimitsExceededError
 from tests.utils.aiohttp_session import get_mocked_session
 
 
+@pytest.fixture(autouse=True)
+def account_context():
+    with patch("nucliadb.search.predict.get_account_id", return_value="account") as get_account:
+        yield get_account
+
+
 async def test_dummy_predict_engine():
     pe = DummyPredictEngine()
     await pe.initialize()
@@ -105,6 +111,8 @@ async def test_detect_entities_ok(onprem, expected_url, expected_header, expecte
     path = expected_url.format(public_url=pe.public_url, cluster=pe.cluster_url)
 
     headers = {expected_header: expected_header_value.format(kbid=kbid, service_account=service_account)}
+    if not onprem:
+        headers["X-STF-ACCOUNT"] = "account"
     pe.session.get.assert_awaited_once_with(
         url=path,
         params={"text": sentence},
@@ -197,7 +205,7 @@ async def test_rephrase():
     pe.session.post.assert_awaited_once_with(
         url="cluster/api/internal/predict/rephrase",
         json=item.model_dump(),
-        headers={"X-STF-KBID": "kbid"},
+        headers={"X-STF-KBID": "kbid", "X-STF-ACCOUNT": "account"},
     )
 
 
@@ -296,7 +304,7 @@ async def test_summarize():
     pe.session.post.assert_awaited_once_with(
         url="cluster/api/internal/predict/summarize",
         json=item.model_dump(),
-        headers={"X-STF-KBID": "kbid"},
+        headers={"X-STF-KBID": "kbid", "X-STF-ACCOUNT": "account"},
         timeout=None,
     )
 
@@ -349,7 +357,22 @@ async def test_get_predict_headers_hosterd():
         zone="europe1",
         onprem=False,
     )
-    assert pe.get_predict_headers("kbid") == {"X-STF-KBID": "kbid"}
+    assert pe.get_predict_headers("kbid") == {
+        "X-STF-KBID": "kbid",
+        "X-STF-ACCOUNT": "account",
+    }
+
+
+def test_predict_rejects_missing_account(account_context, caplog):
+    pe = PredictEngine(onprem=False)
+    account_context.return_value = None
+    with pytest.raises(SendToPredictError, match="Missing X-NUCLIADB-ACCOUNT"):
+        pe.get_predict_headers("kbid")
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == "WARNING"
+    assert caplog.records[0].message == (
+        "Missing X-NUCLIADB-ACCOUNT header for internal Predict request"
+    )
 
 
 async def test_get_answer_generator():
