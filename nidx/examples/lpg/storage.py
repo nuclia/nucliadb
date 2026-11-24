@@ -19,18 +19,15 @@
 #
 from __future__ import annotations
 
-import json
 import math
-import re
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass, field, replace
-from pathlib import Path
+from dataclasses import dataclass, field, replace
+from datetime import datetime, timezone
 from typing import Literal, Protocol, TypeAlias
-from uuid import UUID, uuid4, uuid5
+from uuid import UUID, uuid4
 
 import grpc
-from nidx_binding import NidxBinding
 from nidx_protos import nidx_pb2, nidx_pb2_grpc
 from nidx_protos import nodereader_pb2 as reader
 from nidx_protos import noderesources_pb2 as resources
@@ -39,10 +36,11 @@ from nidx_protos import nodewriter_pb2 as writer
 from nucliadb_protos import utils_pb2
 
 Scalar: TypeAlias = str | int | float | bool | None
+PropertyValue: TypeAlias = Scalar | datetime | list[str]
 Kind: TypeAlias = Literal["node", "edge"]
-ENVELOPE_FIELD = "a/lpg"
-RELATION_FIELD = "a/metadata"
-RPC_TIMEOUT = 5
+Direction: TypeAlias = Literal["outgoing", "incoming", "both"]
+NodeFilterScope: TypeAlias = Literal["all", "intermediate"]
+RPC_TIMEOUT = 60
 DEFAULT_VECTORSET = "lpg-property-v1"
 DEFAULT_VECTOR_DIMENSION = 3
 
@@ -62,11 +60,19 @@ def _scalar(value: Scalar) -> None:
     raise ValueError("Properties must be strings, booleans, int64, finite floats, or null")
 
 
-def _property_key(key: str) -> str:
+def _property_value(value: PropertyValue) -> None:
+    if isinstance(value, datetime):
+        return
+    if isinstance(value, list):
+        if any(not isinstance(item, str) for item in value):
+            raise ValueError("String-list properties must contain only strings")
+        return
+    _scalar(value)
+
+
+def _validate_property_name(key: str) -> None:
     if not isinstance(key, str):
         raise ValueError("Property keys must be strings")
-    # Keep arbitrary user keys out of Tantivy's dot-separated JSON path syntax.
-    return "p_" + key.encode("utf-8").hex()
 
 
 @dataclass(frozen=True)
@@ -74,26 +80,25 @@ class Record:
     tenant: str
     kind: Kind
     id: str
-    properties: dict[str, Scalar]
+    properties: dict[str, PropertyValue]
     labels: list[str] = field(default_factory=list)
     source: str | None = None
     target: str | None = None
     edge_type: str | None = None
     deleting: bool = False
     revision: str = field(default_factory=lambda: uuid4().hex)
-    version: int = 1
     text_chunks: dict[str, list[str]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         UUID(self.tenant)
         _nonempty(self.id)
-        if self.version != 1 or self.kind not in ("node", "edge"):
-            raise ValueError("Unsupported LPG record format")
+        if self.kind not in ("node", "edge"):
+            raise ValueError("Unsupported LPG record kind")
         if not isinstance(self.properties, dict) or not isinstance(self.labels, list):
             raise ValueError("Invalid LPG properties or labels")
         for key, value in self.properties.items():
-            _property_key(key)
-            _scalar(value)
+            _validate_property_name(key)
+            _property_value(value)
         for label in self.labels:
             _nonempty(label)
         if self.kind == "node":
@@ -104,7 +109,7 @@ class Record:
         if not isinstance(self.text_chunks, dict):
             raise ValueError("Text chunks must be a property-to-chunks mapping")
         for key, chunks in self.text_chunks.items():
-            _property_key(key)
+            _validate_property_name(key)
             if not isinstance(chunks, list) or not chunks:
                 raise ValueError("Text properties must contain a nonempty list of chunks")
             if any(not isinstance(chunk, str) or not chunk.strip() for chunk in chunks):
@@ -126,20 +131,22 @@ class Record:
 class PropertyFilter:
     key: str
     op: Literal["eq", "range"]
-    value: Scalar = None
-    lower: int | float | None = None
-    upper: int | float | None = None
+    value: Scalar | datetime = None
+    lower: int | float | datetime | None = None
+    upper: int | float | datetime | None = None
 
-    def expression(self) -> reader.JsonFilterExpression:
-        predicate = reader.JsonFieldPathFilter(
-            field_id=ENVELOPE_FIELD, json_path=f"properties.{_property_key(self.key)}"
-        )
+    def to_proto(self) -> nidx_pb2.LpgPropertyFilter:
+        _validate_property_name(self.key)
+        predicate = nidx_pb2.LpgPropertyFilter(property=self.key)
         if self.op == "eq":
+            if isinstance(self.value, datetime):
+                predicate.datetime = self.value.isoformat()
+                return predicate
             _scalar(self.value)
             if type(self.value) is bool:
                 predicate.boolean = self.value
             elif type(self.value) is int:
-                predicate.int = self.value
+                predicate.integer = self.value
             elif type(self.value) is float:
                 predicate.float = self.value
             elif isinstance(self.value, str):
@@ -148,10 +155,37 @@ class PropertyFilter:
                 raise ValueError("Null equality is not supported; null is stored but not indexed")
         elif self.op == "range":
             bounds = [bound for bound in (self.lower, self.upper) if bound is not None]
+            if any(isinstance(bound, datetime) for bound in bounds):
+                if not all(isinstance(bound, datetime) for bound in bounds):
+                    raise ValueError("Use datetime values for both date bounds")
+                assert self.lower is None or isinstance(self.lower, datetime)
+                assert self.upper is None or isinstance(self.upper, datetime)
+                lower = (
+                    self.lower.replace(tzinfo=timezone.utc)
+                    if self.lower is not None and self.lower.utcoffset() is None
+                    else self.lower
+                )
+                upper = (
+                    self.upper.replace(tzinfo=timezone.utc)
+                    if self.upper is not None and self.upper.utcoffset() is None
+                    else self.upper
+                )
+                if lower is not None and upper is not None and lower > upper:
+                    raise ValueError("Range lower bound exceeds upper bound")
+                predicate.date_range.CopyFrom(
+                    nidx_pb2.LpgDateRange(
+                        lower=self.lower.isoformat() if self.lower is not None else None,
+                        upper=self.upper.isoformat() if self.upper is not None else None,
+                    )
+                )
+                return predicate
             if not bounds or any(type(bound) not in (int, float) for bound in bounds):
                 raise ValueError("A range requires at least one numeric bound")
             for bound in bounds:
+                assert not isinstance(bound, datetime)
                 _scalar(bound)
+            assert not isinstance(self.lower, datetime)
+            assert not isinstance(self.upper, datetime)
             if len({type(bound) for bound in bounds}) != 1:
                 raise ValueError("Use the same numeric type for both bounds")
             if self.lower is not None and self.upper is not None and self.lower > self.upper:
@@ -159,16 +193,16 @@ class PropertyFilter:
             if type(bounds[0]) is int:
                 assert self.lower is None or type(self.lower) is int
                 assert self.upper is None or type(self.upper) is int
-                predicate.int_range.CopyFrom(
-                    reader.JsonFieldPathFilter.IntegerRangePredicate(lower=self.lower, upper=self.upper)
+                predicate.integer_range.CopyFrom(
+                    nidx_pb2.LpgIntegerRange(lower=self.lower, upper=self.upper)
                 )
             else:
                 predicate.float_range.CopyFrom(
-                    reader.JsonFieldPathFilter.FloatRangePredicate(lower=self.lower, upper=self.upper)
+                    nidx_pb2.LpgFloatRange(lower=self.lower, upper=self.upper)
                 )
         else:
             raise ValueError(f"Unsupported property operator: {self.op}")
-        return reader.JsonFilterExpression(path=predicate)
+        return predicate
 
 
 @dataclass(frozen=True)
@@ -183,48 +217,42 @@ class SearchHit:
 
 
 @dataclass(frozen=True)
-class _ChunkRef:
-    resource_id: str
-    field: str
-    start: int
-    end: int
-
-    @property
-    def id(self) -> str:
-        return f"{self.resource_id}/{self.field}/{self.start}-{self.end}"
+class ExpansionMatch:
+    node_id: str
+    edge: Record
+    neighbor: Record
 
 
-def _chunk_id(resource_id: str, property_name: str, start: int, end: int) -> str:
-    return f"{resource_id}/t/{_property_key(property_name)}/{start}-{end}"
+@dataclass(frozen=True)
+class Expansion:
+    matches: list[ExpansionMatch]
+    examined_edges: int
 
 
-def _parse_chunk_id(value: str) -> _ChunkRef:
-    parts = value.split("/")
-    if len(parts) != 4 or parts[1] != "t" or not parts[2].startswith("p_"):
-        raise ValueError(f"Invalid LPG paragraph/vector ID: {value!r}")
-    UUID(parts[0])
-    try:
-        bytes.fromhex(parts[2][2:])
-        span = re.fullmatch(r"(\d+)-(\d+)", parts[3])
-        if span is None:
-            raise ValueError("Invalid span")
-        start, end = (int(part) for part in span.groups())
-    except ValueError as error:
-        raise ValueError(f"Invalid LPG paragraph/vector ID: {value!r}") from error
-    if start < 0 or end <= start:
-        raise ValueError(f"Invalid LPG paragraph/vector span: {value!r}")
-    return _ChunkRef(parts[0], f"t/{parts[2]}", start, end)
+@dataclass(frozen=True)
+class Path:
+    nodes: list[Record]
+    edges: list[Record]
+    examined_edges: int
 
 
-def _chunk_layout(record: Record) -> list[tuple[str, int, int, int]]:
-    layout: list[tuple[str, int, int, int]] = []
-    for property_name, chunks in record.text_chunks.items():
-        offset = 0
-        for index, chunk in enumerate(chunks):
-            end = offset + len(chunk)
-            layout.append((property_name, index, offset, end))
-            offset = end + 1
-    return layout
+def _lpg_direction(direction: Direction) -> nidx_pb2.LpgDirection.ValueType:
+    if direction == "outgoing":
+        return nidx_pb2.LPG_OUTGOING
+    if direction == "incoming":
+        return nidx_pb2.LPG_INCOMING
+    if direction == "both":
+        return nidx_pb2.LPG_BOTH
+    raise ValueError(f"Unknown graph direction: {direction!r}")
+
+
+def _string_sequence(values: Sequence[str]) -> list[str]:
+    if isinstance(values, (str, bytes)):
+        raise ValueError("Expected a sequence of strings, not a single string")
+    items = list(values)
+    for value in items:
+        _nonempty(value)
+    return items
 
 
 def _validate_embeddings(
@@ -273,761 +301,30 @@ class NidxLpgClient(Protocol):
         self, request: nidx_pb2.FindRecordsRequest, timeout: float | None = None
     ) -> nidx_pb2.FindRecordsResponse: ...
 
+    def Expand(
+        self, request: nidx_pb2.ExpandRequest, timeout: float | None = None
+    ) -> nidx_pb2.ExpandResponse: ...
+
+    def ShortestPath(
+        self, request: nidx_pb2.ShortestPathRequest, timeout: float | None = None
+    ) -> nidx_pb2.ShortestPathResponse: ...
+
     def SearchChunks(
         self, request: nidx_pb2.SearchChunksRequest, timeout: float | None = None
     ) -> nidx_pb2.SearchChunksResponse: ...
 
 
-class EmbeddedNidx:
-    """Local harness. Use a dedicated PostgreSQL database: nidx runs migrations."""
+class NidxClient:
+    """Connection to a trusted Nidx API listener with LPG enabled."""
 
-    def __init__(self, database_url: str, directory: Path) -> None:
-        self.inbox = directory.resolve() / "inbox"
-        segments = directory.resolve() / "segments"
-        self.inbox.mkdir(parents=True, exist_ok=True)
-        segments.mkdir(parents=True, exist_ok=True)
-        self.binding = NidxBinding(
-            {
-                "METADATA__DATABASE_URL": database_url,
-                "INDEXER__OBJECT_STORE": "file",
-                "INDEXER__FILE_PATH": str(self.inbox),
-                "STORAGE__OBJECT_STORE": "file",
-                "STORAGE__FILE_PATH": str(segments),
-                "SEARCHER__METADATA_REFRESH_INTERVAL": "0.1",
-            }
-        )
-        self._api_channel = grpc.insecure_channel(f"localhost:{self.binding.api_port}")
-        self._search_channel = grpc.insecure_channel(f"localhost:{self.binding.searcher_port}")
-        grpc.channel_ready_future(self._api_channel).result(timeout=RPC_TIMEOUT)
-        grpc.channel_ready_future(self._search_channel).result(timeout=RPC_TIMEOUT)
-        self.api = nidx_pb2_grpc.NidxApiStub(self._api_channel)
-        self.searcher = nidx_pb2_grpc.NidxSearcherStub(self._search_channel)
-        self.lpg_client: NidxLpgClient = nidx_pb2_grpc.NidxLPGStub(self._api_channel)
+    def __init__(self, address: str) -> None:
+        _nonempty(address)
+        self._channel = grpc.insecure_channel(address)
+        self.api = nidx_pb2_grpc.NidxApiStub(self._channel)
+        self.lpg_client: NidxLpgClient = nidx_pb2_grpc.NidxLPGStub(self._channel)
 
     def close(self) -> None:
-        self._api_channel.close()
-        self._search_channel.close()
-        del self.binding
-
-    def index(self, message: writer.IndexMessage, resource: resources.Resource | None = None) -> None:
-        if resource is None:
-            self.binding.index(message.SerializeToString())
-            return
-        key = f"{uuid4().hex}.pb"
-        path = self.inbox / key
-        path.write_bytes(resource.SerializeToString())
-        message.storage_key = key
-        try:
-            self.binding.index(message.SerializeToString())
-        finally:
-            # Embedded indexing consumes the payload synchronously, including on failure.
-            path.unlink()
-
-
-class Graph:
-    """Single-writer, one-shard-per-tenant storage spike, with bounded visibility waits."""
-
-    def __init__(
-        self,
-        nidx: EmbeddedNidx,
-        tenant: str,
-        shard_id: str,
-        *,
-        vectorset: str = DEFAULT_VECTORSET,
-        vector_dimension: int = DEFAULT_VECTOR_DIMENSION,
-        max_records: int = 1000,
-    ) -> None:
-        self.nidx = nidx
-        self.tenant = str(UUID(tenant))
-        self.shard_id = str(UUID(shard_id))
-        _nonempty(vectorset)
-        if not 1 <= vector_dimension <= 4096:
-            raise ValueError("vector_dimension must be between 1 and 4096")
-        self.vectorset = vectorset
-        self.vector_dimension = vector_dimension
-        if not 1 <= max_records <= 100_000:
-            raise ValueError("max_records must be between 1 and 100000")
-        self.max_records = max_records
-        shard = nidx.api.GetShard(
-            reader.GetShardRequest(shard_id=resources.ShardId(id=self.shard_id)),
-            timeout=RPC_TIMEOUT,
-        )
-        if UUID(shard.metadata.kbid) != UUID(self.tenant):
-            raise ValueError("Shard does not belong to this tenant")
-        vectorsets = nidx.api.ListVectorSets(resources.ShardId(id=self.shard_id), timeout=RPC_TIMEOUT)
-        if self.vectorset not in vectorsets.vectorsets:
-            raise ValueError(f"Shard is missing LPG property vectorset {self.vectorset!r}")
-        self._wait(self._shard_visible, "shard indexes")
-
-    @classmethod
-    def create(
-        cls,
-        nidx: EmbeddedNidx,
-        tenant: str,
-        *,
-        vectorset: str = DEFAULT_VECTORSET,
-        vector_dimension: int = DEFAULT_VECTOR_DIMENSION,
-    ) -> Graph:
-        tenant = str(UUID(tenant))
-        _nonempty(vectorset)
-        if not 1 <= vector_dimension <= 4096:
-            raise ValueError("vector_dimension must be between 1 and 4096")
-        created = nidx.api.NewShard(
-            writer.NewShardRequest(
-                kbid=tenant,
-                vectorsets_configs={
-                    vectorset: writer.VectorIndexConfig(
-                        similarity=utils_pb2.COSINE,
-                        vector_dimension=vector_dimension,
-                    )
-                },
-            ),
-            timeout=RPC_TIMEOUT,
-        )
-        return cls(nidx, tenant, created.id, vectorset=vectorset, vector_dimension=vector_dimension)
-
-    def _shard_visible(self) -> bool:
-        try:
-            self._get_resource(self.resource_id("node", "__readiness__"))
-            response = self.nidx.searcher.Search(
-                reader.SearchRequest(
-                    shard_ids=[self.shard_id],
-                    paragraph=True,
-                    result_per_page=1,
-                    json_filter=reader.JsonFilterExpression(
-                        path=reader.JsonFieldPathFilter(
-                            field_id=ENVELOPE_FIELD, json_path="kind", text="node"
-                        )
-                    ),
-                ),
-                timeout=RPC_TIMEOUT,
-            )
-        except grpc.RpcError as error:
-            if error.code() != grpc.StatusCode.NOT_FOUND:
-                raise
-            # A newly created shard is absent from the searcher's cache until its next sync.
-            return False
-        return list(response.shard_ids) == [self.shard_id]
-
-    def resource_id(self, kind: Kind, external_id: str) -> str:
-        if kind not in ("node", "edge"):
-            raise ValueError(f"Unknown record kind: {kind}")
-        _nonempty(external_id)
-        return uuid5(UUID(self.tenant), json.dumps([kind, external_id])).hex
-
-    def get(self, kind: Kind, external_id: str) -> Record | None:
-        return self._get_resource(self.resource_id(kind, external_id))
-
-    def _get_resource(self, rid: str) -> Record | None:
-        response = self.nidx.searcher.ExtractedTexts(
-            nidx_pb2.ExtractedTextsRequest(
-                shard_id=self.shard_id,
-                field_ids=[
-                    nidx_pb2.ExtractedTextsRequest.FieldId(rid=rid, field_type="a", field_name="lpg")
-                ],
-            ),
-            timeout=RPC_TIMEOUT,
-        )
-        raw = response.fields.get(f"{rid}/{ENVELOPE_FIELD}")
-        if raw is None:
-            return None
-        record = Record(**json.loads(raw))
-        if record.tenant != self.tenant or self.resource_id(record.kind, record.id) != rid:
-            raise ValueError("Stored record identity does not match tenant/resource")
-        return record
-
-    def find(self, kind: Kind, *filters: PropertyFilter) -> list[Record]:
-        expression = self._filter(kind, filters)
-        assert expression is not None
-        return self._find(expression)
-
-    @staticmethod
-    def _filter(
-        kind: Kind | None, filters: Sequence[PropertyFilter]
-    ) -> reader.JsonFilterExpression | None:
-        if kind is not None and kind not in ("node", "edge"):
-            raise ValueError(f"Unknown record kind: {kind}")
-        expressions = []
-        if kind is not None:
-            expressions.append(
-                reader.JsonFilterExpression(
-                    path=reader.JsonFieldPathFilter(field_id=ENVELOPE_FIELD, json_path="kind", text=kind)
-                )
-            )
-        expressions.extend(predicate.expression() for predicate in filters)
-        if not expressions:
-            return None
-        return reader.JsonFilterExpression(
-            bool_and=reader.JsonFilterExpression.List(operands=expressions)
-        )
-
-    def search(
-        self,
-        *,
-        text: str | None = None,
-        vector: Sequence[float] | None = None,
-        kind: Kind | None = None,
-        text_property: str | None = None,
-        filters: Sequence[PropertyFilter] = (),
-        top_k: int = 10,
-        rrf_k: int = 60,
-    ) -> list[SearchHit]:
-        """Search text chunks with BM25, cosine vectors, or reciprocal-rank fusion."""
-        if (text is None or not text.strip()) and vector is None:
-            raise ValueError("Provide nonempty text, an embedding, or both")
-        if text is not None and not text.strip():
-            raise ValueError("Text query cannot be empty")
-        if vector is not None:
-            if len(vector) != self.vector_dimension:
-                raise ValueError(f"Query vector must have exactly {self.vector_dimension} dimensions")
-            if any(type(value) not in (int, float) or not math.isfinite(value) for value in vector):
-                raise ValueError("Query vector values must be finite numbers")
-            if not any(value != 0 for value in vector):
-                raise ValueError("Zero vectors are not supported with cosine similarity")
-        if text_property is not None:
-            _property_key(text_property)
-        if not 1 <= top_k <= self.max_records:
-            raise ValueError(f"top_k must be between 1 and {self.max_records}")
-        if rrf_k < 1:
-            raise ValueError("rrf_k must be positive")
-
-        request = reader.SearchRequest(
-            shard_ids=[self.shard_id],
-            body=text or "",
-            paragraph=text is not None,
-            vector=list(vector) if vector is not None else [],
-            vectorset=self.vectorset if vector is not None else "",
-            result_per_page=self.max_records + 1,
-            with_duplicates=True,
-        )
-        if text_property is not None:
-            request.field_filter.CopyFrom(
-                reader.FilterExpression(
-                    field=reader.FilterExpression.FieldFilter(
-                        field_type="t", field_id=_property_key(text_property)
-                    )
-                )
-            )
-        json_filter = self._filter(kind, filters)
-        if json_filter is not None:
-            request.json_filter.CopyFrom(json_filter)
-        response = self.nidx.searcher.Search(request, timeout=RPC_TIMEOUT)
-        self._complete(response.shard_ids)
-
-        ranks: dict[str, dict[str, int]] = {}
-        if text is not None:
-            paragraph_response = response.paragraph
-            property_hits = [
-                hit for hit in paragraph_response.results if hit.field.strip("/").startswith("t/p_")
-            ]
-            if paragraph_response.next_page or len(property_hits) > self.max_records:
-                raise RuntimeError("Text search candidate limit exceeded; result would be incomplete")
-            for rank, hit in enumerate(property_hits, start=1):
-                field = hit.field.strip("/")
-                ref = _parse_chunk_id(f"{hit.uuid}/{field}/{hit.start}-{hit.end}")
-                ranks.setdefault(ref.id, {})["text"] = rank
-        if vector is not None:
-            for rank, vector_hit in enumerate(response.vector.documents, start=1):
-                if vector_hit.doc_id is None:
-                    raise RuntimeError("nidx returned a vector result without an ID")
-                ref = _parse_chunk_id(vector_hit.doc_id.id)
-                ranks.setdefault(ref.id, {})["vector"] = rank
-            if len(response.vector.documents) > self.max_records:
-                raise RuntimeError("Vector search candidate limit exceeded; result may be incomplete")
-        if not ranks:
-            return []
-
-        request_texts = nidx_pb2.ExtractedTextsRequest(shard_id=self.shard_id)
-        refs = {chunk_id: _parse_chunk_id(chunk_id) for chunk_id in ranks}
-        resource_ids = sorted({ref.resource_id for ref in refs.values()})
-        for rid in resource_ids:
-            request_texts.field_ids.add(rid=rid, field_type="a", field_name="lpg")
-        for ref in refs.values():
-            field_type, field_name = ref.field.split("/", 1)
-            request_texts.paragraph_ids.add(
-                rid=ref.resource_id,
-                field_type=field_type,
-                field_name=field_name,
-                paragraph_start=ref.start,
-                paragraph_end=ref.end,
-            )
-        hydrated = self.nidx.searcher.ExtractedTexts(request_texts, timeout=RPC_TIMEOUT)
-
-        records: dict[str, Record] = {}
-        for rid in resource_ids:
-            raw = hydrated.fields.get(f"{rid}/{ENVELOPE_FIELD}")
-            if raw is None:
-                raise RuntimeError("Search candidate disappeared during record hydration")
-            record = Record(**json.loads(raw))
-            if record.tenant != self.tenant or self.resource_id(record.kind, record.id) != rid:
-                raise ValueError("Stored record identity does not match tenant/resource")
-            if kind is not None and record.kind != kind:
-                raise RuntimeError("Search returned a record outside the requested kind")
-            records[rid] = record
-
-        property_names: dict[tuple[str, str], str] = {}
-        chunk_indices: dict[tuple[str, str, int, int], int] = {}
-        for rid, record in records.items():
-            for property_name, chunk_index, start, end in _chunk_layout(record):
-                token = _property_key(property_name)
-                property_names[(rid, token)] = property_name
-                chunk_indices[(rid, f"t/{token}", start, end)] = chunk_index
-
-        hits = []
-        for chunk_id, modality_ranks in ranks.items():
-            ref = refs[chunk_id]
-            property_token = ref.field.split("/", 1)[1]
-            matched_property = property_names.get((ref.resource_id, property_token))
-            matched_chunk_index = chunk_indices.get((ref.resource_id, ref.field, ref.start, ref.end))
-            if matched_property is None or matched_chunk_index is None:
-                raise RuntimeError("Search result references a stale or unknown text chunk")
-            if text_property is not None and matched_property != text_property:
-                raise RuntimeError("Search returned a different text property than requested")
-            chunk_text = hydrated.paragraphs.get(chunk_id)
-            if chunk_text is None:
-                raise RuntimeError("nidx could not hydrate the matched text chunk")
-            score = sum(1 / (rrf_k + rank) for rank in modality_ranks.values())
-            hits.append(
-                SearchHit(
-                    record=records[ref.resource_id],
-                    property=matched_property,
-                    chunk_index=matched_chunk_index,
-                    text=chunk_text,
-                    score=score,
-                    text_rank=modality_ranks.get("text"),
-                    vector_rank=modality_ranks.get("vector"),
-                )
-            )
-        return sorted(
-            hits,
-            key=lambda hit: (
-                -hit.score,
-                hit.record.id,
-                hit.property,
-                hit.chunk_index,
-            ),
-        )[:top_k]
-
-    def _find(self, expression: reader.JsonFilterExpression) -> list[Record]:
-        response = self.nidx.searcher.Search(
-            reader.SearchRequest(
-                shard_ids=[self.shard_id],
-                paragraph=True,
-                result_per_page=self.max_records + 1,
-                json_filter=expression,
-            ),
-            timeout=RPC_TIMEOUT,
-        )
-        self._complete(response.shard_ids)
-        if response.paragraph.next_page or len(response.paragraph.results) > self.max_records:
-            raise RuntimeError("Prototype candidate limit exceeded; result would be incomplete")
-        records = []
-        seen = set()
-        for hit in response.paragraph.results:
-            if hit.uuid in seen:
-                continue
-            seen.add(hit.uuid)
-            record = self._get_resource(hit.uuid)
-            if record is None:
-                raise RuntimeError("Candidate disappeared during hydration; retry the query")
-            records.append(record)
-        return sorted(records, key=lambda record: record.id)
-
-    def upsert_node(
-        self,
-        id: str,
-        labels: list[str],
-        properties: dict[str, Scalar],
-        *,
-        text_chunks: dict[str, list[str]] | None = None,
-        embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
-    ) -> Record:
-        current = self.get("node", id)
-        if current is not None and current.deleting:
-            raise ValueError("Finish the pending node deletion before replacing it")
-        chunks = text_chunks or {}
-        record = Record(self.tenant, "node", id, properties, labels=labels, text_chunks=chunks)
-        if current is not None and set(current.labels) != set(record.labels):
-            raise ValueError("Node labels/types are immutable; delete and recreate the node")
-        vectors = _validate_embeddings(chunks, embeddings, self.vector_dimension)
-        self._put(record, vectors)
-        return record
-
-    def upsert_edge(
-        self,
-        id: str,
-        source: str,
-        edge_type: str,
-        target: str,
-        properties: dict[str, Scalar],
-        *,
-        text_chunks: dict[str, list[str]] | None = None,
-        embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
-    ) -> Record:
-        chunks = text_chunks or {}
-        record = Record(
-            self.tenant,
-            "edge",
-            id,
-            properties,
-            source=source,
-            target=target,
-            edge_type=edge_type,
-            text_chunks=chunks,
-        )
-        current = self.get("edge", id)
-        if current is not None and current.edge_type != record.edge_type:
-            raise ValueError("Edge type is immutable; delete and recreate the edge")
-        vectors = _validate_embeddings(chunks, embeddings, self.vector_dimension)
-        for endpoint in (source, target):
-            node = self.get("node", endpoint)
-            if node is None or node.deleting:
-                raise ValueError(f"Endpoint {endpoint!r} is missing or being deleted")
-        self._put(record, vectors)
-        return record
-
-    def update_text_properties(
-        self,
-        kind: Kind,
-        id: str,
-        *,
-        text_chunks: Mapping[str, Sequence[str]] | None = None,
-        embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
-    ) -> Record:
-        """Add or replace text chunks and/or embeddings without replacing the LPG record."""
-        if not text_chunks and not embeddings:
-            raise ValueError("Provide text chunks, embeddings, or both")
-        current = self.get(kind, id)
-        if current is None:
-            raise ValueError(f"Cannot update text properties for missing {kind} {id!r}")
-        if current.deleting:
-            raise ValueError("Finish the pending deletion before updating text properties")
-        if text_chunks is not None and not isinstance(text_chunks, Mapping):
-            raise ValueError("Text chunks must map property names to chunk sequences")
-
-        updated_chunks = {
-            property_name: list(chunks) for property_name, chunks in current.text_chunks.items()
-        }
-        for property_name, chunks in (text_chunks or {}).items():
-            if not isinstance(chunks, Sequence) or isinstance(chunks, (str, bytes)):
-                raise ValueError("Each text property must contain a sequence of chunks")
-            updated_chunks[property_name] = list(chunks)
-
-        updated_record = replace(current, text_chunks=updated_chunks, revision=uuid4().hex)
-        vectors = _validate_embeddings(updated_chunks, embeddings, self.vector_dimension)
-        changed_properties = set(text_chunks or {}) | set(vectors)
-        rid = self.resource_id(kind, id)
-        vector_delete_prefixes = [
-            f"{rid}/t/{_property_key(property_name)}/" for property_name in sorted(changed_properties)
-        ]
-        self._put(
-            updated_record,
-            vectors,
-            vector_delete_prefixes=vector_delete_prefixes,
-        )
-        return updated_record
-
-    def _put(
-        self,
-        record: Record,
-        embeddings: dict[str, list[list[float]]] | None = None,
-        *,
-        delete_vectors: bool = True,
-        vector_delete_prefixes: Sequence[str] | None = None,
-    ) -> None:
-        rid = self.resource_id(record.kind, record.id)
-        envelope = json.dumps(asdict(record), allow_nan=False, sort_keys=True)
-        indexed = {
-            "kind": record.kind,
-            "revision": record.revision,
-            "properties": {
-                _property_key(key): value
-                for key, value in record.properties.items()
-                if value is not None
-            },
-        }
-        resource = resources.Resource(
-            resource=resources.ResourceID(uuid=rid, shard_id=self.shard_id),
-            shard_id=self.shard_id,
-            texts={ENVELOPE_FIELD: resources.TextInformation(text=envelope)},
-            json_fields={ENVELOPE_FIELD: resources.JsonFieldValue(value=json.dumps(indexed))},
-            texts_to_delete=[rid],
-            paragraphs_to_delete=[rid],
-            json_fields_to_delete=[rid],
-            relation_fields_to_delete=[RELATION_FIELD],
-        )
-        if delete_vectors:
-            prefixes = [rid] if vector_delete_prefixes is None else vector_delete_prefixes
-            resource.vector_prefixes_to_delete[self.vectorset].items.extend(prefixes)
-        resource.metadata.created.GetCurrentTime()
-        resource.metadata.modified.CopyFrom(resource.metadata.created)
-        resource.paragraphs[ENVELOPE_FIELD].paragraphs[
-            f"{rid}/{ENVELOPE_FIELD}/0-{len(envelope)}"
-        ].CopyFrom(resources.IndexParagraph(start=0, end=len(envelope), field=ENVELOPE_FIELD))
-        embeddings = embeddings or {}
-        for property_name, chunks in record.text_chunks.items():
-            field_id = f"t/{_property_key(property_name)}"
-            resource.texts[field_id].text = "\n".join(chunks)
-            offset = 0
-            for index, chunk in enumerate(chunks):
-                end = offset + len(chunk)
-                paragraph_id = _chunk_id(rid, property_name, offset, end)
-                paragraph = resources.IndexParagraph(start=offset, end=end, field=field_id, index=index)
-                vectors = embeddings.get(property_name)
-                if vectors is not None:
-                    paragraph.vectorsets_sentences[self.vectorset].sentences[paragraph_id].vector.extend(
-                        vectors[index]
-                    )
-                resource.paragraphs[field_id].paragraphs[paragraph_id].CopyFrom(paragraph)
-                offset = end + 1
-        if record.kind == "edge":
-            assert record.source is not None and record.target is not None
-            assert record.edge_type is not None
-            resource.field_relations[RELATION_FIELD].relations.add(
-                facets=[f"/lpg/edge/{rid}"],
-                relation=utils_pb2.Relation(
-                    source=utils_pb2.RelationNode(
-                        value=self.resource_id("node", record.source),
-                        ntype=utils_pb2.RelationNode.RESOURCE,
-                    ),
-                    to=utils_pb2.RelationNode(
-                        value=self.resource_id("node", record.target),
-                        ntype=utils_pb2.RelationNode.RESOURCE,
-                    ),
-                    relation=utils_pb2.Relation.OTHER,
-                    relation_label=record.edge_type,
-                ),
-            )
-        self.nidx.index(self._message(rid, writer.CREATION), resource)
-        self._wait(
-            lambda: self._visible(record, embeddings),
-            f"record {record.kind}/{record.id}",
-        )
-
-    def _visible(self, record: Record, embeddings: dict[str, list[list[float]]]) -> bool:
-        if self.get(record.kind, record.id) != record:
-            return False
-        matches = self._find(
-            reader.JsonFilterExpression(
-                path=reader.JsonFieldPathFilter(
-                    field_id=ENVELOPE_FIELD, json_path="revision", text=record.revision
-                )
-            )
-        )
-        if matches != [record]:
-            return False
-        rid = self.resource_id(record.kind, record.id)
-        topology = self._topology(rid=rid)
-        if record.kind == "node":
-            if topology.graph:
-                return False
-        else:
-            if len(topology.graph) != 1:
-                return False
-            assert record.source is not None and record.target is not None
-            path = topology.graph[0]
-            if not (
-                path.resource_field_id == f"{rid}/{RELATION_FIELD}"
-                and topology.nodes[path.source].value == self.resource_id("node", record.source)
-                and topology.nodes[path.destination].value == self.resource_id("node", record.target)
-                and topology.relations[path.relation].label == record.edge_type
-            ):
-                return False
-        if record.text_chunks:
-            request = nidx_pb2.ExtractedTextsRequest(shard_id=self.shard_id)
-            expected_chunks: dict[str, str] = {}
-            for property_name, chunk_index, start, end in _chunk_layout(record):
-                chunk_id = _chunk_id(rid, property_name, start, end)
-                expected_chunks[chunk_id] = record.text_chunks[property_name][chunk_index]
-                request.paragraph_ids.add(
-                    rid=rid,
-                    field_type="t",
-                    field_name=_property_key(property_name),
-                    paragraph_start=start,
-                    paragraph_end=end,
-                )
-            extracted = self.nidx.searcher.ExtractedTexts(request, timeout=RPC_TIMEOUT)
-            if any(extracted.paragraphs.get(chunk_id) != chunk for chunk_id, chunk in expected_chunks.items()):
-                return False
-        for property_name, vectors in embeddings.items():
-            chunks = [
-                (start, end) for name, _, start, end in _chunk_layout(record) if name == property_name
-            ]
-            for vector, (start, end) in zip(vectors, chunks, strict=True):
-                vector_ids = self._vector_search_ids(
-                    vector,
-                    text_property=property_name,
-                    revision=record.revision,
-                )
-                if _chunk_id(rid, property_name, start, end) not in vector_ids:
-                    return False
-        return True
-
-    def _vector_search_ids(
-        self,
-        vector: Sequence[float],
-        *,
-        text_property: str | None = None,
-        filters: Sequence[PropertyFilter] = (),
-        kind: Kind | None = None,
-        revision: str | None = None,
-    ) -> list[str]:
-        request = reader.SearchRequest(
-            shard_ids=[self.shard_id],
-            vector=list(vector),
-            vectorset=self.vectorset,
-            result_per_page=self.max_records + 1,
-            with_duplicates=True,
-        )
-        if text_property is not None:
-            request.field_filter.CopyFrom(
-                reader.FilterExpression(
-                    field=reader.FilterExpression.FieldFilter(
-                        field_type="t", field_id=_property_key(text_property)
-                    )
-                )
-            )
-        json_filter = self._filter(kind, filters)
-        if revision is not None:
-            revision_filter = reader.JsonFilterExpression(
-                path=reader.JsonFieldPathFilter(
-                    field_id=ENVELOPE_FIELD, json_path="revision", text=revision
-                )
-            )
-            json_filter = (
-                reader.JsonFilterExpression(
-                    bool_and=reader.JsonFilterExpression.List(
-                        operands=[json_filter, revision_filter]
-                    )
-                )
-                if json_filter is not None
-                else revision_filter
-            )
-        if json_filter is not None:
-            request.json_filter.CopyFrom(json_filter)
-        response = self.nidx.searcher.Search(request, timeout=RPC_TIMEOUT)
-        self._complete(response.shard_ids)
-        if len(response.vector.documents) > self.max_records:
-            raise RuntimeError("Vector search candidate limit exceeded; result may be incomplete")
-        return [
-            document.doc_id.id for document in response.vector.documents if document.doc_id is not None
-        ]
-
-    def topology(self, *filters: PropertyFilter) -> list[Record]:
-        """Return edge records via JSON-prefiltered topology, preserving parallel edges."""
-        json_filter = self._filter("edge", filters)
-        assert json_filter is not None
-        response = self.nidx.searcher.Search(
-            reader.SearchRequest(
-                shard_ids=[self.shard_id],
-                result_per_page=self.max_records + 1,
-                json_filter=json_filter,
-                graph_search=reader.SearchRequest.GraphSearch(
-                    query=reader.GraphQuery(
-                        path=reader.GraphQuery.PathQuery(path=reader.GraphQuery.Path())
-                    )
-                ),
-            ),
-            timeout=RPC_TIMEOUT,
-        )
-        self._complete(response.shard_ids)
-        if len(response.graph.graph) > self.max_records:
-            raise RuntimeError("Prototype topology limit exceeded; result would be incomplete")
-        records = []
-        for path in response.graph.graph:
-            rid, field_id = path.resource_field_id.split("/", 1)
-            record = self._get_resource(rid)
-            if record is None or record.kind != "edge" or field_id != RELATION_FIELD:
-                raise RuntimeError("Invalid topology ownership")
-            records.append(record)
-        if len({record.id for record in records}) != len(records):
-            raise RuntimeError("Duplicate topology revision visible")
-        return sorted(records, key=lambda record: record.id)
-
-    def _topology(self, *, rid: str) -> reader.GraphSearchResponse:
-        response = self.nidx.searcher.GraphSearch(
-            reader.GraphSearchRequest(
-                shard_ids=[self.shard_id],
-                top_k=2,
-                # Query ownership directly: a text prefilter could hide a stale triple
-                # after its owning text field has already disappeared.
-                query=reader.GraphQuery(
-                    path=reader.GraphQuery.PathQuery(
-                        facet=reader.GraphQuery.FacetFilter(facet=f"/lpg/edge/{rid}")
-                    )
-                ),
-            ),
-            timeout=RPC_TIMEOUT,
-        )
-        self._complete(response.shard_ids)
-        return response
-
-    def delete_edge(self, id: str) -> None:
-        self._delete("edge", id)
-
-    def delete_node(self, id: str, *, detach: bool = False) -> None:
-        record = self.get("node", id)
-        if record is None:
-            return
-        edges = [edge for edge in self.find("edge") if id in (edge.source, edge.target)]
-        if edges and not detach:
-            raise ValueError("Node has incident edges; use detach=True")
-        # A durable marker lets a new Python Graph instance resume a partial cascade.
-        self._put(
-            Record(
-                self.tenant,
-                "node",
-                id,
-                record.properties,
-                labels=record.labels,
-                deleting=True,
-                text_chunks=record.text_chunks,
-            ),
-            delete_vectors=False,
-        )
-        for edge in edges:
-            self.delete_edge(edge.id)
-        self._delete("node", id)
-
-    def _delete(self, kind: Kind, id: str) -> None:
-        rid = self.resource_id(kind, id)
-        self.nidx.index(self._message(rid, writer.DELETION))
-
-        def absent() -> bool:
-            if self.get(kind, id) is not None:
-                return False
-            candidates = self.nidx.searcher.Search(
-                reader.SearchRequest(
-                    shard_ids=[self.shard_id],
-                    paragraph=True,
-                    result_per_page=1,
-                    field_filter=reader.FilterExpression(
-                        resource=reader.FilterExpression.ResourceFilter(resource_id=rid)
-                    ),
-                ),
-                timeout=RPC_TIMEOUT,
-            )
-            self._complete(candidates.shard_ids)
-            return not candidates.paragraph.results and not self._topology(rid=rid).graph
-
-        self._wait(absent, f"deletion {kind}/{id}")
-
-    def _message(self, rid: str, kind: writer.TypeMessage.ValueType) -> writer.IndexMessage:
-        return writer.IndexMessage(shard=self.shard_id, resource=rid, kbid=self.tenant, typemessage=kind)
-
-    def _complete(self, shard_ids: Sequence[str]) -> None:
-        if list(shard_ids) != [self.shard_id]:
-            raise RuntimeError("nidx returned an incomplete shard response")
-
-    @staticmethod
-    def _wait(check: Callable[[], bool], description: str, timeout: float = 15) -> None:
-        deadline = time.monotonic() + timeout
-        while True:
-            if check():
-                return
-            if time.monotonic() >= deadline:
-                raise TimeoutError(f"Timed out waiting for nidx visibility: {description}")
-            time.sleep(0.05)
+        self._channel.close()
 
 
 def _lpg_kind(kind: Kind) -> nidx_pb2.LpgRecordKind.ValueType:
@@ -1046,9 +343,14 @@ def _kind_name(value: nidx_pb2.LpgRecordKind.ValueType) -> Kind:
     raise ValueError(f"Unknown NidxLPG record kind: {value}")
 
 
-def _to_lpg_property(value: Scalar) -> nidx_pb2.LpgProperty:
+def _to_lpg_property(value: PropertyValue) -> nidx_pb2.LpgProperty:
+    _property_value(value)
     result = nidx_pb2.LpgProperty()
-    if value is None:
+    if isinstance(value, datetime):
+        result.datetime = value.isoformat()
+    elif isinstance(value, list):
+        result.strings.CopyFrom(nidx_pb2.LpgStringList(values=value))
+    elif value is None:
         result.null_value = True
     elif type(value) is str:
         result.text = value
@@ -1063,8 +365,15 @@ def _to_lpg_property(value: Scalar) -> nidx_pb2.LpgProperty:
     return result
 
 
-def _from_lpg_property(value: nidx_pb2.LpgProperty) -> Scalar:
+def _from_lpg_property(value: nidx_pb2.LpgProperty) -> PropertyValue:
     kind = value.WhichOneof("value")
+    if kind == "datetime":
+        try:
+            return datetime.fromisoformat(value.datetime)
+        except ValueError as error:
+            raise ValueError(f"Invalid NidxLPG datetime property: {value.datetime!r}") from error
+    if kind == "strings":
+        return list(value.strings.values)
     if kind == "text":
         return value.text
     if kind == "integer":
@@ -1078,35 +387,6 @@ def _from_lpg_property(value: nidx_pb2.LpgProperty) -> Scalar:
             raise ValueError("Invalid NidxLPG null property")
         return None
     raise ValueError(f"Property type {kind!r} is not supported by the Python LPG facade")
-
-
-def _to_lpg_filter(predicate: PropertyFilter) -> nidx_pb2.LpgPropertyFilter:
-    predicate.expression()
-    result = nidx_pb2.LpgPropertyFilter(property=predicate.key)
-    if predicate.op == "eq":
-        if type(predicate.value) is bool:
-            result.boolean = predicate.value
-        elif type(predicate.value) is int:
-            result.integer = predicate.value
-        elif type(predicate.value) is float:
-            result.float = predicate.value
-        elif isinstance(predicate.value, str):
-            result.text = predicate.value
-        else:
-            raise ValueError("Null equality is not supported")
-    else:
-        bounds = [bound for bound in (predicate.lower, predicate.upper) if bound is not None]
-        if type(bounds[0]) is int:
-            if predicate.lower is not None:
-                result.integer_range.lower = predicate.lower
-            if predicate.upper is not None:
-                result.integer_range.upper = predicate.upper
-        else:
-            if predicate.lower is not None:
-                result.float_range.lower = predicate.lower
-            if predicate.upper is not None:
-                result.float_range.upper = predicate.upper
-    return result
 
 
 def _from_lpg_record(record: nidx_pb2.LpgRecord, tenant: str) -> Record:
@@ -1128,12 +408,12 @@ def _from_lpg_record(record: nidx_pb2.LpgRecord, tenant: str) -> Record:
     )
 
 
-class GraphV2:
+class Graph:
     """Python facade for the NidxLPG record and property APIs."""
 
     def __init__(
         self,
-        nidx: EmbeddedNidx,
+        nidx: NidxClient,
         tenant: str,
         shard_id: str,
         *,
@@ -1162,17 +442,27 @@ class GraphV2:
         vectorsets = nidx.api.ListVectorSets(resources.ShardId(id=self.shard_id), timeout=RPC_TIMEOUT)
         if self.vectorset not in vectorsets.vectorsets:
             raise ValueError(f"Shard is missing LPG property vectorset {self.vectorset!r}")
+        self._wait(self._shard_visible, "shard indexes")
+
+    def _shard_visible(self) -> bool:
+        try:
+            self._get_proto("node", "__lpg_readiness__")
+        except grpc.RpcError as error:
+            if error.code() != grpc.StatusCode.NOT_FOUND:
+                raise
+            return False
+        return True
 
     @classmethod
     def create(
         cls,
-        nidx: EmbeddedNidx,
+        nidx: NidxClient,
         tenant: str,
         *,
         vectorset: str = DEFAULT_VECTORSET,
         vector_dimension: int = DEFAULT_VECTOR_DIMENSION,
         max_records: int = 1000,
-    ) -> GraphV2:
+    ) -> Graph:
         tenant = str(UUID(tenant))
         _nonempty(vectorset)
         if not 1 <= vector_dimension <= 4096:
@@ -1213,9 +503,7 @@ class GraphV2:
             raise RuntimeError("NidxLPG returned an invalid operation result count")
         result = response.results[0]
         if result.status != nidx_pb2.LPG_OPERATION_STATUS_APPLIED:
-            raise RuntimeError(
-                f"NidxLPG operation failed ({result.error_code}): {result.error_message}"
-            )
+            raise RuntimeError(f"NidxLPG operation failed ({result.error_code}): {result.error_message}")
         return result
 
     def _get_proto(self, kind: Kind, id: str) -> nidx_pb2.LpgRecord | None:
@@ -1238,8 +526,6 @@ class GraphV2:
         self,
         record: Record,
         embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
-        *,
-        preserve: nidx_pb2.LpgRecord | None = None,
     ) -> nidx_pb2.LpgRecord:
         if record.tenant != self.tenant:
             raise ValueError("Record belongs to a different tenant")
@@ -1253,18 +539,18 @@ class GraphV2:
             deleting=record.deleting,
         )
         if record.kind == "edge":
-            assert record.source is not None and record.target is not None and record.edge_type is not None
+            assert (
+                record.source is not None and record.target is not None and record.edge_type is not None
+            )
             proto.source = record.source
             proto.target = record.target
             proto.edge_type = record.edge_type
         for name, chunks in record.text_chunks.items():
             text_property = nidx_pb2.LpgTextProperty(chunks=chunks)
             if name in vectors:
-                text_property.embeddings.extend(nidx_pb2.LpgVector(values=vector) for vector in vectors[name])
-            elif preserve is not None:
-                old_property = preserve.text_properties.get(name)
-                if old_property is not None and list(old_property.chunks) == chunks:
-                    text_property.embeddings.extend(old_property.embeddings)
+                text_property.embeddings.extend(
+                    nidx_pb2.LpgVector(values=vector) for vector in vectors[name]
+                )
             proto.text_properties[name].CopyFrom(text_property)
         return proto
 
@@ -1272,23 +558,18 @@ class GraphV2:
         self,
         record: Record,
         embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
-        *,
-        delete_vectors: bool = True,
-        vector_delete_prefixes: Sequence[str] | None = None,
     ) -> None:
-        del vector_delete_prefixes
-        preserve = None
-        if not delete_vectors:
-            preserve = self._get_proto(record.kind, record.id)
-        proto = self._to_proto(record, embeddings, preserve=preserve)
+        proto = self._to_proto(record, embeddings)
         self._operation(nidx_pb2.LpgOperation(upsert_record=proto))
-        self._wait(lambda: self.get(record.kind, record.id) == record, f"record {record.kind}/{record.id}")
+        self._wait(
+            lambda: self.get(record.kind, record.id) == record, f"record {record.kind}/{record.id}"
+        )
 
     def upsert_node(
         self,
         id: str,
         labels: list[str],
-        properties: dict[str, Scalar],
+        properties: dict[str, PropertyValue],
         *,
         text_chunks: dict[str, list[str]] | None = None,
         embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
@@ -1310,7 +591,7 @@ class GraphV2:
         source: str,
         edge_type: str,
         target: str,
-        properties: dict[str, Scalar],
+        properties: dict[str, PropertyValue],
         *,
         text_chunks: dict[str, list[str]] | None = None,
         embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
@@ -1352,7 +633,7 @@ class GraphV2:
             request = nidx_pb2.FindRecordsRequest(
                 graph_id=self.shard_id,
                 kind=_lpg_kind(kind),
-                filters=[_to_lpg_filter(predicate) for predicate in filters],
+                filters=[predicate.to_proto() for predicate in filters],
                 page_size=page_size,
                 page_token=token,
             )
@@ -1376,6 +657,95 @@ class GraphV2:
 
     def topology(self, *filters: PropertyFilter) -> list[Record]:
         return self._find("edge", filters)
+
+    def expand(
+        self,
+        node_ids: Sequence[str],
+        *,
+        direction: Direction,
+        edge_types: Sequence[str] = (),
+        edge_filters: Sequence[PropertyFilter] = (),
+        neighbor_label: str | None = None,
+        neighbor_filters: Sequence[PropertyFilter] = (),
+        candidate_limit: int = 1000,
+        max_results: int = 1000,
+    ) -> Expansion:
+        response = self.lpg.Expand(
+            nidx_pb2.ExpandRequest(
+                graph_id=self.shard_id,
+                node_ids=_string_sequence(node_ids),
+                direction=_lpg_direction(direction),
+                edge_types=_string_sequence(edge_types),
+                edge_filters=[predicate.to_proto() for predicate in edge_filters],
+                neighbor_label=neighbor_label,
+                neighbor_filters=[predicate.to_proto() for predicate in neighbor_filters],
+                candidate_limit=candidate_limit,
+                max_results=max_results,
+            ),
+            timeout=RPC_TIMEOUT,
+        )
+        edges = [_from_lpg_record(record, self.tenant) for record in response.edges]
+        neighbors = [_from_lpg_record(record, self.tenant) for record in response.neighbors]
+        matches = []
+        for match in response.matches:
+            if match.edge_index >= len(edges) or match.neighbor_index >= len(neighbors):
+                raise RuntimeError("NidxLPG returned an invalid expansion record index")
+            matches.append(
+                ExpansionMatch(
+                    node_id=match.node_id,
+                    edge=edges[match.edge_index],
+                    neighbor=neighbors[match.neighbor_index],
+                )
+            )
+        return Expansion(matches=matches, examined_edges=response.examined_edges)
+
+    def shortest_path(
+        self,
+        source: str,
+        target: str,
+        *,
+        direction: Direction,
+        edge_types: Sequence[str] = (),
+        edge_filters: Sequence[PropertyFilter] = (),
+        node_label: str | None = None,
+        node_filters: Sequence[PropertyFilter] = (),
+        node_filter_scope: NodeFilterScope = "all",
+        max_hops: int = 6,
+        max_visited_nodes: int = 1000,
+        max_examined_edges: int = 10000,
+    ) -> Path | None:
+        _nonempty(source)
+        _nonempty(target)
+        if node_filter_scope == "all":
+            scope = nidx_pb2.LPG_ALL_NODES
+        elif node_filter_scope == "intermediate":
+            scope = nidx_pb2.LPG_INTERMEDIATE_NODES
+        else:
+            raise ValueError(f"Unknown node filter scope: {node_filter_scope!r}")
+        response = self.lpg.ShortestPath(
+            nidx_pb2.ShortestPathRequest(
+                graph_id=self.shard_id,
+                source=source,
+                target=target,
+                direction=_lpg_direction(direction),
+                edge_types=_string_sequence(edge_types),
+                edge_filters=[predicate.to_proto() for predicate in edge_filters],
+                node_label=node_label,
+                node_filters=[predicate.to_proto() for predicate in node_filters],
+                node_filter_scope=scope,
+                max_hops=max_hops,
+                max_visited_nodes=max_visited_nodes,
+                max_examined_edges=max_examined_edges,
+            ),
+            timeout=RPC_TIMEOUT,
+        )
+        if not response.found:
+            return None
+        nodes = [_from_lpg_record(record, self.tenant) for record in response.nodes]
+        edges = [_from_lpg_record(record, self.tenant) for record in response.edges]
+        if len(nodes) != len(edges) + 1 or nodes[0].id != source or nodes[-1].id != target:
+            raise RuntimeError("NidxLPG returned an invalid shortest path")
+        return Path(nodes=nodes, edges=edges, examined_edges=response.examined_edges)
 
     def search(
         self,
@@ -1402,7 +772,7 @@ class GraphV2:
         if kind is not None and kind not in ("node", "edge"):
             raise ValueError(f"Unknown record kind: {kind}")
         if text_property is not None:
-            _property_key(text_property)
+            _validate_property_name(text_property)
         if not 1 <= top_k <= self.max_records:
             raise ValueError(f"top_k must be between 1 and {self.max_records}")
         if rrf_k < 1:
@@ -1411,7 +781,7 @@ class GraphV2:
         request = nidx_pb2.SearchChunksRequest(
             graph_id=self.shard_id,
             vector=list(vector) if vector is not None else [],
-            filters=[_to_lpg_filter(predicate) for predicate in filters],
+            filters=[predicate.to_proto() for predicate in filters],
             top_k=top_k,
             vectorset=self.vectorset,
             rrf_k=rrf_k,
@@ -1506,19 +876,15 @@ class GraphV2:
         if record is None:
             return
         incident_edges = self._find("edge", incident_node=id)
-        if incident_edges and not detach:
+        if incident_edges and not detach and not record.deleting:
             raise ValueError("Node has incident edges; use detach=True")
         self._operation(
-            nidx_pb2.LpgOperation(
-                delete_node=nidx_pb2.LpgNodeDeletion(id=id, detach=detach)
-            )
+            nidx_pb2.LpgOperation(delete_node=nidx_pb2.LpgNodeDeletion(id=id, detach=detach))
         )
         self._wait(lambda: self.get("node", id) is None, f"deletion node/{id}")
 
     def _delete(self, kind: Kind, id: str) -> None:
-        self._operation(
-            nidx_pb2.LpgOperation(delete_record=self._key(kind, id))
-        )
+        self._operation(nidx_pb2.LpgOperation(delete_record=self._key(kind, id)))
         self._wait(lambda: self.get(kind, id) is None, f"deletion {kind}/{id}")
 
     @staticmethod

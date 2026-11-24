@@ -3,7 +3,7 @@
 Status: the Python storage and hybrid-search spikes are implemented. A first
 Rust `NidxLPG` service is implemented on the Nidx API listener, including a
 single batched write RPC and separate read/search RPCs. The experimental
-`GraphV2` facade targets that contract, but its parity tests mock the service
+`Graph` facade targets that contract, but its parity tests mock the service
 and do not yet verify live Rust-service interoperability. The original Python
 spike and Rust service still use different record formats.
 
@@ -119,7 +119,7 @@ service if that boundary proves useful.
    separate record lookup, filtering, and hybrid-search RPCs. A write batch
    stops at its first failure; earlier operations remain applied, so batches
    are not transactions. The service uses a versioned Resource text-field
-   envelope and existing Indexer/Searcher services. GraphV2 targets this
+   envelope and existing Indexer/Searcher services. Graph targets this
    contract, but live interoperability tests remain to be added.
 2. **Read queries:** parameterized single-node and one-hop
    `MATCH / WHERE / RETURN`, with node and edge property filters; then a two-hop

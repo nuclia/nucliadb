@@ -3,12 +3,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Exercise Cypher against a real NidxLPG service and an isolated test graph."""
 
-import json
-import os
-import subprocess
 import time
+from collections import deque
 from collections.abc import Iterator
-from pathlib import Path
 from uuid import uuid4
 
 import grpc
@@ -30,70 +27,6 @@ def graph_path(row: dict[str, object]) -> GraphPath:
     value = row["path"]
     assert isinstance(value, GraphPath)
     return value
-
-
-@pytest.fixture
-def lpg_address(database_url: str, tmp_path: Path) -> Iterator[str]:
-    root = Path(__file__).resolve().parents[4]
-    build = subprocess.run(
-        [
-            "cargo",
-            "build",
-            "--manifest-path",
-            str(root / "nidx/Cargo.toml"),
-            "--no-default-features",
-            "--example",
-            "lpg_test_server",
-            "--message-format=json",
-        ],
-        env={**os.environ, "SQLX_OFFLINE": "true"},
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=600,
-    )
-    executable = next(
-        message["executable"]
-        for line in build.stdout.splitlines()
-        if (message := json.loads(line)).get("reason") == "compiler-artifact"
-        and message["target"]["name"] == "lpg_test_server"
-        and message.get("executable")
-    )
-    ready = tmp_path / "ready"
-    log_path = tmp_path / "nidx.log"
-    with log_path.open("w") as log:
-        process = subprocess.Popen(
-            [executable, str(ready)],
-            env={**os.environ, "LPG_TEST_DATABASE_URL": database_url},
-            stdin=subprocess.PIPE,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-        )
-        try:
-            deadline = time.monotonic() + 30
-            while not ready.exists():
-                if process.poll() is not None:
-                    raise RuntimeError(f"LPG test server failed:\n{log_path.read_text()}")
-                if time.monotonic() >= deadline:
-                    raise TimeoutError(f"LPG test server did not start:\n{log_path.read_text()}")
-                time.sleep(0.1)
-            address = ready.read_text()
-            with grpc.insecure_channel(address) as channel:
-                grpc.channel_ready_future(channel).result(timeout=10)
-            yield address
-        finally:
-            assert process.stdin is not None
-            process.stdin.close()
-            try:
-                process.wait(timeout=15)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=5)
-                raise TimeoutError(f"LPG test server did not stop:\n{log_path.read_text()}")
-            if process.returncode:
-                raise RuntimeError(
-                    f"LPG test server exited with {process.returncode}:\n{log_path.read_text()}"
-                )
 
 
 @pytest.fixture
@@ -690,3 +623,336 @@ def test_expand_limits_and_invalid_inputs(
         )
     assert error.value.code() == grpc.StatusCode.RESOURCE_EXHAUSTED
     assert "response byte limit" in (error.value.details() or "")
+
+
+@pytest.fixture
+def shortest_path_records(
+    cypher: Cypher, lpg_graph: tuple[nidx_pb2_grpc.NidxLPGStub, str]
+) -> list[nidx_pb2.LpgRecord]:
+    nodes = [
+        to_record(
+            {
+                "kind": "node",
+                "id": id,
+                "labels": ["Endpoint" if id in ("s", "t") else "Step"],
+                "properties": {
+                    "allowed": id not in ("s", "t", "b"),
+                    "region": "EU",
+                    "level": 1,
+                    "rating": 4.5,
+                },
+            }
+        )
+        for id in ("s", "t", "a", "b", "c", "d", "dead", "isolated")
+    ]
+    edges = [
+        to_record(
+            {
+                "kind": "edge",
+                "id": f"route-{index}",
+                "source": source,
+                "target": target,
+                "edge_type": "ROUTE",
+                "properties": {"enabled": enabled},
+            }
+        )
+        for index, (source, target, enabled) in enumerate(
+            [
+                ("s", "t", False),
+                ("s", "b", True),
+                ("b", "t", True),
+                ("s", "a", True),
+                ("s", "a", True),
+                ("a", "c", True),
+                ("c", "d", True),
+                ("d", "t", True),
+                ("s", "dead", True),
+                ("c", "a", True),
+                ("a", "a", True),
+            ]
+        )
+    ]
+    records = nodes + edges
+    response = lpg_graph[0].BulkLoad(
+        nidx_pb2.BulkLoadRequest(graph_id=cypher.graph_id, records=records), timeout=90
+    )
+    assert all(result.status == nidx_pb2.LPG_OPERATION_STATUS_APPLIED for result in response.results)
+    return records
+
+
+def test_shortest_path_directions_and_limits(
+    cypher: Cypher, lpg_graph: tuple[nidx_pb2_grpc.NidxLPGStub, str]
+) -> None:
+    client, graph_id = lpg_graph
+    request = nidx_pb2.ShortestPathRequest(
+        graph_id=graph_id,
+        source="p1",
+        target="p3",
+        direction=nidx_pb2.LPG_OUTGOING,
+        edge_types=["KNOWS"],
+        max_hops=2,
+        max_visited_nodes=4,
+        max_examined_edges=3,
+    )
+    result = client.ShortestPath(request, timeout=30)
+    assert result.found
+    assert [node.key.id for node in result.nodes] == ["p1", "p2", "p3"]
+    assert [edge.key.id for edge in result.edges] == ["k1", "k2"]
+    assert result.examined_edges == 3  # Includes the self-loop; it does not enter the path.
+    for field, value in (("max_hops", 1), ("max_visited_nodes", 3), ("max_examined_edges", 2)):
+        bounded = nidx_pb2.ShortestPathRequest()
+        bounded.CopyFrom(request)
+        setattr(bounded, field, value)
+        if field == "max_hops":
+            result = client.ShortestPath(bounded, timeout=30)
+            assert not result.found
+            assert not result.nodes and not result.edges
+        else:
+            with pytest.raises(grpc.RpcError) as error:
+                client.ShortestPath(bounded, timeout=30)
+            assert error.value.code() == grpc.StatusCode.RESOURCE_EXHAUSTED
+    request.source, request.target = "p3", "p1"
+    assert not client.ShortestPath(request, timeout=30).found
+    for direction in (nidx_pb2.LPG_INCOMING, nidx_pb2.LPG_BOTH):
+        request.direction = direction
+        request.max_examined_edges = 10
+        result = client.ShortestPath(request, timeout=30)
+        assert result.found
+        assert [node.key.id for node in result.nodes] == ["p3", "p2", "p1"]
+        assert [edge.key.id for edge in result.edges] == ["k2", "k1"]
+        assert [(edge.source, edge.target) for edge in result.edges] == [
+            ("p2", "p3"),
+            ("p1", "p2"),
+        ]
+    request.source = request.target = "p1"
+    request.max_visited_nodes = 1
+    result = client.ShortestPath(request, timeout=30)
+    assert result.found and not result.edges and result.examined_edges == 0
+    assert [node.key.id for node in result.nodes] == ["p1"]
+    for invalid in [
+        nidx_pb2.ShortestPathRequest(source="", target="p3", direction=nidx_pb2.LPG_BOTH),
+        nidx_pb2.ShortestPathRequest(source="p1", target="p3"),
+        nidx_pb2.ShortestPathRequest(
+            source="p1", target="p1", direction=nidx_pb2.LPG_BOTH, node_label=""
+        ),
+        nidx_pb2.ShortestPathRequest(
+            source="p1",
+            target="p3",
+            direction=nidx_pb2.LPG_BOTH,
+            edge_filters=[nidx_pb2.LpgPropertyFilter(property="since")],
+        ),
+        nidx_pb2.ShortestPathRequest(
+            source="p1",
+            target="p3",
+            direction=nidx_pb2.LPG_BOTH,
+            node_filters=[nidx_pb2.LpgPropertyFilter(property="rating", float=float("nan"))],
+        ),
+        nidx_pb2.ShortestPathRequest(source="p1", target="p1", direction=nidx_pb2.LPG_BOTH, max_hops=65),
+        nidx_pb2.ShortestPathRequest(
+            source="p1", target="p1", direction=nidx_pb2.LPG_BOTH, max_visited_nodes=10001
+        ),
+        nidx_pb2.ShortestPathRequest(
+            source="p1", target="p1", direction=nidx_pb2.LPG_BOTH, max_examined_edges=100001
+        ),
+    ]:
+        invalid.graph_id = graph_id
+        with pytest.raises(grpc.RpcError) as error:
+            client.ShortestPath(invalid, timeout=30)
+        assert error.value.code() == grpc.StatusCode.INVALID_ARGUMENT
+    for source, target in (("missing", "p1"), ("p1", "missing"), ("missing", "missing")):
+        with pytest.raises(grpc.RpcError) as error:
+            client.ShortestPath(
+                nidx_pb2.ShortestPathRequest(
+                    graph_id=graph_id, source=source, target=target, direction=nidx_pb2.LPG_BOTH
+                ),
+                timeout=30,
+            )
+        assert error.value.code() == grpc.StatusCode.NOT_FOUND
+
+
+def test_shortest_path_node_prefilters(
+    shortest_path_records: list[nidx_pb2.LpgRecord],
+    lpg_graph: tuple[nidx_pb2_grpc.NidxLPGStub, str],
+) -> None:
+    client, graph_id = lpg_graph
+    request = nidx_pb2.ShortestPathRequest(
+        graph_id=graph_id,
+        source="s",
+        target="t",
+        direction=nidx_pb2.LPG_OUTGOING,
+        edge_types=["ROUTE"],
+        edge_filters=[nidx_pb2.LpgPropertyFilter(property="enabled", boolean=True)],
+        max_hops=4,
+    )
+    assert len(client.ShortestPath(request, timeout=30).edges) == 2
+    request.node_label = "Step"
+    request.node_filters.extend(
+        [
+            nidx_pb2.LpgPropertyFilter(property="allowed", boolean=True),
+            nidx_pb2.LpgPropertyFilter(property="region", text="EU"),
+            nidx_pb2.LpgPropertyFilter(
+                property="level", integer_range=nidx_pb2.LpgIntegerRange(lower=1, upper=2)
+            ),
+            nidx_pb2.LpgPropertyFilter(property="rating", float=4.5),
+        ]
+    )
+    result = client.ShortestPath(request, timeout=30)
+    assert not result.found and result.examined_edges == 0  # Endpoints fail the default all-node filter.
+    request.node_filter_scope = nidx_pb2.LPG_INTERMEDIATE_NODES
+    result = client.ShortestPath(request, timeout=30)
+    assert result.found
+    assert [node.key.id for node in result.nodes] == ["s", "a", "c", "d", "t"]
+    assert len(result.edges) == 4
+    assert result.edges[0].key.id in ("route-3", "route-4")  # Parallel identities remain intact.
+    request.max_hops = 3
+    assert not client.ShortestPath(request, timeout=30).found
+    request.max_hops = 4
+    request.node_filters[1].text = "US"
+    assert not client.ShortestPath(request, timeout=30).found
+    request.node_filters[1].text = "EU"
+    request.node_filters[2].ClearField("integer_range")
+    request.node_filters[2].float = 1.0  # LPG predicates are typed, unlike Cypher numeric equality.
+    assert not client.ShortestPath(request, timeout=30).found
+    request.edge_filters.clear()
+    result = client.ShortestPath(request, timeout=30)
+    assert result.found and len(result.edges) == 1  # Intermediate-only filters exempt both endpoints.
+    request.source = request.target = "s"
+    result = client.ShortestPath(request, timeout=30)
+    assert result.found and len(result.nodes) == 1 and not result.edges
+    request.node_filter_scope = nidx_pb2.LPG_ALL_NODES
+    assert not client.ShortestPath(request, timeout=30).found
+    request.source = request.target = "a"
+    request.node_filters.pop()
+    request.node_filters.pop()
+    assert client.ShortestPath(request, timeout=30).found
+    request.target = "d"
+    result = client.ShortestPath(request, timeout=30)
+    assert result.found
+    assert [node.key.id for node in result.nodes] == ["a", "c", "d"]
+
+
+def test_shortest_path_matches_reference_bfs(
+    shortest_path_records: list[nidx_pb2.LpgRecord],
+    lpg_graph: tuple[nidx_pb2_grpc.NidxLPGStub, str],
+) -> None:
+    client, graph_id = lpg_graph
+    nodes = {r.key.id: r for r in shortest_path_records if r.key.kind == nidx_pb2.LPG_NODE}
+    edges = [
+        r
+        for r in shortest_path_records
+        if r.key.kind == nidx_pb2.LPG_EDGE and r.properties["enabled"].boolean
+    ]
+    for direction in (nidx_pb2.LPG_OUTGOING, nidx_pb2.LPG_INCOMING, nidx_pb2.LPG_BOTH):
+        adjacency: dict[str, set[str]] = {id: set() for id in nodes}
+        for edge in edges:
+            if direction in (nidx_pb2.LPG_OUTGOING, nidx_pb2.LPG_BOTH):
+                adjacency[edge.source].add(edge.target)
+            if direction in (nidx_pb2.LPG_INCOMING, nidx_pb2.LPG_BOTH):
+                adjacency[edge.target].add(edge.source)
+        for source, target in (
+            ("s", "t"),
+            ("t", "s"),
+            ("s", "d"),
+            ("d", "s"),
+            ("a", "t"),
+            ("c", "dead"),
+            ("s", "isolated"),
+            ("isolated", "t"),
+        ):
+            for filtered in (False, True):
+                queue = deque([(source, 0)])
+                visited = {source}
+                distance = None
+                while queue:
+                    node, depth = queue.popleft()
+                    if node == target:
+                        distance = depth
+                        break
+                    for neighbor in adjacency[node]:
+                        if neighbor in visited or (
+                            filtered
+                            and neighbor not in (source, target)
+                            and not nodes[neighbor].properties["allowed"].boolean
+                        ):
+                            continue
+                        visited.add(neighbor)
+                        queue.append((neighbor, depth + 1))
+                for max_hops in (1, 2, 4):
+                    request = nidx_pb2.ShortestPathRequest(
+                        graph_id=graph_id,
+                        source=source,
+                        target=target,
+                        direction=direction,
+                        edge_types=["ROUTE"],
+                        edge_filters=[nidx_pb2.LpgPropertyFilter(property="enabled", boolean=True)],
+                        node_filter_scope=nidx_pb2.LPG_INTERMEDIATE_NODES,
+                        max_hops=max_hops,
+                    )
+                    if filtered:
+                        request.node_filters.append(
+                            nidx_pb2.LpgPropertyFilter(property="allowed", boolean=True)
+                        )
+                    result = client.ShortestPath(request, timeout=30)
+                    assert result.found == (distance is not None and distance <= max_hops)
+                    if not result.found:
+                        assert not result.nodes and not result.edges
+                        continue
+                    assert len(result.edges) == distance
+                    ids = [node.key.id for node in result.nodes]
+                    assert ids[0] == source and ids[-1] == target
+                    assert len(ids) == len(set(ids)) == len(result.edges) + 1
+                    if filtered:
+                        assert all(nodes[id].properties["allowed"].boolean for id in ids[1:-1])
+                    for start, edge, end in zip(ids, result.edges, ids[1:]):
+                        assert edge in edges
+                        if direction == nidx_pb2.LPG_OUTGOING:
+                            assert (edge.source, edge.target) == (start, end)
+                        elif direction == nidx_pb2.LPG_INCOMING:
+                            assert (edge.source, edge.target) == (end, start)
+                        else:
+                            assert {edge.source, edge.target} == {start, end}
+
+
+@pytest.fixture
+def large_shortest_path(cypher: Cypher, lpg_graph: tuple[nidx_pb2_grpc.NidxLPGStub, str]) -> None:
+    client, graph_id = lpg_graph
+    records = [
+        to_record({"kind": "node", "id": id, "labels": ["LargePath"], "properties": {}})
+        for id in ("large-start", "large-mid", "large-end")
+    ] + [
+        to_record(
+            {
+                "kind": "edge",
+                "id": f"large-path-{index}",
+                "source": source,
+                "target": target,
+                "edge_type": "LARGE_PATH",
+                "properties": {"payload": "x" * 1_600_000},
+            }
+        )
+        for index, (source, target) in enumerate(
+            [("large-start", "large-mid"), ("large-mid", "large-end")]
+        )
+    ]
+    loaded = client.BulkLoad(nidx_pb2.BulkLoadRequest(graph_id=graph_id, records=records), timeout=90)
+    assert all(result.status == nidx_pb2.LPG_OPERATION_STATUS_APPLIED for result in loaded.results)
+
+
+def test_shortest_path_response_byte_limit(
+    large_shortest_path: None, lpg_graph: tuple[nidx_pb2_grpc.NidxLPGStub, str]
+) -> None:
+    client, graph_id = lpg_graph
+    with pytest.raises(grpc.RpcError) as error:
+        client.ShortestPath(
+            nidx_pb2.ShortestPathRequest(
+                graph_id=graph_id,
+                source="large-start",
+                target="large-end",
+                direction=nidx_pb2.LPG_OUTGOING,
+                edge_types=["LARGE_PATH"],
+                max_hops=2,
+            ),
+            timeout=30,
+        )
+    assert error.value.code() == grpc.StatusCode.RESOURCE_EXHAUSTED
+    assert "shortest path response byte limit" in (error.value.details() or "")

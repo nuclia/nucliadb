@@ -33,7 +33,7 @@ from nidx.examples.lpg.storage import (
     RPC_TIMEOUT,
     EmbeddedNidx,
     Graph,
-    GraphV2,
+    Graph,
     Kind,
     PropertyFilter,
     Record,
@@ -446,7 +446,7 @@ def ids(records: list[Record]) -> list[str]:
 
 
 def test_records_filters_and_reopen(nidx: EmbeddedNidx) -> None:
-    graph = GraphV2.create(nidx, str(uuid4()))
+    graph = Graph.create(nidx, str(uuid4()))
     product = graph.upsert_node(
         "P1",
         ["Product", "Sellable"],
@@ -484,14 +484,14 @@ def test_records_filters_and_reopen(nidx: EmbeddedNidx) -> None:
     ) == ["P1"]
     assert graph.topology() == []  # Isolated nodes need no artificial self-edge.
 
-    reopened = GraphV2(nidx, graph.tenant, graph.shard_id)
+    reopened = Graph(nidx, graph.tenant, graph.shard_id)
     assert reopened.get("node", "P1") == product
     assert ids(reopened.find("node")) == ["P1", "W1"]
     assert not list(nidx.inbox.iterdir())
 
 
 def test_parallel_edges_typed_graph_prefilter_and_replacement(nidx: EmbeddedNidx) -> None:
-    graph = GraphV2.create(nidx, str(uuid4()))
+    graph = Graph.create(nidx, str(uuid4()))
     graph.upsert_node("P1", ["Product"], {"category": "electronics"})
     graph.upsert_node("W1", ["Warehouse"], {"country": "Spain"})
     graph.upsert_node("W2", ["Warehouse"], {"country": "France"})
@@ -517,7 +517,7 @@ def test_parallel_edges_typed_graph_prefilter_and_replacement(nidx: EmbeddedNidx
 
 
 def test_text_vector_and_hybrid_chunk_search(nidx: EmbeddedNidx) -> None:
-    graph = GraphV2.create(nidx, str(uuid4()))
+    graph = Graph.create(nidx, str(uuid4()))
     product = graph.upsert_node(
         "P1",
         ["Product"],
@@ -633,7 +633,7 @@ def test_text_vector_and_hybrid_chunk_search(nidx: EmbeddedNidx) -> None:
     )
     assert specific_edge_property_hits[0].property == "inspection"
 
-    other_tenant = GraphV2.create(nidx, str(uuid4()))
+    other_tenant = Graph.create(nidx, str(uuid4()))
     other = other_tenant.upsert_node(
         "P1",
         ["Product"],
@@ -663,7 +663,7 @@ def test_text_vector_and_hybrid_chunk_search(nidx: EmbeddedNidx) -> None:
 
 
 def test_text_chunks_and_embeddings_can_be_added_independently(nidx: EmbeddedNidx) -> None:
-    graph = GraphV2.create(nidx, str(uuid4()))
+    graph = Graph.create(nidx, str(uuid4()))
     with pytest.raises(ValueError, match="missing node"):
         graph.update_text_properties("node", "missing", text_chunks={"description": ["text"]})
     node = graph.upsert_node("P1", ["Product"], {"category": "fruit"})
@@ -739,13 +739,13 @@ def test_invalid_text_chunk_embeddings(
     chunks: dict[str, list[str]],
     vectors: Mapping[str, Sequence[Sequence[float]]],
 ) -> None:
-    graph = GraphV2.create(nidx, str(uuid4()))
+    graph = Graph.create(nidx, str(uuid4()))
     with pytest.raises(ValueError):
         graph.upsert_node("P1", ["Product"], {}, text_chunks=chunks, embeddings=vectors)
 
 
 def test_invalid_hybrid_search_queries(nidx: EmbeddedNidx) -> None:
-    graph = GraphV2.create(nidx, str(uuid4()))
+    graph = Graph.create(nidx, str(uuid4()))
     with pytest.raises(ValueError, match="Provide"):
         graph.search()
     with pytest.raises(ValueError, match="exactly 3"):
@@ -757,8 +757,8 @@ def test_invalid_hybrid_search_queries(nidx: EmbeddedNidx) -> None:
 
 
 def test_node_replacement_and_tenant_isolation(nidx: EmbeddedNidx) -> None:
-    first = GraphV2.create(nidx, str(uuid4()))
-    second = GraphV2.create(nidx, str(uuid4()))
+    first = Graph.create(nidx, str(uuid4()))
+    second = Graph.create(nidx, str(uuid4()))
     first.upsert_node("P1", ["Product"], {"price": 150, "old": "remove me"})
     other = second.upsert_node("P1", ["Client"], {"price": 999})
     updated = first.upsert_node("P1", ["Product"], {"price": 80})
@@ -769,7 +769,7 @@ def test_node_replacement_and_tenant_isolation(nidx: EmbeddedNidx) -> None:
     with pytest.raises(ValueError, match="Node labels/types are immutable"):
         first.upsert_node("P1", ["Discounted"], {"price": 80})
     with pytest.raises(ValueError, match="does not belong"):
-        GraphV2(nidx, first.tenant, second.shard_id)
+        Graph(nidx, first.tenant, second.shard_id)
     first.upsert_node("W1", ["Warehouse"], {})
     second.upsert_node("W1", ["Warehouse"], {})
     first.upsert_edge("E1", "P1", "STOCKED_AT", "W1", {"quantity": 10})
@@ -784,7 +784,7 @@ def test_node_replacement_and_tenant_isolation(nidx: EmbeddedNidx) -> None:
 
 
 def test_cascade_and_resume_from_persisted_marker(nidx: EmbeddedNidx) -> None:
-    graph = GraphV2.create(nidx, str(uuid4()))
+    graph = Graph.create(nidx, str(uuid4()))
     graph.upsert_node("P1", ["Product"], {})
     graph.upsert_node("W1", ["Warehouse"], {})
     graph.upsert_node("C1", ["Client"], {})
@@ -801,7 +801,7 @@ def test_cascade_and_resume_from_persisted_marker(nidx: EmbeddedNidx) -> None:
     # Simulate interruption after the durable marker and one incident-edge deletion.
     graph._put(Record(graph.tenant, "node", "P1", {}, labels=["Product"], deleting=True))
     graph.delete_edge("E1")
-    reopened = GraphV2(nidx, graph.tenant, graph.shard_id)
+    reopened = Graph(nidx, graph.tenant, graph.shard_id)
     with pytest.raises(ValueError, match="missing or being deleted"):
         reopened.upsert_edge("late", "P1", "STOCKED_AT", "W1", {})
     reopened.delete_node("P1", detach=True)
@@ -813,7 +813,7 @@ def test_cascade_and_resume_from_persisted_marker(nidx: EmbeddedNidx) -> None:
 
 
 def test_invalid_endpoints_and_candidate_limit(nidx: EmbeddedNidx) -> None:
-    graph = GraphV2.create(nidx, str(uuid4()))
+    graph = Graph.create(nidx, str(uuid4()))
     graph.upsert_node("P1", ["Product"], {})
     with pytest.raises(ValueError, match="missing"):
         graph.upsert_edge("E1", "P1", "STOCKED_AT", "missing", {})
@@ -821,7 +821,7 @@ def test_invalid_endpoints_and_candidate_limit(nidx: EmbeddedNidx) -> None:
     graph.upsert_node("W1", ["Warehouse"], {})
     graph.upsert_edge("E1", "P1", "STOCKED_AT", "W1", {})
     graph.upsert_edge("E2", "P1", "STOCKED_AT", "W1", {})
-    bounded = GraphV2(nidx, graph.tenant, graph.shard_id, max_records=1)
+    bounded = Graph(nidx, graph.tenant, graph.shard_id, max_records=1)
     with pytest.raises(RuntimeError, match="limit exceeded"):
         bounded.find("node")
     with pytest.raises(RuntimeError, match="limit exceeded"):
@@ -836,7 +836,7 @@ def test_binding_restart_and_demo(database_url: str, tmp_path: Path) -> None:
     original = EmbeddedNidx(database_url, tmp_path)
     try:
         original.lpg_client = MockNidxLpgClient(original)
-        graph = GraphV2.create(original, str(uuid4()))
+        graph = Graph.create(original, str(uuid4()))
         product = graph.upsert_node("P1", ["Product"], {"price": 150})
         graph.upsert_node("W1", ["Warehouse"], {})
         edge = graph.upsert_edge("E1", "P1", "STOCKED_AT", "W1", {"quantity": 10})
@@ -847,7 +847,7 @@ def test_binding_restart_and_demo(database_url: str, tmp_path: Path) -> None:
     restarted = EmbeddedNidx(database_url, tmp_path)
     try:
         restarted.lpg_client = MockNidxLpgClient(restarted)
-        reopened = GraphV2(restarted, tenant, shard_id)
+        reopened = Graph(restarted, tenant, shard_id)
         assert reopened.get("node", "P1") == product
         assert reopened.get("edge", "E1") == edge
         assert reopened.topology(PropertyFilter("quantity", "eq", value=10)) == [edge]

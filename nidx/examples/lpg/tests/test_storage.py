@@ -17,21 +17,31 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-import os
 import subprocess
 import sys
 from collections.abc import Iterator, Mapping, Sequence
-from pathlib import Path
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+import grpc
 import pytest
+from nidx_protos import nidx_pb2
 
-from nidx.examples.lpg.storage import EmbeddedNidx, Graph, PropertyFilter, Record
+from nidx.examples.lpg.storage import (
+    Direction,
+    Graph,
+    NidxClient,
+    PropertyFilter,
+    PropertyValue,
+    Record,
+    _from_lpg_property,
+    _to_lpg_property,
+)
 
 
 @pytest.fixture
-def nidx(database_url: str, tmp_path: Path) -> Iterator[EmbeddedNidx]:
-    instance = EmbeddedNidx(database_url, tmp_path)
+def nidx(lpg_address: str) -> Iterator[NidxClient]:
+    instance = NidxClient(lpg_address)
     try:
         yield instance
     finally:
@@ -42,7 +52,177 @@ def ids(records: list[Record]) -> list[str]:
     return [record.id for record in records]
 
 
-def test_records_filters_and_reopen(nidx: EmbeddedNidx) -> None:
+@pytest.fixture
+def connected_graph(nidx: NidxClient) -> Graph:
+    graph = Graph.create(nidx, str(uuid4()))
+    for id, label, active, age, country in [
+        ("A", "Person", True, 30, "ES"),
+        ("B", "Person", False, 40, "ES"),
+        ("C", "Person", True, 35, "FR"),
+        ("X", "Company", True, 10, "ES"),
+        ("isolated", "Person", True, 25, "ES"),
+    ]:
+        graph.upsert_node(
+            id,
+            [label],
+            {"active": active, "age": age, "country": country, "rating": 4.5},
+        )
+    for id, source, edge_type, target, trusted, since, score in [
+        ("ab1", "A", "KNOWS", "B", True, 2020, 0.9),
+        ("ab2", "A", "KNOWS", "B", False, 2024, 0.4),
+        ("bc", "B", "KNOWS", "C", True, 2021, 0.8),
+        ("ax", "A", "WORKS_FOR", "X", True, 2018, 0.9),
+        ("xc", "X", "EMPLOYS", "C", True, 2023, 0.9),
+        ("loop", "A", "KNOWS", "A", True, 1990, 1.0),
+    ]:
+        graph.upsert_edge(
+            id, source, edge_type, target, {"trusted": trusted, "since": since, "score": score}
+        )
+    return graph
+
+
+def test_expand_records_filters_and_limits(connected_graph: Graph) -> None:
+    graph = connected_graph
+    result = graph.expand(
+        ["A", "B", "A"],
+        direction="outgoing",
+        edge_types=["KNOWS"],
+        candidate_limit=4,
+        max_results=4,
+    )
+    assert {(match.node_id, match.edge.id, match.neighbor.id) for match in result.matches} == {
+        ("A", "ab1", "B"),
+        ("A", "ab2", "B"),
+        ("A", "loop", "A"),
+        ("B", "bc", "C"),
+    }
+    assert result.examined_edges == 4
+    assert all(match.edge.kind == "edge" and match.neighbor.kind == "node" for match in result.matches)
+    assert all(match.neighbor.tenant == graph.tenant for match in result.matches)
+    incoming = graph.expand(["B"], direction="incoming", edge_types=["KNOWS"])
+    assert {(match.edge.id, match.neighbor.id) for match in incoming.matches} == {
+        ("ab1", "A"),
+        ("ab2", "A"),
+    }
+    assert all(match.edge.source == "A" and match.edge.target == "B" for match in incoming.matches)
+    both = graph.expand(["A", "B"], direction="both", edge_types=["KNOWS"])
+    assert len(both.matches) == 6 and both.examined_edges == 4
+    filtered = graph.expand(
+        ["A", "B"],
+        direction="outgoing",
+        edge_types=["KNOWS"],
+        edge_filters=[
+            PropertyFilter("trusted", "eq", value=True),
+            PropertyFilter("since", "range", lower=2020),
+            PropertyFilter("score", "range", lower=0.8),
+        ],
+        neighbor_label="Person",
+        neighbor_filters=[
+            PropertyFilter("active", "eq", value=True),
+            PropertyFilter("country", "eq", value="FR"),
+            PropertyFilter("age", "eq", value=35),
+            PropertyFilter("rating", "eq", value=4.5),
+        ],
+    )
+    assert [(match.node_id, match.edge.id, match.neighbor.id) for match in filtered.matches] == [
+        ("B", "bc", "C")
+    ]
+    assert filtered.examined_edges == 2
+    assert filtered.matches[0].edge == graph.get("edge", "bc")
+    assert filtered.matches[0].neighbor == graph.get("node", "C")
+    alternatives = graph.expand(["A", "X"], direction="outgoing", edge_types=["WORKS_FOR", "EMPLOYS"])
+    assert {match.edge.id for match in alternatives.matches} == {"ax", "xc"}
+    assert not graph.expand(["isolated"], direction="both").matches
+    for limited in (
+        lambda: graph.expand(["A", "B"], direction="outgoing", edge_types=["KNOWS"], candidate_limit=3),
+        lambda: graph.expand(["A", "B"], direction="outgoing", edge_types=["KNOWS"], max_results=3),
+    ):
+        with pytest.raises(grpc.RpcError) as error:
+            limited()
+        assert error.value.code() == grpc.StatusCode.RESOURCE_EXHAUSTED
+    with pytest.raises(grpc.RpcError) as error:
+        graph.expand(["missing"], direction="outgoing")
+    assert error.value.code() == grpc.StatusCode.NOT_FOUND
+    with pytest.raises(ValueError, match="sequence"):
+        graph.expand("A", direction="outgoing")
+
+
+def test_shortest_path_records_filters_and_limits(connected_graph: Graph) -> None:
+    graph = connected_graph
+    path = graph.shortest_path(
+        "A",
+        "C",
+        direction="outgoing",
+        edge_types=["KNOWS"],
+        edge_filters=[PropertyFilter("trusted", "eq", value=True)],
+        max_hops=2,
+        max_visited_nodes=4,
+        max_examined_edges=3,
+    )
+    assert path is not None
+    assert ids(path.nodes) == ["A", "B", "C"]
+    assert ids(path.edges) == ["ab1", "bc"]
+    assert path.examined_edges == 3
+    assert path.nodes[0] == graph.get("node", "A")
+    assert path.edges[0] == graph.get("edge", "ab1")
+    directions: tuple[Direction, ...] = ("incoming", "both")
+    for direction in directions:
+        reversed_path = graph.shortest_path("C", "A", direction=direction, edge_types=["KNOWS"])
+        assert reversed_path is not None
+        assert ids(reversed_path.nodes) == ["C", "B", "A"]
+        assert [(edge.source, edge.target) for edge in reversed_path.edges] == [
+            ("B", "C"),
+            ("A", "B"),
+        ]
+    assert graph.shortest_path("C", "A", direction="outgoing", edge_types=["KNOWS"]) is None
+    assert graph.shortest_path("isolated", "C", direction="both") is None
+    assert graph.shortest_path("A", "C", direction="outgoing", max_hops=1) is None
+    assert graph.shortest_path("A", "C", direction="outgoing", node_label="Company") is None
+    filtered = graph.shortest_path(
+        "A",
+        "C",
+        direction="outgoing",
+        edge_types=["WORKS_FOR", "EMPLOYS"],
+        edge_filters=[PropertyFilter("trusted", "eq", value=True)],
+        node_label="Company",
+        node_filters=[
+            PropertyFilter("active", "eq", value=True),
+            PropertyFilter("age", "range", lower=10),
+            PropertyFilter("country", "eq", value="ES"),
+            PropertyFilter("rating", "eq", value=4.5),
+        ],
+        node_filter_scope="intermediate",
+    )
+    assert filtered is not None and ids(filtered.nodes) == ["A", "X", "C"]
+    assert ids(filtered.edges) == ["ax", "xc"]
+    assert (
+        graph.shortest_path(
+            "A", "C", direction="outgoing", node_filters=[PropertyFilter("age", "eq", value=30)]
+        )
+        is None
+    )
+    zero = graph.shortest_path(
+        "A", "A", direction="outgoing", node_label="Company", node_filter_scope="intermediate"
+    )
+    assert zero is not None and ids(zero.nodes) == ["A"] and not zero.edges
+    assert graph.shortest_path("A", "A", direction="outgoing", node_label="Company") is None
+    for bounded in (
+        lambda: graph.shortest_path(
+            "A", "C", direction="outgoing", edge_types=["KNOWS"], max_visited_nodes=2
+        ),
+        lambda: graph.shortest_path(
+            "A", "C", direction="outgoing", edge_types=["KNOWS"], max_examined_edges=2
+        ),
+    ):
+        with pytest.raises(grpc.RpcError) as error:
+            bounded()
+        assert error.value.code() == grpc.StatusCode.RESOURCE_EXHAUSTED
+    with pytest.raises(grpc.RpcError) as error:
+        graph.shortest_path("A", "missing", direction="both")
+    assert error.value.code() == grpc.StatusCode.NOT_FOUND
+
+
+def test_records_filters_and_reopen(nidx: NidxClient) -> None:
     graph = Graph.create(nidx, str(uuid4()))
     product = graph.upsert_node(
         "P1",
@@ -84,7 +264,141 @@ def test_records_filters_and_reopen(nidx: EmbeddedNidx) -> None:
     reopened = Graph(nidx, graph.tenant, graph.shard_id)
     assert reopened.get("node", "P1") == product
     assert ids(reopened.find("node")) == ["P1", "W1"]
-    assert not list(nidx.inbox.iterdir())
+
+
+def test_datetime_and_string_list_properties(nidx: NidxClient) -> None:
+    graph = Graph.create(nidx, str(uuid4()))
+    aware = datetime(2026, 11, 24, 15, 42, 10, 123456, tzinfo=timezone(timedelta(hours=2)))
+    naive = datetime(2026, 11, 24, 15, 42, 10)
+    node = graph.upsert_node(
+        "A", ["Person"], {"created": aware, "local": naive, "tags": ["first", "", "first"]}
+    )
+    graph.upsert_node("B", ["Person"], {"tags": []})
+    edge = graph.upsert_edge("ab", "A", "KNOWS", "B", {"since": aware, "tags": ["friend"]})
+    assert graph.get("node", "A") == node
+    assert graph.get("edge", "ab") == edge
+    assert sorted(ids(graph.find("node"))) == ["A", "B"]
+    expansion = graph.expand(["A"], direction="outgoing")
+    assert expansion.matches[0].edge == edge
+    assert expansion.matches[0].neighbor.properties == {"tags": []}
+    path = graph.shortest_path("A", "B", direction="outgoing")
+    assert path is not None
+    assert path.nodes[0] == node
+    assert path.edges == [edge]
+    assert _to_lpg_property(aware).WhichOneof("value") == "datetime"
+    assert _to_lpg_property([]).WhichOneof("value") == "strings"
+    updated = graph.upsert_node("A", ["Person"], {"created": naive, "tags": []})
+    reopened = Graph(nidx, graph.tenant, graph.shard_id)
+    assert reopened.get("node", "A") == updated
+
+
+def test_invalid_datetime_and_unsupported_property_types() -> None:
+    assert _from_lpg_property(nidx_pb2.LpgProperty(datetime="2026-11-24T12:00:00Z")) == datetime(
+        2026, 11, 24, 12, tzinfo=timezone.utc
+    )
+    with pytest.raises(ValueError, match="Invalid NidxLPG datetime"):
+        _from_lpg_property(nidx_pb2.LpgProperty(datetime="not-a-date"))
+    with pytest.raises(ValueError, match="not supported"):
+        _from_lpg_property(
+            nidx_pb2.LpgProperty(integer_range=nidx_pb2.LpgIntegerRange(lower=1, upper=2))
+        )
+
+
+def test_date_filters_across_graph_reads(nidx: NidxClient) -> None:
+    graph = Graph.create(nidx, str(uuid4()))
+    instant = datetime(2026, 11, 24, 12, 0, 0, 123456, tzinfo=timezone.utc)
+    offset = instant.astimezone(timezone(timedelta(hours=2)))
+    later = (instant + timedelta(microseconds=1)).replace(tzinfo=None)
+    tomorrow = instant + timedelta(days=1)
+    graph.upsert_node(
+        "A",
+        ["Person"],
+        {"created": offset, "active": True},
+        text_chunks={"note": ["date filtering example"]},
+    )
+    graph.upsert_node("B", ["Person"], {"created": later, "active": True})
+    graph.upsert_node("C", ["Person"], {"created": tomorrow, "active": False})
+    graph.upsert_edge("ab", "A", "KNOWS", "B", {"since": instant})
+    graph.upsert_edge("bc", "B", "KNOWS", "C", {"since": later})
+    graph.upsert_edge("ac", "A", "KNOWS", "C", {"since": tomorrow})
+
+    exact = PropertyFilter("created", "eq", value=instant)
+    assert ids(graph.find("node", exact)) == ["A"]
+    assert ids(graph.find("node", PropertyFilter("created", "eq", value=later))) == ["B"]
+    assert sorted(
+        ids(
+            graph.find(
+                "node",
+                PropertyFilter("created", "range", lower=offset, upper=later),
+                PropertyFilter("active", "eq", value=True),
+            )
+        )
+    ) == ["A", "B"]
+    assert ids(graph.find("node", PropertyFilter("created", "range", lower=tomorrow))) == ["C"]
+    assert ids(graph.find("node", PropertyFilter("created", "range", upper=instant))) == ["A"]
+    assert [hit.record.id for hit in graph.search(text="filtering", filters=[exact])] == ["A"]
+    assert ids(graph.topology(PropertyFilter("since", "eq", value=offset))) == ["ab"]
+
+    expansion = graph.expand(
+        ["A"],
+        direction="outgoing",
+        edge_filters=[PropertyFilter("since", "range", upper=later)],
+        neighbor_filters=[PropertyFilter("created", "eq", value=later)],
+    )
+    assert [(match.edge.id, match.neighbor.id) for match in expansion.matches] == [("ab", "B")]
+    edge_filters = [PropertyFilter("since", "range", upper=later)]
+    node_filters = [PropertyFilter("created", "range", upper=later)]
+    path = graph.shortest_path(
+        "A",
+        "C",
+        direction="outgoing",
+        edge_filters=edge_filters,
+        node_filters=node_filters,
+        node_filter_scope="intermediate",
+    )
+    assert path is not None
+    assert [node.id for node in path.nodes] == ["A", "B", "C"]
+    assert (
+        graph.shortest_path(
+            "A",
+            "C",
+            direction="outgoing",
+            edge_filters=edge_filters,
+            node_filters=node_filters,
+        )
+        is None
+    )
+
+    for predicate in [
+        nidx_pb2.LpgPropertyFilter(property="created", datetime="invalid"),
+        nidx_pb2.LpgPropertyFilter(property="created", datetime="9999-01-01T00:00:00Z"),
+        nidx_pb2.LpgPropertyFilter(property="created", date_range=nidx_pb2.LpgDateRange()),
+        nidx_pb2.LpgPropertyFilter(
+            property="created",
+            date_range=nidx_pb2.LpgDateRange(
+                lower=tomorrow.isoformat(),
+                upper=instant.isoformat(),
+            ),
+        ),
+    ]:
+        with pytest.raises(grpc.RpcError) as error:
+            graph.lpg.FindRecords(
+                nidx_pb2.FindRecordsRequest(
+                    graph_id=graph.shard_id,
+                    kind=nidx_pb2.LPG_NODE,
+                    filters=[predicate],
+                ),
+                timeout=60,
+            )
+        assert error.value.code() == grpc.StatusCode.INVALID_ARGUMENT
+
+
+@pytest.mark.parametrize("value", [[1], ["valid", False], [["nested"]]])
+def test_invalid_string_list_properties(value: PropertyValue) -> None:
+    with pytest.raises(ValueError, match="only strings"):
+        Record(str(uuid4()), "node", "A", {"tags": value}, labels=["Person"])
+    with pytest.raises(ValueError, match="only strings"):
+        _to_lpg_property(value)
 
 
 def test_node_and_edge_type_cardinality() -> None:
@@ -105,7 +419,7 @@ def test_node_and_edge_type_cardinality() -> None:
         )
 
 
-def test_parallel_edges_typed_graph_prefilter_and_replacement(nidx: EmbeddedNidx) -> None:
+def test_parallel_edges_typed_graph_prefilter_and_replacement(nidx: NidxClient) -> None:
     graph = Graph.create(nidx, str(uuid4()))
     graph.upsert_node("P1", ["Product"], {"category": "electronics"})
     graph.upsert_node("W1", ["Warehouse"], {"country": "Spain"})
@@ -131,7 +445,7 @@ def test_parallel_edges_typed_graph_prefilter_and_replacement(nidx: EmbeddedNidx
     graph.delete_edge("E1")  # Repeated deletion is safe.
 
 
-def test_text_vector_and_hybrid_chunk_search(nidx: EmbeddedNidx) -> None:
+def test_text_vector_and_hybrid_chunk_search(nidx: NidxClient) -> None:
     graph = Graph.create(nidx, str(uuid4()))
     product = graph.upsert_node(
         "P1",
@@ -173,9 +487,7 @@ def test_text_vector_and_hybrid_chunk_search(nidx: EmbeddedNidx) -> None:
     assert [(hit.property, hit.text) for hit in general_property_hits] == [
         ("features", "crisp sweet fruit")
     ]
-    specific_property_hits = graph.search(
-        text="crisp sweet", kind="node", text_property="features"
-    )
+    specific_property_hits = graph.search(text="crisp sweet", kind="node", text_property="features")
     assert [(hit.property, hit.text) for hit in specific_property_hits] == [
         ("features", "crisp sweet fruit")
     ]
@@ -277,7 +589,7 @@ def test_text_vector_and_hybrid_chunk_search(nidx: EmbeddedNidx) -> None:
     assert old_vector_results[0].record == vegetable
 
 
-def test_text_chunks_and_embeddings_can_be_added_independently(nidx: EmbeddedNidx) -> None:
+def test_text_chunks_and_embeddings_can_be_added_independently(nidx: NidxClient) -> None:
     graph = Graph.create(nidx, str(uuid4()))
     with pytest.raises(ValueError, match="missing node"):
         graph.update_text_properties("node", "missing", text_chunks={"description": ["text"]})
@@ -325,8 +637,12 @@ def test_text_chunks_and_embeddings_can_be_added_independently(nidx: EmbeddedNid
             "inspection": [[1.0, 0.0, 0.0]],
         },
     )
-    assert graph.search(vector=[1.0, 0.0, 0.0], kind="node", text_property="description")[0].record == node
-    assert graph.search(vector=[1.0, 0.0, 0.0], kind="edge", text_property="inspection")[0].record == edge
+    assert (
+        graph.search(vector=[1.0, 0.0, 0.0], kind="node", text_property="description")[0].record == node
+    )
+    assert (
+        graph.search(vector=[1.0, 0.0, 0.0], kind="edge", text_property="inspection")[0].record == edge
+    )
 
     graph.update_text_properties("node", "P1", text_chunks={"tagline": ["limited edition"]})
     assert graph.search(vector=[1.0, 0.0, 0.0], kind="node", text_property="description")
@@ -350,7 +666,7 @@ def test_text_chunks_and_embeddings_can_be_added_independently(nidx: EmbeddedNid
     ],
 )
 def test_invalid_text_chunk_embeddings(
-    nidx: EmbeddedNidx,
+    nidx: NidxClient,
     chunks: dict[str, list[str]],
     vectors: Mapping[str, Sequence[Sequence[float]]],
 ) -> None:
@@ -359,7 +675,7 @@ def test_invalid_text_chunk_embeddings(
         graph.upsert_node("P1", ["Product"], {}, text_chunks=chunks, embeddings=vectors)
 
 
-def test_invalid_hybrid_search_queries(nidx: EmbeddedNidx) -> None:
+def test_invalid_hybrid_search_queries(nidx: NidxClient) -> None:
     graph = Graph.create(nidx, str(uuid4()))
     with pytest.raises(ValueError, match="Provide"):
         graph.search()
@@ -371,7 +687,7 @@ def test_invalid_hybrid_search_queries(nidx: EmbeddedNidx) -> None:
         graph.search(text="query", top_k=0)
 
 
-def test_node_replacement_and_tenant_isolation(nidx: EmbeddedNidx) -> None:
+def test_node_replacement_and_tenant_isolation(nidx: NidxClient) -> None:
     first = Graph.create(nidx, str(uuid4()))
     second = Graph.create(nidx, str(uuid4()))
     first.upsert_node("P1", ["Product"], {"price": 150, "old": "remove me"})
@@ -398,7 +714,7 @@ def test_node_replacement_and_tenant_isolation(nidx: EmbeddedNidx) -> None:
     assert second.topology() == [isolated_edge]
 
 
-def test_cascade_and_resume_from_persisted_marker(nidx: EmbeddedNidx) -> None:
+def test_cascade(nidx: NidxClient) -> None:
     graph = Graph.create(nidx, str(uuid4()))
     graph.upsert_node("P1", ["Product"], {})
     graph.upsert_node("W1", ["Warehouse"], {})
@@ -413,12 +729,7 @@ def test_cascade_and_resume_from_persisted_marker(nidx: EmbeddedNidx) -> None:
     before = graph.get("node", "P1")
     assert before is not None and before.deleting is False
 
-    # Simulate interruption after the durable marker and one incident-edge deletion.
-    graph._put(Record(graph.tenant, "node", "P1", {}, labels=["Product"], deleting=True))
-    graph.delete_edge("E1")
     reopened = Graph(nidx, graph.tenant, graph.shard_id)
-    with pytest.raises(ValueError, match="missing or being deleted"):
-        reopened.upsert_edge("late", "P1", "STOCKED_AT", "W1", {})
     reopened.delete_node("P1", detach=True)
     assert reopened.get("node", "P1") is None
     assert ids(reopened.find("node")) == ["C1", "W1"]
@@ -427,7 +738,7 @@ def test_cascade_and_resume_from_persisted_marker(nidx: EmbeddedNidx) -> None:
     reopened.delete_node("P1", detach=True)
 
 
-def test_invalid_endpoints_and_candidate_limit(nidx: EmbeddedNidx) -> None:
+def test_invalid_endpoints_and_candidate_limit(nidx: NidxClient) -> None:
     graph = Graph.create(nidx, str(uuid4()))
     graph.upsert_node("P1", ["Product"], {})
     with pytest.raises(ValueError, match="missing"):
@@ -447,8 +758,8 @@ def test_invalid_endpoints_and_candidate_limit(nidx: EmbeddedNidx) -> None:
     assert unchanged is not None and unchanged.deleting is False
 
 
-def test_binding_restart_and_demo(database_url: str, tmp_path: Path) -> None:
-    original = EmbeddedNidx(database_url, tmp_path)
+def test_client_reconnect_and_demo(lpg_address: str) -> None:
+    original = NidxClient(lpg_address)
     try:
         graph = Graph.create(original, str(uuid4()))
         product = graph.upsert_node("P1", ["Product"], {"price": 150})
@@ -458,7 +769,7 @@ def test_binding_restart_and_demo(database_url: str, tmp_path: Path) -> None:
     finally:
         original.close()
 
-    restarted = EmbeddedNidx(database_url, tmp_path)
+    restarted = NidxClient(lpg_address)
     try:
         reopened = Graph(restarted, tenant, shard_id)
         assert reopened.get("node", "P1") == product
@@ -470,8 +781,7 @@ def test_binding_restart_and_demo(database_url: str, tmp_path: Path) -> None:
         restarted.close()
 
     demo = subprocess.run(
-        [sys.executable, "-m", "nidx.examples.lpg.demo", "--directory", str(tmp_path)],
-        env={**os.environ, "LPG_DATABASE_URL": database_url},
+        [sys.executable, "-m", "nidx.examples.lpg.demo", "--address", lpg_address],
         capture_output=True,
         text=True,
         timeout=90,
@@ -490,8 +800,10 @@ def test_binding_restart_and_demo(database_url: str, tmp_path: Path) -> None:
         PropertyFilter("x", "range", lower=5, upper=2),
         PropertyFilter("x", "eq", value=float("nan")),
         PropertyFilter("x", "eq", value=2**63),
+        PropertyFilter("x", "range", lower=datetime(2026, 1, 1), upper=2),
+        PropertyFilter("x", "range", lower=datetime(2026, 1, 2), upper=datetime(2026, 1, 1)),
     ],
 )
 def test_invalid_property_filters(predicate: PropertyFilter) -> None:
     with pytest.raises(ValueError):
-        predicate.expression()
+        predicate.to_proto()

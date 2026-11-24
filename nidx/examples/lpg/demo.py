@@ -19,22 +19,17 @@
 #
 import argparse
 import json
-import os
 from dataclasses import asdict
-from pathlib import Path
 from uuid import uuid4
 
-from .storage import EmbeddedNidx, Graph, PropertyFilter
+from .storage import Graph, NidxClient, PropertyFilter
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Milestone 1: LPG storage on real embedded nidx")
-    parser.add_argument("--directory", type=Path, required=True, help="Persistent prototype storage")
+    parser = argparse.ArgumentParser(description="LPG storage through the Rust NidxLPG service")
+    parser.add_argument("--address", required=True, help="Trusted API gRPC address (host:port)")
     args = parser.parse_args()
-    database_url = os.environ.get("LPG_DATABASE_URL")
-    if not database_url:
-        parser.error("Set LPG_DATABASE_URL to a dedicated PostgreSQL database")
-    nidx = EmbeddedNidx(database_url, args.directory)
+    nidx = NidxClient(args.address)
     try:
         graph = Graph.create(nidx, str(uuid4()))
         graph.upsert_node(
@@ -55,7 +50,7 @@ def main() -> None:
                 indent=2,
             )
         )
-        print("Parallel edge with quantity >= 20, recovered through the relation index:")
+        print("Parallel edge with quantity >= 20:")
         print(
             json.dumps(
                 [asdict(r) for r in graph.topology(PropertyFilter("quantity", "range", lower=20))],

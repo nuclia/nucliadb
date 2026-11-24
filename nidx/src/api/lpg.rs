@@ -19,6 +19,7 @@ use nidx_protos::prost::*;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::*;
+use time::{OffsetDateTime, UtcOffset, format_description::well_known::Rfc3339};
 use tokio::sync::Mutex;
 use tonic::{Request, Response, Status, transport::Endpoint};
 use uuid::Uuid;
@@ -36,48 +37,66 @@ const RELATION_FIELD: &str = "a/metadata";
 const NAMESPACE: Uuid = Uuid::from_u128(0x958ee941_b31c_4d0b_9226_f28b07f98180);
 const MAX_LPG_OPERATIONS: usize = 1000;
 const MAX_EXPAND_RESPONSE_BYTES: usize = 3 * 1024 * 1024;
+const MAX_SHORTEST_PATH_STATE_BYTES: usize = 16 * 1024 * 1024;
+
+fn parse_datetime(value: &str) -> Result<OffsetDateTime, Status> {
+    let date = OffsetDateTime::parse(value, &Rfc3339)
+        .or_else(|_| OffsetDateTime::parse(&format!("{value}Z"), &Rfc3339))
+        .map_err(|_| Status::invalid_argument(format!("invalid datetime: {value:?}")))?;
+    i64::try_from(date.unix_timestamp_nanos())
+        .map_err(|_| Status::invalid_argument("datetime is outside the date index's supported range"))?;
+    Ok(date.to_offset(UtcOffset::UTC))
+}
+
+fn date_timestamp(value: &str) -> Result<prost_types::Timestamp, Status> {
+    let date = parse_datetime(value)?;
+    Ok(prost_types::Timestamp {
+        seconds: date.unix_timestamp(),
+        nanos: date.nanosecond() as i32,
+    })
+}
 
 #[derive(Clone)]
-struct PendingUpsert {
+struct PreparedUpsert {
     request: IndexResourceRequest,
     rid: String,
     record: LpgRecord,
     fence: String,
 }
 
-fn pending_upsert(request: IndexResourceRequest) -> Result<PendingUpsert, Status> {
+fn prepared_upsert(request: IndexResourceRequest) -> Result<PreparedUpsert, Status> {
     let resource = request
         .resource
         .as_ref()
-        .ok_or_else(|| Status::data_loss("missing pending resource"))?;
+        .ok_or_else(|| Status::data_loss("missing prepared resource"))?;
     let rid = resource
         .resource
         .as_ref()
-        .ok_or_else(|| Status::data_loss("missing pending ID"))?
+        .ok_or_else(|| Status::data_loss("missing prepared ID"))?
         .uuid
         .clone();
     let text = &resource
         .texts
         .get(FIELD)
-        .ok_or_else(|| Status::data_loss("missing pending record"))?
+        .ok_or_else(|| Status::data_loss("missing prepared record"))?
         .text;
     let bytes = STANDARD
         .decode(text)
-        .map_err(|_| Status::data_loss("invalid pending record"))?;
-    let record = LpgRecord::decode(bytes.as_slice()).map_err(|_| Status::data_loss("invalid pending record"))?;
+        .map_err(|_| Status::data_loss("invalid prepared record"))?;
+    let record = LpgRecord::decode(bytes.as_slice()).map_err(|_| Status::data_loss("invalid prepared record"))?;
     let json: serde_json::Value = serde_json::from_str(
         &resource
             .json_fields
             .get(FIELD)
-            .ok_or_else(|| Status::data_loss("missing pending fence"))?
+            .ok_or_else(|| Status::data_loss("missing prepared fence"))?
             .value,
     )
-    .map_err(|_| Status::data_loss("invalid pending fence"))?;
+    .map_err(|_| Status::data_loss("invalid prepared fence"))?;
     let fence = json["fence"]
         .as_str()
-        .ok_or_else(|| Status::data_loss("missing pending fence"))?
+        .ok_or_else(|| Status::data_loss("missing prepared fence"))?
         .to_owned();
-    Ok(PendingUpsert {
+    Ok(PreparedUpsert {
         request,
         rid,
         record,
@@ -181,57 +200,6 @@ impl LpgServer {
         let index = &indexes[0];
         let config: VectorConfig = index.config().map_err(NidxError::from)?;
         Ok((index.name.clone(), config.vector_type.dimension()))
-    }
-
-    async fn save_pending(&self, graph: &str, kind: i16, payload: Vec<u8>) -> Result<(), Status> {
-        let id = Uuid::parse_str(graph).map_err(|_| Status::invalid_argument("invalid graph ID"))?;
-        sqlx::query("INSERT INTO lpg_pending_mutations (graph_id, kind, payload) VALUES ($1, $2, $3)")
-            .bind(id)
-            .bind(kind)
-            .bind(payload)
-            .execute(&self.meta.pool)
-            .await
-            .map_err(NidxError::from)?;
-        Ok(())
-    }
-
-    async fn recover_pending(&self, graph: &str) -> Result<(), Status> {
-        let id = Uuid::parse_str(graph).map_err(|_| Status::invalid_argument("invalid graph ID"))?;
-        let row: Option<(i16, Vec<u8>)> =
-            sqlx::query_as("SELECT kind, payload FROM lpg_pending_mutations WHERE graph_id = $1")
-                .bind(id)
-                .fetch_optional(&self.meta.pool)
-                .await
-                .map_err(NidxError::from)?;
-        let Some((kind, payload)) = row else {
-            return Ok(());
-        };
-        let mut client = NidxIndexerClient::new(endpoint(&self.endpoints()?.indexer_address)?.connect_lazy());
-        match kind {
-            1 => {
-                let request = IndexResourceRequest::decode(payload.as_slice())
-                    .map_err(|_| Status::data_loss("invalid pending LPG upsert"))?;
-                let pending = pending_upsert(request)?;
-                check_index_status(client.index_resource(pending.request).await?.into_inner())?;
-                self.wait_visible(graph, &pending.rid, Some((&pending.record, &pending.fence)))
-                    .await?;
-            }
-            2 => {
-                let request = IndexMessage::decode(payload.as_slice())
-                    .map_err(|_| Status::data_loss("invalid pending LPG deletion"))?;
-                check_index_status(client.index(request.clone()).await?.into_inner())?;
-                self.wait_visible(graph, &request.resource, None).await?;
-            }
-            _ => return Err(Status::data_loss("unknown pending LPG mutation")),
-        }
-        sqlx::query("DELETE FROM lpg_pending_mutations WHERE graph_id = $1 AND kind = $2 AND payload = $3")
-            .bind(id)
-            .bind(kind)
-            .bind(payload)
-            .execute(&self.meta.pool)
-            .await
-            .map_err(NidxError::from)?;
-        Ok(())
     }
 
     async fn wait_visible(&self, graph: &str, rid: &str, expected: Option<(&LpgRecord, &str)>) -> Result<(), Status> {
@@ -442,26 +410,25 @@ impl LpgServer {
         Ok(request)
     }
 
-    async fn write_prepared(&self, graph: &str, request: IndexResourceRequest) -> Result<(), Status> {
-        self.save_pending(graph, 1, request.encode_to_vec()).await?;
-        self.recover_pending(graph).await
-    }
-
     async fn write_record(&self, graph: &str, record: &LpgRecord) -> Result<(), Status> {
-        let request = self.prepare_record(graph, record, None).await?;
-        self.write_prepared(graph, request).await
+        let prepared = prepared_upsert(self.prepare_record(graph, record, None).await?)?;
+        let mut client = NidxIndexerClient::new(endpoint(&self.endpoints()?.indexer_address)?.connect_lazy());
+        check_index_status(client.index_resource(prepared.request).await?.into_inner())?;
+        self.wait_visible(graph, &prepared.rid, Some((&prepared.record, &prepared.fence)))
+            .await
     }
 
     async fn delete_one(&self, graph: &str, key: &LpgRecordKey) -> Result<(), Status> {
         let rid = resource_id(graph, key)?;
         let request = IndexMessage {
             shard: graph.into(),
-            resource: rid,
+            resource: rid.clone(),
             typemessage: TypeMessage::Deletion as i32,
             ..Default::default()
         };
-        self.save_pending(graph, 2, request.encode_to_vec()).await?;
-        self.recover_pending(graph).await
+        let mut client = NidxIndexerClient::new(endpoint(&self.endpoints()?.indexer_address)?.connect_lazy());
+        check_index_status(client.index(request).await?.into_inner())?;
+        self.wait_visible(graph, &rid, None).await
     }
 
     async fn put_locked(&self, graph: &str, record: &LpgRecord) -> Result<(), Status> {
@@ -651,6 +618,9 @@ fn validate_record(record: &LpgRecord) -> Result<&LpgRecordKey, Status> {
             Some(Value::IntegerRange(v)) if matches!((v.lower, v.upper), (Some(a), Some(b)) if a > b) => {
                 return Err(Status::invalid_argument("invalid integer range"));
             }
+            Some(Value::Datetime(v)) => {
+                parse_datetime(v)?;
+            }
             _ => {}
         }
     }
@@ -735,31 +705,33 @@ fn property_path(name: &str) -> String {
     format!("p_{hex}")
 }
 
-fn indexed_properties(record: &LpgRecord) -> serde_json::Value {
+fn indexed_properties(record: &LpgRecord) -> Result<serde_json::Value, Status> {
     use lpg_property::Value;
-    let properties = record
-        .properties
-        .iter()
-        .filter_map(|(name, property)| {
-            let value = match property.value.as_ref()? {
-                Value::Text(v) => serde_json::json!(v),
-                Value::Integer(v) => serde_json::json!(v),
-                Value::Float(v) => serde_json::json!(v),
-                Value::Boolean(v) => serde_json::json!(v),
-                Value::Strings(v) => serde_json::json!(v.values),
-                _ => return None,
-            };
-            Some((property_path(name), value))
-        })
-        .collect::<serde_json::Map<_, _>>();
-    serde_json::json!({
+    let mut properties = serde_json::Map::new();
+    for (name, property) in &record.properties {
+        let value = match property.value.as_ref() {
+            Some(Value::Text(v)) => serde_json::json!(v),
+            Some(Value::Integer(v)) => serde_json::json!(v),
+            Some(Value::Float(v)) => serde_json::json!(v),
+            Some(Value::Boolean(v)) => serde_json::json!(v),
+            Some(Value::Strings(v)) => serde_json::json!(v.values),
+            Some(Value::Datetime(v)) => serde_json::json!(
+                parse_datetime(v)?
+                    .format(&Rfc3339)
+                    .map_err(|_| Status::invalid_argument("datetime cannot be indexed"))?
+            ),
+            _ => continue,
+        };
+        properties.insert(property_path(name), value);
+    }
+    Ok(serde_json::json!({
         "kind": record.key.as_ref().map(|key| key.kind).unwrap_or_default(),
         "labels": record.labels,
         "source": record.source,
         "target": record.target,
         "edge_type": record.edge_type,
         "properties": properties,
-    })
+    }))
 }
 
 fn project(
@@ -835,7 +807,7 @@ fn project(
             FIELD.to_owned(),
             JsonFieldValue {
                 value: {
-                    let mut json = indexed_properties(record);
+                    let mut json = indexed_properties(record)?;
                     json["fence"] = serde_json::Value::String(fence.into());
                     json.to_string()
                 },
@@ -919,7 +891,7 @@ fn lpg_type_facet(position: &str, value: &str) -> String {
 }
 
 fn filter_expression(kind: i32, filters: &[LpgPropertyFilter]) -> Result<JsonFilterExpression, Status> {
-    use json_field_path_filter::{FloatRangePredicate, IntegerRangePredicate, Predicate};
+    use json_field_path_filter::{DateRangePredicate, FloatRangePredicate, IntegerRangePredicate, Predicate};
     use json_filter_expression::{Expr, List};
     use lpg_property_filter::Predicate as Filter;
     let kind = LpgRecordKind::try_from(kind).map_err(|_| Status::invalid_argument("invalid record kind"))?;
@@ -940,6 +912,18 @@ fn filter_expression(kind: i32, filters: &[LpgPropertyFilter]) -> Result<JsonFil
             Some(Filter::Integer(v)) => Predicate::Int(*v),
             Some(Filter::Float(v)) if v.is_finite() => Predicate::Float(*v),
             Some(Filter::Boolean(v)) => Predicate::Boolean(*v),
+            Some(Filter::Datetime(v)) => Predicate::Date(date_timestamp(v)?),
+            Some(Filter::DateRange(v)) => {
+                let lower = v.lower.as_deref().map(date_timestamp).transpose()?;
+                let upper = v.upper.as_deref().map(date_timestamp).transpose()?;
+                if (lower.is_none() && upper.is_none())
+                    || matches!((&lower, &upper), (Some(a), Some(b))
+                        if (a.seconds, a.nanos) > (b.seconds, b.nanos))
+                {
+                    return Err(Status::invalid_argument("invalid date range filter"));
+                }
+                Predicate::DateRange(DateRangePredicate { lower, upper })
+            }
             Some(Filter::IntegerRange(v))
                 if (v.lower.is_some() || v.upper.is_some())
                     && !matches!((v.lower, v.upper), (Some(a), Some(b)) if a > b) =>
@@ -1075,14 +1059,21 @@ fn expand_filter(req: &ExpandRequest) -> Result<JsonFilterExpression, Status> {
     Ok(expression)
 }
 
-fn matches_property(record: &LpgRecord, filter: &LpgPropertyFilter) -> bool {
+fn matches_property(record: &LpgRecord, filter: &LpgPropertyFilter) -> Result<bool, Status> {
     use lpg_property::Value;
     use lpg_property_filter::Predicate;
     let value = record
         .properties
         .get(&filter.property)
         .and_then(|property| property.value.as_ref());
-    match (value, filter.predicate.as_ref()) {
+    Ok(match (value, filter.predicate.as_ref()) {
+        (Some(Value::Datetime(a)), Some(Predicate::Datetime(b))) => parse_datetime(a)? == parse_datetime(b)?,
+        (Some(Value::Datetime(a)), Some(Predicate::DateRange(b))) => {
+            let date = parse_datetime(a)?;
+            let lower = b.lower.as_deref().map(parse_datetime).transpose()?;
+            let upper = b.upper.as_deref().map(parse_datetime).transpose()?;
+            lower.is_none_or(|lower| date >= lower) && upper.is_none_or(|upper| date <= upper)
+        }
         (Some(Value::Text(a)), Some(Predicate::Text(b))) => a == b,
         (Some(Value::Strings(a)), Some(Predicate::Text(b))) => a.values.contains(b),
         (Some(Value::Boolean(a)), Some(Predicate::Boolean(b))) => a == b,
@@ -1095,7 +1086,227 @@ fn matches_property(record: &LpgRecord, filter: &LpgPropertyFilter) -> bool {
             b.lower.is_none_or(|lower| *a >= lower) && b.upper.is_none_or(|upper| *a <= upper)
         }
         _ => false,
+    })
+}
+
+fn matches_properties(record: &LpgRecord, filters: &[LpgPropertyFilter]) -> Result<bool, Status> {
+    for filter in filters {
+        if !matches_property(record, filter)? {
+            return Ok(false);
+        }
     }
+    Ok(true)
+}
+
+struct BfsVisit {
+    parent: Option<(String, LpgRecord)>,
+    depth: u32,
+}
+
+fn validate_shortest_path(req: &ShortestPathRequest) -> Result<(), Status> {
+    if req.source.is_empty() || req.target.is_empty() {
+        return Err(Status::invalid_argument("source and target must be nonempty"));
+    }
+    LpgNodeFilterScope::try_from(req.node_filter_scope)
+        .map_err(|_| Status::invalid_argument("invalid node filter scope"))?;
+    // Validate even when equal endpoints or endpoint filters avoid expansion.
+    expand_filter(&ExpandRequest {
+        node_ids: vec![req.source.clone()],
+        direction: req.direction,
+        edge_types: req.edge_types.clone(),
+        edge_filters: req.edge_filters.clone(),
+        neighbor_label: req.node_label.clone(),
+        neighbor_filters: req.node_filters.clone(),
+        ..Default::default()
+    })?;
+    if req.max_hops > 64 || req.max_visited_nodes > 10000 || req.max_examined_edges > 100000 {
+        return Err(Status::invalid_argument(
+            "shortest path limits exceed supported maximums",
+        ));
+    }
+    Ok(())
+}
+
+struct BfsSide {
+    frontier: Vec<String>,
+    visits: HashMap<String, BfsVisit>,
+    depth: u32,
+}
+
+impl BfsSide {
+    fn new(root: &str) -> Self {
+        Self {
+            frontier: vec![root.into()],
+            visits: HashMap::from([(root.into(), BfsVisit { parent: None, depth: 0 })]),
+            depth: 0,
+        }
+    }
+
+    fn path_to_root(&self, node: &str) -> (Vec<String>, Vec<LpgRecord>) {
+        let mut ids = vec![node.to_owned()];
+        let mut edges = Vec::new();
+        let mut current = node;
+        while let Some((parent, edge)) = &self.visits[current].parent {
+            ids.push(parent.clone());
+            edges.push(edge.clone());
+            current = parent;
+        }
+        (ids, edges)
+    }
+}
+
+fn shortest_path_response(
+    meeting: &str,
+    forward: &BfsSide,
+    backward: &BfsSide,
+    nodes: &HashMap<String, LpgRecord>,
+    examined_edges: u32,
+) -> Result<ShortestPathResponse, Status> {
+    let (mut ids, mut edges) = forward.path_to_root(meeting);
+    ids.reverse();
+    edges.reverse();
+    let (tail_ids, tail_edges) = backward.path_to_root(meeting);
+    ids.extend(tail_ids.into_iter().skip(1));
+    edges.extend(tail_edges);
+    let response = ShortestPathResponse {
+        found: true,
+        nodes: ids.into_iter().map(|id| nodes[&id].clone()).collect(),
+        edges,
+        examined_edges,
+    };
+    if response.encoded_len() > MAX_EXPAND_RESPONSE_BYTES {
+        return Err(Status::resource_exhausted("shortest path response byte limit exceeded"));
+    }
+    Ok(response)
+}
+
+async fn bidirectional_bfs<F, Fut>(
+    req: &ShortestPathRequest,
+    mut nodes: HashMap<String, LpgRecord>,
+    mut expand: F,
+) -> Result<ShortestPathResponse, Status>
+where
+    F: FnMut(ExpandRequest) -> Fut,
+    Fut: std::future::Future<Output = Result<ExpandResponse, Status>>,
+{
+    let scope = LpgNodeFilterScope::try_from(req.node_filter_scope).unwrap();
+    let direction = LpgDirection::try_from(req.direction).unwrap();
+    let reverse = match direction {
+        LpgDirection::LpgOutgoing => LpgDirection::LpgIncoming,
+        LpgDirection::LpgIncoming => LpgDirection::LpgOutgoing,
+        _ => LpgDirection::LpgBoth,
+    };
+    let max_hops = if req.max_hops == 0 { 6 } else { req.max_hops };
+    let max_visited = if req.max_visited_nodes == 0 {
+        1000
+    } else {
+        req.max_visited_nodes
+    };
+    let max_examined = if req.max_examined_edges == 0 {
+        10000
+    } else {
+        req.max_examined_edges
+    };
+    let template = ExpandRequest {
+        graph_id: req.graph_id.clone(),
+        direction: req.direction,
+        edge_types: req.edge_types.clone(),
+        edge_filters: req.edge_filters.clone(),
+        ..Default::default()
+    };
+    let matches_node = |node: &LpgRecord| -> Result<bool, Status> {
+        Ok(req.node_label.as_ref().is_none_or(|label| node.labels.contains(label))
+            && matches_properties(node, &req.node_filters)?)
+    };
+    if scope == LpgNodeFilterScope::LpgAllNodes {
+        for node in nodes.values() {
+            if !matches_node(node)? {
+                return Ok(ShortestPathResponse::default());
+            }
+        }
+    }
+    let mut forward = BfsSide::new(&req.source);
+    let mut backward = BfsSide::new(&req.target);
+    if req.source == req.target {
+        return shortest_path_response(&req.source, &forward, &backward, &nodes, 0);
+    }
+    if max_visited < 2 {
+        return Err(Status::resource_exhausted("shortest path visited node limit exceeded"));
+    }
+    let mut state_bytes: usize = nodes.values().map(|node| node.encoded_len()).sum();
+    let mut examined_edges = 0;
+    while !forward.frontier.is_empty() && !backward.frontier.is_empty() && forward.depth + backward.depth < max_hops {
+        let from_source = forward.frontier.len() <= backward.frontier.len();
+        let (active, other) = if from_source {
+            (&mut forward, &backward)
+        } else {
+            (&mut backward, &forward)
+        };
+        let frontier = std::mem::take(&mut active.frontier);
+        let mut meeting: Option<(u32, String)> = None;
+        // Finish a full level, including every batch, before selecting a meeting.
+        for batch in frontier.chunks(128) {
+            if examined_edges == max_examined {
+                return Err(Status::resource_exhausted("shortest path examined edge limit exceeded"));
+            }
+            let expansion = expand(ExpandRequest {
+                node_ids: batch.to_vec(),
+                direction: if from_source { direction } else { reverse } as i32,
+                candidate_limit: (max_examined - examined_edges).min(10000),
+                max_results: 10000,
+                ..template.clone()
+            })
+            .await?;
+            examined_edges += expansion.examined_edges;
+            for binding in expansion.matches {
+                let neighbor = &expansion.neighbors[binding.neighbor_index as usize];
+                let id = &neighbor.key.as_ref().unwrap().id;
+                if active.visits.contains_key(id) {
+                    continue;
+                }
+                let exempt =
+                    scope == LpgNodeFilterScope::LpgIntermediateNodes && (id == &req.source || id == &req.target);
+                if !exempt && !matches_node(neighbor)? {
+                    continue;
+                }
+                if active.visits.len() + other.visits.len() == max_visited as usize {
+                    return Err(Status::resource_exhausted("shortest path visited node limit exceeded"));
+                }
+                let edge = &expansion.edges[binding.edge_index as usize];
+                state_bytes += edge.encoded_len();
+                if !nodes.contains_key(id) {
+                    state_bytes += neighbor.encoded_len();
+                }
+                if state_bytes > MAX_SHORTEST_PATH_STATE_BYTES {
+                    return Err(Status::resource_exhausted("shortest path state byte limit exceeded"));
+                }
+                nodes.entry(id.clone()).or_insert_with(|| neighbor.clone());
+                let depth = active.depth + 1;
+                active.visits.insert(
+                    id.clone(),
+                    BfsVisit {
+                        parent: Some((binding.node_id, edge.clone())),
+                        depth,
+                    },
+                );
+                active.frontier.push(id.clone());
+                if let Some(visit) = other.visits.get(id) {
+                    let distance = depth + visit.depth;
+                    if meeting.as_ref().is_none_or(|(best, _)| distance < *best) {
+                        meeting = Some((distance, id.clone()));
+                    }
+                }
+            }
+        }
+        active.depth += 1;
+        if let Some((_, id)) = meeting {
+            return shortest_path_response(&id, &forward, &backward, &nodes, examined_edges);
+        }
+    }
+    Ok(ShortestPathResponse {
+        examined_edges,
+        ..Default::default()
+    })
 }
 
 fn apply_text_patch(record: &mut LpgRecord, patches: HashMap<String, LpgTextPropertyPatch>) -> Result<(), Status> {
@@ -1178,18 +1389,6 @@ impl NidxLpg for LpgServer {
         let graph = self.graph(&req.graph_id).await?;
         let lock = self.graph_lock(&graph).await;
         let _guard = lock.lock().await;
-        let graph_id = Uuid::parse_str(&graph).unwrap();
-        let pending: bool =
-            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM lpg_pending_mutations WHERE graph_id = $1)")
-                .bind(graph_id)
-                .fetch_one(&self.meta.pool)
-                .await
-                .map_err(NidxError::from)?;
-        if pending {
-            return Err(Status::failed_precondition(
-                "ordinary LPG mutation is pending; recover it before bulk loading",
-            ));
-        }
         let order = bulk_order(&req.records)?;
         let node_labels = req
             .records
@@ -1205,7 +1404,7 @@ impl NidxLpg for LpgServer {
             if let Some(existing) = self.get_one(&graph, key.clone()).await? {
                 validate_immutable_types(&existing, record)?;
             }
-            prepared.push(pending_upsert(
+            prepared.push(prepared_upsert(
                 self.prepare_record(&graph, record, Some(&node_labels)).await?,
             )?);
         }
@@ -1589,10 +1788,7 @@ impl NidxLpg for LpgServer {
                 .neighbor_label
                 .as_ref()
                 .is_some_and(|label| !neighbor.labels.contains(label))
-                || !req
-                    .neighbor_filters
-                    .iter()
-                    .all(|filter| matches_property(neighbor, filter))
+                || !matches_properties(neighbor, &req.neighbor_filters)?
             {
                 continue;
             }
@@ -1625,6 +1821,44 @@ impl NidxLpg for LpgServer {
         Ok(Response::new(response))
     }
 
+    async fn shortest_path(
+        &self,
+        request: Request<ShortestPathRequest>,
+    ) -> Result<Response<ShortestPathResponse>, Status> {
+        let req = request.into_inner();
+        validate_shortest_path(&req)?;
+        let graph = self.graph(&req.graph_id).await?;
+        let endpoint_ids: HashSet<_> = [&req.source, &req.target].into_iter().cloned().collect();
+        let nodes: HashMap<_, _> = self
+            .get_records(Request::new(GetRecordsRequest {
+                graph_id: graph,
+                keys: endpoint_ids
+                    .iter()
+                    .map(|id| LpgRecordKey {
+                        kind: LpgRecordKind::LpgNode as i32,
+                        id: id.clone(),
+                    })
+                    .collect(),
+            }))
+            .await?
+            .into_inner()
+            .records
+            .into_iter()
+            .map(|node| (node.key.as_ref().unwrap().id.clone(), node))
+            .collect();
+        if nodes.len() != endpoint_ids.len() {
+            return Err(Status::not_found("shortest path endpoint not found"));
+        }
+        if nodes.values().any(|node| node.deleting) {
+            return Err(Status::failed_precondition("shortest path endpoint is being deleted"));
+        }
+        let result = bidirectional_bfs(&req, nodes, |expansion| async {
+            Ok(self.expand(Request::new(expansion)).await?.into_inner())
+        })
+        .await?;
+        Ok(Response::new(result))
+    }
+
     async fn lpg_operation(
         &self,
         request: Request<LpgOperationRequest>,
@@ -1638,7 +1872,6 @@ impl NidxLpg for LpgServer {
         let graph = self.graph(&req.graph_id).await?;
         let lock = self.graph_lock(&graph).await;
         let _guard = lock.lock().await;
-        self.recover_pending(&graph).await?;
         let mut results = Vec::with_capacity(req.operations.len());
         let mut failed = false;
         for operation in req.operations {
@@ -1827,6 +2060,194 @@ impl LpgServer {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn shortest_path_finishes_batched_bidirectional_levels() {
+        let node = |id: String| LpgRecord {
+            key: Some(LpgRecordKey {
+                kind: LpgRecordKind::LpgNode as i32,
+                id,
+            }),
+            labels: vec!["Node".into()],
+            ..Default::default()
+        };
+        let mut nodes = HashMap::from([
+            ("start".into(), node("start".into())),
+            ("end".into(), node("end".into())),
+        ]);
+        let mut edges = Vec::new();
+        for index in 0..129 {
+            let left = format!("left-{index}");
+            let right = format!("right-{index}");
+            nodes.insert(left.clone(), node(left.clone()));
+            nodes.insert(right.clone(), node(right.clone()));
+            for (hop, (source, target)) in [
+                ("start".to_owned(), left.clone()),
+                (left, right.clone()),
+                (right, "end".to_owned()),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                edges.push(LpgRecord {
+                    key: Some(LpgRecordKey {
+                        kind: LpgRecordKind::LpgEdge as i32,
+                        id: format!("{index}-{hop}"),
+                    }),
+                    source: Some(source),
+                    target: Some(target),
+                    edge_type: Some("LINK".into()),
+                    ..Default::default()
+                });
+            }
+        }
+        let endpoints = HashMap::from([
+            ("start".into(), nodes["start"].clone()),
+            ("end".into(), nodes["end"].clone()),
+        ]);
+        let request = ShortestPathRequest {
+            source: "start".into(),
+            target: "end".into(),
+            direction: LpgDirection::LpgOutgoing as i32,
+            max_hops: 3,
+            ..Default::default()
+        };
+        for fail_last_batch in [false, true] {
+            let mut calls = Vec::new();
+            let result = bidirectional_bfs(&request, endpoints.clone(), |req| {
+                calls.push((req.direction, req.node_ids.len()));
+                if fail_last_batch && req.node_ids.len() == 1 && req.node_ids[0].starts_with("left-") {
+                    return std::future::ready(Err(Status::unavailable("last batch failed")));
+                }
+                let mut response = ExpandResponse::default();
+                for start in req.node_ids {
+                    for edge in &edges {
+                        let neighbor = if req.direction == LpgDirection::LpgOutgoing as i32
+                            && edge.source.as_ref() == Some(&start)
+                        {
+                            edge.target.as_ref()
+                        } else if req.direction == LpgDirection::LpgIncoming as i32
+                            && edge.target.as_ref() == Some(&start)
+                        {
+                            edge.source.as_ref()
+                        } else {
+                            None
+                        };
+                        if let Some(neighbor) = neighbor {
+                            response.matches.push(ExpandMatch {
+                                node_id: start.clone(),
+                                edge_index: response.edges.len() as u32,
+                                neighbor_index: response.neighbors.len() as u32,
+                            });
+                            response.edges.push(edge.clone());
+                            response.neighbors.push(nodes[neighbor].clone());
+                            response.examined_edges += 1;
+                        }
+                    }
+                }
+                std::future::ready(Ok(response))
+            })
+            .await;
+            assert_eq!(
+                calls,
+                [
+                    (LpgDirection::LpgOutgoing as i32, 1),
+                    (LpgDirection::LpgIncoming as i32, 1),
+                    (LpgDirection::LpgOutgoing as i32, 128),
+                    (LpgDirection::LpgOutgoing as i32, 1),
+                ]
+            );
+            if fail_last_batch {
+                assert_eq!(result.unwrap_err().code(), tonic::Code::Unavailable);
+                continue;
+            }
+            let result = result.unwrap();
+            assert!(result.found);
+            assert_eq!(result.examined_edges, 129 * 3);
+            assert_eq!(result.nodes.len(), 4);
+            assert_eq!(result.edges.len(), 3);
+            assert_eq!(result.nodes[0].key.as_ref().unwrap().id, "start");
+            assert_eq!(result.nodes[3].key.as_ref().unwrap().id, "end");
+            for (pair, edge) in result.nodes.windows(2).zip(&result.edges) {
+                assert_eq!(edge.source.as_ref(), Some(&pair[0].key.as_ref().unwrap().id));
+                assert_eq!(edge.target.as_ref(), Some(&pair[1].key.as_ref().unwrap().id));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn shortest_path_bounds_retained_records() {
+        let node = |id: String| LpgRecord {
+            key: Some(LpgRecordKey {
+                kind: LpgRecordKind::LpgNode as i32,
+                id,
+            }),
+            labels: vec!["Node".into()],
+            properties: HashMap::from([(
+                "payload".into(),
+                LpgProperty {
+                    value: Some(lpg_property::Value::Text("x".repeat(1_600_000))),
+                },
+            )]),
+            ..Default::default()
+        };
+        let nodes = HashMap::from([("0".into(), node("0".into())), ("12".into(), node("12".into()))]);
+        let request = ShortestPathRequest {
+            source: "0".into(),
+            target: "12".into(),
+            direction: LpgDirection::LpgOutgoing as i32,
+            max_hops: 12,
+            ..Default::default()
+        };
+        let error = bidirectional_bfs(&request, nodes, |req| {
+            let start = req.node_ids[0].clone();
+            let neighbor = (start.parse::<u32>().unwrap() + 1).to_string();
+            std::future::ready(Ok(ExpandResponse {
+                matches: vec![ExpandMatch {
+                    node_id: start.clone(),
+                    edge_index: 0,
+                    neighbor_index: 0,
+                }],
+                edges: vec![LpgRecord {
+                    key: Some(LpgRecordKey {
+                        kind: LpgRecordKind::LpgEdge as i32,
+                        id: start.clone(),
+                    }),
+                    source: Some(start),
+                    target: Some(neighbor.clone()),
+                    edge_type: Some("LINK".into()),
+                    ..Default::default()
+                }],
+                neighbors: vec![node(neighbor)],
+                examined_edges: 1,
+            }))
+        })
+        .await
+        .unwrap_err();
+        assert_eq!(error.code(), tonic::Code::ResourceExhausted);
+        assert!(error.message().contains("state byte limit"));
+    }
+
+    #[tokio::test]
+    async fn shortest_path_rejects_unknown_enums_before_reading() {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://unused@localhost/unused")
+            .unwrap();
+        let server = LpgServer::new(NidxMetadata { pool }, None);
+        for (direction, node_filter_scope) in [(99, 0), (LpgDirection::LpgBoth as i32, 99)] {
+            let error = server
+                .shortest_path(Request::new(ShortestPathRequest {
+                    source: "same".into(),
+                    target: "same".into(),
+                    direction,
+                    node_filter_scope,
+                    ..Default::default()
+                }))
+                .await
+                .unwrap_err();
+            assert_eq!(error.code(), tonic::Code::InvalidArgument);
+        }
+    }
+
     #[test]
     fn expansion_rejects_unknown_directions_and_oversized_frontiers() {
         for request in [
@@ -1908,7 +2329,8 @@ mod tests {
                         property: property.into(),
                         predicate: Some(predicate),
                     }
-                ),
+                )
+                .unwrap(),
                 expected,
                 "{property}"
             );
@@ -2255,6 +2677,8 @@ mod tests {
         for value in [
             lpg_property::Value::Float(f64::NAN),
             lpg_property::Value::NullValue(false),
+            lpg_property::Value::Datetime("invalid".into()),
+            lpg_property::Value::Datetime("9999-01-01T00:00:00Z".into()),
             lpg_property::Value::IntegerRange(LpgIntegerRange {
                 lower: Some(2),
                 upper: Some(1),
@@ -2272,6 +2696,31 @@ mod tests {
             })
             .is_err()
         );
+    }
+
+    #[test]
+    fn datetime_filters_compare_instants_and_preserve_precision() {
+        let mut record = LpgRecord {
+            properties: HashMap::from([(
+                "date".into(),
+                LpgProperty {
+                    value: Some(lpg_property::Value::Datetime("2026-11-24T14:00:00.123456+02:00".into())),
+                },
+            )]),
+            ..Default::default()
+        };
+        let filter = |value| LpgPropertyFilter {
+            property: "date".into(),
+            predicate: Some(lpg_property_filter::Predicate::Datetime(value)),
+        };
+        assert!(matches_property(&record, &filter("2026-11-24T12:00:00.123456".into())).unwrap());
+        assert!(!matches_property(&record, &filter("2026-11-24T12:00:00.123457Z".into())).unwrap());
+        let json = indexed_properties(&record).unwrap();
+        assert_eq!(json["properties"][property_path("date")], "2026-11-24T12:00:00.123456Z");
+        let timestamp = date_timestamp("1969-12-31T23:59:59.123456Z").unwrap();
+        assert_eq!((timestamp.seconds, timestamp.nanos), (-1, 123456000));
+        record.properties.get_mut("date").unwrap().value = Some(lpg_property::Value::Datetime("bad".into()));
+        assert!(matches_property(&record, &filter("2026-11-24T12:00:00Z".into())).is_err());
     }
 
     #[test]
@@ -2297,7 +2746,7 @@ mod tests {
             ]),
             ..Default::default()
         };
-        let json = indexed_properties(&record);
+        let json = indexed_properties(&record).unwrap();
         assert_eq!(json["properties"][property_path("a.b/猫")], 42);
         assert!(json["properties"].get(property_path("unset")).is_none());
         let filter = LpgPropertyFilter {

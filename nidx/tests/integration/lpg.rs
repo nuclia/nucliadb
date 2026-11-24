@@ -77,7 +77,7 @@ async fn run_test_operation(
 }
 
 #[sqlx::test]
-async fn bulk_stateless_preflight_upsert_and_pending_guard(pool: PgPool) -> anyhow::Result<()> {
+async fn bulk_stateless_preflight_and_upsert(pool: PgPool) -> anyhow::Result<()> {
     let mut fixture = NidxFixture::new(pool.clone()).await?;
     let graph = shard(&mut fixture).await?;
     let node = LpgRecord {
@@ -122,26 +122,6 @@ async fn bulk_stateless_preflight_upsert_and_pending_guard(pool: PgPool) -> anyh
         Code::InvalidArgument
     );
 
-    let graph_id = uuid::Uuid::parse_str(&graph)?;
-    sqlx::query("INSERT INTO lpg_pending_mutations (graph_id, kind, payload) VALUES ($1, 1, $2)")
-        .bind(graph_id)
-        .bind(vec![0xff_u8])
-        .execute(&pool)
-        .await?;
-    assert_eq!(
-        fixture.lpg_client.bulk_load(request.clone()).await.unwrap_err().code(),
-        Code::FailedPrecondition
-    );
-    let payload: Vec<u8> = sqlx::query_scalar("SELECT payload FROM lpg_pending_mutations WHERE graph_id = $1")
-        .bind(graph_id)
-        .fetch_one(&pool)
-        .await?;
-    assert_eq!(payload, [0xff]);
-    sqlx::query("DELETE FROM lpg_pending_mutations WHERE graph_id = $1")
-        .bind(graph_id)
-        .execute(&pool)
-        .await?;
-
     // The test searcher's independently synced indexes can briefly be incomplete.
     // Bulk upserts are safe to retry after an uncertain outcome.
     let results = tokio::time::timeout(Duration::from_secs(30), async {
@@ -183,16 +163,11 @@ async fn bulk_stateless_preflight_upsert_and_pending_guard(pool: PgPool) -> anyh
         vec![updated, edge],
     )
     .await;
-    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM lpg_pending_mutations WHERE graph_id = $1")
-        .bind(graph_id)
-        .fetch_one(&pool)
-        .await?;
-    assert_eq!(count, 0);
     Ok(())
 }
 
 #[sqlx::test]
-async fn bulk_stateless_failure_has_no_pending_state(pool: PgPool) -> anyhow::Result<()> {
+async fn bulk_and_ordinary_failures_require_client_retries(pool: PgPool) -> anyhow::Result<()> {
     let mut fixture = NidxFixture::new(pool.clone()).await?;
     let graph = shard(&mut fixture).await?;
     let mut settings = fixture.settings.settings.lpg.clone().unwrap();
@@ -209,7 +184,7 @@ async fn bulk_stateless_failure_has_no_pending_state(pool: PgPool) -> anyhow::Re
     };
     let router = tonic::service::Routes::new(NidxIndexerServer::new(proxy)).into_axum_router();
     tokio::spawn(server.serve(router, shutdown.clone()));
-    let broken = nidx::api::lpg::LpgServer::new(fixture.settings.metadata.clone(), Some(settings));
+    let broken = nidx::api::lpg::LpgServer::new(fixture.settings.metadata.clone(), Some(settings.clone()));
     let invalid_edge = LpgRecord {
         key: Some(key(LpgRecordKind::LpgEdge, "edge")),
         source: Some("one".into()),
@@ -250,7 +225,7 @@ async fn bulk_stateless_failure_has_no_pending_state(pool: PgPool) -> anyhow::Re
     let error = broken
         .bulk_load(Request::new(BulkLoadRequest {
             graph_id: graph.clone(),
-            records,
+            records: records.clone(),
         }))
         .await
         .unwrap_err();
@@ -261,52 +236,61 @@ async fn bulk_stateless_failure_has_no_pending_state(pool: PgPool) -> anyhow::Re
         *kinds.lock().unwrap(),
         [LpgRecordKind::LpgNode as i32, LpgRecordKind::LpgEdge as i32]
     );
-    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM lpg_pending_mutations WHERE graph_id = $1")
-        .bind(uuid::Uuid::parse_str(&graph)?)
-        .fetch_one(&pool)
+    broken
+        .bulk_load(Request::new(BulkLoadRequest {
+            graph_id: graph.clone(),
+            records: records.clone(),
+        }))
         .await?;
-    assert_eq!(count, 0);
-    shutdown.cancel();
-    Ok(())
-}
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
+    let keys = records.iter().map(|record| record.key.clone().unwrap()).collect();
+    wait_for(&mut fixture, &graph, keys, records).await;
 
-#[sqlx::test]
-async fn stateless_bulk_migration_guards_pending_batches(pool: PgPool) -> anyhow::Result<()> {
-    const SETUP: &str = "
-        CREATE TEMP TABLE lpg_pending_mutations (
-            kind SMALLINT NOT NULL CONSTRAINT lpg_pending_mutations_kind_check CHECK (kind IN (1, 2, 3))
-        ) ON COMMIT DROP;
-        CREATE TEMP TABLE lpg_bulk_sessions (id INT) ON COMMIT DROP;
-        CREATE TEMP TABLE lpg_bulk_records (id INT) ON COMMIT DROP;
-    ";
-    const MIGRATION: &str = include_str!("../../migrations/20261123120000_lpg_stateless_bulk.sql");
-
-    let mut tx = pool.begin().await?;
-    sqlx::raw_sql(SETUP).execute(&mut *tx).await?;
-    sqlx::query("INSERT INTO lpg_pending_mutations VALUES (3)")
-        .execute(&mut *tx)
-        .await?;
-    let error = sqlx::raw_sql(MIGRATION).execute(&mut *tx).await.unwrap_err();
-    assert!(error.to_string().contains("Run the previous server"));
-    tx.rollback().await?;
-
-    let mut tx = pool.begin().await?;
-    sqlx::raw_sql(SETUP).execute(&mut *tx).await?;
-    sqlx::query("INSERT INTO lpg_pending_mutations VALUES (1), (2)")
-        .execute(&mut *tx)
-        .await?;
-    sqlx::raw_sql(MIGRATION).execute(&mut *tx).await?;
-    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM lpg_pending_mutations")
-        .fetch_one(&mut *tx)
-        .await?;
-    assert_eq!(count, 2);
-    assert!(
-        sqlx::query("INSERT INTO lpg_pending_mutations VALUES (3)")
-            .execute(&mut *tx)
-            .await
-            .is_err()
+    calls.store(0, Ordering::SeqCst);
+    let node = |id: &str| LpgRecord {
+        key: Some(key(LpgRecordKind::LpgNode, id)),
+        labels: vec!["Node".into()],
+        ..Default::default()
+    };
+    let operations = |ids: &[&str]| {
+        Request::new(LpgOperationRequest {
+            graph_id: graph.clone(),
+            operations: ids
+                .iter()
+                .map(|id| LpgOperation {
+                    operation: Some(lpg_operation::Operation::UpsertRecord(node(id))),
+                })
+                .collect(),
+        })
+    };
+    let results = broken
+        .lpg_operation(operations(&["a", "b", "c"]))
+        .await?
+        .into_inner()
+        .results;
+    assert_eq!(
+        results.iter().map(|result| result.status).collect::<Vec<_>>(),
+        [
+            LpgOperationStatus::Applied as i32,
+            LpgOperationStatus::Failed as i32,
+            LpgOperationStatus::Skipped as i32,
+        ]
     );
-    tx.rollback().await?;
+    assert_eq!(results[1].error_code, "Unavailable");
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+
+    let restarted = nidx::api::lpg::LpgServer::new(fixture.settings.metadata.clone(), Some(settings));
+    let result = restarted.lpg_operation(operations(&["c"])).await?.into_inner();
+    assert_eq!(result.results[0].status, LpgOperationStatus::Applied as i32);
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
+    let keys: Vec<_> = ["a", "b", "c"].map(|id| key(LpgRecordKind::LpgNode, id)).into();
+    wait_for(&mut fixture, &graph, keys.clone(), vec![node("a"), node("c")]).await;
+
+    let result = restarted.lpg_operation(operations(&["b"])).await?.into_inner();
+    assert_eq!(result.results[0].status, LpgOperationStatus::Applied as i32);
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
+    wait_for(&mut fixture, &graph, keys, vec![node("a"), node("b"), node("c")]).await;
+    shutdown.cancel();
     Ok(())
 }
 
@@ -1153,12 +1137,13 @@ async fn lpg_node_deletion_validates_endpoints_and_detaches(pool: PgPool) -> any
 }
 
 #[sqlx::test]
-async fn lpg_pending_deletion_marker_is_recovered_and_cascade_resumes(pool: PgPool) -> anyhow::Result<()> {
+async fn lpg_indexed_deletion_marker_blocks_writes_and_cascade_resumes(pool: PgPool) -> anyhow::Result<()> {
     let mut fixture = NidxFixture::new(pool.clone()).await?;
     let graph = shard(&mut fixture).await?;
     let node_key = key(LpgRecordKind::LpgNode, "a");
     let node = LpgRecord {
         key: Some(node_key.clone()),
+        labels: vec!["Node".into()],
         revision: "before".into(),
         ..Default::default()
     };
@@ -1184,7 +1169,7 @@ async fn lpg_pending_deletion_marker_is_recovered_and_cascade_resumes(pool: PgPo
         })
         .await?;
 
-    // Simulate a crash after the durable marker request was stored, before indexing it.
+    // Simulate interruption after indexing the marker, before deleting incident edges.
     let namespace = uuid::Uuid::from_u128(0x958ee941_b31c_4d0b_9226_f28b07f98180);
     let rid = uuid::Uuid::new_v5(&namespace, format!("{graph}/{}:{}:a", node_key.kind, 1).as_bytes())
         .simple()
@@ -1204,7 +1189,7 @@ async fn lpg_pending_deletion_marker_is_recovered_and_cascade_resumes(pool: PgPo
         metadata: Some(IndexMetadata { created: Some(timestamp), modified: Some(timestamp) }),
         texts: HashMap::from([(field.into(), TextInformation { text: encoded, labels: vec![] })]),
         json_fields: HashMap::from([(field.into(), JsonFieldValue {
-            value: r#"{"kind":1,"labels":[],"source":null,"target":null,"edge_type":null,"properties":{},"fence":"pending-test"}"#.into()
+            value: r#"{"kind":1,"labels":["Node"],"source":null,"target":null,"edge_type":null,"properties":{},"fence":"marker-test"}"#.into()
         })]),
         paragraphs: HashMap::from([(field.into(), IndexParagraphs {
             paragraphs: HashMap::from([(format!("{rid}/{field}/0-{end}"), IndexParagraph {
@@ -1215,16 +1200,17 @@ async fn lpg_pending_deletion_marker_is_recovered_and_cascade_resumes(pool: PgPo
         json_fields_to_delete: vec![rid.clone()], vectors_to_delete_in_all_vectorsets: vec![rid],
         ..Default::default()
     };
-    let payload = IndexResourceRequest {
-        shard_id: graph.clone(),
-        resource: Some(resource),
-    }
-    .encode_to_vec();
-    sqlx::query("INSERT INTO lpg_pending_mutations (graph_id, kind, payload) VALUES ($1, 1, $2)")
-        .bind(uuid::Uuid::parse_str(&graph)?)
-        .bind(payload)
-        .execute(&pool)
-        .await?;
+    let mut indexer =
+        NidxIndexerClient::connect(fixture.settings.settings.lpg.as_ref().unwrap().indexer_address.clone()).await?;
+    let status = indexer
+        .index_resource(IndexResourceRequest {
+            shard_id: graph.clone(),
+            resource: Some(resource),
+        })
+        .await?
+        .into_inner();
+    assert_eq!(status.status, nidx_protos::op_status::Status::Ok as i32);
+    wait_for(&mut fixture, &graph, vec![node_key.clone()], vec![marked]).await;
     assert_eq!(
         fixture
             .lpg_client
@@ -1237,7 +1223,6 @@ async fn lpg_pending_deletion_marker_is_recovered_and_cascade_resumes(pool: PgPo
             .code(),
         Code::FailedPrecondition
     );
-    wait_for(&mut fixture, &graph, vec![node_key.clone()], vec![marked]).await;
     assert_eq!(
         fixture
             .lpg_client
@@ -1258,6 +1243,7 @@ async fn lpg_pending_deletion_marker_is_recovered_and_cascade_resumes(pool: PgPo
                 graph_id: graph.clone(),
                 record: Some(LpgRecord {
                     key: Some(node_key.clone()),
+                    labels: vec!["Node".into()],
                     ..Default::default()
                 }),
             })

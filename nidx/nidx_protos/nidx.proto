@@ -41,6 +41,7 @@ service NidxLPG {
   rpc GetRecords(GetRecordsRequest) returns (GetRecordsResponse) {}
   rpc FindRecords(FindRecordsRequest) returns (FindRecordsResponse) {}
   rpc Expand(ExpandRequest) returns (ExpandResponse) {}
+  rpc ShortestPath(ShortestPathRequest) returns (ShortestPathResponse) {}
   rpc SearchChunks(SearchChunksRequest) returns (SearchChunksResponse) {}
 }
 
@@ -67,6 +68,7 @@ message LpgProperty {
         bool boolean = 4;
         LpgStringList strings = 5;
         bool null_value = 6;
+        // RFC 3339 instant (naive values are UTC), within signed int64 nanoseconds.
         string datetime = 7;
         LpgIntegerRange integer_range = 8;
         LpgFloatRange float_range = 9;
@@ -195,6 +197,9 @@ message LpgPropertyFilter {
         bool boolean = 5;
         LpgIntegerRange integer_range = 6;
         LpgFloatRange float_range = 7;
+        // ISO 8601/RFC 3339 instants; timezone-naive values are interpreted as UTC.
+        string datetime = 8;
+        LpgDateRange date_range = 9;
     }
 }
 
@@ -258,6 +263,43 @@ message ExpandResponse {
     // Deduplicated record tables referenced by the indexes in matches.
     repeated LpgRecord edges = 2;
     repeated LpgRecord neighbors = 3;
+    uint32 examined_edges = 4;
+}
+
+enum LpgNodeFilterScope {
+    // Default: every node, including source and target, must match.
+    LPG_ALL_NODES = 0;
+    LPG_INTERMEDIATE_NODES = 1;
+}
+
+message ShortestPathRequest {
+    string graph_id = 1;
+    string source = 2;
+    string target = 3;
+    LpgDirection direction = 4;
+    repeated string edge_types = 5;
+    repeated LpgPropertyFilter edge_filters = 6;
+    optional string node_label = 7;
+    repeated LpgPropertyFilter node_filters = 8;
+    LpgNodeFilterScope node_filter_scope = 9;
+    // Default 6, maximum 64. Equal endpoints may return a zero-edge path.
+    uint32 max_hops = 10;
+    // Total visited entries across both search directions (including roots).
+    // Default 1000, maximum 10000.
+    uint32 max_visited_nodes = 11;
+    // Cumulative Expand candidate counts, including repeat examinations.
+    // Default 10000, maximum 100000.
+    uint32 max_examined_edges = 12;
+}
+
+message ShortestPathResponse {
+    // One unweighted shortest valid path, or found=false within max_hops.
+    // Ties are arbitrary. Reads do not share a snapshot.
+    bool found = 1;
+    // Ordered source-to-target; nodes.size == edges.size + 1 when found.
+    repeated LpgRecord nodes = 2;
+    // Original edge orientation and identity are preserved.
+    repeated LpgRecord edges = 3;
     uint32 examined_edges = 4;
 }
 
