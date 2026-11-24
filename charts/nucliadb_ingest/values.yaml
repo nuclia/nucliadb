@@ -5,6 +5,8 @@
 # Image settings
 imagePullPolicy: IfNotPresent
 imageOtherPullPolicy: Always
+# Secrets used to pull images from private registries, e.g. [{name: my-registry}]
+imagePullSecrets: []
 containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 image: IMAGE_TO_REPLACE
 

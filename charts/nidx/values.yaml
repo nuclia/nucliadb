@@ -7,6 +7,9 @@
 # -- Image pull policy
 imagePullPolicy: IfNotPresent
 
+# -- Secrets used to pull images from private registries (e.g. [{name: my-registry}])
+imagePullSecrets: []
+
 # -- Container registry (e.g. docker.io/nuclia)
 containerRegistry: CONTAINER_REGISTRY_TO_REPLACE
 
