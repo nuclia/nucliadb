@@ -21,6 +21,7 @@ nidx chart
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | imagePullPolicy | string | `"IfNotPresent"` | Image pull policy |
+| imagePullSecrets | list | `[]` | Secrets used to pull images from private registries (e.g. [{name: my-registry}]) |
 | containerRegistry | string | `"CONTAINER_REGISTRY_TO_REPLACE"` | Container registry (e.g. docker.io/nuclia) |
 | image | string | `"IMAGE_TO_REPLACE"` | Image name (without registry eg. nidx:latest) |
 | env | object | `{}` | Global environment variables to add to all containers |

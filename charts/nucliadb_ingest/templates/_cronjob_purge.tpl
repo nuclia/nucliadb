@@ -43,6 +43,10 @@ spec:
             {{- end }}
           {{- end }}
         spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           serviceAccountName: {{ if kindIs "string" .Values.purgeCron.serviceAccount }}{{ .Values.purgeCron.serviceAccount }}{{ else }}{{ .Values.purgeCron.serviceAccount.name | default "default" }}{{ end }}
           nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 12 }}

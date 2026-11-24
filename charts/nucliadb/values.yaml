@@ -3,6 +3,8 @@
 # Image settings: This allows you to change the image used for the NucliaDB.
 # You can use a different image, or a different version of the same image.
 imagePullPolicy: IfNotPresent
+# Secrets used to pull images from private registries, e.g. [{name: my-registry}]
+imagePullSecrets: []
 image: nuclia/nucliadb
 imageVersion:
 

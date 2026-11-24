@@ -31,6 +31,10 @@ spec:
         release: "{{ .Release.Name }}"
         heritage: "{{ .Release.Service }}"
     spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       nodeSelector:
 {{ toYaml .Values.nodeSelector | indent 8 }}
       topologySpreadConstraints:
