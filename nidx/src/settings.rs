@@ -151,7 +151,10 @@ impl ObjectStoreConfig {
                 endpoint,
                 account_key,
             } => {
-                let mut builder = MicrosoftAzureBuilder::new().with_url(container_url);
+                // Unless account_key is specified, the library takes the credentials from the standard AZURE_*
+                // environment variables, such as the AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_FEDERATED_TOKEN_FILE
+                // that AKS workload identity injects, and falls back to the managed identity of the host
+                let mut builder = MicrosoftAzureBuilder::from_env().with_url(container_url);
                 if let Some(endpoint) = endpoint {
                     builder = builder.with_endpoint(endpoint.clone());
                     if endpoint.starts_with("http:") {
