@@ -107,8 +107,8 @@ async def initialize():
             raise ConfigurationError("AZURE_ACCOUNT_URL env variable not configured")
 
         storage_backend = AzureBlobStore()
-        # Uploads go to the knowledge box containers, so they use the same account as
-        # nucliadb_utils' AzureStorage does for them.
+        # Uploaded files are stored in the knowledge box containers, which live in the
+        # KB storage account when one is configured.
         await storage_backend.initialize(
             storage_settings.azure_kb_account_url or storage_settings.azure_account_url,
             connection_string=storage_settings.azure_connection_string,
