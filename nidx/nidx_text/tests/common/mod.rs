@@ -86,11 +86,13 @@ pub fn create_resource(shard_id: String) -> Resource {
     let ti_title = nidx_protos::TextInformation {
         text: DOC1_TI.to_string(),
         labels: vec!["/l/mylabel".to_string(), "/e/myentity".to_string()],
+        ..Default::default()
     };
 
     let ti_body = nidx_protos::TextInformation {
         text: DOC1_P1.to_string() + DOC1_P2 + DOC1_P3,
         labels: vec!["/f/body".to_string(), "/l/mylabel2".to_string()],
+        ..Default::default()
     };
 
     let mut texts = HashMap::new();

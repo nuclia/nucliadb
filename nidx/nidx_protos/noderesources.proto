@@ -8,6 +8,9 @@ import public "nucliadb_protos/utils.proto";
 message TextInformation {
     string text = 1;
     repeated string labels = 2;
+    // Keep field/paragraph metadata and stored text, but do not index text tokens.
+    // Unset/false preserves normal full-text indexing.
+    bool skip_tokenization = 3;
 }
 
 message JsonFieldValue {

@@ -16,6 +16,7 @@ pub mod api;
 mod errors;
 pub mod grpc_server;
 mod import_export;
+mod lpg;
 pub mod indexer;
 pub mod metadata;
 pub mod metrics;

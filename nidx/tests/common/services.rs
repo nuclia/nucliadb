@@ -18,14 +18,15 @@ use std::time::Duration;
 
 use nidx::api::grpc::ApiServer;
 use nidx::grpc_server::GrpcServer;
-use nidx::indexer::{delete_resource, index_resource};
+use nidx::indexer::{IndexerServer, delete_resource, index_resource};
 use nidx::searcher::SyncedSearcher;
 use nidx::searcher::grpc::SearchServer;
 use nidx::searcher::shard_selector::ShardSelector;
-use nidx::settings::{EnvSettings, MetadataSettings, SearcherSettings, StorageSettings};
+use nidx::settings::{EnvSettings, LpgSettings, MetadataSettings, SearcherSettings, StorageSettings};
 use nidx::{NidxMetadata, Settings};
 use nidx_protos::Resource;
 use nidx_protos::nidx::nidx_api_client::NidxApiClient;
+use nidx_protos::nidx::nidx_lpg_client::NidxLpgClient;
 use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use object_store::memory::InMemory;
 use sqlx::PgPool;
@@ -36,16 +37,19 @@ use tonic::transport::Channel;
 pub struct NidxFixture {
     pub searcher_client: NidxSearcherClient<Channel>,
     pub api_client: NidxApiClient<Channel>,
+    pub lpg_client: NidxLpgClient<Channel>,
     pub settings: Settings,
+    _work_dir: tempfile::TempDir,
     seq: i64,
 }
 
 impl NidxFixture {
     pub async fn new(pool: PgPool) -> anyhow::Result<Self> {
         let shutdown = CancellationToken::new();
-        let settings = Settings {
+        let mut settings = Settings {
             metadata: NidxMetadata::new_with_pool(pool).await?,
             settings: EnvSettings {
+                lpg: None,
                 indexer: Some(nidx::settings::IndexerSettings {
                     object_store: Arc::new(InMemory::new()),
                     nats_server: None,
@@ -67,12 +71,6 @@ impl NidxFixture {
                 audit: None,
             },
         };
-        // API server
-        let api_service = ApiServer::new(&settings).into_router();
-        let api_server = GrpcServer::new("localhost:0").await?;
-        let api_port = api_server.port()?;
-        tokio::task::spawn(api_server.serve(api_service, shutdown.clone()));
-
         // Searcher API
         let work_dir = tempdir()?;
         let searcher = SyncedSearcher::new(settings.metadata.clone(), work_dir.path());
@@ -81,12 +79,13 @@ impl NidxFixture {
         let searcher_port = searcher_server.port()?;
         tokio::task::spawn(searcher_server.serve(searcher_api.into_router(), shutdown.clone()));
         let settings_copy = settings.clone();
+        let searcher_shutdown = shutdown.clone();
         tokio::task::spawn(async move {
             searcher
                 .run(
                     settings_copy.storage.as_ref().unwrap().object_store.clone(),
                     settings_copy.searcher.clone().unwrap_or_default(),
-                    shutdown.clone(),
+                    searcher_shutdown,
                     ShardSelector::new_single(),
                     None,
                     None,
@@ -94,14 +93,30 @@ impl NidxFixture {
                 .await
         });
 
+        let indexer_server = GrpcServer::new("localhost:0").await?;
+        let indexer_port = indexer_server.port()?;
+        let indexer = IndexerServer::new(settings.clone())?.into_service();
+        tokio::task::spawn(indexer_server.serve(indexer, shutdown.clone()));
+        settings.settings.lpg = Some(LpgSettings {
+            indexer_address: format!("http://localhost:{indexer_port}"),
+            searcher_address: format!("http://localhost:{searcher_port}"),
+        });
+        let api_service = ApiServer::new(&settings).into_router();
+        let api_server = GrpcServer::new("localhost:0").await?;
+        let api_port = api_server.port()?;
+        tokio::task::spawn(api_server.serve(api_service, shutdown.clone()));
+
         // Clients
         let searcher_client = NidxSearcherClient::connect(format!("http://localhost:{searcher_port}")).await?;
         let api_client = NidxApiClient::connect(format!("http://localhost:{api_port}")).await?;
+        let lpg_client = NidxLpgClient::connect(format!("http://localhost:{api_port}")).await?;
 
         Ok(NidxFixture {
             searcher_client,
             api_client,
+            lpg_client,
             settings,
+            _work_dir: work_dir,
             seq: 1,
         })
     }

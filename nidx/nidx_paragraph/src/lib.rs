@@ -87,6 +87,20 @@ impl ParagraphIndexer {
         indexer.finalize()
     }
 
+    #[instrument(name = "paragraph::index_resources", skip_all)]
+    pub fn index_resources(
+        &self,
+        output_dir: &Path,
+        resources: &[nidx_protos::Resource],
+    ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
+        let schema = ParagraphSchema::new();
+        let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), schema.schema.clone())?;
+        for resource in resources.iter().filter(|resource| !resource.skip_paragraphs) {
+            index_paragraphs(&mut indexer, resource, schema.clone())?;
+        }
+        indexer.finalize()
+    }
+
     pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
         resource.paragraphs_to_delete.clone()
     }

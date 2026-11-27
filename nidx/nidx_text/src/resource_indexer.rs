@@ -15,7 +15,7 @@
 
 use anyhow::anyhow;
 use nidx_tantivy::TantivyIndexer;
-use tantivy::{doc, schema::Facet};
+use tantivy::{doc, schema::Facet, tokenizer::PreTokenizedString};
 
 use crate::schema::{TextSchema, encode_field_id, encode_field_id_bytes, timestamp_to_datetime_utc};
 
@@ -73,7 +73,17 @@ pub fn index_document(
         facet_key.push_str(field.as_str());
         let facet_field = Facet::from(facet_key.as_str());
         field_doc.add_facet(schema.field, facet_field);
-        field_doc.add_text(schema.text, &text_info.text);
+        if text_info.skip_tokenization {
+            field_doc.add_pre_tokenized_text(
+                schema.text,
+                PreTokenizedString {
+                    text: text_info.text.clone(),
+                    tokens: vec![],
+                },
+            );
+        } else {
+            field_doc.add_text(schema.text, &text_info.text);
+        }
 
         for d in encode_field_id(resource_uuid, &format!("/{field}")) {
             field_doc.add_u64(schema.encoded_field_id, d);

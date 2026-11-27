@@ -205,6 +205,7 @@ fn build_resource_with_field(shard_id: String, field_id: String) -> noderesource
         noderesources::TextInformation {
             text: "Dummy text".to_string(),
             labels: vec![format!("/l/field_id/{label}")],
+            ..Default::default()
         },
     );
 

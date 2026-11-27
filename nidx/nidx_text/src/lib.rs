@@ -146,6 +146,21 @@ impl TextIndexer {
         indexer.finalize()
     }
 
+    #[instrument(name = "text::index_resources", skip_all)]
+    pub fn index_resources(
+        &self,
+        output_dir: &Path,
+        config: TextConfig,
+        resources: &[nidx_protos::Resource],
+    ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
+        let schema = TextSchema::new(config.version);
+        let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), schema.schema.clone())?;
+        for resource in resources.iter().filter(|resource| !resource.skip_texts) {
+            index_document(&mut indexer, resource, schema.clone())?;
+        }
+        indexer.finalize()
+    }
+
     pub fn deletions_for_resource(&self, resource: &nidx_protos::Resource) -> Vec<String> {
         resource.texts_to_delete.clone()
     }

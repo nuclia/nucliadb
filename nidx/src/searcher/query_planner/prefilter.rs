@@ -172,7 +172,15 @@ fn parse_json_prefilter(request: &SearchRequest) -> NidxResult<Option<JsonSearch
     }))
 }
 
-fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> NidxResult<JsonFilterExpression> {
+fn json_datetime(ts: &nidx_protos::prost_types::Timestamp) -> NidxResult<nidx_json::DateTime> {
+    let nanos = i64::try_from(i128::from(ts.seconds) * 1_000_000_000 + i128::from(ts.nanos))
+        .ok()
+        .filter(|_| (0..1_000_000_000).contains(&ts.nanos))
+        .ok_or_else(|| NidxError::InvalidRequest("Invalid JSON date timestamp".into()))?;
+    Ok(nidx_json::DateTime::from_timestamp_nanos(nanos))
+}
+
+pub(crate) fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> NidxResult<JsonFilterExpression> {
     match expr
         .expr
         .as_ref()
@@ -213,15 +221,11 @@ fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> NidxResult<
                     upper: r.upper,
                 },
                 Predicate::Boolean(b) => JsonPredicate::Boolean(*b),
-                Predicate::Date(ts) => JsonPredicate::Date(nidx_json::DateTime::from_timestamp_secs(ts.seconds)),
-                Predicate::DateRange(r) => {
-                    let ts_to_dt =
-                        |ts: &nidx_protos::prost_types::Timestamp| nidx_json::DateTime::from_timestamp_secs(ts.seconds);
-                    JsonPredicate::DateRange {
-                        lower: r.lower.as_ref().map(ts_to_dt),
-                        upper: r.upper.as_ref().map(ts_to_dt),
-                    }
-                }
+                Predicate::Date(ts) => JsonPredicate::Date(json_datetime(ts)?),
+                Predicate::DateRange(r) => JsonPredicate::DateRange {
+                    lower: r.lower.as_ref().map(json_datetime).transpose()?,
+                    upper: r.upper.as_ref().map(json_datetime).transpose()?,
+                },
             };
             Ok(JsonFilterExpression::Path(JsonPathFilter {
                 field_id: path_filter.field_id.clone(),

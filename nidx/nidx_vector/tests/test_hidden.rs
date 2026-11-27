@@ -77,3 +77,55 @@ fn test_hidden_search() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_batch_groups_vectors_by_segment_tags() -> anyhow::Result<()> {
+    let config = VectorConfig::for_paragraphs(nidx_vector::config::VectorType::DenseF32 { dimension: 4 });
+    let resources = vec![
+        resource(vec!["/q/h".into()], vec![]),
+        resource(vec![], vec![]),
+        resource(vec![], vec![]),
+    ];
+    let dir = tempdir()?;
+    let segments = VectorIndexer.index_resources(dir.path(), &config, &resources, "default", true)?;
+    assert_eq!(segments.len(), 2);
+    assert_eq!(segments.iter().map(|segment| segment.records).sum::<usize>(), 3);
+    let searcher = VectorSearcher::open(
+        config.clone(),
+        TestOpener::new(
+            segments.into_iter().map(|segment| (segment, 1i64.into())).collect(),
+            vec![],
+        ),
+    )?;
+    let response = searcher.search(
+        &VectorSearchRequest {
+            vector: vec![0.5; 4],
+            min_score: -1.0,
+            result_per_page: 10,
+            segment_filtering_formula: Some(BooleanExpression::Not(Box::new(BooleanExpression::Literal(
+                "/q/h".into(),
+            )))),
+            ..Default::default()
+        },
+        &PrefilterResult::All,
+    )?;
+    let ids: HashSet<_> = response
+        .documents
+        .into_iter()
+        .map(|doc| doc.doc_id.unwrap().id)
+        .collect();
+    assert_eq!(
+        ids,
+        resources[1..]
+            .iter()
+            .map(|resource| format!("{}/a/title/0-5", resource.resource.as_ref().unwrap().uuid,))
+            .collect()
+    );
+    let empty_dir = tempdir()?;
+    assert!(
+        VectorIndexer
+            .index_resources(empty_dir.path(), &config, &resources, "missing", false)?
+            .is_empty()
+    );
+    Ok(())
+}

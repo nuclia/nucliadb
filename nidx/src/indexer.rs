@@ -43,6 +43,8 @@ use crate::segment_store::pack_and_upload;
 use crate::utilization_tracker::UtilizationTracker;
 use crate::{Settings, metadata::*};
 
+pub(crate) mod batch;
+
 #[cfg(feature = "telemetry")]
 use crate::telemetry;
 
@@ -68,6 +70,7 @@ pub struct IndexerServer {
     meta: NidxMetadata,
     indexer_storage: Arc<DynObjectStore>,
     segment_storage: Arc<DynObjectStore>,
+    work_path: PathBuf,
 }
 
 impl IndexerServer {
@@ -84,6 +87,7 @@ impl IndexerServer {
             meta,
             indexer_storage,
             segment_storage,
+            work_path: settings.work_path.clone().unwrap_or_else(tempfile::env::temp_dir),
         })
     }
 
@@ -94,6 +98,62 @@ impl IndexerServer {
 
 #[tonic::async_trait]
 impl NidxIndexer for IndexerServer {
+    async fn index_resources(
+        &self,
+        request: tonic::Request<nidx_protos::IndexResourcesRequest>,
+    ) -> tonic::Result<tonic::Response<OpStatus>> {
+        let request = request.into_inner();
+        let shard_id = batch::validate_request(&request)?;
+        Shard::get(&self.meta.pool, shard_id).await.map_err(NidxError::from)?;
+        let seq = IndexRequest::create(&self.meta.pool).await.map_err(NidxError::from)?;
+        batch::index_resources(
+            &self.meta,
+            self.segment_storage.clone(),
+            &self.work_path,
+            shard_id,
+            request.resources,
+            seq.seq(),
+        )
+        .await
+        .map_err(NidxError::from)?;
+        seq.delete(&self.meta.pool).await.map_err(NidxError::from)?;
+        Ok(tonic::Response::new(OpStatus::default()))
+    }
+
+    async fn index_resource(
+        &self,
+        request: tonic::Request<nidx_protos::IndexResourceRequest>,
+    ) -> tonic::Result<tonic::Response<OpStatus>> {
+        let request = request.into_inner();
+        let resource = request
+            .resource
+            .ok_or_else(|| tonic::Status::invalid_argument("resource required"))?;
+        let id = resource
+            .resource
+            .as_ref()
+            .ok_or_else(|| tonic::Status::invalid_argument("resource ID required"))?;
+        let shard_id =
+            Uuid::parse_str(&request.shard_id).map_err(|_| tonic::Status::invalid_argument("invalid shard ID"))?;
+        Uuid::parse_str(&id.uuid).map_err(|_| tonic::Status::invalid_argument("invalid resource ID"))?;
+        if id.shard_id != request.shard_id || resource.shard_id != request.shard_id {
+            return Err(tonic::Status::invalid_argument("shard IDs must match"));
+        }
+        Shard::get(&self.meta.pool, shard_id).await.map_err(NidxError::from)?;
+        let seq = IndexRequest::create(&self.meta.pool).await.map_err(NidxError::from)?;
+        index_resource(
+            &self.meta,
+            self.segment_storage.clone(),
+            &self.work_path,
+            &request.shard_id,
+            resource,
+            seq.seq(),
+        )
+        .await
+        .map_err(NidxError::from)?;
+        seq.delete(&self.meta.pool).await.map_err(NidxError::from)?;
+        Ok(tonic::Response::new(OpStatus::default()))
+    }
+
     async fn index(&self, request: tonic::Request<IndexMessage>) -> tonic::Result<tonic::Response<OpStatus>> {
         let msg = request.into_inner();
 

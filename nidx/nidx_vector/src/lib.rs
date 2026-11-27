@@ -37,7 +37,7 @@ use nidx_types::{OpenIndexMetadata, SegmentMetadata};
 use searcher::Searcher;
 use segment::OpenSegment;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::iter::{Peekable, Rev};
 use std::path::Path;
 use thiserror::Error;
@@ -91,6 +91,48 @@ impl VectorIndexer {
         } else {
             resource.vectors_to_delete_in_all_vectorsets.clone()
         }
+    }
+
+    #[instrument(name = "vector::index_resources", skip_all)]
+    pub fn index_resources(
+        &self,
+        output_dir: &Path,
+        config: &VectorConfig,
+        resources: &[Resource],
+        index_name: &str,
+        use_default_vectorset: bool,
+    ) -> anyhow::Result<Vec<VectorSegmentMetadata>> {
+        let mut groups: BTreeMap<Vec<String>, Vec<segment::Elem>> = BTreeMap::new();
+        for resource in resources {
+            let (mut tags, elems) = match config.entity {
+                IndexEntity::Paragraph => (
+                    resource
+                        .labels
+                        .iter()
+                        .filter(|tag| SEGMENT_TAGS.contains(&tag.as_str()))
+                        .cloned()
+                        .collect::<Vec<_>>(),
+                    indexer::paragraph_elements(
+                        &ResourceWrapper::new_vectorset_resource(resource, index_name, use_default_vectorset),
+                        config,
+                    )?,
+                ),
+                IndexEntity::RelationNode => (vec![], indexer::relation_node_elements(resource, index_name)?),
+                IndexEntity::RelationEdge => (vec![], indexer::relation_edge_elements(resource, index_name)?),
+            };
+            if !elems.is_empty() {
+                tags.sort();
+                tags.dedup();
+                groups.entry(tags).or_default().extend(elems);
+            }
+        }
+        let mut segments = Vec::with_capacity(groups.len());
+        for (index, (tags, elems)) in groups.into_iter().enumerate() {
+            let path = output_dir.join(index.to_string());
+            std::fs::create_dir(&path)?;
+            segments.push(segment::create(&path, elems, config, tags.into_iter().collect())?.into_metadata());
+        }
+        Ok(segments)
     }
 
     #[instrument(name = "vector::merge", skip_all)]

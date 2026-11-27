@@ -13,7 +13,7 @@
 // limitations under the License.
 //
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 use tantivy::collector::{Collector, SegmentCollector};
 use tantivy::columnar::Column;
@@ -48,6 +48,67 @@ impl SegmentCollector for RidSegmentCollector {
 
 struct RidCollector;
 
+struct RidPageCollector {
+    after: Option<Uuid>,
+    limit: usize,
+}
+
+struct RidPageSegmentCollector {
+    encoded_rid_reader: Column,
+    after: Option<Uuid>,
+    limit: usize,
+    results: BTreeSet<Uuid>,
+}
+
+impl SegmentCollector for RidPageSegmentCollector {
+    type Fruit = BTreeSet<Uuid>;
+
+    fn collect(&mut self, doc: tantivy::DocId, _score: tantivy::Score) {
+        let rid = decode_rid(self.encoded_rid_reader.values_for_doc(doc));
+        if self.after.is_none_or(|after| rid > after) {
+            self.results.insert(rid);
+            if self.results.len() > self.limit {
+                self.results.pop_last();
+            }
+        }
+    }
+
+    fn harvest(self) -> Self::Fruit {
+        self.results
+    }
+}
+
+impl Collector for RidPageCollector {
+    type Fruit = Vec<Uuid>;
+    type Child = RidPageSegmentCollector;
+
+    fn for_segment(&self, _ordinal: SegmentOrdinal, segment: &SegmentReader) -> tantivy::Result<Self::Child> {
+        Ok(RidPageSegmentCollector {
+            encoded_rid_reader: segment.fast_fields().u64("encoded_resource_id")?,
+            after: self.after,
+            limit: self.limit,
+            results: BTreeSet::new(),
+        })
+    }
+
+    fn requires_scoring(&self) -> bool {
+        false
+    }
+
+    fn merge_fruits(&self, fruits: Vec<BTreeSet<Uuid>>) -> tantivy::Result<Self::Fruit> {
+        let mut results = BTreeSet::new();
+        for fruit in fruits {
+            for rid in fruit {
+                results.insert(rid);
+                if results.len() > self.limit {
+                    results.pop_last();
+                }
+            }
+        }
+        Ok(results.into_iter().collect())
+    }
+}
+
 impl Collector for RidCollector {
     type Fruit = HashSet<Uuid>;
     type Child = RidSegmentCollector;
@@ -73,6 +134,19 @@ impl Collector for RidCollector {
 }
 
 impl JsonReaderService {
+    pub fn search_page(
+        &self,
+        query: &dyn tantivy::query::Query,
+        after: Option<Uuid>,
+        limit: usize,
+    ) -> anyhow::Result<Vec<Uuid>> {
+        anyhow::ensure!(limit > 0, "page limit must be positive");
+        Ok(self
+            .reader
+            .searcher()
+            .search(query, &RidPageCollector { after, limit })?)
+    }
+
     pub fn search(&self, query: &dyn tantivy::query::Query) -> anyhow::Result<HashSet<Uuid>> {
         let searcher = self.reader.searcher();
         Ok(searcher.search(query, &RidCollector)?)

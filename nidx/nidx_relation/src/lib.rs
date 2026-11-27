@@ -16,12 +16,14 @@
 mod graph_collector;
 pub mod graph_query_parser;
 mod io_maps;
+mod lpg;
 mod reader;
 mod resource_indexer;
 mod schema;
 mod top_unique_n;
 
 use anyhow::anyhow;
+pub use lpg::LpgRelation;
 use nidx_protos::graph_query;
 use nidx_protos::graph_query::node::FuzzyMatch;
 use nidx_protos::graph_query::node::MatchKind;
@@ -138,6 +140,27 @@ impl RelationIndexer {
         }
 
         index_relations(&mut indexer, resource, field_schema)?;
+        indexer.finalize()
+    }
+
+    #[instrument(name = "relation::index_resources", skip_all)]
+    pub fn index_resources(
+        &self,
+        output_dir: &Path,
+        config: &RelationConfig,
+        resources: &[nidx_protos::Resource],
+    ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
+        if config.version != 2 {
+            return Err(anyhow!("Unsupported nidx_relation version"));
+        }
+        let schema = RelationSchema::new(config.version);
+        let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), schema.schema.clone())?;
+        for resource in resources {
+            if resource.status == ResourceStatus::Delete as i32 {
+                return Err(anyhow!("This is a deletion, not a set resource"));
+            }
+            index_relations(&mut indexer, resource, schema.clone())?;
+        }
         indexer.finalize()
     }
 

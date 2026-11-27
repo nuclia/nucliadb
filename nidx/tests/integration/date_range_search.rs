@@ -75,6 +75,7 @@ async fn populate(fixture: &mut NidxFixture, shard_id: String, metadata: IndexMe
     let text_content = TextInformation {
         text: "Dummy text".to_string(),
         labels: vec![],
+        ..Default::default()
     };
 
     let resource = Resource {

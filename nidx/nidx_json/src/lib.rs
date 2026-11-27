@@ -37,7 +37,7 @@ use tantivy::{
     Term,
     directory::MmapDirectory,
     indexer::merge_indices,
-    query::{Query, TermSetQuery},
+    query::{BooleanQuery, Query, TermSetQuery},
     schema::Field,
 };
 use tracing::instrument;
@@ -84,6 +84,20 @@ impl JsonIndexer {
         let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
 
         index_json_fields(&mut indexer, resource, field_schema)?;
+        indexer.finalize()
+    }
+
+    #[instrument(name = "json::index_resources", skip_all)]
+    pub fn index_resources(
+        &self,
+        output_dir: &Path,
+        resources: &[nidx_protos::Resource],
+    ) -> anyhow::Result<Option<TantivySegmentMetadata>> {
+        let schema = JsonSchema::new();
+        let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), schema.schema.clone())?;
+        for resource in resources.iter().filter(|resource| !resource.skip_json) {
+            index_json_fields(&mut indexer, resource, schema.clone())?;
+        }
         indexer.finalize()
     }
 
@@ -146,7 +160,80 @@ impl JsonSearcher {
         self.reader.search(&*query)
     }
 
+    #[instrument(name = "json::search_resource_ids", skip_all)]
+    pub fn search_resource_ids(&self, request: &JsonSearchRequest, ids: &[Uuid]) -> anyhow::Result<HashSet<Uuid>> {
+        if ids.is_empty() {
+            return Ok(HashSet::new());
+        }
+        let uuid_field = self.reader.schema.schema.get_field("uuid")?;
+        let resources = TermSetQuery::new(
+            ids.iter()
+                .map(|id| Term::from_field_bytes(uuid_field, id.simple().to_string().as_bytes())),
+        );
+        let filter = build_tantivy_query(&request.filter, self.reader.schema.json);
+        self.reader
+            .search(&BooleanQuery::intersection(vec![Box::new(resources), filter]))
+    }
+
+    #[instrument(name = "json::search_page", skip_all)]
+    pub fn search_page(
+        &self,
+        request: &JsonSearchRequest,
+        after: Option<Uuid>,
+        limit: usize,
+    ) -> anyhow::Result<Vec<Uuid>> {
+        let query = build_tantivy_query(&request.filter, self.reader.schema.json);
+        self.reader.search_page(&*query, after, limit)
+    }
+
     pub fn space_usage(&self) -> usize {
         self.reader.space_usage()
+    }
+}
+
+#[cfg(test)]
+mod lpg_tests {
+    use super::*;
+    use crate::search::{JsonFilterExpression, JsonPathFilter, JsonPredicate};
+    use tantivy::{Index, TantivyDocument, schema::OwnedValue};
+
+    #[test]
+    fn neighbor_filter_is_intersected_with_resource_ids() -> anyhow::Result<()> {
+        let schema = JsonSchema::new();
+        let index = Index::create_in_ram(schema.schema.clone());
+        let mut writer = index.writer(15_000_000)?;
+        for (number, enabled) in [(1, true), (2, false), (3, true)] {
+            let id = Uuid::from_u128(number);
+            let mut doc = TantivyDocument::default();
+            doc.add_bytes(schema.rid, id.simple().to_string().as_bytes());
+            for word in schema::encode_rid(id) {
+                doc.add_u64(schema.encoded_rid, word);
+            }
+            doc.add_field_value(
+                schema.json,
+                &OwnedValue::from(serde_json::json!({
+                    "a/lpg_record_v1": {"enabled": enabled}
+                })),
+            );
+            writer.add_document(doc)?;
+        }
+        writer.commit()?;
+        let reader = index.reader()?;
+        let searcher = JsonSearcher {
+            reader: JsonReaderService { schema, index, reader },
+        };
+        let query = JsonSearchRequest {
+            filter: JsonFilterExpression::Path(JsonPathFilter {
+                field_id: "a/lpg_record_v1".into(),
+                json_path: "enabled".into(),
+                predicate: JsonPredicate::Boolean(true),
+            }),
+        };
+        assert_eq!(
+            searcher.search_resource_ids(&query, &[Uuid::from_u128(1), Uuid::from_u128(2)])?,
+            HashSet::from([Uuid::from_u128(1)])
+        );
+        assert!(searcher.search_resource_ids(&query, &[])?.is_empty());
+        Ok(())
     }
 }
