@@ -22,6 +22,7 @@ use axum::body::{Body, Bytes};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use nidx_paragraph::ParagraphConfig;
 use nidx_protos::nidx::nidx_api_server::*;
 use nidx_protos::*;
 use nidx_vector::config::VectorConfig;
@@ -97,6 +98,11 @@ impl NidxApi for ApiServer {
         // TODO? analytics event
         let request = request.into_inner();
         let kbid = Uuid::from_str(&request.kbid).map_err(NidxError::from)?;
+        let paragraph_config = if let Some(config) = request.paragraph_config {
+            ParagraphConfig::from_proto(config)
+        } else {
+            ParagraphConfig::default()
+        };
         let mut vector_configs = Vec::with_capacity(request.vectorsets_configs.len());
         for (vectorset_id, config) in request.vectorsets_configs {
             vector_configs.push((
@@ -118,7 +124,7 @@ impl NidxApi for ApiServer {
         }
 
         let features = request.features.iter().map(|x| x.as_str()).collect();
-        let shard = shards::create_shard(&self.meta, kbid, vector_configs, features).await?;
+        let shard = shards::create_shard(&self.meta, kbid, paragraph_config, vector_configs, features).await?;
 
         Ok(Response::new(ShardCreated {
             id: shard.id.to_string(),

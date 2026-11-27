@@ -16,6 +16,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use nidx_paragraph::ParagraphConfig;
 use nidx_types::Seq;
 use object_store::ObjectStore;
 use object_store::memory::InMemory;
@@ -45,7 +46,7 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
         ("multilingual".to_string(), VECTOR_CONFIG),
         ("english".to_string(), VECTOR_CONFIG),
     ];
-    let shard = shards::create_shard(&meta, kbid, vector_configs, HashSet::new()).await?;
+    let shard = shards::create_shard(&meta, kbid, ParagraphConfig::default(), vector_configs, HashSet::new()).await?;
 
     let indexes = shard.indexes(&meta.pool).await?;
     assert_eq!(indexes.len(), 6);
@@ -114,7 +115,8 @@ async fn test_shards_create_and_delete(pool: sqlx::PgPool) -> anyhow::Result<()>
     // Create a shard that will survive the purge, with some segments/deletions
     let kbid = Uuid::new_v4();
     let vector_configs = vec![("english".to_string(), VECTOR_CONFIG)];
-    let surviving_shard = shards::create_shard(&meta, kbid, vector_configs, HashSet::new()).await?;
+    let surviving_shard =
+        shards::create_shard(&meta, kbid, ParagraphConfig::default(), vector_configs, HashSet::new()).await?;
     let resource = people_and_places(surviving_shard.id.to_string());
     let rid = resource.resource.as_ref().unwrap().uuid.clone();
     index_resource(
@@ -168,8 +170,15 @@ async fn test_configure_shards_with_prewarm(pool: sqlx::PgPool) -> anyhow::Resul
         ("multilingual".to_string(), VECTOR_CONFIG),
         ("english".to_string(), VECTOR_CONFIG),
     ];
-    let shard_1 = shards::create_shard(&meta, kbid, vector_configs.clone(), HashSet::new()).await?;
-    let shard_2 = shards::create_shard(&meta, kbid, vector_configs, HashSet::new()).await?;
+    let shard_1 = shards::create_shard(
+        &meta,
+        kbid,
+        ParagraphConfig::default(),
+        vector_configs.clone(),
+        HashSet::new(),
+    )
+    .await?;
+    let shard_2 = shards::create_shard(&meta, kbid, ParagraphConfig::default(), vector_configs, HashSet::new()).await?;
 
     let shard_ids = [shard_1.id, shard_2.id];
 

@@ -15,6 +15,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use nidx_paragraph::ParagraphConfig;
 use nidx_vector::config::VectorConfig;
 use uuid::Uuid;
 
@@ -25,6 +26,7 @@ use crate::metadata::{Index, IndexConfig, IndexKind, MergeJob, Segment, Shard};
 pub async fn create_shard(
     meta: &NidxMetadata,
     kbid: Uuid,
+    paragraph_config: ParagraphConfig,
     vector_configs: Vec<(String, VectorConfig)>,
     _features: HashSet<&str>,
 ) -> NidxResult<Shard> {
@@ -35,7 +37,7 @@ pub async fn create_shard(
     let mut tx = meta.transaction().await?;
     let shard = Shard::create(&mut *tx, kbid).await?;
     Index::create(&mut *tx, shard.id, "text", IndexConfig::new_text()).await?;
-    Index::create(&mut *tx, shard.id, "paragraph", IndexConfig::new_paragraph()).await?;
+    Index::create(&mut *tx, shard.id, "paragraph", paragraph_config.into()).await?;
     Index::create(&mut *tx, shard.id, "relation", IndexConfig::new_relation()).await?;
     Index::create(&mut *tx, shard.id, "json", IndexConfig::new_json()).await?;
     for (vectorset_id, config) in vector_configs.into_iter() {

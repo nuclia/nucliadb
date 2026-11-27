@@ -46,6 +46,14 @@ enum VectorType {
     DENSE_F32 = 0;
 }
 
+message ParagraphIndexConfig {
+    enum Tokenizer {
+        DEFAULT = 0;
+        MAGIC_CHAR = 1;
+    }
+    Tokenizer indexing_tokenizer = 1;
+}
+
 message VectorIndexConfig {
     utils.VectorSimilarity similarity = 1;
     bool normalize_vectors = 2;
@@ -62,6 +70,8 @@ message NewShardRequest {
     bool prewarm_enabled = 7;
     map<string, VectorIndexConfig> relation_node_vectorsets_configs = 8;
     map<string, VectorIndexConfig> relation_edge_vectorsets_configs = 9;
+
+    ParagraphIndexConfig paragraph_config = 11;
 
     // list of feature flags we want to enable for the shard being created. We
     // use this as a way to FF nidx shards without introducing a FF library

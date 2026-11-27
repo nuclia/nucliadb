@@ -24,7 +24,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use nidx_tantivy::{
-    TantivyIndexer, TantivyMeta, TantivySegmentMetadata,
+    TantivyIndexer, TantivyIndexerOptions, TantivyMeta, TantivySegmentMetadata,
     index_reader::{DeletionQueryBuilder, open_index_with_deletions},
 };
 use nidx_types::OpenIndexMetadata;
@@ -81,7 +81,11 @@ impl JsonIndexer {
             return Ok(None);
         }
         let field_schema = JsonSchema::new();
-        let mut indexer = TantivyIndexer::new(output_dir.to_path_buf(), field_schema.schema.clone())?;
+        let mut indexer = TantivyIndexer::new(
+            output_dir.to_path_buf(),
+            field_schema.schema.clone(),
+            TantivyIndexerOptions::default(),
+        )?;
 
         index_json_fields(&mut indexer, resource, field_schema)?;
         indexer.finalize()

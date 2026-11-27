@@ -106,18 +106,20 @@ pub fn parse_excluded(schema: &ParagraphSchema, excluded: &str) -> Box<dyn Query
 
 #[cfg(test)]
 mod tests {
+    use crate::ParagraphConfig;
+
     use super::*;
 
     #[test]
     fn test_empty_query_is_all_query() {
-        let schema = ParagraphSchema::new();
+        let schema = ParagraphSchema::new(&ParagraphConfig::default());
         let query = parse_keyword_query(&[], &schema).unwrap();
         assert!(query.is::<AllQuery>());
     }
 
     #[test]
     fn test_one_clause_simplification() {
-        let schema = ParagraphSchema::new();
+        let schema = ParagraphSchema::new(&ParagraphConfig::default());
 
         let query = parse_keyword_query(&[Token::Literal("nucliadb".into())], &schema).unwrap();
         let term = extract_term_from(&query);
@@ -126,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_tantivy_query_conversion() {
-        let schema = ParagraphSchema::new();
+        let schema = ParagraphSchema::new(&ParagraphConfig::default());
 
         // nucliadb -is a "RAG database" with "superpowers"
         let query = vec![
@@ -191,7 +193,7 @@ mod tests {
     #[test]
     /// The tokenizer should not allow an empty (whitespaces) Quoted token
     fn test_parse_quoted_error() {
-        let schema = ParagraphSchema::new();
+        let schema = ParagraphSchema::new(&ParagraphConfig::default());
 
         let quoted = "   ";
         let r = parse_quoted(&schema, quoted);

@@ -15,7 +15,7 @@
 
 #![allow(dead_code)] // clippy doesn't check for usage in other tests modules
 
-use nidx_paragraph::{ParagraphIndexer, ParagraphSearcher};
+use nidx_paragraph::{ParagraphConfig, ParagraphIndexer, ParagraphSearcher};
 use nidx_protos::Resource;
 use nidx_tantivy::{TantivyMeta, TantivySegmentMetadata};
 use nidx_types::{OpenIndexMetadata, Seq};
@@ -42,9 +42,12 @@ impl OpenIndexMetadata<TantivyMeta> for TestOpener {
     }
 }
 
-pub fn test_reader(resource: &Resource) -> ParagraphSearcher {
+pub fn test_reader(config: ParagraphConfig, resource: &Resource) -> ParagraphSearcher {
     let dir = TempDir::new().unwrap();
-    let segment_meta = ParagraphIndexer.index_resource(dir.path(), resource).unwrap().unwrap();
+    let segment_meta = ParagraphIndexer
+        .index_resource(dir.path(), config.clone(), resource)
+        .unwrap()
+        .unwrap();
 
-    ParagraphSearcher::open(TestOpener::new(vec![(segment_meta, 1i64.into())], vec![])).unwrap()
+    ParagraphSearcher::open(config, TestOpener::new(vec![(segment_meta, 1i64.into())], vec![])).unwrap()
 }

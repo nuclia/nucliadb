@@ -22,12 +22,15 @@
 //! The indexes for merging and searching also take charge of applying the deletions, so each individual index does not have to worry about it.
 
 pub mod index_reader;
+pub mod tokenizers;
 pub mod utils;
 
 use nidx_types::SegmentMetadata;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tantivy::{Index, SingleSegmentIndexWriter, TantivyDocument, directory::MmapDirectory, schema::Schema};
+
+use crate::tokenizers::custom_tokenizer_manager;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct TantivyMeta {
@@ -42,9 +45,18 @@ pub struct TantivyIndexer {
     has_documents: bool,
 }
 
+#[derive(Default)]
+pub struct TantivyIndexerOptions {
+    pub use_custom_tokenizers: bool,
+}
+
 impl TantivyIndexer {
-    pub fn new(output_dir: PathBuf, schema: Schema) -> anyhow::Result<Self> {
-        let index_builder = Index::builder().schema(schema);
+    pub fn new(output_dir: PathBuf, schema: Schema, options: TantivyIndexerOptions) -> anyhow::Result<Self> {
+        let index_builder = if options.use_custom_tokenizers {
+            Index::builder().schema(schema).tokenizers(custom_tokenizer_manager())
+        } else {
+            Index::builder().schema(schema)
+        };
         let writer = index_builder.single_segment_index_writer(MmapDirectory::open(&output_dir)?, 15_000_000)?;
         Ok(Self {
             writer,

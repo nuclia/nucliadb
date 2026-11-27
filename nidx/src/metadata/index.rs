@@ -16,6 +16,7 @@
 use std::{any::TypeId, path::PathBuf};
 
 use anyhow::anyhow;
+use nidx_paragraph::ParagraphConfig;
 use nidx_relation::RelationConfig;
 use nidx_text::TextConfig;
 use nidx_vector::config::VectorConfig;
@@ -72,7 +73,7 @@ pub struct Index {
 
 pub enum IndexConfig {
     Text(TextConfig),
-    Paragraph(()),
+    Paragraph(ParagraphConfig),
     Vector(VectorConfig),
     Relation(RelationConfig),
     VectorRelationNode(VectorConfig),
@@ -270,8 +271,9 @@ impl Index {
                 TypeId::of::<VectorConfig>()
             }
             IndexKind::Text => TypeId::of::<TextConfig>(),
+            IndexKind::Paragraph => TypeId::of::<ParagraphConfig>(),
             IndexKind::Relation => TypeId::of::<RelationConfig>(),
-            _ => TypeId::of::<()>(),
+            IndexKind::Json => TypeId::of::<()>(),
         };
 
         if TypeId::of::<T>() != config_type {
@@ -318,6 +320,12 @@ impl Serialize for IndexConfig {
     }
 }
 
+impl From<ParagraphConfig> for IndexConfig {
+    fn from(value: ParagraphConfig) -> Self {
+        Self::Paragraph(value)
+    }
+}
+
 impl From<VectorConfig> for IndexConfig {
     fn from(value: VectorConfig) -> Self {
         match value.entity {
@@ -347,7 +355,7 @@ impl IndexConfig {
     }
 
     pub fn new_paragraph() -> Self {
-        Self::Paragraph(())
+        Self::Paragraph(ParagraphConfig::default())
     }
 
     pub fn new_relation() -> Self {

@@ -17,8 +17,12 @@ use nidx_protos::prost::*;
 use tantivy::DateTime;
 use tantivy::TantivyDocument;
 use tantivy::schema::DateOptions;
+use tantivy::schema::IndexRecordOption;
+use tantivy::schema::TextFieldIndexing;
 use tantivy::schema::Value;
 use tantivy::schema::{FacetOptions, Field, NumericOptions, STORED, STRING, Schema, TEXT};
+
+use crate::ParagraphConfig;
 
 #[derive(Debug, Clone)]
 pub struct ParagraphSchema {
@@ -65,20 +69,14 @@ pub fn datetime_utc_to_timestamp(tantivy: &DateTime) -> nidx_protos::prost_types
     }
 }
 
-impl ParagraphSchema {
-    pub fn new() -> ParagraphSchema {
-        ParagraphSchema::default()
-    }
-
-    /// Returns the paragraph metadata for the given document, if any.
-    pub fn metadata(&self, doc: &TantivyDocument) -> Option<ParagraphMetadata> {
-        doc.get_first(self.metadata)
-            .and_then(|value| ParagraphMetadata::decode(value.as_bytes()?).ok())
+impl Default for ParagraphSchema {
+    fn default() -> Self {
+        Self::new(&ParagraphConfig::default())
     }
 }
 
-impl Default for ParagraphSchema {
-    fn default() -> Self {
+impl ParagraphSchema {
+    pub fn new(config: &ParagraphConfig) -> Self {
         let mut sb = Schema::builder();
         let num_options: NumericOptions = NumericOptions::default().set_stored().set_fast();
 
@@ -90,7 +88,16 @@ impl Default for ParagraphSchema {
         let field_uuid = sb.add_text_field("field_uuid", STRING);
         let paragraph = sb.add_text_field("paragraph", STRING | STORED);
         // NOTE: review search query tokenization if we change how are we tokenizing this field
-        let text = sb.add_text_field("text", TEXT);
+
+        let text = if let Some(tokenizer) = &config.custom_indexing_tokenizer {
+            let indexing = TextFieldIndexing::default()
+                .set_tokenizer(tokenizer.tokenizer_name())
+                .set_fieldnorms(true)
+                .set_index_option(IndexRecordOption::WithFreqsAndPositions);
+            sb.add_text_field("text", TEXT.set_indexing_options(indexing))
+        } else {
+            sb.add_text_field("text", TEXT)
+        };
         let start_pos = sb.add_u64_field("start_pos", num_options.clone());
         let end_pos = sb.add_u64_field("end_pos", num_options.clone());
 
@@ -129,5 +136,11 @@ impl Default for ParagraphSchema {
             repeated_in_field,
             metadata,
         }
+    }
+
+    /// Returns the paragraph metadata for the given document, if any.
+    pub fn metadata(&self, doc: &TantivyDocument) -> Option<ParagraphMetadata> {
+        doc.get_first(self.metadata)
+            .and_then(|value| ParagraphMetadata::decode(value.as_bytes()?).ok())
     }
 }
