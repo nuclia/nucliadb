@@ -171,7 +171,7 @@ jobs:
     runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgres:15
+        image: postgres:19
         env:
           POSTGRES_PASSWORD: postgres
         ports:
@@ -319,7 +319,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:13
+        image: postgres:19
         env:
           POSTGRES_PASSWORD: postgres
         options: >-
