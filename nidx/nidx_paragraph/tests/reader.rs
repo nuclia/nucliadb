@@ -139,7 +139,11 @@ fn create_resource_with_fields(shard_id: String, rid: String, fields: Vec<Field>
             position += paragraph.len() as i32;
         }
 
-        let text_info = TextInformation { text, labels };
+        let text_info = TextInformation {
+            text,
+            labels,
+            ..Default::default()
+        };
         texts.insert(field_id.to_string(), text_info);
 
         field_paragraphs.insert(
@@ -161,6 +165,25 @@ fn create_resource_with_fields(shard_id: String, rid: String, fields: Vec<Field>
     };
 
     (rid, resource)
+}
+
+#[test]
+fn test_skip_tokenization_keeps_paragraph_metadata() -> anyhow::Result<()> {
+    let (_, mut resource) = create_resource("shard".into());
+    resource.texts.get_mut("title").unwrap().skip_tokenization = true;
+    let reader = test_reader(&resource);
+    for (body, expected) in [("first", 0), ("tantivy", 1), ("", 4)] {
+        let result = reader.search(
+            &ParagraphSearchRequest {
+                body: body.into(),
+                result_per_page: 20,
+                ..Default::default()
+            },
+            &PrefilterResult::All,
+        )?;
+        assert_eq!(result.total, expected, "query: {body:?}");
+    }
+    Ok(())
 }
 
 #[test]

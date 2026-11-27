@@ -29,6 +29,23 @@ def graph_path(row: dict[str, object]) -> GraphPath:
     return value
 
 
+def load_searchable_records(
+    client: nidx_pb2_grpc.NidxLPGStub,
+    graph_id: str,
+    records: list[nidx_pb2.LpgRecord],
+    *,
+    timeout: float = 90,
+) -> nidx_pb2.LpgOperationResponse:
+    # Query fixtures need search-visible completion, unlike bulk ingestion.
+    return client.LPGOperation(
+        nidx_pb2.LpgOperationRequest(
+            graph_id=graph_id,
+            operations=[nidx_pb2.LpgOperation(upsert_record=record) for record in records],
+        ),
+        timeout=timeout,
+    )
+
+
 @pytest.fixture
 def lpg_graph(lpg_address: str) -> Iterator[tuple[nidx_pb2_grpc.NidxLPGStub, str]]:
     with grpc.insecure_channel(lpg_address) as channel:
@@ -195,11 +212,10 @@ def cypher(lpg_graph: tuple[nidx_pb2_grpc.NidxLPGStub, str]) -> Cypher:
         )
         for id, source, target, kind, properties in edges
     ]
-    request = nidx_pb2.BulkLoadRequest(graph_id=graph_id, records=records)
     deadline = time.monotonic() + 60
     while True:
         try:
-            response = client.BulkLoad(request, timeout=40)
+            response = load_searchable_records(client, graph_id, records, timeout=40)
             break
         except grpc.RpcError as error:
             # The search indexes may not have synchronized at startup.
@@ -606,10 +622,7 @@ def test_expand_limits_and_invalid_inputs(
             "properties": {"payload": "x" * 1_600_000},
         }
     )
-    loaded = client.BulkLoad(
-        nidx_pb2.BulkLoadRequest(graph_id=graph_id, records=[*endpoints, large_edge]),
-        timeout=90,
-    )
+    loaded = load_searchable_records(client, graph_id, [*endpoints, large_edge])
     assert all(result.status == nidx_pb2.LPG_OPERATION_STATUS_APPLIED for result in loaded.results)
     with pytest.raises(grpc.RpcError) as error:
         client.Expand(
@@ -673,9 +686,7 @@ def shortest_path_records(
         )
     ]
     records = nodes + edges
-    response = lpg_graph[0].BulkLoad(
-        nidx_pb2.BulkLoadRequest(graph_id=cypher.graph_id, records=records), timeout=90
-    )
+    response = load_searchable_records(lpg_graph[0], cypher.graph_id, records)
     assert all(result.status == nidx_pb2.LPG_OPERATION_STATUS_APPLIED for result in response.results)
     return records
 
@@ -934,7 +945,7 @@ def large_shortest_path(cypher: Cypher, lpg_graph: tuple[nidx_pb2_grpc.NidxLPGSt
             [("large-start", "large-mid"), ("large-mid", "large-end")]
         )
     ]
-    loaded = client.BulkLoad(nidx_pb2.BulkLoadRequest(graph_id=graph_id, records=records), timeout=90)
+    loaded = load_searchable_records(client, graph_id, records)
     assert all(result.status == nidx_pb2.LPG_OPERATION_STATUS_APPLIED for result in loaded.results)
 
 

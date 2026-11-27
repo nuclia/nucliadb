@@ -17,10 +17,12 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+import json
 import subprocess
 import sys
 from collections.abc import Iterator, Mapping, Sequence
 from datetime import datetime, timedelta, timezone
+from unittest.mock import Mock
 from uuid import uuid4
 
 import grpc
@@ -687,6 +689,96 @@ def test_invalid_hybrid_search_queries(nidx: NidxClient) -> None:
         graph.search(text="query", top_k=0)
 
 
+def _mock_graph(*, max_records: int = 1000) -> Graph:
+    tenant = str(uuid4())
+    client = Mock()
+    client.api.GetShard.return_value.metadata.kbid = tenant
+    client.api.ListVectorSets.return_value.vectorsets = ["test"]
+    client.lpg_client.GetRecords.return_value = nidx_pb2.GetRecordsResponse()
+    client.lpg_client.SearchChunks.return_value = nidx_pb2.SearchChunksResponse()
+    return Graph(
+        client, tenant, str(uuid4()), vectorset="test", vector_dimension=3, max_records=max_records
+    )
+
+
+def test_search_minimum_scores_are_forwarded() -> None:
+    graph = _mock_graph(max_records=1)
+    client = graph.nidx
+    graph.search(text="query", vector=[1.0, 0.0, 0.0], min_score_semantic=0.75, min_score_keyword=2.5)
+    request = client.lpg_client.SearchChunks.call_args.args[0]
+    assert request.top_k == 10
+    assert request.min_score_semantic == pytest.approx(0.75)
+    assert request.min_score_keyword == pytest.approx(2.5)
+    graph.search(text="query")
+    request = client.lpg_client.SearchChunks.call_args.args[0]
+    assert request.min_score_semantic == 0.0
+    assert request.min_score_keyword == 0.0
+    for parameter in ["min_score_semantic", "min_score_keyword"]:
+        for value in [float("nan"), float("inf"), float("-inf"), True, "0.5"]:
+            client.lpg_client.SearchChunks.reset_mock()
+            with pytest.raises(ValueError, match=parameter):
+                graph.search(text="query", **{parameter: value})
+            client.lpg_client.SearchChunks.assert_not_called()
+
+
+def test_find_pages_are_explicit_and_independent_of_total_record_limit() -> None:
+    graph = _mock_graph(max_records=1)
+    records = [
+        nidx_pb2.LpgRecord(key=nidx_pb2.LpgRecordKey(kind=nidx_pb2.LPG_NODE, id=id), labels=["Node"])
+        for id in ["b", "a", "c"]
+    ]
+    graph.lpg.FindRecords.side_effect = [
+        nidx_pb2.FindRecordsResponse(records=records[:2], next_page_token="next"),
+        nidx_pb2.FindRecordsResponse(records=records[2:]),
+    ]
+    predicate = PropertyFilter("price", "range", lower=1)
+    first = graph.find_page("node", predicate, page_size=2)
+    assert [record.id for record in first.records] == ["b", "a"]
+    assert first.next_page_token == "next"
+    second = graph.find_page("node", predicate, page_size=2, page_token=first.next_page_token)
+    assert [record.id for record in second.records] == ["c"]
+    assert second.next_page_token == ""
+    requests = [call.args[0] for call in graph.lpg.FindRecords.call_args_list]
+    assert [request.page_token for request in requests] == ["", "next"]
+    assert all(
+        request.page_size == 2 and list(request.filters) == [predicate.to_proto()]
+        for request in requests
+    )
+    graph.lpg.FindRecords.reset_mock()
+    for arguments in [
+        {"page_size": 0},
+        {"page_size": 1001},
+        {"page_size": True},
+        {"page_token": None},
+    ]:
+        with pytest.raises(ValueError):
+            graph.find_page("node", **arguments)
+    with pytest.raises(ValueError, match="kind"):
+        graph.find_page("invalid")
+    graph.lpg.FindRecords.assert_not_called()
+
+
+def test_find_convenience_preserves_sorting_limits_and_cursor_loop_checks() -> None:
+    graph = _mock_graph(max_records=2)
+    records = [
+        nidx_pb2.LpgRecord(key=nidx_pb2.LpgRecordKey(kind=nidx_pb2.LPG_NODE, id=id), labels=["Node"])
+        for id in ["b", "a"]
+    ]
+    graph.lpg.FindRecords.side_effect = [
+        nidx_pb2.FindRecordsResponse(records=records[:1], next_page_token="next"),
+        nidx_pb2.FindRecordsResponse(records=records[1:]),
+    ]
+    assert [record.id for record in graph.find("node")] == ["a", "b"]
+    graph.max_records = 1
+    graph.lpg.FindRecords.side_effect = None
+    graph.lpg.FindRecords.return_value = nidx_pb2.FindRecordsResponse(records=records)
+    with pytest.raises(RuntimeError, match="candidate limit exceeded"):
+        graph.find("node")
+    graph.lpg.FindRecords.return_value = nidx_pb2.FindRecordsResponse(next_page_token="loop")
+    with pytest.raises(RuntimeError, match="repeated a pagination token"):
+        graph.find("node")
+
+
 def test_node_replacement_and_tenant_isolation(nidx: NidxClient) -> None:
     first = Graph.create(nidx, str(uuid4()))
     second = Graph.create(nidx, str(uuid4()))
@@ -707,14 +799,15 @@ def test_node_replacement_and_tenant_isolation(nidx: NidxClient) -> None:
     isolated_edge = second.upsert_edge("E1", "P1", "STOCKED_AT", "W1", {"quantity": 999})
     assert second.topology() == [isolated_edge]
     assert first.topology(PropertyFilter("quantity", "eq", value=999)) == []
-    first.delete_node("P1", detach=True)
+    first.delete_edge("E1")
+    first.delete_node("P1")
     assert ids(first.find("node")) == ["W1"]
     assert first.topology() == []
     assert second.get("node", "P1") == other
     assert second.topology() == [isolated_edge]
 
 
-def test_cascade(nidx: NidxClient) -> None:
+def test_node_deletion_requires_removing_incident_edges(nidx: NidxClient) -> None:
     graph = Graph.create(nidx, str(uuid4()))
     graph.upsert_node("P1", ["Product"], {})
     graph.upsert_node("W1", ["Warehouse"], {})
@@ -727,15 +820,20 @@ def test_cascade(nidx: NidxClient) -> None:
     with pytest.raises(ValueError, match="incident edges"):
         graph.delete_node("P1")
     before = graph.get("node", "P1")
-    assert before is not None and before.deleting is False
+    assert before is not None
+    assert ids(graph.find("edge")) == ["E1", "E2", "E3", "E4", "E5"]
 
     reopened = Graph(nidx, graph.tenant, graph.shard_id)
-    reopened.delete_node("P1", detach=True)
+    for edge_id in ["E1", "E2", "E3", "E5"]:
+        with pytest.raises(ValueError, match="incident edges"):
+            reopened.delete_node("P1")
+        reopened.delete_edge(edge_id)
+    reopened.delete_node("P1")
     assert reopened.get("node", "P1") is None
     assert ids(reopened.find("node")) == ["C1", "W1"]
     assert ids(reopened.find("edge")) == ["E4"]
     assert ids(reopened.topology()) == ["E4"]
-    reopened.delete_node("P1", detach=True)
+    reopened.delete_node("P1")
 
 
 def test_invalid_endpoints_and_candidate_limit(nidx: NidxClient) -> None:
@@ -753,12 +851,12 @@ def test_invalid_endpoints_and_candidate_limit(nidx: NidxClient) -> None:
     with pytest.raises(RuntimeError, match="limit exceeded"):
         bounded.topology()
     with pytest.raises(RuntimeError, match="limit exceeded"):
-        bounded.delete_node("P1", detach=True)
+        bounded.delete_node("P1")
     unchanged = graph.get("node", "P1")
-    assert unchanged is not None and unchanged.deleting is False
+    assert unchanged is not None
 
 
-def test_client_reconnect_and_demo(lpg_address: str) -> None:
+def test_client_reconnect_and_demo(nidx: NidxClient, lpg_address: str) -> None:
     original = NidxClient(lpg_address)
     try:
         graph = Graph.create(original, str(uuid4()))
@@ -775,7 +873,8 @@ def test_client_reconnect_and_demo(lpg_address: str) -> None:
         assert reopened.get("node", "P1") == product
         assert reopened.get("edge", "E1") == edge
         assert reopened.topology(PropertyFilter("quantity", "eq", value=10)) == [edge]
-        reopened.delete_node("P1", detach=True)
+        reopened.delete_edge("E1")
+        reopened.delete_node("P1")
         assert reopened.find("edge") == []
     finally:
         restarted.close()
@@ -784,10 +883,76 @@ def test_client_reconnect_and_demo(lpg_address: str) -> None:
         [sys.executable, "-m", "nidx.examples.lpg.demo", "--address", lpg_address],
         capture_output=True,
         text=True,
-        timeout=90,
+        timeout=300,
     )
     assert demo.returncode == 0, demo.stdout + demo.stderr
-    assert "Reopen, replacement, and cascading deletion verified." in demo.stdout
+    result = json.loads(demo.stdout)
+    assert {person["name"] for person in result["people"]} == {
+        "Ramon",
+        "Ferran",
+        "Joan Antoni",
+        "Carmen",
+        "Oni",
+        "Kento",
+        "Arnau",
+        "Matteu Jonglez",
+    }
+    people = {person["name"]: person for person in result["people"]}
+    assert people["Ramon"]["role"] == "manager"
+    assert all(
+        people[name]["role"] == "software engineer" and people[name]["team"] == "nucliadb"
+        for name in ("Ferran", "Joan Antoni")
+    )
+    assert {person["name"] for person in result["discovery"]["people"]} == {
+        "Carmen",
+        "Oni",
+        "Kento",
+        "Arnau",
+    }
+    assert result["updated_text_properties"]["text_chunks"]["focus"] == [
+        "nucliadb graph search, indexing, and retrieval"
+    ]
+    for mode in ("text", "vector", "hybrid"):
+        assert {hit["name"] for hit in result["search"][mode]} == {"Ferran", "Joan Antoni"}
+    assert all(
+        hit["text_rank"] is not None and hit["vector_rank"] is not None
+        for hit in result["search"]["hybrid"]
+    )
+    assert {match["person"] for match in result["expand"]["matches"]} == {
+        "Ferran",
+        "Joan Antoni",
+        "Carmen",
+        "Oni",
+        "Kento",
+        "Arnau",
+    }
+    assert result["shortest_path"]["people"] == ["Ferran", "Ramon", "Matteu Jonglez"]
+    assert result["shortest_path"]["relationships"] == ["REPORTS_TO", "REPORTS_TO"]
+    cypher = result["cypher"]
+    assert cypher["lookup"]["rows"][0]["p"]["name"] == "Ferran"
+    assert len(cypher["neighborhood"]["rows"]) == 8
+    assert len(cypher["bounded_traversal"]["rows"]) == 2
+    assert len(cypher["coworkers"]["rows"]) == 7
+    assert {row["other"]["name"] for row in cypher["coworkers"]["rows"]} == (set(people) - {"Ferran"})
+    assert len(cypher["relationship_filter"]["rows"]) == 7
+    assert any(
+        row["a"]["name"] == "Ramon" and row["b"]["name"] == "Matteu Jonglez"
+        for row in cypher["relationship_filter"]["rows"]
+    )
+    assert cypher["employee_count"]["rows"] == [{"c.name": "Progress", "employees": 8}]
+    assert [node["name"] for node in cypher["shortest_path"]["rows"][0]["path"]["nodes"]] == [
+        "Ferran",
+        "Ramon",
+        "Matteu Jonglez",
+    ]
+    assert "incident edges" in result["deletion"]["initial_error"]
+    assert result["deletion"]["removed_edges"] == ["arnau-reports-to", "arnau-works-for"]
+    assert result["deletion"]["node_exists"] is False
+    graph = Graph(nidx, result["graph"]["tenant"], result["graph"]["shard_id"])
+    assert graph.get("node", "arnau") is None
+    assert graph.get("node", "ramon") is not None
+    assert graph.get("edge", "arnau-reports-to") is None
+    assert graph.get("edge", "arnau-works-for") is None
 
 
 @pytest.mark.parametrize(

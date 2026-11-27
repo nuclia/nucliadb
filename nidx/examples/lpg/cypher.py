@@ -9,8 +9,7 @@ import argparse
 import json
 import math
 import re
-from collections import deque
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
@@ -27,6 +26,14 @@ class QueryLimitExceeded(RuntimeError):
     """Executing the query would exceed a safety limit."""
 
 
+MAX_EXPAND_NODES = 1000
+
+
+def _raise_limit(error: grpc.RpcError) -> None:
+    if error.code() == grpc.StatusCode.RESOURCE_EXHAUSTED:
+        raise QueryLimitExceeded(f"Server limit exceeded: {error.details()}") from error
+
+
 class LpgReader(Protocol):
     def FindRecords(
         self, request: nidx_pb2.FindRecordsRequest, *, timeout: float
@@ -35,6 +42,12 @@ class LpgReader(Protocol):
     def GetRecords(
         self, request: nidx_pb2.GetRecordsRequest, *, timeout: float
     ) -> nidx_pb2.GetRecordsResponse: ...
+
+    def Expand(self, request: nidx_pb2.ExpandRequest, *, timeout: float) -> nidx_pb2.ExpandResponse: ...
+
+    def ShortestPath(
+        self, request: nidx_pb2.ShortestPathRequest, *, timeout: float
+    ) -> nidx_pb2.ShortestPathResponse: ...
 
 
 @dataclass(frozen=True)
@@ -329,17 +342,41 @@ class _Execution:
             if self.matches(node, predicates):
                 yield node
 
-    def edges(
-        self, node: str, direction: str, edge_type: str | None = None
-    ) -> Iterator[nidx_pb2.LpgRecord]:
-        if direction == "source":
-            yield from self.find(nidx_pb2.LPG_EDGE, source=node, edge_type=edge_type)
-        elif direction == "target":
-            yield from self.find(nidx_pb2.LPG_EDGE, target=node, edge_type=edge_type)
-        elif direction == "incident_node":
-            yield from self.find(nidx_pb2.LPG_EDGE, incident_node=node, edge_type=edge_type)
-        else:
-            raise ValueError(f"Unknown direction: {direction}")
+    def expand(
+        self,
+        node_ids: Iterable[str],
+        direction: nidx_pb2.LpgDirection.ValueType,
+        edge_types: Sequence[str] = (),
+        neighbor_label: str | None = None,
+    ) -> dict[str, list[tuple[nidx_pb2.LpgRecord, nidx_pb2.LpgRecord]]]:
+        """One-hop expansion through the server-side Expand RPC, batched by start node."""
+        ids = list(dict.fromkeys(node_ids))
+        cap = min(10000, self.query.max_records)
+        bindings: dict[str, list[tuple[nidx_pb2.LpgRecord, nidx_pb2.LpgRecord]]] = {}
+        for offset in range(0, len(ids), MAX_EXPAND_NODES):
+            self._rpc()
+            request = nidx_pb2.ExpandRequest(
+                graph_id=self.query.graph_id,
+                node_ids=ids[offset : offset + MAX_EXPAND_NODES],
+                direction=direction,
+                edge_types=edge_types,
+                neighbor_label=neighbor_label,
+                candidate_limit=cap,
+                max_results=cap,
+            )
+            try:
+                response = self.query.client.Expand(request, timeout=self.query.timeout)
+            except grpc.RpcError as error:
+                _raise_limit(error)
+                raise
+            self._count(len(response.edges) + len(response.neighbors))
+            for match in response.matches:
+                neighbor = response.neighbors[match.neighbor_index]
+                self.nodes.setdefault(neighbor.key.id, neighbor)
+                bindings.setdefault(match.node_id, []).append(
+                    (response.edges[match.edge_index], neighbor)
+                )
+        return bindings
 
     def run(
         self, kind: str, p: dict[str, str], predicates: Sequence[_Predicate]
@@ -354,27 +391,37 @@ class _Execution:
             for node in starts:
                 yield {p["node"]: node}
         elif kind == "neighborhood":
-            for node in starts:
-                for edge in self.edges(node.key.id, "incident_node"):
-                    other_id = edge.target if edge.source == node.key.id else edge.source
-                    yield {p["node"]: node, p["rel"]: edge, p["other"]: self.node(other_id)}
+            nodes = list(starts)
+            bindings = self.expand((node.key.id for node in nodes), nidx_pb2.LPG_BOTH)
+            for node in nodes:
+                for edge, other in bindings.get(node.key.id, []):
+                    yield {p["node"]: node, p["rel"]: edge, p["other"]: other}
         elif kind == "traverse":
-            for node in starts:
-                yield from self.paths(node, p)
+            yield from self.paths(list(starts), p)
         elif kind == "join":
             middle_predicates = [
                 predicate for predicate in predicates if predicate.variable == p["middle"]
             ]
-            for node in starts:
-                for first in self.edges(node.key.id, "source", p["type1"]):
-                    middle = self.node(first.target)
-                    if p["label2"] not in middle.labels or not self.matches(middle, middle_predicates):
+            nodes = list(starts)
+            first_hops = self.expand(
+                (node.key.id for node in nodes),
+                nidx_pb2.LPG_OUTGOING,
+                [p["type1"]],
+                p["label2"],
+            )
+            middles = {
+                middle.key.id: middle
+                for hops in first_hops.values()
+                for _, middle in hops
+                if self.matches(middle, middle_predicates)
+            }
+            second_hops = self.expand(middles, nidx_pb2.LPG_INCOMING, [p["type2"]], p["label3"])
+            for node in nodes:
+                for first, middle in first_hops.get(node.key.id, []):
+                    if middle.key.id not in middles:
                         continue
-                    for second in self.edges(middle.key.id, "target", p["type2"]):
-                        if second.key.id == first.key.id:
-                            continue
-                        other = self.node(second.source)
-                        if p["label3"] in other.labels and self.matches(other, other_predicates):
+                    for second, other in second_hops.get(middle.key.id, []):
+                        if second.key.id != first.key.id and self.matches(other, other_predicates):
                             yield {p["node"]: node, p["middle"]: middle, p["other"]: other}
         elif kind == "edge_filter":
             edge_predicates = [predicate for predicate in predicates if predicate.variable == p["rel"]]
@@ -415,44 +462,52 @@ class _Execution:
                     if path is not None:
                         yield {p["path"]: path}
 
-    def paths(self, start: nidx_pb2.LpgRecord, p: dict[str, str]) -> Iterator[dict[str, object]]:
-        types = set(p["types"].split("|"))
-        stack = [Path((start,), ())]
-        while stack:
-            path = stack.pop()
-            length = len(path.relationships)
-            if length >= int(p["min"]):
-                yield {p["path"]: path}
-            if length == int(p["max"]):
-                continue
-            used = {edge.key.id for edge in path.relationships}
-            for edge in self.edges(path.nodes[-1].key.id, "source"):
-                if edge.edge_type in types and edge.key.id not in used:
-                    stack.append(
-                        Path((*path.nodes, self.node(edge.target)), (*path.relationships, edge))
-                    )
+    def paths(
+        self, starts: Sequence[nidx_pb2.LpgRecord], p: dict[str, str]
+    ) -> Iterator[dict[str, object]]:
+        types = p["types"].split("|")
+        frontier = [Path((start,), ()) for start in starts]
+        for length in range(1, int(p["max"]) + 1):
+            if not frontier:
+                return
+            bindings = self.expand(
+                (path.nodes[-1].key.id for path in frontier), nidx_pb2.LPG_OUTGOING, types
+            )
+            extended = []
+            for path in frontier:
+                used = {edge.key.id for edge in path.relationships}
+                for edge, neighbor in bindings.get(path.nodes[-1].key.id, []):
+                    if edge.key.id in used:
+                        continue
+                    longer = Path((*path.nodes, neighbor), (*path.relationships, edge))
+                    extended.append(longer)
+                    if length >= int(p["min"]):
+                        yield {p["path"]: longer}
+            frontier = extended
 
     def shortest(
         self, start: nidx_pb2.LpgRecord, end: nidx_pb2.LpgRecord, edge_type: str, max_hops: int
     ) -> Path | None:
-        queue = deque([Path((start,), ())])
-        seen = {start.key.id}
-        while queue:
-            path = queue.popleft()
-            if len(path.relationships) == max_hops:
-                continue
-            node = path.nodes[-1]
-            for edge in self.edges(node.key.id, "incident_node", edge_type):
-                next_id = edge.target if edge.source == node.key.id else edge.source
-                if next_id in seen:
-                    continue
-                next_node = self.node(next_id)
-                next_path = Path((*path.nodes, next_node), (*path.relationships, edge))
-                if next_id == end.key.id:
-                    return next_path
-                seen.add(next_id)
-                queue.append(next_path)
-        return None
+        self._rpc()
+        try:
+            response = self.query.client.ShortestPath(
+                nidx_pb2.ShortestPathRequest(
+                    graph_id=self.query.graph_id,
+                    source=start.key.id,
+                    target=end.key.id,
+                    direction=nidx_pb2.LPG_BOTH,
+                    edge_types=[edge_type],
+                    max_hops=max_hops,
+                ),
+                timeout=self.query.timeout,
+            )
+        except grpc.RpcError as error:
+            _raise_limit(error)
+            raise
+        if not response.found:
+            return None
+        self._count(len(response.nodes) + len(response.edges))
+        return Path(tuple(response.nodes), tuple(response.edges))
 
 
 def _json_value(value: object) -> object:

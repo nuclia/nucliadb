@@ -49,6 +49,7 @@ async fn create_dummy_resources(total: u8, fixture: &mut NidxFixture, shard_id: 
             nidx_protos::TextInformation {
                 text: format!("Dummy text {i:0>3}"),
                 labels: vec![],
+                ..Default::default()
             },
         );
         let mut security = Security::default();

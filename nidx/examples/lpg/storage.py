@@ -43,6 +43,7 @@ NodeFilterScope: TypeAlias = Literal["all", "intermediate"]
 RPC_TIMEOUT = 60
 DEFAULT_VECTORSET = "lpg-property-v1"
 DEFAULT_VECTOR_DIMENSION = 3
+MAX_SEARCH_RESULTS = 10_000
 
 
 def _nonempty(value: str) -> None:
@@ -85,7 +86,6 @@ class Record:
     source: str | None = None
     target: str | None = None
     edge_type: str | None = None
-    deleting: bool = False
     revision: str = field(default_factory=lambda: uuid4().hex)
     text_chunks: dict[str, list[str]] = field(default_factory=dict)
 
@@ -123,8 +123,14 @@ class Record:
                 _nonempty(value)
         elif any(value is not None for value in (self.source, self.target, self.edge_type)):
             raise ValueError("Nodes cannot have edge endpoints or type")
-        if type(self.deleting) is not bool or not isinstance(self.revision, str):
-            raise ValueError("Invalid deletion state or revision")
+        if not isinstance(self.revision, str):
+            raise ValueError("Invalid revision")
+
+
+@dataclass(frozen=True)
+class FindPage:
+    records: list[Record]
+    next_page_token: str
 
 
 @dataclass(frozen=True)
@@ -402,14 +408,18 @@ def _from_lpg_record(record: nidx_pb2.LpgRecord, tenant: str) -> Record:
         source=record.source if record.HasField("source") else None,
         target=record.target if record.HasField("target") else None,
         edge_type=record.edge_type if record.HasField("edge_type") else None,
-        deleting=record.deleting,
         revision=record.revision,
         text_chunks={name: list(value.chunks) for name, value in record.text_properties.items()},
     )
 
 
 class Graph:
-    """Python facade for the NidxLPG record and property APIs."""
+    """Python facade for an existing tenant-owned NidxLPG shard.
+
+    Use ``create`` to create a shard, or construct a Graph with an existing
+    shard ID. ``max_records`` bounds the list-returning enumeration helpers.
+    Search uses ``top_k``; ``find_page`` exposes independent pagination.
+    """
 
     def __init__(
         self,
@@ -463,6 +473,7 @@ class Graph:
         vector_dimension: int = DEFAULT_VECTOR_DIMENSION,
         max_records: int = 1000,
     ) -> Graph:
+        """Create a graph shard for the tenant with a cosine-similarity vectorset."""
         tenant = str(UUID(tenant))
         _nonempty(vectorset)
         if not 1 <= vector_dimension <= 4096:
@@ -519,6 +530,7 @@ class Graph:
         return record
 
     def get(self, kind: Kind, external_id: str) -> Record | None:
+        """Return the node or edge with this ID, or None if it does not exist."""
         proto = self._get_proto(kind, external_id)
         return None if proto is None else _from_lpg_record(proto, self.tenant)
 
@@ -536,7 +548,6 @@ class Graph:
             properties={key: _to_lpg_property(value) for key, value in record.properties.items()},
             vectorset=self.vectorset,
             revision=record.revision,
-            deleting=record.deleting,
         )
         if record.kind == "edge":
             assert (
@@ -574,9 +585,12 @@ class Graph:
         text_chunks: dict[str, list[str]] | None = None,
         embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
     ) -> Record:
+        """Create or fully replace a node and return it.
+
+        Labels are required and immutable. Optional embeddings must provide
+        one vector per text chunk.
+        """
         current = self.get("node", id)
-        if current is not None and current.deleting:
-            raise ValueError("Finish the pending node deletion before replacing it")
         chunks = text_chunks or {}
         record = Record(self.tenant, "node", id, properties, labels=labels, text_chunks=chunks)
         if current is not None and set(current.labels) != set(record.labels):
@@ -596,6 +610,11 @@ class Graph:
         text_chunks: dict[str, list[str]] | None = None,
         embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
     ) -> Record:
+        """Create or fully replace a directed edge and return it.
+
+        Both endpoints must exist, and an existing edge's type is immutable.
+        Optional embeddings must provide one vector per text chunk.
+        """
         chunks = text_chunks or {}
         record = Record(
             self.tenant,
@@ -613,10 +632,54 @@ class Graph:
         vectors = _validate_embeddings(chunks, embeddings, self.vector_dimension)
         for endpoint_id in (source, target):
             node = self.get("node", endpoint_id)
-            if node is None or node.deleting:
-                raise ValueError(f"Endpoint {endpoint_id!r} is missing or being deleted")
+            if node is None:
+                raise ValueError(f"Endpoint {endpoint_id!r} is missing")
         self._put(record, vectors)
         return record
+
+    def _find_page(
+        self,
+        kind: Kind,
+        filters: Sequence[PropertyFilter],
+        *,
+        page_size: int,
+        page_token: str,
+        incident_node: str | None = None,
+    ) -> FindPage:
+        if kind not in ("node", "edge"):
+            raise ValueError(f"Unknown record kind: {kind}")
+        if type(page_size) is not int or not 1 <= page_size <= 1000:
+            raise ValueError("page_size must be between 1 and 1000")
+        if not isinstance(page_token, str):
+            raise ValueError("page_token must be a string")
+        request = nidx_pb2.FindRecordsRequest(
+            graph_id=self.shard_id,
+            kind=_lpg_kind(kind),
+            filters=[predicate.to_proto() for predicate in filters],
+            page_size=page_size,
+            page_token=page_token,
+        )
+        if incident_node is not None:
+            request.incident_node = incident_node
+        response = self.lpg.FindRecords(request, timeout=RPC_TIMEOUT)
+        return FindPage(
+            [_from_lpg_record(record, self.tenant) for record in response.records],
+            response.next_page_token,
+        )
+
+    def find_page(
+        self,
+        kind: Kind,
+        *filters: PropertyFilter,
+        page_size: int = 100,
+        page_token: str = "",
+    ) -> FindPage:
+        """Return one resource-ID-ordered page, independent of max_records.
+
+        Pass next_page_token with the same kind/filters to continue. An empty
+        next_page_token marks the end. Pages are not a snapshot of concurrent writes.
+        """
+        return self._find_page(kind, filters, page_size=page_size, page_token=page_token)
 
     def _find(
         self,
@@ -630,20 +693,17 @@ class Graph:
         records: list[Record] = []
         page_size = min(1000, self.max_records + 1)
         while True:
-            request = nidx_pb2.FindRecordsRequest(
-                graph_id=self.shard_id,
-                kind=_lpg_kind(kind),
-                filters=[predicate.to_proto() for predicate in filters],
+            page = self._find_page(
+                kind,
+                filters,
                 page_size=page_size,
                 page_token=token,
+                incident_node=incident_node,
             )
-            if incident_node is not None:
-                request.incident_node = incident_node
-            response = self.lpg.FindRecords(request, timeout=RPC_TIMEOUT)
-            records.extend(_from_lpg_record(record, self.tenant) for record in response.records)
+            records.extend(page.records)
             if len(records) > self.max_records:
                 raise RuntimeError("Prototype candidate limit exceeded; result would be incomplete")
-            token = response.next_page_token
+            token = page.next_page_token
             if not token:
                 return sorted(records, key=lambda record: record.id)
             if token in seen_tokens:
@@ -651,11 +711,17 @@ class Graph:
             seen_tokens.add(token)
 
     def find(self, kind: Kind, *filters: PropertyFilter) -> list[Record]:
+        """Return matching nodes or edges sorted by ID, applying all filters.
+
+        Raise RuntimeError if the result exceeds ``max_records``.
+        Use find_page for caller-controlled pagination without that total limit.
+        """
         if kind not in ("node", "edge"):
             raise ValueError(f"Unknown record kind: {kind}")
         return self._find(kind, filters)
 
     def topology(self, *filters: PropertyFilter) -> list[Record]:
+        """Return edges sorted by ID, applying filters to edge properties."""
         return self._find("edge", filters)
 
     def expand(
@@ -670,6 +736,11 @@ class Graph:
         candidate_limit: int = 1000,
         max_results: int = 1000,
     ) -> Expansion:
+        """Expand one hop from the given nodes in the requested direction.
+
+        Optional filters restrict edges and neighbors. The result contains
+        start-node, edge, and neighbor bindings and the examined edge count.
+        """
         response = self.lpg.Expand(
             nidx_pb2.ExpandRequest(
                 graph_id=self.shard_id,
@@ -714,6 +785,11 @@ class Graph:
         max_visited_nodes: int = 1000,
         max_examined_edges: int = 10000,
     ) -> Path | None:
+        """Return one bounded, unweighted shortest path, or None if not found.
+
+        Node filters apply to all nodes by default; ``intermediate`` exempts
+        the source and target. Direction and edge filters constrain traversal.
+        """
         _nonempty(source)
         _nonempty(target)
         if node_filter_scope == "all":
@@ -757,7 +833,18 @@ class Graph:
         filters: Sequence[PropertyFilter] = (),
         top_k: int = 10,
         rrf_k: int = 60,
+        min_score_semantic: float = 0.0,
+        min_score_keyword: float = 0.0,
     ) -> list[SearchHit]:
+        """Search text chunks using text, a vector, or both.
+
+        Hybrid search combines text and vector rankings with reciprocal rank
+        fusion. Optional kind, property, and record filters restrict results.
+        Minimum scores filter semantic and keyword candidates before fusion,
+        not the final reciprocal-rank score. Both default to zero.
+        Return up to top_k hits, independent of max_records and the total
+        matching chunks. Hybrid fusion uses bounded internal ranked windows.
+        """
         if (text is None or not text.strip()) and vector is None:
             raise ValueError("Provide nonempty text, an embedding, or both")
         if text is not None and not text.strip():
@@ -773,10 +860,16 @@ class Graph:
             raise ValueError(f"Unknown record kind: {kind}")
         if text_property is not None:
             _validate_property_name(text_property)
-        if not 1 <= top_k <= self.max_records:
-            raise ValueError(f"top_k must be between 1 and {self.max_records}")
+        if type(top_k) is not int or not 1 <= top_k <= MAX_SEARCH_RESULTS:
+            raise ValueError(f"top_k must be between 1 and {MAX_SEARCH_RESULTS}")
         if rrf_k < 1:
             raise ValueError("rrf_k must be positive")
+        for name, value in (
+            ("min_score_semantic", min_score_semantic),
+            ("min_score_keyword", min_score_keyword),
+        ):
+            if type(value) not in (int, float) or not math.isfinite(value):
+                raise ValueError(f"{name} must be a finite number")
 
         request = nidx_pb2.SearchChunksRequest(
             graph_id=self.shard_id,
@@ -785,7 +878,8 @@ class Graph:
             top_k=top_k,
             vectorset=self.vectorset,
             rrf_k=rrf_k,
-            candidate_limit=self.max_records,
+            min_score_semantic=min_score_semantic,
+            min_score_keyword=min_score_keyword,
         )
         if text_property is not None:
             request.property = text_property
@@ -819,13 +913,16 @@ class Graph:
         text_chunks: Mapping[str, Sequence[str]] | None = None,
         embeddings: Mapping[str, Sequence[Sequence[float]]] | None = None,
     ) -> Record:
+        """Update selected text chunks and/or embeddings on an existing record.
+
+        Replacing chunks clears their previous embeddings unless new ones are
+        supplied; other text properties are preserved.
+        """
         if not text_chunks and not embeddings:
             raise ValueError("Provide text chunks, embeddings, or both")
         current = self.get(kind, id)
         if current is None:
             raise ValueError(f"Cannot update text properties for missing {kind} {id!r}")
-        if current.deleting:
-            raise ValueError("Finish the pending deletion before updating text properties")
         if text_chunks is not None and not isinstance(text_chunks, Mapping):
             raise ValueError("Text chunks must map property names to chunk sequences")
         updated_chunks = {name: list(chunks) for name, chunks in current.text_chunks.items()}
@@ -869,18 +966,21 @@ class Graph:
         return record
 
     def delete_edge(self, id: str) -> None:
+        """Delete an edge by ID; deleting a missing edge is a no-op."""
         self._delete("edge", id)
 
-    def delete_node(self, id: str, *, detach: bool = False) -> None:
+    def delete_node(self, id: str) -> None:
+        """Delete a node by ID after all incoming and outgoing edges are removed.
+
+        Deleting a missing node is a no-op; deletion fails if edges remain.
+        """
         record = self.get("node", id)
         if record is None:
             return
         incident_edges = self._find("edge", incident_node=id)
-        if incident_edges and not detach and not record.deleting:
-            raise ValueError("Node has incident edges; use detach=True")
-        self._operation(
-            nidx_pb2.LpgOperation(delete_node=nidx_pb2.LpgNodeDeletion(id=id, detach=detach))
-        )
+        if incident_edges:
+            raise ValueError("Node has incident edges; delete them first")
+        self._operation(nidx_pb2.LpgOperation(delete_node=nidx_pb2.LpgNodeDeletion(id=id)))
         self._wait(lambda: self.get("node", id) is None, f"deletion node/{id}")
 
     def _delete(self, kind: Kind, id: str) -> None:

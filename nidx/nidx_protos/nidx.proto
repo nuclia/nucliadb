@@ -23,6 +23,16 @@ service NidxSearcher {
   rpc Suggest(nodereader.SuggestRequest) returns (nodereader.SuggestResponse) {}
 
   rpc ExtractedTexts(ExtractedTextsRequest) returns (ExtractedTextsResponse) {}
+  // Internal shard-local LPG read; preserves key order and omits missing records.
+  rpc LPGGetRecords(GetRecordsRequest) returns (GetRecordsResponse) {}
+  // Direct JSON-index enumeration with a merge/replica-stable resource-ID cursor.
+  rpc LPGFindRecords(FindRecordsRequest) returns (FindRecordsResponse) {}
+  // Shard-local relation adjacency with JSON property filters and record hydration.
+  rpc LPGExpand(ExpandRequest) returns (ExpandResponse) {}
+  // Shard-local lightweight traversal; hydrates only the final path.
+  rpc LPGShortestPath(ShortestPathRequest) returns (ShortestPathResponse) {}
+  // Shard-local ranked chunk search; hydrates only the final top-k results.
+  rpc LPGSearchChunks(SearchChunksRequest) returns (SearchChunksResponse) {}
 
   // Streams
   rpc Paragraphs(nodereader.StreamRequest) returns (stream nodereader.ParagraphItem) {}
@@ -33,10 +43,13 @@ service NidxIndexer {
   rpc Index(nodewriter.IndexMessage) returns (nodewriter.OpStatus) {}
   // Internal trusted-service API; resource bytes do not pass through an object store.
   rpc IndexResource(IndexResourceRequest) returns (nodewriter.OpStatus) {}
+  // Internal trusted-service API; distinct resources share index segments.
+  rpc IndexResources(IndexResourcesRequest) returns (nodewriter.OpStatus) {}
 }
 
 service NidxLPG {
   rpc LPGOperation(LpgOperationRequest) returns (LpgOperationResponse) {}
+  // Returns after indexer acknowledgement; search visibility is asynchronous.
   rpc BulkLoad(BulkLoadRequest) returns (LpgOperationResponse) {}
   rpc GetRecords(GetRecordsRequest) returns (GetRecordsResponse) {}
   rpc FindRecords(FindRecordsRequest) returns (FindRecordsResponse) {}
@@ -48,6 +61,14 @@ service NidxLPG {
 message IndexResourceRequest {
     string shard_id = 1;
     noderesources.Resource resource = 2;
+}
+
+message IndexResourcesRequest {
+    string shard_id = 1;
+    // 1-1000 distinct resource UUIDs, all belonging to shard_id.
+    // Upserts only; the complete encoded request must fit within 4 MiB.
+    // Published together across indexes; RPC failures can have uncertain outcomes.
+    repeated noderesources.Resource resources = 2;
 }
 
 enum LpgRecordKind {
@@ -109,11 +130,8 @@ message LpgRecord {
     map<string, LpgTextProperty> text_properties = 7;
     // Required for embeddings when the graph has multiple vectorsets.
     string vectorset = 8;
-    // Opaque client-supplied revision, persisted verbatim on upsert; DeleteNode
-    // replaces it when setting the deletion marker. Not a conditional version.
+    // Opaque client-supplied revision, persisted verbatim on upsert. Not a conditional version.
     string revision = 9;
-    // Server-owned marker while node deletion is in progress.
-    bool deleting = 10;
 }
 
 message UpsertRecordRequest { string graph_id = 1; LpgRecord record = 2; }
@@ -121,9 +139,8 @@ message GetRecordsRequest { string graph_id = 1; repeated LpgRecordKey keys = 2;
 // Returned records follow request order; absent keys are omitted.
 message GetRecordsResponse { repeated LpgRecord records = 1; }
 message DeleteRecordRequest { string graph_id = 1; LpgRecordKey key = 2; }
-// Without detach, a node with incident edges is rejected. An already marked
-// deletion resumes regardless of detach; deletion is not atomic.
-message DeleteNodeRequest { string graph_id = 1; string id = 2; bool detach = 3; }
+// Nodes with incident edges must have those edges deleted first.
+message DeleteNodeRequest { string graph_id = 1; string id = 2; }
 message PatchTextPropertiesRequest {
     string graph_id = 1;
     LpgRecordKey key = 2;
@@ -134,7 +151,6 @@ message PatchTextPropertiesResponse { LpgRecord record = 1; }
 
 message LpgNodeDeletion {
     string id = 1;
-    bool detach = 2;
 }
 
 message LpgTextPropertyUpdate {
@@ -158,7 +174,9 @@ message LpgOperationRequest {
     repeated LpgOperation operations = 2;
 }
 
-// Trusted full upserts; every edge endpoint must be a node in this request.
+// Trusted full upserts; callers guarantee that existing types do not change.
+// Every edge endpoint must be a node in this request or have endpoint_labels.
+// Referenced endpoints must already have been indexed; they are not rewritten.
 // Failures may leave a partially applied or uncertain batch.
 // Callers must coordinate writers; mutation serialization is local to one server.
 message BulkLoadRequest {
@@ -166,6 +184,7 @@ message BulkLoadRequest {
     reserved 2;
     // Nodes are applied before edges; results follow the original order.
     repeated LpgRecord records = 3;
+    map<string, LpgStringList> endpoint_labels = 4;
 }
 
 enum LpgOperationStatus {
@@ -209,6 +228,7 @@ message FindRecordsRequest {
     repeated LpgPropertyFilter filters = 3;
     uint32 page_size = 4;
     // Opaque cursor from the preceding response, with the same query parameters.
+    // Not a snapshot; resource-ID ordering survives segment merges and replica routing.
     string page_token = 5;
     optional string label = 6;
     // Edge-local endpoint filters. incident_node matches source OR target,
@@ -233,7 +253,7 @@ enum LpgDirection {
 message ExpandRequest {
     string graph_id = 1;
     // 1-1000 starting IDs; duplicates are treated as one starting node.
-    // Missing starting nodes fail with NOT_FOUND; deleting ones are rejected.
+    // Missing starting nodes fail with NOT_FOUND.
     repeated string node_ids = 2;
     LpgDirection direction = 3;
     // OR of types; empty means all types.
@@ -287,7 +307,7 @@ message ShortestPathRequest {
     // Total visited entries across both search directions (including roots).
     // Default 1000, maximum 10000.
     uint32 max_visited_nodes = 11;
-    // Cumulative Expand candidate counts, including repeat examinations.
+    // Cumulative matching adjacency candidate counts, including repeat examinations.
     // Default 10000, maximum 100000.
     uint32 max_examined_edges = 12;
 }
@@ -313,7 +333,11 @@ message SearchChunksRequest {
     uint32 top_k = 7;
     string vectorset = 8;
     uint32 rrf_k = 9;
-    uint32 candidate_limit = 10;
+    reserved 10;
+    reserved "candidate_limit";
+    // Applied to each modality's candidates before reciprocal-rank fusion.
+    float min_score_semantic = 11;
+    float min_score_keyword = 12;
 }
 message LpgChunkHit {
     LpgRecord record = 1;

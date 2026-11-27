@@ -180,7 +180,7 @@ fn json_datetime(ts: &nidx_protos::prost_types::Timestamp) -> NidxResult<nidx_js
     Ok(nidx_json::DateTime::from_timestamp_nanos(nanos))
 }
 
-fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> NidxResult<JsonFilterExpression> {
+pub(crate) fn proto_to_json_filter(expr: &nidx_protos::JsonFilterExpression) -> NidxResult<JsonFilterExpression> {
     match expr
         .expr
         .as_ref()

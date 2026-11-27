@@ -71,10 +71,14 @@ pub fn index_paragraphs(
         // properly in 3 words (printf, hello and world).
         //
         // Note how we are replacing 2 chars for 2 whitespace
-        let chars: Vec<char> = EXPLICIT_ESCAPE_CHAR
-            .replace_all(&text_info.text, "  ")
-            .chars()
-            .collect();
+        let chars: Vec<char> = if text_info.skip_tokenization {
+            vec![]
+        } else {
+            EXPLICIT_ESCAPE_CHAR
+                .replace_all(&text_info.text, "  ")
+                .chars()
+                .collect()
+        };
         let field_labels = text_info
             .labels
             .iter()
@@ -118,7 +122,9 @@ pub fn index_paragraphs(
                 .for_each(|facet| doc.add_facet(schema.facets, facet));
             doc.add_facet(schema.field, Facet::from(&facet_field));
             doc.add_text(schema.paragraph, paragraph_id.clone());
-            doc.add_text(schema.text, &text);
+            if !text_info.skip_tokenization {
+                doc.add_text(schema.text, &text);
+            }
             doc.add_u64(schema.start_pos, start_pos);
             doc.add_u64(schema.end_pos, end_pos);
             doc.add_u64(schema.index, index);

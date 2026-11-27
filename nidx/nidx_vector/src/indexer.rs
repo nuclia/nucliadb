@@ -98,6 +98,25 @@ pub fn index_resource(
 ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
     debug!("Creating elements for the main index");
 
+    let elems = paragraph_elements(&resource, config)?;
+    if elems.is_empty() {
+        return Ok(None);
+    }
+
+    let tags = resource
+        .labels()
+        .iter()
+        .filter(|t| SEGMENT_TAGS.contains(&t.as_str()))
+        .cloned()
+        .collect();
+
+    debug!("Creating the segment");
+    let segment = segment::create(output_path, elems, config, tags)?;
+
+    Ok(Some(segment.into_metadata()))
+}
+
+pub(crate) fn paragraph_elements(resource: &ResourceWrapper, config: &VectorConfig) -> anyhow::Result<Vec<Elem>> {
     let mut elems = Vec::new();
     let normalize_vectors = config.normalize_vectors;
     for (_, field_paragraphs) in resource.fields() {
@@ -127,21 +146,7 @@ pub fn index_resource(
         }
     }
 
-    if elems.is_empty() {
-        return Ok(None);
-    }
-
-    let tags = resource
-        .labels()
-        .iter()
-        .filter(|t| SEGMENT_TAGS.contains(&t.as_str()))
-        .cloned()
-        .collect();
-
-    debug!("Creating the segment");
-    let segment = segment::create(output_path, elems, config, tags)?;
-
-    Ok(Some(segment.into_metadata()))
+    Ok(elems)
 }
 
 fn encode_metadata_field(rid: &str, field: &str) -> Option<Vec<u8>> {
@@ -156,6 +161,16 @@ pub fn index_relation_nodes(
 ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
     debug!("Creating elements for the main index");
 
+    let elems = relation_node_elements(resource, index_name)?;
+    if elems.is_empty() {
+        return Ok(None);
+    }
+    debug!("Creating the segment");
+    let segment = segment::create(output_path, elems, config, HashSet::new())?;
+    Ok(Some(segment.into_metadata()))
+}
+
+pub(crate) fn relation_node_elements(resource: &Resource, index_name: &str) -> anyhow::Result<Vec<Elem>> {
     let Some(resource_id) = &resource.resource else {
         return Err(anyhow!("resource_id required"));
     };
@@ -179,14 +194,7 @@ pub fn index_relation_nodes(
         }
     }
 
-    if elems.is_empty() {
-        return Ok(None);
-    }
-
-    debug!("Creating the segment");
-    let segment = segment::create(output_path, elems, config, HashSet::new())?;
-
-    Ok(Some(segment.into_metadata()))
+    Ok(elems)
 }
 
 pub fn index_relation_edges(
@@ -197,6 +205,16 @@ pub fn index_relation_edges(
 ) -> anyhow::Result<Option<VectorSegmentMetadata>> {
     debug!("Creating elements for the main index");
 
+    let elems = relation_edge_elements(resource, index_name)?;
+    if elems.is_empty() {
+        return Ok(None);
+    }
+    debug!("Creating the segment");
+    let segment = segment::create(output_path, elems, config, HashSet::new())?;
+    Ok(Some(segment.into_metadata()))
+}
+
+pub(crate) fn relation_edge_elements(resource: &Resource, index_name: &str) -> anyhow::Result<Vec<Elem>> {
     let Some(resource_id) = &resource.resource else {
         return Err(anyhow!("resource_id required"));
     };
@@ -220,12 +238,5 @@ pub fn index_relation_edges(
         }
     }
 
-    if elems.is_empty() {
-        return Ok(None);
-    }
-
-    debug!("Creating the segment");
-    let segment = segment::create(output_path, elems, config, HashSet::new())?;
-
-    Ok(Some(segment.into_metadata()))
+    Ok(elems)
 }

@@ -37,7 +37,7 @@ use crate::searcher::shard_selector::SearcherNode;
 
 use super::shard_selector::ShardSelector;
 use super::streams;
-use super::{index_cache::IndexCache, shard_merge, shard_search, shard_suggest, shard_text};
+use super::{index_cache::IndexCache, shard_lpg, shard_merge, shard_search, shard_suggest, shard_text};
 use tracing::*;
 
 /// When this header is set, we only try to serve the request from the local node
@@ -101,7 +101,8 @@ macro_rules! shard_request {
         $request:ident,
         $shard_id:ident,
         LOCAL => $local:expr,
-        REMOTE => $remote_method:ident
+        REMOTE => $remote_method:ident,
+        REMOTE_ERROR => $remote_error:expr
         $(, STREAM => $stream_type:ty)?
     } => {{
         let mut errors = Vec::new();
@@ -126,10 +127,7 @@ macro_rules! shard_request {
                             request.metadata_mut().insert(HEADER_LOCAL_ONLY, "1".parse().unwrap());
                             client.$remote_method(request)
                                 .await
-                                .map_err(|e| match e.code() {
-                                    tonic::Code::NotFound => NidxError::NotFound,
-                                    _ => NidxError::Unknown(anyhow::Error::from(e)),
-                                })
+                                .map_err($remote_error)
                                 $(.map(|response| -> Response<$stream_type> { Response::new(Box::pin(response.into_inner())) }))?
                         },
                         Err(e) => Err(e)
@@ -152,6 +150,26 @@ macro_rules! shard_request {
             return Err(Status::internal("Unknown search error"));
         }
     }};
+    {
+        $name:literal,
+        $self:ident,
+        $request:ident,
+        $shard_id:ident,
+        LOCAL => $local:expr,
+        REMOTE => $remote_method:ident
+        $(, STREAM => $stream_type:ty)?
+    } => {
+        shard_request! {
+            $name, $self, $request, $shard_id,
+            LOCAL => $local,
+            REMOTE => $remote_method,
+            REMOTE_ERROR => |e: Status| match e.code() {
+                tonic::Code::NotFound => NidxError::NotFound,
+                _ => NidxError::Unknown(anyhow::Error::from(e)),
+            }
+            $(, STREAM => $stream_type)?
+        }
+    };
 }
 
 #[tonic::async_trait]
@@ -181,6 +199,100 @@ impl NidxSearcher for SearchServer {
             shard_id,
             LOCAL => shard_text::extracted_texts(Arc::clone(&self.index_cache), message.clone()).await,
             REMOTE => extracted_texts
+        }
+    }
+
+    async fn lpg_get_records(&self, request: Request<GetRecordsRequest>) -> Result<Response<GetRecordsResponse>> {
+        let message = request.get_ref();
+        let shard_id = Uuid::parse_str(&message.graph_id).map_err(|_| Status::invalid_argument("invalid graph ID"))?;
+        for key in &message.keys {
+            crate::lpg::resource_id(&shard_id.to_string(), key)?;
+        }
+        shard_request! {
+            "lpg_get_records",
+            self,
+            request,
+            shard_id,
+            LOCAL => shard_lpg::get_records(Arc::clone(&self.index_cache), message.clone()).await,
+            REMOTE => lpg_get_records,
+            REMOTE_ERROR => NidxError::GrpcError
+        }
+    }
+
+    async fn lpg_find_records(
+        &self,
+        mut request: Request<FindRecordsRequest>,
+    ) -> Result<Response<FindRecordsResponse>> {
+        let shard_id =
+            Uuid::parse_str(&request.get_ref().graph_id).map_err(|_| Status::invalid_argument("invalid graph ID"))?;
+        request.get_mut().graph_id = shard_id.to_string();
+        let message = request.get_ref();
+        shard_lpg::validate_find(message)?;
+        shard_request! {
+            "lpg_find_records",
+            self,
+            request,
+            shard_id,
+            LOCAL => shard_lpg::find_records(Arc::clone(&self.index_cache), message.clone()).await,
+            REMOTE => lpg_find_records,
+            REMOTE_ERROR => NidxError::GrpcError
+        }
+    }
+
+    async fn lpg_expand(&self, mut request: Request<ExpandRequest>) -> Result<Response<ExpandResponse>> {
+        let shard_id =
+            Uuid::parse_str(&request.get_ref().graph_id).map_err(|_| Status::invalid_argument("invalid graph ID"))?;
+        request.get_mut().graph_id = shard_id.to_string();
+        let message = request.get_ref();
+        crate::lpg::expand_filter(message)?;
+        shard_request! {
+            "lpg_expand",
+            self,
+            request,
+            shard_id,
+            LOCAL => shard_lpg::expand(Arc::clone(&self.index_cache), message.clone()).await,
+            REMOTE => lpg_expand,
+            REMOTE_ERROR => NidxError::GrpcError
+        }
+    }
+
+    async fn lpg_shortest_path(
+        &self,
+        mut request: Request<ShortestPathRequest>,
+    ) -> Result<Response<ShortestPathResponse>> {
+        let shard_id =
+            Uuid::parse_str(&request.get_ref().graph_id).map_err(|_| Status::invalid_argument("invalid graph ID"))?;
+        request.get_mut().graph_id = shard_id.to_string();
+        let message = request.get_ref();
+        crate::lpg::validate_shortest_path(message)?;
+        shard_request! {
+            "lpg_shortest_path",
+            self,
+            request,
+            shard_id,
+            LOCAL => shard_lpg::shortest_path(Arc::clone(&self.index_cache), message.clone()).await,
+            REMOTE => lpg_shortest_path,
+            REMOTE_ERROR => NidxError::GrpcError
+        }
+    }
+
+    async fn lpg_search_chunks(
+        &self,
+        mut request: Request<SearchChunksRequest>,
+    ) -> Result<Response<SearchChunksResponse>> {
+        let shard_id =
+            Uuid::parse_str(&request.get_ref().graph_id).map_err(|_| Status::invalid_argument("invalid graph ID"))?;
+        request.get_mut().graph_id = shard_id.to_string();
+        let message = request.get_ref();
+        crate::lpg::validate_search(message)?;
+        shard_request! {
+            "lpg_search_chunks",
+            self,
+            request,
+            shard_id,
+            LOCAL => shard_lpg::search_chunks(Arc::clone(&self.index_cache), message.clone()).await,
+            REMOTE => lpg_search_chunks,
+            REMOTE_ERROR => NidxError::GrpcError
         }
     }
 

@@ -106,6 +106,7 @@ fn build_resource(shard_id: String) -> noderesources::Resource {
         noderesources::TextInformation {
             text: "Dummy text".to_string(),
             labels: vec![],
+            ..Default::default()
         },
     );
 

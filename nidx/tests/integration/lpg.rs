@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
+use crate::common::cluster::{NetworkAvailability, SearcherCluster, Topology};
 use crate::common::services::NidxFixture;
 use base64::{Engine, engine::general_purpose::STANDARD, engine::general_purpose::URL_SAFE_NO_PAD};
 use nidx::api::grpc::ApiServer;
@@ -18,16 +19,17 @@ use nidx_protos::nidx::nidx_indexer_client::NidxIndexerClient;
 use nidx_protos::nidx::nidx_indexer_server::{NidxIndexer, NidxIndexerServer};
 use nidx_protos::nidx::nidx_lpg_client::NidxLpgClient;
 use nidx_protos::nidx::nidx_lpg_server::NidxLpg;
+use nidx_protos::nidx::nidx_searcher_client::NidxSearcherClient;
 use nidx_protos::prost::*;
 use nidx_protos::relation::RelationType;
 use nidx_protos::{
-    BulkLoadRequest, DeleteNodeRequest, DeleteRecordRequest, FindRecordsRequest, GetRecordsRequest, GraphQuery,
-    GraphSearchRequest, IndexMessage, IndexMetadata, IndexParagraph, IndexParagraphs, IndexResourceRequest,
-    JsonFieldValue, LpgIntegerRange, LpgOperation, LpgOperationRequest, LpgOperationResult, LpgOperationStatus,
+    BulkLoadRequest, DeleteNodeRequest, DeleteRecordRequest, ExpandRequest, ExpandResponse, FindRecordsRequest,
+    GetRecordsRequest, GraphQuery, GraphSearchRequest, IndexMessage, IndexResourceRequest, IndexResourcesRequest,
+    LpgDirection, LpgIntegerRange, LpgOperation, LpgOperationRequest, LpgOperationResult, LpgOperationStatus,
     LpgProperty, LpgPropertyFilter, LpgRecord, LpgRecordKey, LpgRecordKind, LpgStringList, LpgTextChunks,
     LpgTextProperty, LpgTextPropertyPatch, LpgTextPropertyUpdate, LpgVector, NewShardRequest, OpStatus,
-    PatchTextPropertiesRequest, Resource, ResourceId, SearchChunksRequest, TextInformation, UpsertRecordRequest,
-    VectorIndexConfig, graph_query, lpg_operation, lpg_property, lpg_property_filter,
+    PatchTextPropertiesRequest, SearchChunksRequest, ShortestPathRequest, UpsertRecordRequest, VectorIndexConfig,
+    graph_query, lpg_operation, lpg_property, lpg_property_filter,
 };
 use sqlx::PgPool;
 use tokio_util::sync::CancellationToken;
@@ -96,18 +98,13 @@ async fn bulk_stateless_preflight_and_upsert(pool: PgPool) -> anyhow::Result<()>
     let request = BulkLoadRequest {
         graph_id: graph.clone(),
         records: vec![edge.clone(), node.clone()],
+        ..Default::default()
     };
     let mut invalid = request.clone();
     invalid.records.pop();
     assert_eq!(
         fixture.lpg_client.bulk_load(invalid).await.unwrap_err().code(),
         Code::FailedPrecondition
-    );
-    let mut invalid = request.clone();
-    invalid.records[1].deleting = true;
-    assert_eq!(
-        fixture.lpg_client.bulk_load(invalid).await.unwrap_err().code(),
-        Code::InvalidArgument
     );
     let mut invalid = request.clone();
     invalid.records[1].text_properties.insert(
@@ -154,6 +151,7 @@ async fn bulk_stateless_preflight_and_upsert(pool: PgPool) -> anyhow::Result<()>
         .bulk_load(BulkLoadRequest {
             graph_id: graph.clone(),
             records: vec![updated.clone()],
+            ..Default::default()
         })
         .await?;
     wait_for(
@@ -164,6 +162,320 @@ async fn bulk_stateless_preflight_and_upsert(pool: PgPool) -> anyhow::Result<()>
     )
     .await;
     Ok(())
+}
+
+#[sqlx::test]
+async fn bulk_returns_after_indexer_acknowledgement_without_visibility(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+    let graph = shard(&mut fixture).await?;
+    let mut node = LpgRecord {
+        key: Some(key(LpgRecordKind::LpgNode, "node")),
+        labels: vec!["Node".into()],
+        revision: "visible".into(),
+        ..Default::default()
+    };
+    fixture
+        .lpg_client
+        .upsert_record(UpsertRecordRequest {
+            graph_id: graph.clone(),
+            record: Some(node.clone()),
+        })
+        .await?;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let indexer = AcknowledgeOnlyIndexer(calls.clone());
+    let server = GrpcServer::new("127.0.0.1:0").await?;
+    let mut settings = fixture.settings.settings.lpg.clone().unwrap();
+    settings.indexer_address = format!("http://127.0.0.1:{}", server.port()?);
+    settings.searcher_address = "http://127.0.0.1:1".into();
+    let shutdown = CancellationToken::new();
+    let router = tonic::service::Routes::new(NidxIndexerServer::new(indexer)).into_axum_router();
+    tokio::spawn(server.serve(router, shutdown.clone()));
+    let lpg = nidx::api::lpg::LpgServer::new(fixture.settings.metadata.clone(), Some(settings));
+    node.revision = "acknowledged-but-not-visible".into();
+    let mut other = node.clone();
+    other.key.as_mut().unwrap().id = "other".into();
+    let response = tokio::time::timeout(
+        Duration::from_secs(5),
+        lpg.bulk_load(Request::new(BulkLoadRequest {
+            graph_id: graph.clone(),
+            records: vec![node.clone(), other],
+            ..Default::default()
+        })),
+    )
+    .await??;
+    shutdown.cancel();
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    let results = response.into_inner().results;
+    assert_eq!(results.len(), 2);
+    assert!(
+        results
+            .iter()
+            .all(|result| result.status == LpgOperationStatus::Applied as i32)
+    );
+    let stored = fixture
+        .lpg_client
+        .get_records(GetRecordsRequest {
+            graph_id: graph,
+            keys: vec![node.key.unwrap()],
+        })
+        .await?
+        .into_inner();
+    assert_eq!(stored.records[0].revision, "visible");
+    Ok(())
+}
+
+struct AcknowledgeOnlyIndexer(Arc<AtomicUsize>);
+
+#[sqlx::test]
+async fn bulk_shared_segments_preserve_resource_ownership(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool.clone()).await?;
+    let graph = shard(&mut fixture).await?;
+    let node = |id: &str, text: &str, vector: Vec<f32>| LpgRecord {
+        key: Some(key(LpgRecordKind::LpgNode, id)),
+        labels: vec!["Node".into()],
+        text_properties: HashMap::from([(
+            "text".into(),
+            LpgTextProperty {
+                chunks: vec![text.into()],
+                embeddings: vec![LpgVector { values: vector }],
+            },
+        )]),
+        ..Default::default()
+    };
+    let a = node("a", "red apple", vec![1.0, 0.0, 0.0]);
+    let b = node("b", "blue berry", vec![0.0, 1.0, 0.0]);
+    let edge = |id: &str| LpgRecord {
+        key: Some(key(LpgRecordKind::LpgEdge, id)),
+        source: Some("a".into()),
+        target: Some("b".into()),
+        edge_type: Some("LINK".into()),
+        ..Default::default()
+    };
+    let e1 = edge("e1");
+    let e2 = edge("e2");
+    let records = vec![e1.clone(), b.clone(), a.clone(), e2.clone()];
+    fixture
+        .lpg_client
+        .bulk_load(BulkLoadRequest {
+            graph_id: graph.clone(),
+            records: records.clone(),
+            ..Default::default()
+        })
+        .await?;
+    let indexes = nidx::metadata::Index::for_shard(&pool, uuid::Uuid::parse_str(&graph)?).await?;
+    assert_eq!(indexes.len(), 5);
+    for index in &indexes {
+        let segments = index.segments(&pool).await?;
+        assert_eq!(segments.len(), 1, "{:?} should share a segment", index.kind);
+        assert_eq!(segments[0].delete_at, None);
+        let expected_records = match index.kind {
+            nidx::metadata::IndexKind::Text | nidx::metadata::IndexKind::Paragraph => 6,
+            nidx::metadata::IndexKind::Json => 4,
+            _ => 2,
+        };
+        assert_eq!(segments[0].records, expected_records, "{:?}", index.kind);
+    }
+    wait_for(
+        &mut fixture,
+        &graph,
+        records.iter().map(|record| record.key.clone().unwrap()).collect(),
+        records,
+    )
+    .await;
+
+    let a = node("a", "green pear", vec![0.0, 0.0, 1.0]);
+    let mut e1 = e1;
+    e1.target = Some("a".into());
+    fixture
+        .lpg_client
+        .bulk_load(BulkLoadRequest {
+            graph_id: graph.clone(),
+            records: vec![a.clone(), e1.clone()],
+            endpoint_labels: HashMap::from([(
+                "a".into(),
+                LpgStringList {
+                    values: vec!["Node".into()],
+                },
+            )]),
+        })
+        .await?;
+    let records = vec![a.clone(), b.clone(), e1.clone(), e2.clone()];
+    wait_for(
+        &mut fixture,
+        &graph,
+        records.iter().map(|record| record.key.clone().unwrap()).collect(),
+        records,
+    )
+    .await;
+    fixture.wait_sync().await;
+    for (text, expected) in [("apple", 0), ("pear", 1), ("berry", 1)] {
+        let response = fixture
+            .lpg_client
+            .search_chunks(SearchChunksRequest {
+                graph_id: graph.clone(),
+                text: Some(text.into()),
+                top_k: 10,
+                ..Default::default()
+            })
+            .await?
+            .into_inner();
+        assert_eq!(response.hits.len(), expected, "text: {text}");
+    }
+    let vectors = fixture
+        .lpg_client
+        .search_chunks(SearchChunksRequest {
+            graph_id: graph.clone(),
+            vector: vec![0.0, 0.0, 1.0],
+            top_k: 1,
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    assert_eq!(vectors.hits[0].record.as_ref().unwrap().key.as_ref().unwrap().id, "a");
+    fixture
+        .lpg_client
+        .delete_record(DeleteRecordRequest {
+            graph_id: graph.clone(),
+            key: e1.key,
+        })
+        .await?;
+    wait_for(
+        &mut fixture,
+        &graph,
+        vec![a.key.clone().unwrap(), b.key.clone().unwrap(), e2.key.clone().unwrap()],
+        vec![a, b, e2.clone()],
+    )
+    .await;
+    fixture.wait_sync().await;
+    let edges = fixture
+        .lpg_client
+        .find_records(FindRecordsRequest {
+            graph_id: graph.clone(),
+            kind: LpgRecordKind::LpgEdge as i32,
+            page_size: 10,
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    assert_eq!(edges.records, vec![e2]);
+    let relations = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard_ids: vec![graph],
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(graph_query::path_query::Query::Facet(graph_query::FacetFilter {
+                        facet: format!("/lpg/type/edge/{}", URL_SAFE_NO_PAD.encode("LINK")),
+                    })),
+                }),
+            }),
+            top_k: 10,
+            ..Default::default()
+        })
+        .await?
+        .into_inner();
+    assert_eq!(relations.graph.len(), 1);
+    Ok(())
+}
+
+#[sqlx::test]
+async fn bulk_endpoint_references_do_not_rewrite_nodes(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool.clone()).await?;
+    let graph = shard(&mut fixture).await?;
+    let node = LpgRecord {
+        key: Some(key(LpgRecordKind::LpgNode, "node")),
+        labels: vec!["Node".into()],
+        revision: "original".into(),
+        ..Default::default()
+    };
+    fixture
+        .lpg_client
+        .bulk_load(BulkLoadRequest {
+            graph_id: graph.clone(),
+            records: vec![node.clone()],
+            ..Default::default()
+        })
+        .await?;
+    let edge = LpgRecord {
+        key: Some(key(LpgRecordKind::LpgEdge, "edge")),
+        source: Some("node".into()),
+        target: Some("node".into()),
+        edge_type: Some("loop".into()),
+        ..Default::default()
+    };
+    let response = fixture
+        .lpg_client
+        .bulk_load(BulkLoadRequest {
+            graph_id: graph.clone(),
+            records: vec![edge.clone()],
+            endpoint_labels: HashMap::from([(
+                "node".into(),
+                LpgStringList {
+                    values: node.labels.clone(),
+                },
+            )]),
+        })
+        .await?
+        .into_inner();
+    assert_eq!(response.results.len(), 1);
+    assert_eq!(response.results[0].status, LpgOperationStatus::Applied as i32);
+    let text_segments: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM segments JOIN indexes ON segments.index_id = indexes.id \
+         WHERE indexes.shard_id = $1 AND indexes.kind = 'text'",
+    )
+    .bind(uuid::Uuid::parse_str(&graph)?)
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(
+        text_segments, 2,
+        "one segment per explicit record, with no endpoint rewrite"
+    );
+    wait_for(
+        &mut fixture,
+        &graph,
+        vec![node.key.clone().unwrap(), edge.key.clone().unwrap()],
+        vec![node, edge.clone()],
+    )
+    .await;
+    fixture.wait_sync().await;
+    let relations = fixture
+        .searcher_client
+        .graph_search(GraphSearchRequest {
+            shard_ids: vec![graph],
+            query: Some(GraphQuery {
+                path: Some(graph_query::PathQuery {
+                    query: Some(graph_query::path_query::Query::Facet(graph_query::FacetFilter {
+                        facet: format!("/lpg/type/source/{}", URL_SAFE_NO_PAD.encode("Node")),
+                    })),
+                }),
+            }),
+            top_k: 10,
+            ..Default::default()
+        })
+        .await?;
+    assert_eq!(relations.into_inner().graph.len(), 1);
+    Ok(())
+}
+
+#[tonic::async_trait]
+impl NidxIndexer for AcknowledgeOnlyIndexer {
+    async fn index_resources(&self, request: Request<IndexResourcesRequest>) -> Result<Response<OpStatus>, Status> {
+        assert_eq!(request.get_ref().resources.len(), 2);
+        self.0.fetch_add(1, Ordering::SeqCst);
+        Ok(Response::new(OpStatus::default()))
+    }
+
+    async fn index(&self, _: Request<IndexMessage>) -> Result<Response<OpStatus>, Status> {
+        Err(Status::unimplemented("use IndexResource"))
+    }
+
+    async fn index_resource(&self, _: Request<IndexResourceRequest>) -> Result<Response<OpStatus>, Status> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        Ok(Response::new(OpStatus {
+            status: nidx_protos::op_status::Status::Ok as i32,
+            ..Default::default()
+        }))
+    }
 }
 
 #[sqlx::test]
@@ -202,6 +514,7 @@ async fn bulk_and_ordinary_failures_require_client_retries(pool: PgPool) -> anyh
             },
             invalid_edge,
         ],
+        ..Default::default()
     };
     assert_eq!(
         broken.bulk_load(Request::new(invalid)).await.unwrap_err().code(),
@@ -226,12 +539,13 @@ async fn bulk_and_ordinary_failures_require_client_retries(pool: PgPool) -> anyh
         .bulk_load(Request::new(BulkLoadRequest {
             graph_id: graph.clone(),
             records: records.clone(),
+            ..Default::default()
         }))
         .await
         .unwrap_err();
     assert_eq!(error.code(), Code::Unavailable);
     assert!(error.message().contains("partially applied"));
-    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(
         *kinds.lock().unwrap(),
         [LpgRecordKind::LpgNode as i32, LpgRecordKind::LpgEdge as i32]
@@ -240,9 +554,10 @@ async fn bulk_and_ordinary_failures_require_client_retries(pool: PgPool) -> anyh
         .bulk_load(Request::new(BulkLoadRequest {
             graph_id: graph.clone(),
             records: records.clone(),
+            ..Default::default()
         }))
         .await?;
-    assert_eq!(calls.load(Ordering::SeqCst), 4);
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
     let keys = records.iter().map(|record| record.key.clone().unwrap()).collect();
     wait_for(&mut fixture, &graph, keys, records).await;
 
@@ -274,7 +589,8 @@ async fn bulk_and_ordinary_failures_require_client_retries(pool: PgPool) -> anyh
             LpgOperationStatus::Applied as i32,
             LpgOperationStatus::Failed as i32,
             LpgOperationStatus::Skipped as i32,
-        ]
+        ],
+        "{results:?}"
     );
     assert_eq!(results[1].error_code, "Unavailable");
     assert_eq!(calls.load(Ordering::SeqCst), 2);
@@ -302,6 +618,20 @@ struct FailSecondIndex {
 
 #[tonic::async_trait]
 impl NidxIndexer for FailSecondIndex {
+    async fn index_resources(&self, request: Request<IndexResourcesRequest>) -> Result<Response<OpStatus>, Status> {
+        for resource in &request.get_ref().resources {
+            let bytes = STANDARD.decode(&resource.texts["a/lpg_record_v1"].text).unwrap();
+            let record = LpgRecord::decode(bytes.as_slice()).unwrap();
+            self.kinds.lock().unwrap().push(record.key.unwrap().kind);
+        }
+        let call = self.calls.fetch_add(1, Ordering::SeqCst);
+        let response = self.upstream.clone().index_resources(request).await?;
+        if call == 0 {
+            return Err(Status::unavailable("injected failure after batch publication"));
+        }
+        Ok(response)
+    }
+
     async fn index(&self, request: Request<IndexMessage>) -> Result<Response<OpStatus>, Status> {
         self.upstream.clone().index(request).await
     }
@@ -380,7 +710,6 @@ impl LpgWriteTestExt for NidxLpgClient<Channel> {
             LpgOperation {
                 operation: Some(lpg_operation::Operation::DeleteNode(nidx_protos::LpgNodeDeletion {
                     id: request.id,
-                    detach: request.detach,
                 })),
             },
         )
@@ -467,14 +796,117 @@ async fn wait_for(fixture: &mut NidxFixture, graph: &str, keys: Vec<LpgRecordKey
                 keys: keys.clone(),
             })
             .await;
-        if let Ok(response) = result {
-            if response.into_inner().records == expected {
-                return;
-            }
+        if let Ok(response) = result
+            && response.into_inner().records == expected
+        {
+            return;
         }
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
     panic!("records did not become visible: {expected:?}");
+}
+
+#[sqlx::test]
+async fn lpg_get_records_searcher_local_and_remote(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+    let graph = shard(&mut fixture).await?;
+    let other_graph = shard(&mut fixture).await?;
+    let node_key = key(LpgRecordKind::LpgNode, "same/id 🦊");
+    let node = LpgRecord {
+        key: Some(node_key.clone()),
+        labels: vec!["Node".into()],
+        revision: "original".into(),
+        ..Default::default()
+    };
+    fixture
+        .lpg_client
+        .upsert_record(UpsertRecordRequest {
+            graph_id: graph.clone(),
+            record: Some(node.clone()),
+        })
+        .await?;
+    let request = GetRecordsRequest {
+        graph_id: graph.clone(),
+        keys: vec![
+            node_key.clone(),
+            key(LpgRecordKind::LpgEdge, &node_key.id),
+            key(LpgRecordKind::LpgNode, "missing"),
+            node_key.clone(),
+        ],
+    };
+    let expected = vec![node.clone(), node.clone()];
+    wait_for(&mut fixture, &graph, request.keys.clone(), expected.clone()).await;
+    assert_eq!(
+        fixture
+            .searcher_client
+            .lpg_get_records(request.clone())
+            .await?
+            .into_inner()
+            .records,
+        expected
+    );
+    fixture.wait_sync().await;
+    assert!(
+        fixture
+            .searcher_client
+            .lpg_get_records(GetRecordsRequest {
+                graph_id: other_graph,
+                keys: vec![node_key],
+            })
+            .await?
+            .into_inner()
+            .records
+            .is_empty()
+    );
+    let cluster = SearcherCluster::new(
+        fixture.settings.clone(),
+        Topology {
+            nodes: 2,
+            shard_replication: 1,
+            network: vec![NetworkAvailability::Connected; 2],
+        },
+    )
+    .await?;
+    let mut local_replicas = 0;
+    for searcher in &cluster.searchers {
+        let mut client =
+            NidxSearcherClient::connect(format!("http://{}", searcher.as_ref().unwrap().address())).await?;
+        assert_eq!(
+            client.lpg_get_records(request.clone()).await?.into_inner().records,
+            expected
+        );
+        let mut local_request = Request::new(request.clone());
+        local_request.metadata_mut().insert("nidx-local-only", "1".parse()?);
+        if client.lpg_get_records(local_request).await.is_ok() {
+            local_replicas += 1;
+        }
+        for invalid_key in [key(LpgRecordKind::Unspecified, "n"), key(LpgRecordKind::LpgNode, "")] {
+            assert_eq!(
+                client
+                    .lpg_get_records(GetRecordsRequest {
+                        graph_id: graph.clone(),
+                        keys: vec![invalid_key],
+                    })
+                    .await
+                    .unwrap_err()
+                    .code(),
+                Code::InvalidArgument
+            );
+        }
+        assert_eq!(
+            client
+                .lpg_get_records(GetRecordsRequest {
+                    graph_id: uuid::Uuid::new_v4().to_string(),
+                    keys: vec![],
+                })
+                .await
+                .unwrap_err()
+                .code(),
+            Code::NotFound
+        );
+    }
+    assert_eq!(local_replicas, 1, "the other node must have forwarded its read");
+    Ok(())
 }
 
 #[sqlx::test]
@@ -929,17 +1361,61 @@ async fn lpg_find_records_with_filters_and_pagination(pool: PgPool) -> anyhow::R
         ],
         ..Default::default()
     };
+    let cluster = SearcherCluster::new(
+        fixture.settings.clone(),
+        Topology {
+            nodes: 2,
+            shard_replication: 1,
+            network: vec![NetworkAvailability::Connected; 2],
+        },
+    )
+    .await?;
+    let mut searcher_clients = Vec::new();
+    for node in &cluster.searchers {
+        searcher_clients
+            .push(NidxSearcherClient::connect(format!("http://{}", node.as_ref().unwrap().address())).await?);
+    }
     let mut collected = std::collections::BTreeSet::new();
     let mut token = String::new();
-    for _ in 0..3 {
-        let response = fixture
-            .lpg_client
-            .find_records(FindRecordsRequest {
-                page_token: token,
+    for page in 0..3 {
+        let next_request = FindRecordsRequest {
+            page_token: token,
+            ..request.clone()
+        };
+        let response = if page == 0 {
+            fixture.lpg_client.find_records(next_request).await?.into_inner()
+        } else {
+            searcher_clients[(page - 1) % 2]
+                .lpg_find_records(next_request)
+                .await?
+                .into_inner()
+        };
+        if page == 0 {
+            assert!(!response.next_page_token.is_empty());
+            for client in &mut searcher_clients {
+                let direct = client.lpg_find_records(request.clone()).await?.into_inner();
+                assert_eq!(direct, response);
+                let next = client
+                    .lpg_find_records(FindRecordsRequest {
+                        page_token: direct.next_page_token,
+                        ..request.clone()
+                    })
+                    .await?
+                    .into_inner();
+                assert_eq!(next.records.len(), 1);
+                assert!(next.next_page_token.is_empty());
+                assert_ne!(next.records[0].key, response.records[0].key);
+            }
+            let invalid = FindRecordsRequest {
+                page_token: response.next_page_token.clone(),
+                label: Some("another-label".into()),
                 ..request.clone()
-            })
-            .await?
-            .into_inner();
+            };
+            assert_eq!(
+                searcher_clients[0].lpg_find_records(invalid).await.unwrap_err().code(),
+                Code::InvalidArgument
+            );
+        }
         for record in response.records {
             assert!(collected.insert(record.key.unwrap().id));
         }
@@ -950,6 +1426,332 @@ async fn lpg_find_records_with_filters_and_pagination(pool: PgPool) -> anyhow::R
     }
     assert!(token.is_empty());
     assert_eq!(collected, ["a".to_string(), "b".to_string()].into());
+    for client in &mut searcher_clients {
+        assert_eq!(
+            client
+                .lpg_find_records(FindRecordsRequest {
+                    page_size: 0,
+                    ..request.clone()
+                })
+                .await
+                .unwrap_err()
+                .code(),
+            Code::InvalidArgument
+        );
+        assert_eq!(
+            client
+                .lpg_find_records(FindRecordsRequest {
+                    graph_id: uuid::Uuid::new_v4().to_string(),
+                    ..request.clone()
+                })
+                .await
+                .unwrap_err()
+                .code(),
+            Code::NotFound
+        );
+    }
+    Ok(())
+}
+
+#[sqlx::test]
+async fn lpg_expand_filters_batches_and_routes_to_shard_owner(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+    let graph = shard(&mut fixture).await?;
+    let mut nodes = Vec::new();
+    for (id, label, country) in [("p", "Product", "US"), ("w", "Warehouse", "ES"), ("t", "Other", "US")] {
+        let node = LpgRecord {
+            key: Some(key(LpgRecordKind::LpgNode, id)),
+            labels: vec![label.into()],
+            properties: HashMap::from([(
+                "country".into(),
+                LpgProperty {
+                    value: Some(lpg_property::Value::Text(country.into())),
+                },
+            )]),
+            ..Default::default()
+        };
+        fixture
+            .lpg_client
+            .upsert_record(UpsertRecordRequest {
+                graph_id: graph.clone(),
+                record: Some(node.clone()),
+            })
+            .await?;
+        nodes.push(node);
+    }
+    wait_for(
+        &mut fixture,
+        &graph,
+        nodes.iter().map(|node| node.key.clone().unwrap()).collect(),
+        nodes,
+    )
+    .await;
+    let mut edges = Vec::new();
+    for (id, source, target, edge_type, confirmed) in [
+        ("e1", "p", "w", "STOCKED_AT", true),
+        ("e2", "p", "w", "STOCKED_AT", false),
+        ("e3", "w", "p", "RETURNED_FROM", true),
+        ("loop", "p", "p", "STOCKED_AT", true),
+        ("other", "p", "t", "STOCKED_AT", true),
+    ] {
+        let edge = LpgRecord {
+            key: Some(key(LpgRecordKind::LpgEdge, id)),
+            source: Some(source.into()),
+            target: Some(target.into()),
+            edge_type: Some(edge_type.into()),
+            properties: HashMap::from([(
+                "confirmed".into(),
+                LpgProperty {
+                    value: Some(lpg_property::Value::Boolean(confirmed)),
+                },
+            )]),
+            ..Default::default()
+        };
+        fixture
+            .lpg_client
+            .upsert_record(UpsertRecordRequest {
+                graph_id: graph.clone(),
+                record: Some(edge.clone()),
+            })
+            .await?;
+        edges.push(edge);
+    }
+    wait_for(
+        &mut fixture,
+        &graph,
+        edges.iter().map(|edge| edge.key.clone().unwrap()).collect(),
+        edges,
+    )
+    .await;
+    fixture.wait_sync().await;
+    let request = ExpandRequest {
+        graph_id: graph.clone(),
+        node_ids: vec!["p".into(), "p".into()],
+        direction: LpgDirection::LpgBoth as i32,
+        ..Default::default()
+    };
+    let bindings = |response: &ExpandResponse| {
+        response
+            .matches
+            .iter()
+            .map(|m| {
+                (
+                    m.node_id.clone(),
+                    response.edges[m.edge_index as usize].key.as_ref().unwrap().id.clone(),
+                    response.neighbors[m.neighbor_index as usize]
+                        .key
+                        .as_ref()
+                        .unwrap()
+                        .id
+                        .clone(),
+                )
+            })
+            .collect::<std::collections::BTreeSet<_>>()
+    };
+    let public = fixture.lpg_client.expand(request.clone()).await?.into_inner();
+    assert_eq!(
+        (
+            public.examined_edges,
+            public.matches.len(),
+            public.edges.len(),
+            public.neighbors.len()
+        ),
+        (5, 5, 5, 3)
+    );
+    let path_request = ShortestPathRequest {
+        graph_id: graph.clone(),
+        source: "w".into(),
+        target: "t".into(),
+        direction: LpgDirection::LpgBoth as i32,
+        edge_types: vec!["STOCKED_AT".into()],
+        edge_filters: vec![LpgPropertyFilter {
+            property: "confirmed".into(),
+            predicate: Some(lpg_property_filter::Predicate::Boolean(true)),
+        }],
+        max_hops: 2,
+        ..Default::default()
+    };
+    let public_path = fixture
+        .lpg_client
+        .shortest_path(path_request.clone())
+        .await?
+        .into_inner();
+    assert!(public_path.found);
+    assert_eq!(
+        public_path
+            .nodes
+            .iter()
+            .map(|node| node.key.as_ref().unwrap().id.as_str())
+            .collect::<Vec<_>>(),
+        ["w", "p", "t"]
+    );
+    assert_eq!(
+        public_path
+            .edges
+            .iter()
+            .map(|edge| edge.key.as_ref().unwrap().id.as_str())
+            .collect::<Vec<_>>(),
+        ["e1", "other"]
+    );
+    let cluster = SearcherCluster::new(
+        fixture.settings.clone(),
+        Topology {
+            nodes: 2,
+            shard_replication: 1,
+            network: vec![NetworkAvailability::Connected; 2],
+        },
+    )
+    .await?;
+    for node in &cluster.searchers {
+        let mut client = NidxSearcherClient::connect(format!("http://{}", node.as_ref().unwrap().address())).await?;
+        let direct_path = client.lpg_shortest_path(path_request.clone()).await?.into_inner();
+        assert_eq!(direct_path.nodes, public_path.nodes);
+        assert_eq!(direct_path.edges, public_path.edges);
+        assert!(
+            !client
+                .lpg_shortest_path(ShortestPathRequest {
+                    max_hops: 1,
+                    ..path_request.clone()
+                })
+                .await?
+                .into_inner()
+                .found
+        );
+        for (invalid, code) in [
+            (
+                ShortestPathRequest {
+                    direction: 99,
+                    ..path_request.clone()
+                },
+                Code::InvalidArgument,
+            ),
+            (
+                ShortestPathRequest {
+                    node_filter_scope: 99,
+                    ..path_request.clone()
+                },
+                Code::InvalidArgument,
+            ),
+            (
+                ShortestPathRequest {
+                    max_hops: 65,
+                    ..path_request.clone()
+                },
+                Code::InvalidArgument,
+            ),
+            (
+                ShortestPathRequest {
+                    source: "missing".into(),
+                    ..path_request.clone()
+                },
+                Code::NotFound,
+            ),
+            (
+                ShortestPathRequest {
+                    max_visited_nodes: 1,
+                    ..path_request.clone()
+                },
+                Code::ResourceExhausted,
+            ),
+            (
+                ShortestPathRequest {
+                    graph_id: uuid::Uuid::new_v4().to_string(),
+                    ..path_request.clone()
+                },
+                Code::NotFound,
+            ),
+        ] {
+            assert_eq!(client.lpg_shortest_path(invalid).await.unwrap_err().code(), code);
+        }
+        let direct = client.lpg_expand(request.clone()).await?.into_inner();
+        assert_eq!(bindings(&direct), bindings(&public));
+        let batched = client
+            .lpg_expand(ExpandRequest {
+                node_ids: vec!["p".into(), "w".into(), "p".into()],
+                ..request.clone()
+            })
+            .await?
+            .into_inner();
+        assert_eq!(
+            (batched.examined_edges, batched.matches.len(), batched.edges.len()),
+            (5, 8, 5)
+        );
+        let incoming = client
+            .lpg_expand(ExpandRequest {
+                direction: LpgDirection::LpgIncoming as i32,
+                ..request.clone()
+            })
+            .await?
+            .into_inner();
+        assert_eq!((incoming.examined_edges, incoming.matches.len()), (2, 2));
+        let filtered = client
+            .lpg_expand(ExpandRequest {
+                edge_types: vec!["STOCKED_AT".into()],
+                edge_filters: vec![LpgPropertyFilter {
+                    property: "confirmed".into(),
+                    predicate: Some(lpg_property_filter::Predicate::Boolean(true)),
+                }],
+                neighbor_label: Some("Warehouse".into()),
+                neighbor_filters: vec![LpgPropertyFilter {
+                    property: "country".into(),
+                    predicate: Some(lpg_property_filter::Predicate::Text("ES".into())),
+                }],
+                ..request.clone()
+            })
+            .await?
+            .into_inner();
+        assert_eq!(filtered.examined_edges, 3);
+        assert_eq!(bindings(&filtered), [("p".into(), "e1".into(), "w".into())].into());
+        for limited in [
+            ExpandRequest {
+                candidate_limit: 4,
+                neighbor_label: Some("Warehouse".into()),
+                ..request.clone()
+            },
+            ExpandRequest {
+                max_results: 4,
+                ..request.clone()
+            },
+        ] {
+            assert_eq!(
+                client.lpg_expand(limited).await.unwrap_err().code(),
+                Code::ResourceExhausted
+            );
+        }
+        assert_eq!(
+            client
+                .lpg_expand(ExpandRequest {
+                    node_ids: vec!["missing".into()],
+                    ..request.clone()
+                })
+                .await
+                .unwrap_err()
+                .code(),
+            Code::NotFound
+        );
+        assert_eq!(
+            client
+                .lpg_expand(ExpandRequest {
+                    direction: 99,
+                    ..request.clone()
+                })
+                .await
+                .unwrap_err()
+                .code(),
+            Code::InvalidArgument
+        );
+        assert_eq!(
+            client
+                .lpg_expand(ExpandRequest {
+                    graph_id: uuid::Uuid::new_v4().to_string(),
+                    ..request.clone()
+                })
+                .await
+                .unwrap_err()
+                .code(),
+            Code::NotFound
+        );
+    }
     Ok(())
 }
 
@@ -1028,7 +1830,7 @@ async fn lpg_paginated_incident_edges_include_parallel_edges_and_self_loops(pool
 }
 
 #[sqlx::test]
-async fn lpg_node_deletion_validates_endpoints_and_detaches(pool: PgPool) -> anyhow::Result<()> {
+async fn lpg_node_deletion_requires_removing_incident_edges(pool: PgPool) -> anyhow::Result<()> {
     let mut fixture = NidxFixture::new(pool).await?;
     let graph = shard(&mut fixture).await?;
     let node = LpgRecord {
@@ -1069,19 +1871,37 @@ async fn lpg_node_deletion_validates_endpoints_and_detaches(pool: PgPool) -> any
     for record in [
         edge("e1", "a", "b"),
         edge("e2", "a", "b"),
+        edge("e3", "b", "a"),
         edge("loop", "a", "a"),
         edge("keep", "b", "b"),
     ] {
         fixture.lpg_client.upsert_record(upsert(record)).await?;
     }
-    wait_for(&mut fixture, &graph, vec![node.key.clone().unwrap()], vec![node]).await;
+    wait_for(
+        &mut fixture,
+        &graph,
+        vec![
+            node.key.clone().unwrap(),
+            key(LpgRecordKind::LpgEdge, "e1"),
+            key(LpgRecordKind::LpgEdge, "e2"),
+            key(LpgRecordKind::LpgEdge, "e3"),
+            key(LpgRecordKind::LpgEdge, "loop"),
+        ],
+        vec![
+            node,
+            edge("e1", "a", "b"),
+            edge("e2", "a", "b"),
+            edge("e3", "b", "a"),
+            edge("loop", "a", "a"),
+        ],
+    )
+    .await;
     assert_eq!(
         fixture
             .lpg_client
             .delete_node(DeleteNodeRequest {
                 graph_id: graph.clone(),
                 id: "a".into(),
-                detach: false,
             })
             .await
             .unwrap_err()
@@ -1100,30 +1920,79 @@ async fn lpg_node_deletion_validates_endpoints_and_detaches(pool: PgPool) -> any
             .code(),
         Code::FailedPrecondition
     );
-    fixture
-        .lpg_client
-        .delete_node(DeleteNodeRequest {
-            graph_id: graph.clone(),
-            id: "a".into(),
-            detach: true,
+    for id in ["e1", "e2", "loop"] {
+        fixture
+            .lpg_client
+            .delete_record(DeleteRecordRequest {
+                graph_id: graph.clone(),
+                key: Some(key(LpgRecordKind::LpgEdge, id)),
+            })
+            .await?;
+        assert_eq!(
+            fixture
+                .lpg_client
+                .delete_node(DeleteNodeRequest {
+                    graph_id: graph.clone(),
+                    id: "a".into(),
+                })
+                .await
+                .unwrap_err()
+                .code(),
+            Code::FailedPrecondition
+        );
+    }
+    let operations = ["e3"]
+        .into_iter()
+        .map(|id| LpgOperation {
+            operation: Some(lpg_operation::Operation::DeleteRecord(key(LpgRecordKind::LpgEdge, id))),
         })
-        .await?;
+        .chain([LpgOperation {
+            operation: Some(lpg_operation::Operation::DeleteRecord(key(LpgRecordKind::LpgNode, "a"))),
+        }])
+        .collect();
+    let results = fixture
+        .lpg_client
+        .lpg_operation(LpgOperationRequest {
+            graph_id: graph.clone(),
+            operations,
+        })
+        .await?
+        .into_inner()
+        .results;
+    assert_eq!(results.len(), 2);
+    assert!(
+        results
+            .iter()
+            .all(|result| result.status == LpgOperationStatus::Applied as i32)
+    );
     fixture
         .lpg_client
         .delete_node(DeleteNodeRequest {
             graph_id: graph.clone(),
             id: "a".into(),
-            detach: true,
         })
         .await?;
     let keys = vec![
         key(LpgRecordKind::LpgNode, "a"),
         key(LpgRecordKind::LpgEdge, "e1"),
         key(LpgRecordKind::LpgEdge, "e2"),
+        key(LpgRecordKind::LpgEdge, "e3"),
         key(LpgRecordKind::LpgEdge, "loop"),
         key(LpgRecordKind::LpgEdge, "keep"),
     ];
     wait_for(&mut fixture, &graph, keys, vec![edge("keep", "b", "b")]).await;
+    assert_eq!(
+        fixture
+            .lpg_client
+            .delete_node(DeleteNodeRequest {
+                graph_id: graph.clone(),
+                id: "b".into(),
+            })
+            .await
+            .unwrap_err()
+            .code(),
+        Code::FailedPrecondition
+    );
     assert_eq!(
         fixture
             .lpg_client
@@ -1137,136 +2006,7 @@ async fn lpg_node_deletion_validates_endpoints_and_detaches(pool: PgPool) -> any
 }
 
 #[sqlx::test]
-async fn lpg_indexed_deletion_marker_blocks_writes_and_cascade_resumes(pool: PgPool) -> anyhow::Result<()> {
-    let mut fixture = NidxFixture::new(pool.clone()).await?;
-    let graph = shard(&mut fixture).await?;
-    let node_key = key(LpgRecordKind::LpgNode, "a");
-    let node = LpgRecord {
-        key: Some(node_key.clone()),
-        labels: vec!["Node".into()],
-        revision: "before".into(),
-        ..Default::default()
-    };
-    fixture
-        .lpg_client
-        .upsert_record(UpsertRecordRequest {
-            graph_id: graph.clone(),
-            record: Some(node.clone()),
-        })
-        .await?;
-    let edge = LpgRecord {
-        key: Some(key(LpgRecordKind::LpgEdge, "loop")),
-        source: Some("a".into()),
-        target: Some("a".into()),
-        edge_type: Some("link".into()),
-        ..Default::default()
-    };
-    fixture
-        .lpg_client
-        .upsert_record(UpsertRecordRequest {
-            graph_id: graph.clone(),
-            record: Some(edge.clone()),
-        })
-        .await?;
-
-    // Simulate interruption after indexing the marker, before deleting incident edges.
-    let namespace = uuid::Uuid::from_u128(0x958ee941_b31c_4d0b_9226_f28b07f98180);
-    let rid = uuid::Uuid::new_v5(&namespace, format!("{graph}/{}:{}:a", node_key.kind, 1).as_bytes())
-        .simple()
-        .to_string();
-    let marked = LpgRecord {
-        deleting: true,
-        revision: "deletion".into(),
-        ..node
-    };
-    let encoded = STANDARD.encode(marked.encode_to_vec());
-    let field = "a/lpg_record_v1";
-    let end = encoded.len() as i32;
-    let timestamp = nidx_protos::prost_types::Timestamp { seconds: 1, nanos: 0 };
-    let resource = Resource {
-        resource: Some(ResourceId { shard_id: graph.clone(), uuid: rid.clone() }),
-        shard_id: graph.clone(),
-        metadata: Some(IndexMetadata { created: Some(timestamp), modified: Some(timestamp) }),
-        texts: HashMap::from([(field.into(), TextInformation { text: encoded, labels: vec![] })]),
-        json_fields: HashMap::from([(field.into(), JsonFieldValue {
-            value: r#"{"kind":1,"labels":["Node"],"source":null,"target":null,"edge_type":null,"properties":{},"fence":"marker-test"}"#.into()
-        })]),
-        paragraphs: HashMap::from([(field.into(), IndexParagraphs {
-            paragraphs: HashMap::from([(format!("{rid}/{field}/0-{end}"), IndexParagraph {
-                field: field.into(), start: 0, end, ..Default::default()
-            })]),
-        })]),
-        texts_to_delete: vec![rid.clone()], paragraphs_to_delete: vec![rid.clone()],
-        json_fields_to_delete: vec![rid.clone()], vectors_to_delete_in_all_vectorsets: vec![rid],
-        ..Default::default()
-    };
-    let mut indexer =
-        NidxIndexerClient::connect(fixture.settings.settings.lpg.as_ref().unwrap().indexer_address.clone()).await?;
-    let status = indexer
-        .index_resource(IndexResourceRequest {
-            shard_id: graph.clone(),
-            resource: Some(resource),
-        })
-        .await?
-        .into_inner();
-    assert_eq!(status.status, nidx_protos::op_status::Status::Ok as i32);
-    wait_for(&mut fixture, &graph, vec![node_key.clone()], vec![marked]).await;
-    assert_eq!(
-        fixture
-            .lpg_client
-            .upsert_record(UpsertRecordRequest {
-                graph_id: graph.clone(),
-                record: Some(edge.clone())
-            })
-            .await
-            .unwrap_err()
-            .code(),
-        Code::FailedPrecondition
-    );
-    assert_eq!(
-        fixture
-            .lpg_client
-            .patch_text_properties(PatchTextPropertiesRequest {
-                graph_id: graph.clone(),
-                key: Some(node_key.clone()),
-                ..Default::default()
-            })
-            .await
-            .unwrap_err()
-            .code(),
-        Code::FailedPrecondition
-    );
-    assert_eq!(
-        fixture
-            .lpg_client
-            .upsert_record(UpsertRecordRequest {
-                graph_id: graph.clone(),
-                record: Some(LpgRecord {
-                    key: Some(node_key.clone()),
-                    labels: vec!["Node".into()],
-                    ..Default::default()
-                }),
-            })
-            .await
-            .unwrap_err()
-            .code(),
-        Code::FailedPrecondition
-    );
-    // An already-started cascade resumes even if the retry omits detach.
-    fixture
-        .lpg_client
-        .delete_node(DeleteNodeRequest {
-            graph_id: graph.clone(),
-            id: "a".into(),
-            detach: false,
-        })
-        .await?;
-    wait_for(&mut fixture, &graph, vec![node_key, edge.key.unwrap()], vec![]).await;
-    Ok(())
-}
-
-#[sqlx::test]
-async fn lpg_edge_upsert_and_detach_are_serialized(pool: PgPool) -> anyhow::Result<()> {
+async fn lpg_edge_upsert_and_node_deletion_are_serialized(pool: PgPool) -> anyhow::Result<()> {
     let mut fixture = NidxFixture::new(pool).await?;
     let graph = shard(&mut fixture).await?;
     let node = LpgRecord {
@@ -1293,24 +2033,125 @@ async fn lpg_edge_upsert_and_detach_are_serialized(pool: PgPool) -> anyhow::Resu
         fixture.lpg_client.delete_node(DeleteNodeRequest {
             graph_id: graph.clone(),
             id: "a".into(),
-            detach: true
         }),
         other.upsert_record(UpsertRecordRequest {
             graph_id: graph.clone(),
             record: Some(edge.clone())
         }),
     );
-    deleted?;
-    if let Err(error) = inserted {
-        assert_eq!(error.code(), Code::FailedPrecondition);
+    match (deleted, inserted) {
+        (Ok(_), Err(error)) => {
+            assert_eq!(error.code(), Code::FailedPrecondition);
+            wait_for(
+                &mut fixture,
+                &graph,
+                vec![key(LpgRecordKind::LpgNode, "a"), edge.key.unwrap()],
+                vec![],
+            )
+            .await;
+        }
+        (Err(error), Ok(_)) => {
+            assert_eq!(error.code(), Code::FailedPrecondition);
+            let node = LpgRecord {
+                key: Some(key(LpgRecordKind::LpgNode, "a")),
+                labels: vec!["Node".into()],
+                ..Default::default()
+            };
+            wait_for(
+                &mut fixture,
+                &graph,
+                vec![node.key.clone().unwrap(), edge.key.clone().unwrap()],
+                vec![node, edge],
+            )
+            .await;
+        }
+        _ => panic!("exactly one concurrent operation must succeed"),
     }
+    Ok(())
+}
+
+#[sqlx::test]
+async fn lpg_search_top_k_accepts_more_than_a_thousand_matches(pool: PgPool) -> anyhow::Result<()> {
+    let mut fixture = NidxFixture::new(pool).await?;
+    let graph = shard(&mut fixture).await?;
+    let chunks = LpgTextProperty {
+        chunks: vec!["apple".into(); 1002],
+        embeddings: vec![
+            LpgVector {
+                values: vec![1.0, 0.0, 0.0]
+            };
+            1002
+        ],
+    };
+    let records: Vec<_> = [("keep", true), ("exclude", false)]
+        .into_iter()
+        .map(|(id, eligible)| LpgRecord {
+            key: Some(key(LpgRecordKind::LpgNode, id)),
+            labels: vec!["Node".into()],
+            properties: HashMap::from([(
+                "eligible".into(),
+                LpgProperty {
+                    value: Some(lpg_property::Value::Boolean(eligible)),
+                },
+            )]),
+            text_properties: HashMap::from([("description".into(), chunks.clone()), ("other".into(), chunks.clone())]),
+            ..Default::default()
+        })
+        .collect();
+    fixture
+        .lpg_client
+        .bulk_load(BulkLoadRequest {
+            graph_id: graph.clone(),
+            records: records.clone(),
+            ..Default::default()
+        })
+        .await?;
     wait_for(
         &mut fixture,
         &graph,
-        vec![key(LpgRecordKind::LpgNode, "a"), edge.key.unwrap()],
-        vec![],
+        records.iter().map(|record| record.key.clone().unwrap()).collect(),
+        records,
     )
     .await;
+    fixture.wait_sync().await;
+    for (text, vector) in [
+        (Some("apple".to_string()), vec![]),
+        (None, vec![1.0, 0.0, 0.0]),
+        (Some("apple".to_string()), vec![1.0, 0.0, 0.0]),
+    ] {
+        let response = fixture
+            .lpg_client
+            .search_chunks(SearchChunksRequest {
+                graph_id: graph.clone(),
+                text: text.clone(),
+                vector: vector.clone(),
+                kind: Some(LpgRecordKind::LpgNode as i32),
+                property: Some("description".into()),
+                filters: vec![LpgPropertyFilter {
+                    property: "eligible".into(),
+                    predicate: Some(lpg_property_filter::Predicate::Boolean(true)),
+                }],
+                top_k: 10,
+                ..Default::default()
+            })
+            .await?
+            .into_inner();
+        assert_eq!(response.hits.len(), 10);
+        for hit in response.hits {
+            assert_eq!(hit.record.unwrap().key.unwrap().id, "keep");
+            assert_eq!(hit.property, "description");
+            assert_eq!(hit.text, "apple");
+            assert!(hit.text_rank.is_some() || hit.vector_rank.is_some());
+            if text.is_none() {
+                assert!(hit.text_rank.is_none());
+                assert!(hit.vector_rank.is_some());
+            }
+            if vector.is_empty() {
+                assert!(hit.text_rank.is_some());
+                assert!(hit.vector_rank.is_none());
+            }
+        }
+    }
     Ok(())
 }
 
@@ -1321,6 +2162,7 @@ async fn lpg_text_chunks_search_and_patch(pool: PgPool) -> anyhow::Result<()> {
     let node_key = key(LpgRecordKind::LpgNode, "node");
     let record = LpgRecord {
         key: Some(node_key.clone()),
+        labels: vec!["Node".into()],
         text_properties: HashMap::from([
             (
                 "description".into(),
@@ -1368,6 +2210,43 @@ async fn lpg_text_chunks_search_and_patch(pool: PgPool) -> anyhow::Result<()> {
     assert_eq!(hybrid.hits[0].text, "red apple");
     assert_eq!(hybrid.hits[0].text_rank, Some(1));
     assert_eq!(hybrid.hits[0].vector_rank, Some(1));
+
+    let search = SearchChunksRequest {
+        graph_id: graph.clone(),
+        text: Some("red apple".into()),
+        vector: vec![1.0, 0.0, 0.0],
+        property: Some("description".into()),
+        top_k: 10,
+        ..Default::default()
+    };
+    for (semantic, keyword, text_rank, vector_rank) in [
+        (0.5, 0.0, Some(1), Some(1)),
+        (2.0, 0.0, Some(1), None),
+        (0.0, 1_000_000.0, None, Some(1)),
+    ] {
+        let response = fixture
+            .lpg_client
+            .search_chunks(SearchChunksRequest {
+                min_score_semantic: semantic,
+                min_score_keyword: keyword,
+                ..search.clone()
+            })
+            .await?
+            .into_inner();
+        assert_eq!(response.hits.len(), 1);
+        assert_eq!(response.hits[0].text_rank, text_rank);
+        assert_eq!(response.hits[0].vector_rank, vector_rank);
+    }
+    let excluded = fixture
+        .lpg_client
+        .search_chunks(SearchChunksRequest {
+            min_score_semantic: 2.0,
+            min_score_keyword: 1_000_000.0,
+            ..search
+        })
+        .await?
+        .into_inner();
+    assert!(excluded.hits.is_empty());
 
     let updated = fixture
         .lpg_client
@@ -1438,6 +2317,7 @@ async fn lpg_surfaces_downstream_errors(pool: PgPool) -> anyhow::Result<()> {
             graph_id: graph.clone(),
             record: Some(LpgRecord {
                 key: Some(node_key.clone()),
+                labels: vec!["Node".into()],
                 ..Default::default()
             }),
         })

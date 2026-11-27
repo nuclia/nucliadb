@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from nidx.examples.lpg.generate_data import Config, generate_records, write_dataset
+from nidx.examples.lpg.load_data import read_dataset
 
 
 def test_jsonl_graph_integrity(tmp_path: Path) -> None:
@@ -65,11 +66,53 @@ def test_reproducibility_and_vectors() -> None:
     assert without_vectors == list(generate_records(replace(config, vector_dimension=0)))
 
 
+def test_variable_properties_and_loader_compatibility(tmp_path: Path) -> None:
+    config = Config(
+        products=30,
+        warehouses=10,
+        clients=10,
+        max_node_properties=100,
+        max_edge_properties=50,
+        vector_dimension=384,
+    )
+    rows = list(generate_records(config))
+    assert rows == list(generate_records(config))
+    counts: dict[str, set[int]] = {"node": set(), "edge": set()}
+    types: dict[str, set[type]] = {"node": set(), "edge": set()}
+    for row in rows:
+        count = len(row["properties"]) + len(row["text_chunks"])
+        maximum = config.max_node_properties if row["kind"] == "node" else config.max_edge_properties
+        assert count <= maximum
+        counts[row["kind"]].add(count)
+        types[row["kind"]].update(type(value) for value in row["properties"].values())
+        assert row["text_chunks"].keys() == row["embeddings"].keys()
+        for name, vectors in row["embeddings"].items():
+            assert len(vectors) == len(row["text_chunks"][name])
+            assert all(len(vector) == 384 for vector in vectors)
+    assert all(len(values) > 1 for values in counts.values())
+    assert all(values == {str, int, float, bool, list} for values in types.values())
+    base = list(generate_records(replace(config, max_node_properties=0, max_edge_properties=0)))
+    for row, original in zip(rows, base, strict=True):
+        assert {key: value for key, value in row.items() if key != "properties"} == {
+            key: value for key, value in original.items() if key != "properties"
+        }
+        assert original["properties"].items() <= row["properties"].items()
+    output = tmp_path / "rich.jsonl"
+    write_dataset(output, config)
+    with read_dataset(output) as dataset:
+        assert dataset.node_count == 50
+        assert dataset.edge_count == len(rows) - 50
+        assert dataset.vector_dimension == 384
+
+
 @pytest.mark.parametrize(
     "overrides, message",
     [
         ({"products": -1}, "products must be nonnegative"),
         ({"vector_dimension": -1}, "vector_dimension must be nonnegative"),
+        ({"max_node_properties": -1}, "max_node_properties must be nonnegative"),
+        ({"max_node_properties": 9}, "max_node_properties must be 0 or at least 10"),
+        ({"max_edge_properties": 4}, "max_edge_properties must be 0 or at least 5"),
         ({"isolated_per_label": 201}, "cannot exceed"),
         ({"warehouses": 1}, "STOCKED_AT requires"),
         ({"products": 1, "stocked_per_product": 0}, "BUYS requires"),
@@ -105,6 +148,10 @@ def test_cli(tmp_path: Path) -> None:
         "2",
         "--vector-dimension",
         "3",
+        "--max-node-properties",
+        "100",
+        "--max-edge-properties",
+        "50",
     ]
     result = subprocess.run(command, check=True, capture_output=True, text=True)
     assert json.loads(result.stdout) == {
@@ -114,7 +161,13 @@ def test_cli(tmp_path: Path) -> None:
         "nodes": 7,
         "edges": 23,
     }
-    assert len(output.read_text().splitlines()) == 30
+    rows = [json.loads(line) for line in output.read_text().splitlines()]
+    assert len(rows) == 30
+    assert {
+        row["kind"] for row in rows if any(name.startswith("synthetic_") for name in row["properties"])
+    } == {"node", "edge"}
+    for row in rows:
+        assert len(row["properties"]) + len(row["text_chunks"]) <= (100 if row["kind"] == "node" else 50)
     invalid = subprocess.run([*command, "--products", "-1"], capture_output=True, text=True)
     assert invalid.returncode == 2
     assert "products must be nonnegative" in invalid.stderr

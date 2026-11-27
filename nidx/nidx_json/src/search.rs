@@ -300,6 +300,42 @@ mod tests {
     }
 
     #[test]
+    fn paged_search_is_filtered_and_exclusive() {
+        let (svc, apple, _banana, cherry) = build_test_index();
+        let query = build_tantivy_query(
+            &path("t/product", "available", JsonPredicate::Boolean(true)),
+            svc.schema.json,
+        );
+        assert_eq!(svc.search_page(&*query, None, 1).unwrap(), vec![apple]);
+        assert_eq!(svc.search_page(&*query, Some(apple), 2).unwrap(), vec![cherry]);
+        assert!(svc.search_page(&*query, Some(cherry), 2).unwrap().is_empty());
+        assert!(svc.search_page(&*query, None, 0).is_err());
+    }
+
+    #[test]
+    fn paged_search_deduplicates_and_orders_across_segments() {
+        let schema = JsonSchema::new();
+        let index = Index::create_in_ram(schema.schema.clone());
+        let mut writer: IndexWriter = index.writer(15_000_000).unwrap();
+        writer.set_merge_policy(Box::new(tantivy::merge_policy::NoMergePolicy));
+        for batch in [[9, 1, 5], [3, 5, 7]] {
+            for number in batch {
+                add_doc(&mut writer, &schema, Uuid::from_u128(number), "t/product", vec![]);
+            }
+            writer.commit().unwrap();
+        }
+        let reader = index.reader().unwrap();
+        let svc = JsonReaderService { index, schema, reader };
+        let query = tantivy::query::AllQuery;
+        let first = svc.search_page(&query, None, 3).unwrap();
+        assert_eq!(first, [1, 3, 5].map(Uuid::from_u128));
+        assert_eq!(
+            svc.search_page(&query, first.last().copied(), 3).unwrap(),
+            [7, 9].map(Uuid::from_u128)
+        );
+    }
+
+    #[test]
     fn test_exact_match() {
         let (svc, apple, _banana, _cherry) = build_test_index();
         // Full stored value matches.

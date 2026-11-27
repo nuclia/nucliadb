@@ -22,6 +22,9 @@ class Service(nidx_pb2_grpc.NidxLPGServicer):
         self.requests: list[nidx_pb2.FindRecordsRequest] = []
         self.repeat_cursor = False
         self.fail_find = False
+        self.expand_error: grpc.StatusCode | None = None
+        self.expand_requests: list[nidx_pb2.ExpandRequest] = []
+        self.path_requests: list[nidx_pb2.ShortestPathRequest] = []
         self.records = [
             to_record(row)
             for row in [
@@ -110,6 +113,64 @@ class Service(nidx_pb2_grpc.NidxLPGServicer):
             next_page_token="1" if self.repeat_cursor else str(end) if end < len(records) else "",
         )
 
+    def _incident(self, node: str, direction: int, edge_types: list[str]) -> list[tuple]:
+        found = []
+        for edge in self.records:
+            if edge.key.kind != nidx_pb2.LPG_EDGE or (edge_types and edge.edge_type not in edge_types):
+                continue
+            outgoing = edge.source == node and direction in (nidx_pb2.LPG_OUTGOING, nidx_pb2.LPG_BOTH)
+            incoming = edge.target == node and direction in (nidx_pb2.LPG_INCOMING, nidx_pb2.LPG_BOTH)
+            if outgoing:
+                found.append((edge, edge.target))
+            if incoming and not (outgoing and edge.source == edge.target):
+                found.append((edge, edge.source))
+        return found
+
+    def Expand(
+        self, request: nidx_pb2.ExpandRequest, context: grpc.ServicerContext
+    ) -> nidx_pb2.ExpandResponse:
+        if self.expand_error:
+            context.abort(self.expand_error, "expand failed")
+        self.expand_requests.append(request)
+        nodes = {record.key.id: record for record in self.records if record.key.kind == nidx_pb2.LPG_NODE}
+        response = nidx_pb2.ExpandResponse()
+        for node_id in dict.fromkeys(request.node_ids):
+            for edge, neighbor_id in self._incident(node_id, request.direction, list(request.edge_types)):
+                neighbor = nodes[neighbor_id]
+                if request.HasField("neighbor_label") and request.neighbor_label not in neighbor.labels:
+                    continue
+                response.edges.append(edge)
+                response.neighbors.append(neighbor)
+                response.matches.append(
+                    nidx_pb2.ExpandMatch(
+                        node_id=node_id,
+                        edge_index=len(response.edges) - 1,
+                        neighbor_index=len(response.neighbors) - 1,
+                    )
+                )
+        return response
+
+    def ShortestPath(
+        self, request: nidx_pb2.ShortestPathRequest, context: grpc.ServicerContext
+    ) -> nidx_pb2.ShortestPathResponse:
+        self.path_requests.append(request)
+        nodes = {record.key.id: record for record in self.records if record.key.kind == nidx_pb2.LPG_NODE}
+        queue = [(request.source, [nodes[request.source]], [])]
+        seen = {request.source}
+        while queue:
+            node, path_nodes, path_edges = queue.pop(0)
+            if len(path_edges) == request.max_hops:
+                continue
+            for edge, neighbor in self._incident(node, request.direction, list(request.edge_types)):
+                if neighbor in seen:
+                    continue
+                seen.add(neighbor)
+                step = (neighbor, [*path_nodes, nodes[neighbor]], [*path_edges, edge])
+                if neighbor == request.target:
+                    return nidx_pb2.ShortestPathResponse(found=True, nodes=step[1], edges=step[2])
+                queue.append(step)
+        return nidx_pb2.ShortestPathResponse()
+
     def GetRecords(
         self, request: nidx_pb2.GetRecordsRequest, context: grpc.ServicerContext
     ) -> nidx_pb2.GetRecordsResponse:
@@ -162,8 +223,7 @@ def test_all_seven_supplied_query_shapes(graph, queries) -> None:
     neighbors = client.execute(queries[1], {"name": "Alice"})
     assert {"k1", "k2", "k4", "e1", "e3", "e4"}.issubset(set(ids(neighbors, "r")))
     assert ids([row for row in neighbors if row["r"].key.id == "k4"], "neighbor") == ["p1"]
-    assert any(request.HasField("incident_node") for request in service.requests)
-    assert any(request.page_token for request in service.requests)
+    assert service.expand_requests[-1].direction == nidx_pb2.LPG_BOTH
 
     paths = client.execute(queries[2], {"name": "Alice"})
     paths = [row["path"] for row in paths]
@@ -179,6 +239,9 @@ def test_all_seven_supplied_query_shapes(graph, queries) -> None:
     assert len(shortest) == 1
     assert [node.key.id for node in shortest[0]["path"].nodes] == ["p1", "p2", "p3"]
     assert len(shortest[0]["path"].relationships) == 2
+    request = service.path_requests[-1]
+    assert (request.source, request.target, request.direction) == ("p1", "p3", nidx_pb2.LPG_BOTH)
+    assert list(request.edge_types) == ["KNOWS"] and request.max_hops == 6
 
 
 def test_parameters_limits_and_rejections(graph, queries) -> None:
@@ -328,9 +391,13 @@ def test_failures_are_surfaced(graph, queries) -> None:
         client.execute(queries[0], {"email": "a"})
     assert error.value.code() == grpc.StatusCode.UNAVAILABLE
     service.fail_find = False
-    service.records = [record for record in service.records if record.key.id != "c1"]
-    with pytest.raises(RuntimeError, match="Endpoint 'c1' disappeared"):
-        client.execute(queries[3], {"name": "Alice"})
+    service.expand_error = grpc.StatusCode.UNAVAILABLE
+    with pytest.raises(grpc.RpcError) as error:
+        client.execute(queries[1], {"name": "Alice"})
+    assert error.value.code() == grpc.StatusCode.UNAVAILABLE
+    service.expand_error = grpc.StatusCode.RESOURCE_EXHAUSTED
+    with pytest.raises(QueryLimitExceeded, match="Server limit"):
+        client.execute(queries[2], {"name": "Alice"})
 
 
 def test_cli_over_grpc(queries) -> None:

@@ -18,6 +18,29 @@ The index is divided in various components that can be deployed and scaled separ
 - **searcher**: Continually syncs a set of indexes (downloads them to disk) and provides search over them.
 - **api**: Provides the gRPC API to manage indexes, provide stats, search...
 
+### Stored text without tokenization
+
+`TextInformation.skip_tokenization` defaults to `false`: existing clients and
+RAG workloads continue indexing full text. Set it to `true` for opaque stored
+fields that should not participate in full-text search. Text remains retrievable
+on text index versions supporting stored text (v5+); field/paragraph metadata and
+vectors are preserved, but neither the text nor paragraph index emits text
+tokens for that field. Existing segments need reindexing to remove old tokens.
+
+### Multi-resource indexing
+
+The trusted `NidxIndexer.IndexResources` RPC accepts 1–1000 distinct resource
+UUIDs from one shard, with a maximum encoded request size of 4 MiB. It builds
+shared segments per index (separating vector segment tags) and publishes their
+metadata and aggregated deletion keys in one transaction using one sequence.
+Each resource keeps its identity and replacement/deletion behavior. Build or
+upload failures publish no indexes from that request; transport failures after
+publication can leave the outcome uncertain.
+
+LPG bulk loading uses this additive path and splits projected resources to fit
+the message limit before submitting any writes. Ordinary single-resource
+indexing remains unchanged. No additional PostgreSQL tables are needed.
+
 ## Organization
 
 The code is divided into a set of crates:

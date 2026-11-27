@@ -16,7 +16,7 @@
 mod common;
 use common::TestOpener;
 use nidx_tests::little_prince;
-use nidx_text::{DocumentSearchRequest, TextConfig, TextIndexer, TextSearcher};
+use nidx_text::{DocumentSearchRequest, FieldUid, TextConfig, TextIndexer, TextSearcher};
 use tempfile::tempdir;
 
 #[test]
@@ -79,5 +79,68 @@ fn test_index_merge_search() -> anyhow::Result<()> {
     })?;
     assert_eq!(result.results.len(), 2);
 
+    Ok(())
+}
+
+#[test]
+fn test_skip_tokenization_preserves_stored_text_and_field_lookup() -> anyhow::Result<()> {
+    let mut resource = little_prince("shard", None);
+    resource.texts.get_mut("a/title").unwrap().skip_tokenization = true;
+    let field = FieldUid {
+        rid: resource.resource.as_ref().unwrap().uuid.clone(),
+        field_type: "a".into(),
+        field_name: "title".into(),
+        split: None,
+    };
+    let segment_dir = tempdir()?;
+    let segment = TextIndexer
+        .index_resource(segment_dir.path(), TextConfig::default(), &resource)?
+        .unwrap();
+    let merge_dir = tempdir()?;
+    let merged = TextIndexer.merge(
+        merge_dir.path(),
+        TextConfig::default(),
+        TestOpener::new(vec![(segment.clone(), 1i64.into())], vec![]),
+    )?;
+    for meta in [segment, merged] {
+        let searcher = TextSearcher::open(
+            TextConfig::default(),
+            TestOpener::new(vec![(meta, 1i64.into())], vec![]),
+        )?;
+        let fields = searcher.reader.get_fields_text(vec![field.clone()])?;
+        assert_eq!(fields[&field].as_deref(), Some("The little prince"));
+        for (body, expected) in [("little", 0), ("friendship", 1), ("", 2)] {
+            let result = searcher.search(&DocumentSearchRequest {
+                body: body.into(),
+                result_per_page: 20,
+                ..Default::default()
+            })?;
+            assert_eq!(result.results.len(), expected, "query: {body:?}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_batch_skips_texts_without_losing_other_resources() -> anyhow::Result<()> {
+    let mut skipped = little_prince("shard", None);
+    skipped.skip_texts = true;
+    let kept = little_prince("shard", None);
+    let rid = kept.resource.as_ref().unwrap().uuid.clone();
+    let dir = tempdir()?;
+    let segment = TextIndexer
+        .index_resources(dir.path(), TextConfig::default(), &[skipped, kept])?
+        .unwrap();
+    assert_eq!(segment.records, 2);
+    let searcher = TextSearcher::open(
+        TextConfig::default(),
+        TestOpener::new(vec![(segment, 1i64.into())], vec![]),
+    )?;
+    let response = searcher.search(&DocumentSearchRequest {
+        result_per_page: 20,
+        ..Default::default()
+    })?;
+    assert_eq!(response.results.len(), 2);
+    assert!(response.results.iter().all(|result| result.uuid == rid));
     Ok(())
 }

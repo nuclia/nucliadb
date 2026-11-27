@@ -43,6 +43,8 @@ use crate::segment_store::pack_and_upload;
 use crate::utilization_tracker::UtilizationTracker;
 use crate::{Settings, metadata::*};
 
+pub(crate) mod batch;
+
 #[cfg(feature = "telemetry")]
 use crate::telemetry;
 
@@ -96,6 +98,28 @@ impl IndexerServer {
 
 #[tonic::async_trait]
 impl NidxIndexer for IndexerServer {
+    async fn index_resources(
+        &self,
+        request: tonic::Request<nidx_protos::IndexResourcesRequest>,
+    ) -> tonic::Result<tonic::Response<OpStatus>> {
+        let request = request.into_inner();
+        let shard_id = batch::validate_request(&request)?;
+        Shard::get(&self.meta.pool, shard_id).await.map_err(NidxError::from)?;
+        let seq = IndexRequest::create(&self.meta.pool).await.map_err(NidxError::from)?;
+        batch::index_resources(
+            &self.meta,
+            self.segment_storage.clone(),
+            &self.work_path,
+            shard_id,
+            request.resources,
+            seq.seq(),
+        )
+        .await
+        .map_err(NidxError::from)?;
+        seq.delete(&self.meta.pool).await.map_err(NidxError::from)?;
+        Ok(tonic::Response::new(OpStatus::default()))
+    }
+
     async fn index_resource(
         &self,
         request: tonic::Request<nidx_protos::IndexResourceRequest>,

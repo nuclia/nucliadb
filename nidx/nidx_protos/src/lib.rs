@@ -46,6 +46,7 @@ pub use utils::*;
 // A couple of helpful re-exports
 pub mod prost {
     pub use prost::Message as _;
+    pub use prost::length_delimiter_len;
 }
 
 pub mod prost_types {

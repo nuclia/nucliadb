@@ -43,6 +43,8 @@ class Config:
     isolated_per_label: int = 1
     seed: int = 42
     vector_dimension: int = 0
+    max_node_properties: int = 0
+    max_edge_properties: int = 0
 
     def __post_init__(self) -> None:
         for name in (
@@ -54,9 +56,14 @@ class Config:
             "supplies_per_warehouse",
             "isolated_per_label",
             "vector_dimension",
+            "max_node_properties",
+            "max_edge_properties",
         ):
             if getattr(self, name) < 0:
                 raise ValueError(f"{name} must be nonnegative")
+        for name, minimum in (("max_node_properties", 10), ("max_edge_properties", 5)):
+            if 0 < getattr(self, name) < minimum:
+                raise ValueError(f"{name} must be 0 or at least {minimum}, including text properties")
         if self.isolated_per_label > min(self.products, self.warehouses, self.clients):
             raise ValueError("isolated_per_label cannot exceed any node count")
         products = self.products - self.isolated_per_label
@@ -85,8 +92,35 @@ def generate_records(config: Config) -> Iterator[GraphRow]:
     fake.seed_instance(config.seed)
     rng = random.Random(config.seed)
     vector_rng = random.Random(config.seed + 1)
+    property_rng = random.Random(config.seed + 2)
 
-    def with_vectors(row: GraphRow) -> GraphRow:
+    def enrich(row: GraphRow) -> GraphRow:
+        maximum = config.max_node_properties if row["kind"] == "node" else config.max_edge_properties
+        if maximum:
+            count = len(row["properties"]) + len(row["text_chunks"])
+            for index in range(property_rng.randint(count, maximum) - count):
+                name = f"synthetic_{index:03d}"
+                match index % 6:
+                    case 0:
+                        row["properties"][name] = (
+                            f"{property_rng.choice(COUNTRIES)} {property_rng.choice(CATEGORIES)[2]}"
+                        )
+                    case 1:
+                        row["properties"][name] = property_rng.randint(-1_000_000, 1_000_000)
+                    case 2:
+                        row["properties"][name] = round(property_rng.uniform(-10_000, 10_000), 4)
+                    case 3:
+                        row["properties"][name] = property_rng.choice((True, False))
+                    case 4:
+                        row["properties"][name] = property_rng.sample(
+                            COUNTRIES, property_rng.randint(1, 3)
+                        )
+                    case 5:
+                        row["properties"][name] = date.fromordinal(
+                            property_rng.randint(
+                                date(2020, 1, 1).toordinal(), date(2025, 12, 31).toordinal()
+                            )
+                        ).isoformat()
         if config.vector_dimension:
             embeddings: dict[str, list[list[float]]] = {}
             for name, chunks in row["text_chunks"].items():
@@ -106,7 +140,7 @@ def generate_records(config: Config) -> Iterator[GraphRow]:
         item = rng.choice(items)
         brand = fake.company()
         country = rng.choice(COUNTRIES)
-        yield with_vectors(
+        yield enrich(
             {
                 "kind": "node",
                 "id": f"P{index:08d}",
@@ -134,7 +168,7 @@ def generate_records(config: Config) -> Iterator[GraphRow]:
         country = rng.choice(COUNTRIES)
         city = fake.city()
         refrigerated = rng.choice((True, False))
-        yield with_vectors(
+        yield enrich(
             {
                 "kind": "node",
                 "id": f"W{index:08d}",
@@ -162,7 +196,7 @@ def generate_records(config: Config) -> Iterator[GraphRow]:
         name = fake.company()
         sector = rng.choice(CATEGORIES)[0]
         country = rng.choice(COUNTRIES)
-        yield with_vectors(
+        yield enrich(
             {
                 "kind": "node",
                 "id": f"C{index:08d}",
@@ -193,7 +227,7 @@ def generate_records(config: Config) -> Iterator[GraphRow]:
     def edge(source: str, edge_type: str, target: str) -> GraphRow:
         nonlocal edge_index
         edge_index += 1
-        return with_vectors(
+        return enrich(
             {
                 "kind": "edge",
                 "id": f"E{edge_index:010d}",
@@ -256,6 +290,8 @@ def main() -> None:
         "isolated_per_label",
         "seed",
         "vector_dimension",
+        "max_node_properties",
+        "max_edge_properties",
     ):
         parser.add_argument(f"--{name.replace('_', '-')}", type=int, default=getattr(defaults, name))
     args = parser.parse_args()
@@ -270,6 +306,8 @@ def main() -> None:
             isolated_per_label=args.isolated_per_label,
             seed=args.seed,
             vector_dimension=args.vector_dimension,
+            max_node_properties=args.max_node_properties,
+            max_edge_properties=args.max_edge_properties,
         )
     except ValueError as error:
         parser.error(str(error))

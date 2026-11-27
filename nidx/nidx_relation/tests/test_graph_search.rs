@@ -23,8 +23,8 @@ use nidx_protos::graph_search_request::QueryKind;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::{
-    GraphQuery, GraphSearchRequest, GraphSearchResponse, IndexRelation, IndexRelations, RelationNode, Resource,
-    ResourceId,
+    GraphQuery, GraphSearchRequest, GraphSearchResponse, IndexRelation, IndexRelations, LpgDirection, RelationNode,
+    Resource, ResourceId,
 };
 use nidx_relation::graph_query_parser::VectorQueryResults;
 use nidx_relation::{RelationConfig, RelationIndexer, RelationSearcher};
@@ -1090,6 +1090,105 @@ fn create_reader() -> anyhow::Result<RelationSearcher> {
         RelationConfig::default(),
         TestOpener::new(vec![(segment_meta, 1i64.into())], vec![]),
     )
+}
+
+#[test]
+fn lpg_adjacency_is_exact_bounded_and_preserves_parallel_edges() -> anyhow::Result<()> {
+    let mut dirs = Vec::new();
+    let mut segments = Vec::new();
+    for (number, source, target, kind, projected) in [
+        (1, "Node", "warehouse", "STOCKED_AT", true),
+        (2, "Node", "warehouse", "STOCKED_AT", true),
+        (2, "Node", "warehouse", "STOCKED_AT", true),
+        (3, "warehouse", "Node", "RETURNED_FROM", true),
+        (4, "Node", "Node", "STOCKED_AT", true),
+        (5, "node", "warehouse", "STOCKED_AT", true),
+        (6, "Nöde", "warehouse", "STOCKED_AT", true),
+        (7, "Node", "warehouse", "STOCKED_AT", false),
+    ] {
+        let id = Uuid::from_u128(number);
+        let mut relation = common::create_relation(
+            source.into(),
+            NodeType::Resource,
+            "".into(),
+            target.into(),
+            NodeType::Resource,
+            "".into(),
+            RelationType::Other,
+            kind.into(),
+        );
+        if projected {
+            relation.facets.push(format!("/lpg/edge/{}", id.simple()));
+        }
+        let resource = Resource {
+            resource: Some(ResourceId {
+                uuid: id.simple().to_string(),
+                shard_id: "shard".into(),
+            }),
+            field_relations: HashMap::from([(
+                "a/metadata".into(),
+                IndexRelations {
+                    relations: vec![relation],
+                },
+            )]),
+            ..Default::default()
+        };
+        let dir = TempDir::new()?;
+        let meta = RelationIndexer
+            .index_resource(dir.path(), &RelationConfig::default(), &resource)?
+            .unwrap();
+        segments.push((meta, 1i64.into()));
+        dirs.push(dir);
+    }
+    let searcher = RelationSearcher::open(RelationConfig::default(), TestOpener::new(segments, vec![]))?;
+    let starts = vec!["Node".into(), "Node".into()];
+    let ids =
+        |edges: Vec<nidx_relation::LpgRelation>| edges.into_iter().map(|edge| edge.resource_id).collect::<Vec<_>>();
+    assert_eq!(
+        ids(searcher.lpg_expand(&starts, LpgDirection::LpgOutgoing, &[], None, 10)?),
+        [1, 2, 4].map(Uuid::from_u128)
+    );
+    assert_eq!(
+        ids(searcher.lpg_expand(&starts, LpgDirection::LpgIncoming, &[], None, 10)?),
+        [3, 4].map(Uuid::from_u128)
+    );
+    assert_eq!(
+        ids(searcher.lpg_expand(&starts, LpgDirection::LpgBoth, &[], None, 10)?),
+        [1, 2, 3, 4].map(Uuid::from_u128)
+    );
+    assert_eq!(
+        ids(searcher.lpg_expand(&starts, LpgDirection::LpgOutgoing, &[], None, 2)?),
+        [1, 2].map(Uuid::from_u128)
+    );
+    assert_eq!(
+        ids(searcher.lpg_expand(&starts, LpgDirection::LpgBoth, &["RETURNED_FROM".into()], None, 10)?),
+        [Uuid::from_u128(3)]
+    );
+    assert!(
+        searcher
+            .lpg_expand(&starts, LpgDirection::LpgBoth, &["stocked_at".into()], None, 10)?
+            .is_empty()
+    );
+    let allowed = HashSet::from([Uuid::from_u128(2), Uuid::from_u128(5)]);
+    assert_eq!(
+        ids(searcher.lpg_expand(&starts, LpgDirection::LpgBoth, &[], Some(&allowed), 10)?),
+        [Uuid::from_u128(2)]
+    );
+    assert!(
+        searcher
+            .lpg_expand(&starts, LpgDirection::LpgBoth, &[], Some(&HashSet::new()), 10)?
+            .is_empty()
+    );
+    let batched = vec!["Node".into(), "warehouse".into()];
+    assert_eq!(
+        ids(searcher.lpg_expand(&batched, LpgDirection::LpgBoth, &[], None, 10)?),
+        [1, 2, 3, 4, 5, 6].map(Uuid::from_u128)
+    );
+    assert_eq!(
+        ids(searcher.lpg_expand(&["Nöde".into()], LpgDirection::LpgOutgoing, &[], None, 10)?),
+        [Uuid::from_u128(6)]
+    );
+    Ok(())
 }
 
 fn create_reader_file_field() -> anyhow::Result<RelationSearcher> {

@@ -19,11 +19,16 @@ use nidx_protos::prost::*;
 use nidx_protos::relation::RelationType;
 use nidx_protos::relation_node::NodeType;
 use nidx_protos::*;
-use time::{OffsetDateTime, UtcOffset, format_description::well_known::Rfc3339};
+use time::format_description::well_known::Rfc3339;
 use tokio::sync::Mutex;
 use tonic::{Request, Response, Status, transport::Endpoint};
 use uuid::Uuid;
 
+use crate::indexer::batch::{MAX_BATCH_BYTES, MAX_RESOURCES};
+use crate::lpg::{
+    FIELD, expand_filter, find_filter, parse_datetime, property_path, resource_id, validate_search,
+    validate_shortest_path,
+};
 use crate::{
     NidxMetadata,
     errors::NidxError,
@@ -32,29 +37,8 @@ use crate::{
 };
 use nidx_vector::config::VectorConfig;
 
-const FIELD: &str = "a/lpg_record_v1";
 const RELATION_FIELD: &str = "a/metadata";
-const NAMESPACE: Uuid = Uuid::from_u128(0x958ee941_b31c_4d0b_9226_f28b07f98180);
 const MAX_LPG_OPERATIONS: usize = 1000;
-const MAX_EXPAND_RESPONSE_BYTES: usize = 3 * 1024 * 1024;
-const MAX_SHORTEST_PATH_STATE_BYTES: usize = 16 * 1024 * 1024;
-
-fn parse_datetime(value: &str) -> Result<OffsetDateTime, Status> {
-    let date = OffsetDateTime::parse(value, &Rfc3339)
-        .or_else(|_| OffsetDateTime::parse(&format!("{value}Z"), &Rfc3339))
-        .map_err(|_| Status::invalid_argument(format!("invalid datetime: {value:?}")))?;
-    i64::try_from(date.unix_timestamp_nanos())
-        .map_err(|_| Status::invalid_argument("datetime is outside the date index's supported range"))?;
-    Ok(date.to_offset(UtcOffset::UTC))
-}
-
-fn date_timestamp(value: &str) -> Result<prost_types::Timestamp, Status> {
-    let date = parse_datetime(value)?;
-    Ok(prost_types::Timestamp {
-        seconds: date.unix_timestamp(),
-        nanos: date.nanosecond() as i32,
-    })
-}
 
 #[derive(Clone)]
 struct PreparedUpsert {
@@ -104,29 +88,48 @@ fn prepared_upsert(request: IndexResourceRequest) -> Result<PreparedUpsert, Stat
     })
 }
 
-async fn submit_then_wait<T: Clone, S, SF, V, VF>(
-    items: &[T],
-    visibility_budget: Duration,
-    mut submit: S,
-    mut visible: V,
-) -> Result<(), Status>
+async fn submit_all<T: Clone, S, SF>(items: &[T], mut submit: S) -> Result<(), Status>
 where
     S: FnMut(T) -> SF,
     SF: std::future::Future<Output = Result<(), Status>>,
-    V: FnMut(T) -> VF,
-    VF: std::future::Future<Output = Result<(), Status>>,
 {
     for item in items {
         submit(item.clone()).await?;
     }
-    tokio::time::timeout(visibility_budget, async {
-        for item in items {
-            visible(item.clone()).await?;
+    Ok(())
+}
+
+fn index_batches(graph: &str, resources: Vec<Resource>) -> Result<Vec<IndexResourcesRequest>, Status> {
+    let mut request = IndexResourcesRequest {
+        shard_id: graph.into(),
+        resources: vec![],
+    };
+    let header_size = request.encoded_len();
+    let mut size = header_size;
+    let mut batches = Vec::new();
+    for resource in resources {
+        let length = resource.encoded_len();
+        let entry_size = 1 + length_delimiter_len(length) + length;
+        if header_size + entry_size > MAX_BATCH_BYTES {
+            return Err(Status::resource_exhausted(
+                "indexed resource exceeds gRPC message limit",
+            ));
         }
-        Ok(())
-    })
-    .await
-    .map_err(|_| Status::deadline_exceeded("LPG mutation was indexed but is not yet visible"))?
+        if size + entry_size > MAX_BATCH_BYTES || request.resources.len() == MAX_RESOURCES {
+            batches.push(request);
+            request = IndexResourcesRequest {
+                shard_id: graph.into(),
+                resources: vec![],
+            };
+            size = header_size;
+        }
+        request.resources.push(resource);
+        size += entry_size;
+    }
+    if !request.resources.is_empty() {
+        batches.push(request);
+    }
+    Ok(batches)
 }
 
 #[derive(Clone)]
@@ -362,9 +365,8 @@ impl LpgServer {
             },
         )
         .await?
-        .filter(|node| !node.deleting)
         .map(|node| node.labels)
-        .ok_or_else(|| Status::failed_precondition("edge endpoint is missing or being deleted"))
+        .ok_or_else(|| Status::failed_precondition("edge endpoint is missing"))
     }
 
     async fn prepare_record(
@@ -433,13 +435,7 @@ impl LpgServer {
 
     async fn put_locked(&self, graph: &str, record: &LpgRecord) -> Result<(), Status> {
         let key = validate_record(record)?;
-        if record.deleting {
-            return Err(Status::invalid_argument("deleting is reserved for DeleteNode"));
-        }
         if let Some(existing) = self.get_one(graph, key.clone()).await? {
-            if key.kind == LpgRecordKind::LpgNode as i32 && existing.deleting {
-                return Err(Status::failed_precondition("node is being deleted"));
-            }
             validate_immutable_types(&existing, record)?;
         }
         self.write_record(graph, record).await
@@ -465,9 +461,6 @@ impl LpgServer {
             .into_iter()
             .next()
             .ok_or_else(|| Status::not_found("record not found"))?;
-        if record.deleting {
-            return Err(Status::failed_precondition("node is being deleted"));
-        }
         apply_text_patch(&mut record, update.properties)?;
         if let Some(vectorset) = update.vectorset {
             record.vectorset = vectorset;
@@ -485,14 +478,14 @@ impl LpgServer {
             Some(lpg_operation::Operation::DeleteRecord(key)) => {
                 resource_id(graph, &key)?;
                 if key.kind == LpgRecordKind::LpgNode as i32 {
-                    self.delete_node_locked(graph, &key.id, false).await?;
+                    self.delete_node_locked(graph, &key.id).await?;
                 } else {
                     self.delete_one(graph, &key).await?;
                 }
                 Ok(None)
             }
             Some(lpg_operation::Operation::DeleteNode(deletion)) => {
-                self.delete_node_locked(graph, &deletion.id, deletion.detach).await?;
+                self.delete_node_locked(graph, &deletion.id).await?;
                 Ok(None)
             }
             Some(lpg_operation::Operation::PatchTextProperties(update)) => {
@@ -514,32 +507,19 @@ impl LpgServer {
         .map(Response::into_inner)
     }
 
-    async fn delete_node_locked(&self, graph: &str, id: &str, detach: bool) -> Result<(), Status> {
+    async fn delete_node_locked(&self, graph: &str, id: &str) -> Result<(), Status> {
         let key = LpgRecordKey {
             kind: LpgRecordKind::LpgNode as i32,
             id: id.into(),
         };
         resource_id(graph, &key)?;
-        let Some(mut node) = self.get_one(graph, key.clone()).await? else {
+        if self.get_one(graph, key.clone()).await?.is_none() {
             return Ok(());
-        };
-        if !node.deleting {
-            if !detach && !self.incident_edges(graph, id, 1).await?.records.is_empty() {
-                return Err(Status::failed_precondition("node has incident edges; detach required"));
-            }
-            node.deleting = true;
-            node.revision = Uuid::new_v4().simple().to_string();
-            self.write_record(graph, &node).await?;
         }
-        loop {
-            let edges = self.incident_edges(graph, id, 1000).await?.records;
-            if edges.is_empty() {
-                break;
-            }
-            for edge in edges {
-                let key = edge.key.ok_or_else(|| Status::data_loss("edge key missing"))?;
-                self.delete_one(graph, &key).await?;
-            }
+        if !self.incident_edges(graph, id, 1).await?.records.is_empty() {
+            return Err(Status::failed_precondition(
+                "node has incident edges; delete them first",
+            ));
         }
         self.delete_one(graph, &key).await
     }
@@ -562,16 +542,6 @@ fn check_index_status(status: OpStatus) -> Result<(), Status> {
         )));
     }
     Ok(())
-}
-
-fn resource_id(graph: &str, key: &LpgRecordKey) -> Result<String, Status> {
-    let kind = LpgRecordKind::try_from(key.kind).map_err(|_| Status::invalid_argument("invalid record kind"))?;
-    if kind == LpgRecordKind::Unspecified || key.id.is_empty() {
-        return Err(Status::invalid_argument("record kind and nonempty ID required"));
-    }
-    // Length prefix makes the kind and ID mapping unambiguous.
-    let name = format!("{graph}/{}:{}:{}", key.kind, key.id.len(), key.id);
-    Ok(Uuid::new_v5(&NAMESPACE, name.as_bytes()).simple().to_string())
 }
 
 fn validate_record(record: &LpgRecord) -> Result<&LpgRecordKey, Status> {
@@ -661,26 +631,45 @@ fn validate_immutable_types(existing: &LpgRecord, incoming: &LpgRecord) -> Resul
     Ok(())
 }
 
-fn bulk_order(records: &[LpgRecord]) -> Result<Vec<usize>, Status> {
+fn bulk_order(records: &[LpgRecord], endpoint_labels: &HashMap<String, LpgStringList>) -> Result<Vec<usize>, Status> {
     if records.is_empty() || records.len() > MAX_LPG_OPERATIONS {
         return Err(Status::invalid_argument(format!(
             "records must contain between 1 and {MAX_LPG_OPERATIONS} items"
         )));
     }
+    if endpoint_labels.len() > 2 * MAX_LPG_OPERATIONS {
+        return Err(Status::invalid_argument("too many bulk endpoint references"));
+    }
     let mut keys = HashSet::new();
     let mut nodes = HashSet::new();
+    for (id, labels) in endpoint_labels {
+        if id.is_empty()
+            || labels.values.is_empty()
+            || labels.values.iter().any(String::is_empty)
+            || labels.values.iter().collect::<HashSet<_>>().len() != labels.values.len()
+        {
+            return Err(Status::invalid_argument(
+                "bulk endpoint references require an ID and unique nonempty labels",
+            ));
+        }
+        nodes.insert(id.as_str());
+    }
     let mut order = Vec::with_capacity(records.len());
     for (index, record) in records.iter().enumerate() {
         let key = validate_record(record)?;
         resource_id("", key)?;
-        if record.deleting {
-            return Err(Status::invalid_argument("deleting is reserved for DeleteNode"));
-        }
         if !keys.insert((key.kind, key.id.clone())) {
             return Err(Status::invalid_argument("duplicate record key in bulk request"));
         }
         if key.kind == LpgRecordKind::LpgNode as i32 {
-            nodes.insert(key.id.clone());
+            if let Some(labels) = endpoint_labels.get(&key.id)
+                && labels.values.iter().collect::<HashSet<_>>() != record.labels.iter().collect::<HashSet<_>>()
+            {
+                return Err(Status::invalid_argument(
+                    "bulk endpoint labels disagree with node labels",
+                ));
+            }
+            nodes.insert(key.id.as_str());
             order.push(index);
         }
     }
@@ -688,9 +677,9 @@ fn bulk_order(records: &[LpgRecord]) -> Result<Vec<usize>, Status> {
         if record.key.as_ref().unwrap().kind == LpgRecordKind::LpgEdge as i32 {
             for id in [&record.source, &record.target] {
                 let id = id.as_ref().unwrap();
-                if !nodes.contains(id) {
+                if !nodes.contains(id.as_str()) {
                     return Err(Status::failed_precondition(
-                        "bulk edge endpoints must be nodes in this request",
+                        "bulk edge endpoints require a node or endpoint labels in this request",
                     ));
                 }
             }
@@ -698,11 +687,6 @@ fn bulk_order(records: &[LpgRecord]) -> Result<Vec<usize>, Status> {
         }
     }
     Ok(order)
-}
-
-fn property_path(name: &str) -> String {
-    let hex: String = name.as_bytes().iter().map(|b| format!("{b:02x}")).collect();
-    format!("p_{hex}")
 }
 
 fn indexed_properties(record: &LpgRecord) -> Result<serde_json::Value, Status> {
@@ -801,6 +785,7 @@ fn project(
             TextInformation {
                 text: encoded,
                 labels: vec![],
+                skip_tokenization: true,
             },
         )]),
         json_fields: HashMap::from([(
@@ -842,6 +827,7 @@ fn project(
             TextInformation {
                 text: property.chunks.join("\n"),
                 labels: vec![],
+                ..Default::default()
             },
         );
         let mut paragraphs = HashMap::new();
@@ -890,425 +876,6 @@ fn lpg_type_facet(position: &str, value: &str) -> String {
     format!("/lpg/type/{position}/{}", URL_SAFE_NO_PAD.encode(value.as_bytes()))
 }
 
-fn filter_expression(kind: i32, filters: &[LpgPropertyFilter]) -> Result<JsonFilterExpression, Status> {
-    use json_field_path_filter::{DateRangePredicate, FloatRangePredicate, IntegerRangePredicate, Predicate};
-    use json_filter_expression::{Expr, List};
-    use lpg_property_filter::Predicate as Filter;
-    let kind = LpgRecordKind::try_from(kind).map_err(|_| Status::invalid_argument("invalid record kind"))?;
-    let path = |json_path, predicate| JsonFilterExpression {
-        expr: Some(Expr::Path(JsonFieldPathFilter {
-            field_id: FIELD.into(),
-            json_path,
-            predicate: Some(predicate),
-        })),
-    };
-    let mut operands = Vec::new();
-    if kind != LpgRecordKind::Unspecified {
-        operands.push(path("kind".into(), Predicate::Int(kind as i64)));
-    }
-    for filter in filters {
-        let predicate = match filter.predicate.as_ref() {
-            Some(Filter::Text(v)) => Predicate::Text(v.clone()),
-            Some(Filter::Integer(v)) => Predicate::Int(*v),
-            Some(Filter::Float(v)) if v.is_finite() => Predicate::Float(*v),
-            Some(Filter::Boolean(v)) => Predicate::Boolean(*v),
-            Some(Filter::Datetime(v)) => Predicate::Date(date_timestamp(v)?),
-            Some(Filter::DateRange(v)) => {
-                let lower = v.lower.as_deref().map(date_timestamp).transpose()?;
-                let upper = v.upper.as_deref().map(date_timestamp).transpose()?;
-                if (lower.is_none() && upper.is_none())
-                    || matches!((&lower, &upper), (Some(a), Some(b))
-                        if (a.seconds, a.nanos) > (b.seconds, b.nanos))
-                {
-                    return Err(Status::invalid_argument("invalid date range filter"));
-                }
-                Predicate::DateRange(DateRangePredicate { lower, upper })
-            }
-            Some(Filter::IntegerRange(v))
-                if (v.lower.is_some() || v.upper.is_some())
-                    && !matches!((v.lower, v.upper), (Some(a), Some(b)) if a > b) =>
-            {
-                Predicate::IntRange(IntegerRangePredicate {
-                    lower: v.lower,
-                    upper: v.upper,
-                })
-            }
-            Some(Filter::FloatRange(v))
-                if (v.lower.is_some() || v.upper.is_some())
-                    && v.lower.is_none_or(f64::is_finite)
-                    && v.upper.is_none_or(f64::is_finite)
-                    && !matches!((v.lower, v.upper), (Some(a), Some(b)) if a > b) =>
-            {
-                Predicate::FloatRange(FloatRangePredicate {
-                    lower: v.lower,
-                    upper: v.upper,
-                })
-            }
-            _ => return Err(Status::invalid_argument("invalid property filter")),
-        };
-        operands.push(path(
-            format!("properties.{}", property_path(&filter.property)),
-            predicate,
-        ));
-    }
-    Ok(JsonFilterExpression {
-        expr: Some(Expr::BoolAnd(List { operands })),
-    })
-}
-
-fn find_filter(req: &FindRecordsRequest) -> Result<JsonFilterExpression, Status> {
-    use json_field_path_filter::Predicate;
-    use json_filter_expression::{Expr, List};
-    if req.kind == LpgRecordKind::Unspecified as i32 {
-        return Err(Status::invalid_argument("record kind required"));
-    }
-    let mut expression = filter_expression(req.kind, &req.filters)?;
-    let Some(Expr::BoolAnd(ref mut operands)) = expression.expr else {
-        return Err(Status::internal("invalid filter expression"));
-    };
-    let path = |name: &str, value: &str| JsonFilterExpression {
-        expr: Some(Expr::Path(JsonFieldPathFilter {
-            field_id: FIELD.into(),
-            json_path: name.into(),
-            predicate: Some(Predicate::Text(value.into())),
-        })),
-    };
-    for (name, value) in [
-        ("labels", &req.label),
-        ("source", &req.source),
-        ("target", &req.target),
-        ("edge_type", &req.edge_type),
-    ] {
-        if let Some(value) = value {
-            if value.is_empty() {
-                return Err(Status::invalid_argument("filter values must be nonempty"));
-            }
-            if name == "labels" && req.kind != LpgRecordKind::LpgNode as i32 {
-                return Err(Status::invalid_argument("label filters require node kind"));
-            }
-            if name != "labels" && req.kind != LpgRecordKind::LpgEdge as i32 {
-                return Err(Status::invalid_argument("endpoint and type filters require edge kind"));
-            }
-            operands.operands.push(path(name, value));
-        }
-    }
-    if let Some(node) = &req.incident_node {
-        if node.is_empty() || req.kind != LpgRecordKind::LpgEdge as i32 {
-            return Err(Status::invalid_argument(
-                "incident_node requires edge kind and a nonempty ID",
-            ));
-        }
-        operands.operands.push(JsonFilterExpression {
-            expr: Some(Expr::BoolOr(List {
-                operands: vec![path("source", node), path("target", node)],
-            })),
-        });
-    }
-    Ok(expression)
-}
-
-fn expand_filter(req: &ExpandRequest) -> Result<JsonFilterExpression, Status> {
-    use json_filter_expression::{Expr, List};
-    let direction =
-        LpgDirection::try_from(req.direction).map_err(|_| Status::invalid_argument("invalid expansion direction"))?;
-    if direction == LpgDirection::Unspecified {
-        return Err(Status::invalid_argument("expansion direction required"));
-    }
-    if req.node_ids.is_empty() || req.node_ids.len() > 1000 || req.node_ids.iter().any(String::is_empty) {
-        return Err(Status::invalid_argument("node_ids requires 1-1000 nonempty IDs"));
-    }
-    if req.edge_types.len() > 1000 || req.edge_types.iter().any(String::is_empty) {
-        return Err(Status::invalid_argument(
-            "edge_types requires at most 1000 nonempty types",
-        ));
-    }
-    if req.neighbor_label.as_ref().is_some_and(String::is_empty) {
-        return Err(Status::invalid_argument("neighbor_label must be nonempty"));
-    }
-    filter_expression(LpgRecordKind::LpgNode as i32, &req.neighbor_filters)?;
-    let mut expression = filter_expression(LpgRecordKind::LpgEdge as i32, &req.edge_filters)?;
-    let Some(Expr::BoolAnd(ref mut operands)) = expression.expr else {
-        return Err(Status::internal("invalid expansion filter"));
-    };
-    let text = |name: &str, value: &str| JsonFilterExpression {
-        expr: Some(Expr::Path(JsonFieldPathFilter {
-            field_id: FIELD.into(),
-            json_path: name.into(),
-            predicate: Some(json_field_path_filter::Predicate::Text(value.into())),
-        })),
-    };
-    let mut endpoints = Vec::new();
-    for id in req.node_ids.iter().collect::<HashSet<_>>() {
-        if matches!(direction, LpgDirection::LpgOutgoing | LpgDirection::LpgBoth) {
-            endpoints.push(text("source", id));
-        }
-        if matches!(direction, LpgDirection::LpgIncoming | LpgDirection::LpgBoth) {
-            endpoints.push(text("target", id));
-        }
-    }
-    operands.operands.push(JsonFilterExpression {
-        expr: Some(Expr::BoolOr(List { operands: endpoints })),
-    });
-    if !req.edge_types.is_empty() {
-        operands.operands.push(JsonFilterExpression {
-            expr: Some(Expr::BoolOr(List {
-                operands: req.edge_types.iter().map(|value| text("edge_type", value)).collect(),
-            })),
-        });
-    }
-    Ok(expression)
-}
-
-fn matches_property(record: &LpgRecord, filter: &LpgPropertyFilter) -> Result<bool, Status> {
-    use lpg_property::Value;
-    use lpg_property_filter::Predicate;
-    let value = record
-        .properties
-        .get(&filter.property)
-        .and_then(|property| property.value.as_ref());
-    Ok(match (value, filter.predicate.as_ref()) {
-        (Some(Value::Datetime(a)), Some(Predicate::Datetime(b))) => parse_datetime(a)? == parse_datetime(b)?,
-        (Some(Value::Datetime(a)), Some(Predicate::DateRange(b))) => {
-            let date = parse_datetime(a)?;
-            let lower = b.lower.as_deref().map(parse_datetime).transpose()?;
-            let upper = b.upper.as_deref().map(parse_datetime).transpose()?;
-            lower.is_none_or(|lower| date >= lower) && upper.is_none_or(|upper| date <= upper)
-        }
-        (Some(Value::Text(a)), Some(Predicate::Text(b))) => a == b,
-        (Some(Value::Strings(a)), Some(Predicate::Text(b))) => a.values.contains(b),
-        (Some(Value::Boolean(a)), Some(Predicate::Boolean(b))) => a == b,
-        (Some(Value::Integer(a)), Some(Predicate::Integer(b))) => a == b,
-        (Some(Value::Float(a)), Some(Predicate::Float(b))) => a == b,
-        (Some(Value::Integer(a)), Some(Predicate::IntegerRange(b))) => {
-            b.lower.is_none_or(|lower| *a >= lower) && b.upper.is_none_or(|upper| *a <= upper)
-        }
-        (Some(Value::Float(a)), Some(Predicate::FloatRange(b))) => {
-            b.lower.is_none_or(|lower| *a >= lower) && b.upper.is_none_or(|upper| *a <= upper)
-        }
-        _ => false,
-    })
-}
-
-fn matches_properties(record: &LpgRecord, filters: &[LpgPropertyFilter]) -> Result<bool, Status> {
-    for filter in filters {
-        if !matches_property(record, filter)? {
-            return Ok(false);
-        }
-    }
-    Ok(true)
-}
-
-struct BfsVisit {
-    parent: Option<(String, LpgRecord)>,
-    depth: u32,
-}
-
-fn validate_shortest_path(req: &ShortestPathRequest) -> Result<(), Status> {
-    if req.source.is_empty() || req.target.is_empty() {
-        return Err(Status::invalid_argument("source and target must be nonempty"));
-    }
-    LpgNodeFilterScope::try_from(req.node_filter_scope)
-        .map_err(|_| Status::invalid_argument("invalid node filter scope"))?;
-    // Validate even when equal endpoints or endpoint filters avoid expansion.
-    expand_filter(&ExpandRequest {
-        node_ids: vec![req.source.clone()],
-        direction: req.direction,
-        edge_types: req.edge_types.clone(),
-        edge_filters: req.edge_filters.clone(),
-        neighbor_label: req.node_label.clone(),
-        neighbor_filters: req.node_filters.clone(),
-        ..Default::default()
-    })?;
-    if req.max_hops > 64 || req.max_visited_nodes > 10000 || req.max_examined_edges > 100000 {
-        return Err(Status::invalid_argument(
-            "shortest path limits exceed supported maximums",
-        ));
-    }
-    Ok(())
-}
-
-struct BfsSide {
-    frontier: Vec<String>,
-    visits: HashMap<String, BfsVisit>,
-    depth: u32,
-}
-
-impl BfsSide {
-    fn new(root: &str) -> Self {
-        Self {
-            frontier: vec![root.into()],
-            visits: HashMap::from([(root.into(), BfsVisit { parent: None, depth: 0 })]),
-            depth: 0,
-        }
-    }
-
-    fn path_to_root(&self, node: &str) -> (Vec<String>, Vec<LpgRecord>) {
-        let mut ids = vec![node.to_owned()];
-        let mut edges = Vec::new();
-        let mut current = node;
-        while let Some((parent, edge)) = &self.visits[current].parent {
-            ids.push(parent.clone());
-            edges.push(edge.clone());
-            current = parent;
-        }
-        (ids, edges)
-    }
-}
-
-fn shortest_path_response(
-    meeting: &str,
-    forward: &BfsSide,
-    backward: &BfsSide,
-    nodes: &HashMap<String, LpgRecord>,
-    examined_edges: u32,
-) -> Result<ShortestPathResponse, Status> {
-    let (mut ids, mut edges) = forward.path_to_root(meeting);
-    ids.reverse();
-    edges.reverse();
-    let (tail_ids, tail_edges) = backward.path_to_root(meeting);
-    ids.extend(tail_ids.into_iter().skip(1));
-    edges.extend(tail_edges);
-    let response = ShortestPathResponse {
-        found: true,
-        nodes: ids.into_iter().map(|id| nodes[&id].clone()).collect(),
-        edges,
-        examined_edges,
-    };
-    if response.encoded_len() > MAX_EXPAND_RESPONSE_BYTES {
-        return Err(Status::resource_exhausted("shortest path response byte limit exceeded"));
-    }
-    Ok(response)
-}
-
-async fn bidirectional_bfs<F, Fut>(
-    req: &ShortestPathRequest,
-    mut nodes: HashMap<String, LpgRecord>,
-    mut expand: F,
-) -> Result<ShortestPathResponse, Status>
-where
-    F: FnMut(ExpandRequest) -> Fut,
-    Fut: std::future::Future<Output = Result<ExpandResponse, Status>>,
-{
-    let scope = LpgNodeFilterScope::try_from(req.node_filter_scope).unwrap();
-    let direction = LpgDirection::try_from(req.direction).unwrap();
-    let reverse = match direction {
-        LpgDirection::LpgOutgoing => LpgDirection::LpgIncoming,
-        LpgDirection::LpgIncoming => LpgDirection::LpgOutgoing,
-        _ => LpgDirection::LpgBoth,
-    };
-    let max_hops = if req.max_hops == 0 { 6 } else { req.max_hops };
-    let max_visited = if req.max_visited_nodes == 0 {
-        1000
-    } else {
-        req.max_visited_nodes
-    };
-    let max_examined = if req.max_examined_edges == 0 {
-        10000
-    } else {
-        req.max_examined_edges
-    };
-    let template = ExpandRequest {
-        graph_id: req.graph_id.clone(),
-        direction: req.direction,
-        edge_types: req.edge_types.clone(),
-        edge_filters: req.edge_filters.clone(),
-        ..Default::default()
-    };
-    let matches_node = |node: &LpgRecord| -> Result<bool, Status> {
-        Ok(req.node_label.as_ref().is_none_or(|label| node.labels.contains(label))
-            && matches_properties(node, &req.node_filters)?)
-    };
-    if scope == LpgNodeFilterScope::LpgAllNodes {
-        for node in nodes.values() {
-            if !matches_node(node)? {
-                return Ok(ShortestPathResponse::default());
-            }
-        }
-    }
-    let mut forward = BfsSide::new(&req.source);
-    let mut backward = BfsSide::new(&req.target);
-    if req.source == req.target {
-        return shortest_path_response(&req.source, &forward, &backward, &nodes, 0);
-    }
-    if max_visited < 2 {
-        return Err(Status::resource_exhausted("shortest path visited node limit exceeded"));
-    }
-    let mut state_bytes: usize = nodes.values().map(|node| node.encoded_len()).sum();
-    let mut examined_edges = 0;
-    while !forward.frontier.is_empty() && !backward.frontier.is_empty() && forward.depth + backward.depth < max_hops {
-        let from_source = forward.frontier.len() <= backward.frontier.len();
-        let (active, other) = if from_source {
-            (&mut forward, &backward)
-        } else {
-            (&mut backward, &forward)
-        };
-        let frontier = std::mem::take(&mut active.frontier);
-        let mut meeting: Option<(u32, String)> = None;
-        // Finish a full level, including every batch, before selecting a meeting.
-        for batch in frontier.chunks(128) {
-            if examined_edges == max_examined {
-                return Err(Status::resource_exhausted("shortest path examined edge limit exceeded"));
-            }
-            let expansion = expand(ExpandRequest {
-                node_ids: batch.to_vec(),
-                direction: if from_source { direction } else { reverse } as i32,
-                candidate_limit: (max_examined - examined_edges).min(10000),
-                max_results: 10000,
-                ..template.clone()
-            })
-            .await?;
-            examined_edges += expansion.examined_edges;
-            for binding in expansion.matches {
-                let neighbor = &expansion.neighbors[binding.neighbor_index as usize];
-                let id = &neighbor.key.as_ref().unwrap().id;
-                if active.visits.contains_key(id) {
-                    continue;
-                }
-                let exempt =
-                    scope == LpgNodeFilterScope::LpgIntermediateNodes && (id == &req.source || id == &req.target);
-                if !exempt && !matches_node(neighbor)? {
-                    continue;
-                }
-                if active.visits.len() + other.visits.len() == max_visited as usize {
-                    return Err(Status::resource_exhausted("shortest path visited node limit exceeded"));
-                }
-                let edge = &expansion.edges[binding.edge_index as usize];
-                state_bytes += edge.encoded_len();
-                if !nodes.contains_key(id) {
-                    state_bytes += neighbor.encoded_len();
-                }
-                if state_bytes > MAX_SHORTEST_PATH_STATE_BYTES {
-                    return Err(Status::resource_exhausted("shortest path state byte limit exceeded"));
-                }
-                nodes.entry(id.clone()).or_insert_with(|| neighbor.clone());
-                let depth = active.depth + 1;
-                active.visits.insert(
-                    id.clone(),
-                    BfsVisit {
-                        parent: Some((binding.node_id, edge.clone())),
-                        depth,
-                    },
-                );
-                active.frontier.push(id.clone());
-                if let Some(visit) = other.visits.get(id) {
-                    let distance = depth + visit.depth;
-                    if meeting.as_ref().is_none_or(|(best, _)| distance < *best) {
-                        meeting = Some((distance, id.clone()));
-                    }
-                }
-            }
-        }
-        active.depth += 1;
-        if let Some((_, id)) = meeting {
-            return shortest_path_response(&id, &forward, &backward, &nodes, examined_edges);
-        }
-    }
-    Ok(ShortestPathResponse {
-        examined_edges,
-        ..Default::default()
-    })
-}
-
 fn apply_text_patch(record: &mut LpgRecord, patches: HashMap<String, LpgTextPropertyPatch>) -> Result<(), Status> {
     if patches.is_empty() {
         return Err(Status::invalid_argument("text property patch required"));
@@ -1350,38 +917,6 @@ fn apply_text_patch(record: &mut LpgRecord, patches: HashMap<String, LpgTextProp
     Ok(())
 }
 
-#[derive(Default)]
-struct ChunkCandidate {
-    rid: String,
-    field: String,
-    start: usize,
-    end: usize,
-    text_rank: Option<u32>,
-    vector_rank: Option<u32>,
-}
-
-fn chunk_candidate(id: &str) -> Result<ChunkCandidate, Status> {
-    let parts: Vec<_> = id.split('/').collect();
-    if parts.len() != 4 || parts[1] != "t" || !parts[2].starts_with("p_") {
-        return Err(Status::data_loss("invalid chunk ID"));
-    }
-    let (start, end) = parts[3]
-        .split_once('-')
-        .ok_or_else(|| Status::data_loss("invalid chunk ID"))?;
-    let start = start.parse().map_err(|_| Status::data_loss("invalid chunk offset"))?;
-    let end = end.parse().map_err(|_| Status::data_loss("invalid chunk offset"))?;
-    if start >= end {
-        return Err(Status::data_loss("invalid chunk offset"));
-    }
-    Ok(ChunkCandidate {
-        rid: parts[0].into(),
-        field: format!("{}/{}", parts[1], parts[2]),
-        start,
-        end,
-        ..Default::default()
-    })
-}
-
 #[tonic::async_trait]
 impl NidxLpg for LpgServer {
     async fn bulk_load(&self, request: Request<BulkLoadRequest>) -> Result<Response<LpgOperationResponse>, Status> {
@@ -1389,44 +924,35 @@ impl NidxLpg for LpgServer {
         let graph = self.graph(&req.graph_id).await?;
         let lock = self.graph_lock(&graph).await;
         let _guard = lock.lock().await;
-        let order = bulk_order(&req.records)?;
-        let node_labels = req
-            .records
-            .iter()
-            .filter_map(|record| {
-                let key = record.key.as_ref()?;
-                (key.kind == LpgRecordKind::LpgNode as i32).then(|| (key.id.clone(), record.labels.clone()))
-            })
+        let order = bulk_order(&req.records, &req.endpoint_labels)?;
+        let mut node_labels = req
+            .endpoint_labels
+            .into_iter()
+            .map(|(id, labels)| (id, labels.values))
             .collect::<HashMap<_, _>>();
+        node_labels.extend(req.records.iter().filter_map(|record| {
+            let key = record.key.as_ref()?;
+            (key.kind == LpgRecordKind::LpgNode as i32).then(|| (key.id.clone(), record.labels.clone()))
+        }));
         let mut prepared = Vec::with_capacity(req.records.len());
         for record in &req.records {
-            let key = record.key.as_ref().unwrap();
-            if let Some(existing) = self.get_one(&graph, key.clone()).await? {
-                validate_immutable_types(&existing, record)?;
-            }
-            prepared.push(prepared_upsert(
-                self.prepare_record(&graph, record, Some(&node_labels)).await?,
-            )?);
+            prepared.push(self.prepare_record(&graph, record, Some(&node_labels)).await?);
         }
-        let prepared: Vec<_> = order.into_iter().map(|index| prepared[index].clone()).collect();
+        let resources = order
+            .into_iter()
+            .map(|index| {
+                prepared[index]
+                    .resource
+                    .take()
+                    .ok_or_else(|| Status::internal("missing prepared resource"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let batches = index_batches(&graph, resources)?;
         let client = NidxIndexerClient::new(endpoint(&self.endpoints()?.indexer_address)?.connect_lazy());
-        submit_then_wait(
-            &prepared,
-            Duration::from_secs(30),
-            |item| {
-                let mut client = client.clone();
-                async move { check_index_status(client.index_resource(item.request).await?.into_inner()) }
-            },
-            |item| {
-                let server = self.clone();
-                let graph = graph.clone();
-                async move {
-                    server
-                        .wait_visible(&graph, &item.rid, Some((&item.record, &item.fence)))
-                        .await
-                }
-            },
-        )
+        submit_all(&batches, |batch| {
+            let mut client = client.clone();
+            async move { check_index_status(client.index_resources(batch).await?.into_inner()) }
+        })
         .await
         .map_err(|error| {
             Status::new(
@@ -1451,200 +977,21 @@ impl NidxLpg for LpgServer {
         &self,
         request: Request<SearchChunksRequest>,
     ) -> Result<Response<SearchChunksResponse>, Status> {
-        let req = request.into_inner();
-        if req.text.as_ref().is_some_and(|text| text.trim().is_empty()) || (req.text.is_none() && req.vector.is_empty())
-        {
-            return Err(Status::invalid_argument("nonempty text or vector required"));
-        }
-        if !req.vector.is_empty() && (req.vector.iter().any(|v| !v.is_finite()) || req.vector.iter().all(|v| *v == 0.0))
-        {
-            return Err(Status::invalid_argument("vector must be finite and nonzero"));
-        }
-        if req.kind == Some(LpgRecordKind::Unspecified as i32) {
-            return Err(Status::invalid_argument("invalid record kind"));
-        }
-        let limit = if req.candidate_limit == 0 {
-            1000
-        } else {
-            req.candidate_limit
-        };
-        if limit > 10000 || req.top_k == 0 || req.top_k > limit {
-            return Err(Status::invalid_argument("invalid top_k or candidate_limit"));
-        }
-        let rrf_k = if req.rrf_k == 0 { 60 } else { req.rrf_k };
-        let filter = if req.kind.is_some() || !req.filters.is_empty() {
-            Some(filter_expression(req.kind.unwrap_or_default(), &req.filters)?)
-        } else {
-            None
-        };
+        let mut req = request.into_inner();
+        validate_search(&req)?;
         let graph = self.graph(&req.graph_id).await?;
-        let vectorset = if req.vector.is_empty() {
-            String::new()
-        } else {
+        if !req.vector.is_empty() {
             let (name, dimension) = self.vector_configuration(&graph, &req.vectorset).await?;
             if req.vector.len() != dimension {
                 return Err(Status::invalid_argument(format!(
                     "vector must have {dimension} dimensions"
                 )));
             }
-            name
-        };
-        let field_filter = req.property.as_ref().map(|property| FilterExpression {
-            expr: Some(filter_expression::Expr::Field(filter_expression::FieldFilter {
-                field_type: "t".into(),
-                field_id: Some(property_path(property)),
-            })),
-        });
+            req.vectorset = name;
+        }
+        req.graph_id = graph;
         let mut client = NidxSearcherClient::new(endpoint(&self.endpoints()?.searcher_address)?.connect_lazy());
-        let response = client
-            .search(SearchRequest {
-                shard_ids: vec![graph.clone()],
-                body: req.text.clone().unwrap_or_default(),
-                paragraph: req.text.is_some(),
-                vector: req.vector.clone(),
-                vectorset,
-                result_per_page: (limit + 1) as i32,
-                with_duplicates: true,
-                json_filter: filter,
-                field_filter,
-                ..Default::default()
-            })
-            .await?
-            .into_inner();
-        if response.shard_ids != [graph.clone()] {
-            return Err(Status::unavailable("incomplete shard search"));
-        }
-        let mut candidates: HashMap<String, ChunkCandidate> = HashMap::new();
-        if let Some(paragraphs) = response.paragraph {
-            if paragraphs.next_page {
-                return Err(Status::resource_exhausted("text candidate limit exceeded"));
-            }
-            let mut rank = 0u32;
-            for hit in paragraphs.results {
-                let field = hit.field.trim_matches('/');
-                if !field.starts_with("t/p_") {
-                    continue;
-                }
-                rank += 1;
-                if rank > limit {
-                    return Err(Status::resource_exhausted("text candidate limit exceeded"));
-                }
-                let id = format!("{}/{field}/{}-{}", hit.uuid, hit.start, hit.end);
-                let mut candidate = chunk_candidate(&id)?;
-                candidate.text_rank = Some(rank);
-                candidates.insert(id, candidate);
-            }
-        }
-        if let Some(vectors) = response.vector {
-            if vectors.documents.len() > limit as usize {
-                return Err(Status::resource_exhausted("vector candidate limit exceeded"));
-            }
-            for (index, hit) in vectors.documents.into_iter().enumerate() {
-                let id = hit.doc_id.ok_or_else(|| Status::data_loss("missing vector ID"))?.id;
-                if !candidates.contains_key(&id) {
-                    candidates.insert(id.clone(), chunk_candidate(&id)?);
-                }
-                candidates.get_mut(&id).unwrap().vector_rank = Some(index as u32 + 1);
-            }
-        }
-        if candidates.is_empty() {
-            return Ok(Response::new(SearchChunksResponse::default()));
-        }
-        let ids: std::collections::HashSet<_> = candidates.values().map(|c| c.rid.clone()).collect();
-        let texts = client
-            .extracted_texts(ExtractedTextsRequest {
-                shard_id: graph.clone(),
-                field_ids: ids
-                    .iter()
-                    .map(|rid| extracted_texts_request::FieldId {
-                        rid: rid.clone(),
-                        field_type: "a".into(),
-                        field_name: "lpg_record_v1".into(),
-                        split: None,
-                    })
-                    .collect(),
-                paragraph_ids: vec![],
-            })
-            .await?
-            .into_inner();
-        let mut records = HashMap::new();
-        for rid in ids {
-            let value = texts
-                .fields
-                .get(&format!("{rid}/{FIELD}"))
-                .filter(|v| !v.is_empty())
-                .ok_or_else(|| Status::unavailable("search candidate disappeared"))?;
-            let bytes = STANDARD
-                .decode(value)
-                .map_err(|_| Status::data_loss("invalid LPG envelope"))?;
-            let record = LpgRecord::decode(bytes.as_slice()).map_err(|_| Status::data_loss("invalid LPG record"))?;
-            let key = record
-                .key
-                .as_ref()
-                .ok_or_else(|| Status::data_loss("record key missing"))?;
-            if resource_id(&graph, key).map_err(|_| Status::data_loss("invalid record key"))? != rid
-                || req.kind.is_some_and(|kind| key.kind != kind)
-            {
-                return Err(Status::data_loss("search candidate identity mismatch"));
-            }
-            records.insert(rid, record);
-        }
-        let mut hits = Vec::new();
-        for candidate in candidates.into_values() {
-            let record = &records[&candidate.rid];
-            let mut matched = None;
-            for (name, property) in &record.text_properties {
-                if format!("t/{}", property_path(name)) != candidate.field {
-                    continue;
-                }
-                let mut start = 0usize;
-                for (index, chunk) in property.chunks.iter().enumerate() {
-                    let end = start + chunk.chars().count();
-                    if start == candidate.start && end == candidate.end {
-                        matched = Some((name.clone(), index as u32, chunk.clone()));
-                        break;
-                    }
-                    start = end + 1;
-                }
-            }
-            let (property, chunk_index, text) = matched.ok_or_else(|| Status::unavailable("stale search candidate"))?;
-            if req.property.as_ref().is_some_and(|requested| requested != &property) {
-                return Err(Status::data_loss("search returned unexpected property"));
-            }
-            let score = candidate
-                .text_rank
-                .map_or(0.0, |rank| 1.0 / (rrf_k as f64 + rank as f64))
-                + candidate
-                    .vector_rank
-                    .map_or(0.0, |rank| 1.0 / (rrf_k as f64 + rank as f64));
-            hits.push(LpgChunkHit {
-                record: Some(record.clone()),
-                property,
-                chunk_index,
-                text,
-                score,
-                text_rank: candidate.text_rank,
-                vector_rank: candidate.vector_rank,
-            });
-        }
-        hits.sort_by(|a, b| {
-            b.score
-                .total_cmp(&a.score)
-                .then_with(|| {
-                    a.record
-                        .as_ref()
-                        .unwrap()
-                        .key
-                        .as_ref()
-                        .unwrap()
-                        .id
-                        .cmp(&b.record.as_ref().unwrap().key.as_ref().unwrap().id)
-                })
-                .then_with(|| a.property.cmp(&b.property))
-                .then_with(|| a.chunk_index.cmp(&b.chunk_index))
-        });
-        hits.truncate(req.top_k as usize);
-        Ok(Response::new(SearchChunksResponse { hits }))
+        client.lpg_search_chunks(req).await
     }
 
     async fn find_records(
@@ -1652,173 +999,23 @@ impl NidxLpg for LpgServer {
         request: Request<FindRecordsRequest>,
     ) -> Result<Response<FindRecordsResponse>, Status> {
         let req = request.into_inner();
-        let filter = find_filter(&req)?;
+        find_filter(&req)?;
         if !(1..=1000).contains(&req.page_size) {
             return Err(Status::invalid_argument("page_size must be between 1 and 1000"));
         }
-        Ok(Response::new(self.find_page(req, filter).await?))
+        let graph = self.graph(&req.graph_id).await?;
+        let mut client = NidxSearcherClient::new(endpoint(&self.endpoints()?.searcher_address)?.connect_lazy());
+        client
+            .lpg_find_records(FindRecordsRequest { graph_id: graph, ..req })
+            .await
     }
 
     async fn expand(&self, request: Request<ExpandRequest>) -> Result<Response<ExpandResponse>, Status> {
         let req = request.into_inner();
-        let filter = expand_filter(&req)?;
-        let candidate_limit = if req.candidate_limit == 0 {
-            1000
-        } else {
-            req.candidate_limit
-        };
-        let max_results = if req.max_results == 0 { 1000 } else { req.max_results };
-        if candidate_limit > 10000 || max_results > 10000 {
-            return Err(Status::invalid_argument("expansion limits must not exceed 10000"));
-        }
+        expand_filter(&req)?;
         let graph = self.graph(&req.graph_id).await?;
-        let starts: HashSet<_> = req.node_ids.iter().cloned().collect();
-        let start_keys = starts
-            .iter()
-            .map(|id| LpgRecordKey {
-                kind: LpgRecordKind::LpgNode as i32,
-                id: id.clone(),
-            })
-            .collect();
-        let mut nodes: HashMap<_, _> = self
-            .get_records(Request::new(GetRecordsRequest {
-                graph_id: graph.clone(),
-                keys: start_keys,
-            }))
-            .await?
-            .into_inner()
-            .records
-            .into_iter()
-            .map(|record| (record.key.as_ref().unwrap().id.clone(), record))
-            .collect();
-        if nodes.len() != starts.len() {
-            return Err(Status::not_found("expansion starting node not found"));
-        }
-        if nodes.values().any(|node| node.deleting) {
-            return Err(Status::failed_precondition("expansion starting node is being deleted"));
-        }
-        let candidates = self
-            .find_page(
-                FindRecordsRequest {
-                    graph_id: graph.clone(),
-                    kind: LpgRecordKind::LpgEdge as i32,
-                    page_size: candidate_limit + 1,
-                    ..Default::default()
-                },
-                filter,
-            )
-            .await?;
-        if !candidates.next_page_token.is_empty() || candidates.records.len() > candidate_limit as usize {
-            return Err(Status::resource_exhausted("expansion candidate limit exceeded"));
-        }
-        let direction = LpgDirection::try_from(req.direction).unwrap();
-        let mut bindings = Vec::new();
-        let mut neighbors = HashSet::new();
-        for (index, edge) in candidates.records.iter().enumerate() {
-            let source = edge
-                .source
-                .as_ref()
-                .ok_or_else(|| Status::data_loss("edge source missing"))?;
-            let target = edge
-                .target
-                .as_ref()
-                .ok_or_else(|| Status::data_loss("edge target missing"))?;
-            let outgoing =
-                matches!(direction, LpgDirection::LpgOutgoing | LpgDirection::LpgBoth) && starts.contains(source);
-            let incoming =
-                matches!(direction, LpgDirection::LpgIncoming | LpgDirection::LpgBoth) && starts.contains(target);
-            if outgoing {
-                bindings.push((source.clone(), index, target.clone()));
-                neighbors.insert(target.clone());
-            }
-            if incoming && !(outgoing && source == target) {
-                bindings.push((target.clone(), index, source.clone()));
-                neighbors.insert(source.clone());
-            }
-            if !outgoing && !incoming {
-                return Err(Status::data_loss("expansion returned an unrelated edge"));
-            }
-        }
-        let keys: Vec<_> = neighbors
-            .iter()
-            .filter(|id| !nodes.contains_key(*id))
-            .map(|id| LpgRecordKey {
-                kind: LpgRecordKind::LpgNode as i32,
-                id: id.clone(),
-            })
-            .collect();
-        for chunk in keys.chunks(128) {
-            let response = self
-                .get_records(Request::new(GetRecordsRequest {
-                    graph_id: graph.clone(),
-                    keys: chunk.to_vec(),
-                }))
-                .await?
-                .into_inner();
-            if response.records.len() != chunk.len() {
-                return Err(Status::unavailable("expansion neighbor disappeared"));
-            }
-            for record in response.records {
-                nodes.insert(record.key.as_ref().unwrap().id.clone(), record);
-            }
-        }
-        if neighbors.iter().any(|id| nodes[id].deleting) {
-            return Err(Status::unavailable("expansion neighbor is being deleted"));
-        }
-        let mut response = ExpandResponse {
-            examined_edges: candidates.records.len() as u32,
-            ..Default::default()
-        };
-        let mut edge_indexes = HashMap::new();
-        let mut neighbor_indexes = HashMap::new();
-        // All response tables use a one-byte field tag and a varint message length.
-        let entry_len = |len: usize| {
-            let mut length_bytes = 1;
-            let mut remaining = len;
-            while remaining >= 128 {
-                length_bytes += 1;
-                remaining >>= 7;
-            }
-            1 + length_bytes + len
-        };
-        let mut response_bytes = response.encoded_len();
-        for (node_id, index, neighbor_id) in bindings {
-            let neighbor = &nodes[&neighbor_id];
-            if req
-                .neighbor_label
-                .as_ref()
-                .is_some_and(|label| !neighbor.labels.contains(label))
-                || !matches_properties(neighbor, &req.neighbor_filters)?
-            {
-                continue;
-            }
-            if response.matches.len() == max_results as usize {
-                return Err(Status::resource_exhausted("expansion result limit exceeded"));
-            }
-            let edge_index = *edge_indexes.entry(index).or_insert_with(|| {
-                let i = response.edges.len() as u32;
-                response_bytes += entry_len(candidates.records[index].encoded_len());
-                response.edges.push(candidates.records[index].clone());
-                i
-            });
-            let neighbor_index = *neighbor_indexes.entry(neighbor_id).or_insert_with(|| {
-                let i = response.neighbors.len() as u32;
-                response_bytes += entry_len(neighbor.encoded_len());
-                response.neighbors.push(neighbor.clone());
-                i
-            });
-            let binding = ExpandMatch {
-                node_id,
-                edge_index,
-                neighbor_index,
-            };
-            response_bytes += entry_len(binding.encoded_len());
-            if response_bytes > MAX_EXPAND_RESPONSE_BYTES {
-                return Err(Status::resource_exhausted("expansion response byte limit exceeded"));
-            }
-            response.matches.push(binding);
-        }
-        Ok(Response::new(response))
+        let mut client = NidxSearcherClient::new(endpoint(&self.endpoints()?.searcher_address)?.connect_lazy());
+        client.lpg_expand(ExpandRequest { graph_id: graph, ..req }).await
     }
 
     async fn shortest_path(
@@ -1828,35 +1025,10 @@ impl NidxLpg for LpgServer {
         let req = request.into_inner();
         validate_shortest_path(&req)?;
         let graph = self.graph(&req.graph_id).await?;
-        let endpoint_ids: HashSet<_> = [&req.source, &req.target].into_iter().cloned().collect();
-        let nodes: HashMap<_, _> = self
-            .get_records(Request::new(GetRecordsRequest {
-                graph_id: graph,
-                keys: endpoint_ids
-                    .iter()
-                    .map(|id| LpgRecordKey {
-                        kind: LpgRecordKind::LpgNode as i32,
-                        id: id.clone(),
-                    })
-                    .collect(),
-            }))
-            .await?
-            .into_inner()
-            .records
-            .into_iter()
-            .map(|node| (node.key.as_ref().unwrap().id.clone(), node))
-            .collect();
-        if nodes.len() != endpoint_ids.len() {
-            return Err(Status::not_found("shortest path endpoint not found"));
-        }
-        if nodes.values().any(|node| node.deleting) {
-            return Err(Status::failed_precondition("shortest path endpoint is being deleted"));
-        }
-        let result = bidirectional_bfs(&req, nodes, |expansion| async {
-            Ok(self.expand(Request::new(expansion)).await?.into_inner())
-        })
-        .await?;
-        Ok(Response::new(result))
+        let mut client = NidxSearcherClient::new(endpoint(&self.endpoints()?.searcher_address)?.connect_lazy());
+        client
+            .lpg_shortest_path(ShortestPathRequest { graph_id: graph, ..req })
+            .await
     }
 
     async fn lpg_operation(
@@ -1905,326 +1077,45 @@ impl NidxLpg for LpgServer {
     async fn get_records(&self, request: Request<GetRecordsRequest>) -> Result<Response<GetRecordsResponse>, Status> {
         let req = request.into_inner();
         let graph = self.graph(&req.graph_id).await?;
-        let ids = req
-            .keys
-            .iter()
-            .map(|key| resource_id(&graph, key))
-            .collect::<Result<Vec<_>, _>>()?;
+        for key in &req.keys {
+            resource_id(&graph, key)?;
+        }
         let mut client = NidxSearcherClient::new(endpoint(&self.endpoints()?.searcher_address)?.connect_lazy());
-        let fields = ids
-            .iter()
-            .map(|rid| extracted_texts_request::FieldId {
-                rid: rid.clone(),
-                field_type: "a".into(),
-                field_name: "lpg_record_v1".into(),
-                split: None,
+        client
+            .lpg_get_records(GetRecordsRequest {
+                graph_id: graph,
+                keys: req.keys,
             })
-            .collect();
-        let response = client
-            .extracted_texts(ExtractedTextsRequest {
-                shard_id: graph,
-                field_ids: fields,
-                paragraph_ids: vec![],
-            })
-            .await?
-            .into_inner();
-        let mut records = Vec::new();
-        for (rid, key) in ids.iter().zip(&req.keys) {
-            if let Some(value) = response.fields.get(&format!("{rid}/{FIELD}")).filter(|v| !v.is_empty()) {
-                let bytes = STANDARD
-                    .decode(value)
-                    .map_err(|_| Status::data_loss("invalid LPG envelope"))?;
-                let record =
-                    LpgRecord::decode(bytes.as_slice()).map_err(|_| Status::data_loss("invalid LPG record"))?;
-                if record.key.as_ref() != Some(key) {
-                    return Err(Status::data_loss("LPG record key mismatch"));
-                }
-
-                records.push(record);
-            }
-        }
-        Ok(Response::new(GetRecordsResponse { records }))
-    }
-}
-
-impl LpgServer {
-    async fn find_page(
-        &self,
-        req: FindRecordsRequest,
-        filter: JsonFilterExpression,
-    ) -> Result<FindRecordsResponse, Status> {
-        let cursor = if req.page_token.is_empty() {
-            None
-        } else {
-            let bytes = STANDARD
-                .decode(&req.page_token)
-                .map_err(|_| Status::invalid_argument("invalid page token"))?;
-            let cursor =
-                SearchAfter::decode(bytes.as_slice()).map_err(|_| Status::invalid_argument("invalid page token"))?;
-            if !cursor.score.is_finite() {
-                return Err(Status::invalid_argument("invalid page token"));
-            }
-            Some(cursor)
-        };
-        let graph = self.graph(&req.graph_id).await?;
-        let mut client = NidxSearcherClient::new(endpoint(&self.endpoints()?.searcher_address)?.connect_lazy());
-        let response = client
-            .search(SearchRequest {
-                shard_ids: vec![graph.clone()],
-                paragraph: true,
-                result_per_page: req.page_size as i32,
-                json_filter: Some(filter),
-                field_filter: Some(FilterExpression {
-                    expr: Some(filter_expression::Expr::Field(filter_expression::FieldFilter {
-                        field_type: "a".into(),
-                        field_id: Some("lpg_record_v1".into()),
-                    })),
-                }),
-                search_after: cursor,
-                ..Default::default()
-            })
-            .await?
-            .into_inner();
-        if response.shard_ids != [graph.clone()] {
-            return Err(Status::unavailable("incomplete shard search"));
-        }
-        let Some(paragraphs) = response.paragraph else {
-            return Ok(FindRecordsResponse::default());
-        };
-        let mut next_page_token = String::new();
-        if paragraphs.next_page {
-            let last = paragraphs
-                .results
-                .last()
-                .ok_or_else(|| Status::data_loss("missing pagination result"))?;
-            let Some(paragraph_result::SortValue::Score(score)) = &last.sort_value else {
-                return Err(Status::data_loss("missing pagination score"));
-            };
-            next_page_token = STANDARD.encode(
-                SearchAfter {
-                    score: score.bm25,
-                    shard_id: last.shard_id.clone(),
-                    docaddr: score.docaddr,
-                }
-                .encode_to_vec(),
-            );
-        }
-        let fields = paragraphs
-            .results
-            .iter()
-            .map(|hit| extracted_texts_request::FieldId {
-                rid: hit.uuid.clone(),
-                field_type: "a".into(),
-                field_name: "lpg_record_v1".into(),
-                split: None,
-            })
-            .collect();
-        let texts = client
-            .extracted_texts(ExtractedTextsRequest {
-                shard_id: graph.clone(),
-                field_ids: fields,
-                paragraph_ids: vec![],
-            })
-            .await?
-            .into_inner();
-        let mut records = Vec::with_capacity(paragraphs.results.len());
-        for hit in paragraphs.results {
-            let value = texts
-                .fields
-                .get(&format!("{}/{FIELD}", hit.uuid))
-                .filter(|value| !value.is_empty())
-                .ok_or_else(|| Status::unavailable("record disappeared during search"))?;
-            let bytes = STANDARD
-                .decode(value)
-                .map_err(|_| Status::data_loss("invalid LPG envelope"))?;
-            let record = LpgRecord::decode(bytes.as_slice()).map_err(|_| Status::data_loss("invalid LPG record"))?;
-            let key = record
-                .key
-                .as_ref()
-                .ok_or_else(|| Status::data_loss("record key missing"))?;
-            if key.kind != req.kind
-                || resource_id(&graph, key).map_err(|_| Status::data_loss("invalid record key"))? != hit.uuid
-            {
-                return Err(Status::data_loss("LPG record identity mismatch"));
-            }
-            records.push(record);
-        }
-        Ok(FindRecordsResponse {
-            records,
-            next_page_token,
-        })
+            .await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lpg::{date_timestamp, filter_expression, matches_property};
 
     #[tokio::test]
-    async fn shortest_path_finishes_batched_bidirectional_levels() {
-        let node = |id: String| LpgRecord {
-            key: Some(LpgRecordKey {
-                kind: LpgRecordKind::LpgNode as i32,
-                id,
-            }),
-            labels: vec!["Node".into()],
-            ..Default::default()
-        };
-        let mut nodes = HashMap::from([
-            ("start".into(), node("start".into())),
-            ("end".into(), node("end".into())),
-        ]);
-        let mut edges = Vec::new();
-        for index in 0..129 {
-            let left = format!("left-{index}");
-            let right = format!("right-{index}");
-            nodes.insert(left.clone(), node(left.clone()));
-            nodes.insert(right.clone(), node(right.clone()));
-            for (hop, (source, target)) in [
-                ("start".to_owned(), left.clone()),
-                (left, right.clone()),
-                (right, "end".to_owned()),
-            ]
-            .into_iter()
-            .enumerate()
-            {
-                edges.push(LpgRecord {
-                    key: Some(LpgRecordKey {
-                        kind: LpgRecordKind::LpgEdge as i32,
-                        id: format!("{index}-{hop}"),
-                    }),
-                    source: Some(source),
-                    target: Some(target),
-                    edge_type: Some("LINK".into()),
-                    ..Default::default()
-                });
+    async fn search_rejects_nonfinite_minimum_scores_before_reading() {
+        let pool = sqlx::postgres::PgPoolOptions::new()
+            .connect_lazy("postgres://unused@localhost/unused")
+            .unwrap();
+        let server = LpgServer::new(NidxMetadata { pool }, None);
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            for semantic in [false, true] {
+                let error = server
+                    .search_chunks(Request::new(SearchChunksRequest {
+                        text: Some("query".into()),
+                        min_score_semantic: if semantic { value } else { 0.0 },
+                        min_score_keyword: if semantic { 0.0 } else { value },
+                        ..Default::default()
+                    }))
+                    .await
+                    .unwrap_err();
+                assert_eq!(error.code(), tonic::Code::InvalidArgument);
+                assert!(error.message().contains("minimum scores"));
             }
         }
-        let endpoints = HashMap::from([
-            ("start".into(), nodes["start"].clone()),
-            ("end".into(), nodes["end"].clone()),
-        ]);
-        let request = ShortestPathRequest {
-            source: "start".into(),
-            target: "end".into(),
-            direction: LpgDirection::LpgOutgoing as i32,
-            max_hops: 3,
-            ..Default::default()
-        };
-        for fail_last_batch in [false, true] {
-            let mut calls = Vec::new();
-            let result = bidirectional_bfs(&request, endpoints.clone(), |req| {
-                calls.push((req.direction, req.node_ids.len()));
-                if fail_last_batch && req.node_ids.len() == 1 && req.node_ids[0].starts_with("left-") {
-                    return std::future::ready(Err(Status::unavailable("last batch failed")));
-                }
-                let mut response = ExpandResponse::default();
-                for start in req.node_ids {
-                    for edge in &edges {
-                        let neighbor = if req.direction == LpgDirection::LpgOutgoing as i32
-                            && edge.source.as_ref() == Some(&start)
-                        {
-                            edge.target.as_ref()
-                        } else if req.direction == LpgDirection::LpgIncoming as i32
-                            && edge.target.as_ref() == Some(&start)
-                        {
-                            edge.source.as_ref()
-                        } else {
-                            None
-                        };
-                        if let Some(neighbor) = neighbor {
-                            response.matches.push(ExpandMatch {
-                                node_id: start.clone(),
-                                edge_index: response.edges.len() as u32,
-                                neighbor_index: response.neighbors.len() as u32,
-                            });
-                            response.edges.push(edge.clone());
-                            response.neighbors.push(nodes[neighbor].clone());
-                            response.examined_edges += 1;
-                        }
-                    }
-                }
-                std::future::ready(Ok(response))
-            })
-            .await;
-            assert_eq!(
-                calls,
-                [
-                    (LpgDirection::LpgOutgoing as i32, 1),
-                    (LpgDirection::LpgIncoming as i32, 1),
-                    (LpgDirection::LpgOutgoing as i32, 128),
-                    (LpgDirection::LpgOutgoing as i32, 1),
-                ]
-            );
-            if fail_last_batch {
-                assert_eq!(result.unwrap_err().code(), tonic::Code::Unavailable);
-                continue;
-            }
-            let result = result.unwrap();
-            assert!(result.found);
-            assert_eq!(result.examined_edges, 129 * 3);
-            assert_eq!(result.nodes.len(), 4);
-            assert_eq!(result.edges.len(), 3);
-            assert_eq!(result.nodes[0].key.as_ref().unwrap().id, "start");
-            assert_eq!(result.nodes[3].key.as_ref().unwrap().id, "end");
-            for (pair, edge) in result.nodes.windows(2).zip(&result.edges) {
-                assert_eq!(edge.source.as_ref(), Some(&pair[0].key.as_ref().unwrap().id));
-                assert_eq!(edge.target.as_ref(), Some(&pair[1].key.as_ref().unwrap().id));
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn shortest_path_bounds_retained_records() {
-        let node = |id: String| LpgRecord {
-            key: Some(LpgRecordKey {
-                kind: LpgRecordKind::LpgNode as i32,
-                id,
-            }),
-            labels: vec!["Node".into()],
-            properties: HashMap::from([(
-                "payload".into(),
-                LpgProperty {
-                    value: Some(lpg_property::Value::Text("x".repeat(1_600_000))),
-                },
-            )]),
-            ..Default::default()
-        };
-        let nodes = HashMap::from([("0".into(), node("0".into())), ("12".into(), node("12".into()))]);
-        let request = ShortestPathRequest {
-            source: "0".into(),
-            target: "12".into(),
-            direction: LpgDirection::LpgOutgoing as i32,
-            max_hops: 12,
-            ..Default::default()
-        };
-        let error = bidirectional_bfs(&request, nodes, |req| {
-            let start = req.node_ids[0].clone();
-            let neighbor = (start.parse::<u32>().unwrap() + 1).to_string();
-            std::future::ready(Ok(ExpandResponse {
-                matches: vec![ExpandMatch {
-                    node_id: start.clone(),
-                    edge_index: 0,
-                    neighbor_index: 0,
-                }],
-                edges: vec![LpgRecord {
-                    key: Some(LpgRecordKey {
-                        kind: LpgRecordKind::LpgEdge as i32,
-                        id: start.clone(),
-                    }),
-                    source: Some(start),
-                    target: Some(neighbor.clone()),
-                    edge_type: Some("LINK".into()),
-                    ..Default::default()
-                }],
-                neighbors: vec![node(neighbor)],
-                examined_edges: 1,
-            }))
-        })
-        .await
-        .unwrap_err();
-        assert_eq!(error.code(), tonic::Code::ResourceExhausted);
-        assert!(error.message().contains("state byte limit"));
     }
 
     #[tokio::test]
@@ -2338,113 +1229,84 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn batch_submits_every_item_before_checking_visibility() {
+    async fn batch_submits_every_item() {
         let events = Arc::new(std::sync::Mutex::new(Vec::new()));
-        submit_then_wait(
-            &[1, 2, 3],
-            Duration::from_secs(30),
-            |item| {
-                let events = events.clone();
-                async move {
-                    events.lock().unwrap().push(("submit", item));
-                    Ok(())
-                }
-            },
-            |item| {
-                let events = events.clone();
-                async move {
-                    events.lock().unwrap().push(("visible", item));
-                    Ok(())
-                }
-            },
-        )
+        submit_all(&[1, 2, 3], |item| {
+            let events = events.clone();
+            async move {
+                events.lock().unwrap().push(item);
+                Ok(())
+            }
+        })
         .await
         .unwrap();
+        assert_eq!(*events.lock().unwrap(), [1, 2, 3]);
+    }
+
+    #[test]
+    fn projected_batches_respect_the_encoded_grpc_limit() {
+        let resource = Resource {
+            texts: HashMap::from([(
+                FIELD.into(),
+                TextInformation {
+                    text: "x".repeat(2 * 1024 * 1024),
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        };
+        let resources = vec![resource; 3];
+        let batches = index_batches("graph", resources.clone()).unwrap();
+        assert_eq!(batches.len(), 3);
+        assert!(batches.iter().all(|request| request.encoded_len() <= MAX_BATCH_BYTES));
         assert_eq!(
-            *events.lock().unwrap(),
-            [
-                ("submit", 1),
-                ("submit", 2),
-                ("submit", 3),
-                ("visible", 1),
-                ("visible", 2),
-                ("visible", 3)
-            ]
+            batches
+                .into_iter()
+                .flat_map(|request| request.resources)
+                .collect::<Vec<_>>(),
+            resources
+        );
+        let mut oversized = resources[0].clone();
+        oversized.texts.get_mut(FIELD).unwrap().text = "x".repeat(MAX_BATCH_BYTES);
+        assert_eq!(
+            index_batches("graph", vec![resources[0].clone(), oversized])
+                .unwrap_err()
+                .code(),
+            tonic::Code::ResourceExhausted
+        );
+    }
+
+    #[test]
+    fn projected_batches_respect_the_resource_count_limit() {
+        let resources = vec![Resource::default(); 2 * MAX_RESOURCES + 1];
+        let batches = index_batches("graph", resources).unwrap();
+        assert_eq!(
+            batches
+                .iter()
+                .map(|request| request.resources.len())
+                .collect::<Vec<_>>(),
+            [MAX_RESOURCES, MAX_RESOURCES, 1]
         );
     }
 
     #[tokio::test]
-    async fn batch_propagates_submission_and_visibility_failures() {
-        for fail_submit in [true, false] {
-            let events = Arc::new(std::sync::Mutex::new(Vec::new()));
-            let error = submit_then_wait(
-                &[1, 2, 3],
-                Duration::from_secs(30),
-                |item| {
-                    let events = events.clone();
-                    async move {
-                        events.lock().unwrap().push(("submit", item));
-                        if fail_submit && item == 2 {
-                            Err(Status::unavailable("index"))
-                        } else {
-                            Ok(())
-                        }
-                    }
-                },
-                |item| {
-                    let events = events.clone();
-                    async move {
-                        events.lock().unwrap().push(("visible", item));
-                        if !fail_submit && item == 2 {
-                            Err(Status::data_loss("search"))
-                        } else {
-                            Ok(())
-                        }
-                    }
-                },
-            )
-            .await
-            .unwrap_err();
-            assert_eq!(
-                error.code(),
-                if fail_submit {
-                    tonic::Code::Unavailable
+    async fn batch_propagates_submission_failure_and_stops() {
+        let events = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let error = submit_all(&[1, 2, 3], |item| {
+            let events = events.clone();
+            async move {
+                events.lock().unwrap().push(item);
+                if item == 2 {
+                    Err(Status::unavailable("index"))
                 } else {
-                    tonic::Code::DataLoss
+                    Ok(())
                 }
-            );
-            let events = events.lock().unwrap();
-            if fail_submit {
-                assert_eq!(*events, [("submit", 1), ("submit", 2)]);
-            } else {
-                assert_eq!(
-                    *events,
-                    [
-                        ("submit", 1),
-                        ("submit", 2),
-                        ("submit", 3),
-                        ("visible", 1),
-                        ("visible", 2)
-                    ]
-                );
             }
-        }
-    }
-
-    #[tokio::test]
-    async fn batch_visibility_checks_share_one_budget() {
-        let error = submit_then_wait(
-            &[1, 2],
-            Duration::from_millis(100),
-            |_| async { Ok(()) },
-            |_| async {
-                tokio::time::sleep(Duration::from_millis(80)).await;
-                Ok(())
-            },
-        )
+        })
         .await
         .unwrap_err();
-        assert_eq!(error.code(), tonic::Code::DeadlineExceeded);
+        assert_eq!(error.code(), tonic::Code::Unavailable);
+        assert_eq!(*events.lock().unwrap(), [1, 2]);
     }
 
     #[test]
@@ -2469,22 +1331,34 @@ mod tests {
         };
         let a = node("a");
         let b = node("b");
-        assert!(bulk_order(&[edge.clone(), a.clone()]).is_err());
-        assert_eq!(bulk_order(&[edge.clone(), b.clone(), a.clone()]).unwrap(), [1, 2, 0]);
-        assert!(bulk_order(&[a.clone(), a.clone()]).is_err());
-        assert!(bulk_order(&[]).is_err());
-        assert!(bulk_order(&vec![a.clone(); 1001]).is_err());
+        let empty = HashMap::new();
+        assert!(bulk_order(&[edge.clone(), a.clone()], &empty).is_err());
+        assert_eq!(
+            bulk_order(&[edge.clone(), b.clone(), a.clone()], &empty).unwrap(),
+            [1, 2, 0]
+        );
+        assert!(bulk_order(&[a.clone(), a.clone()], &empty).is_err());
+        assert!(bulk_order(&[], &empty).is_err());
+        assert!(bulk_order(&vec![a.clone(); 1001], &empty).is_err());
         let mut changed = b;
         changed.revision = "changed".into();
-        assert!(bulk_order(&[changed]).is_ok());
-        let mut marked = a;
-        marked.deleting = true;
-        assert!(bulk_order(&[marked]).is_err());
-        assert!(bulk_order(&[edge]).is_err());
+        assert!(bulk_order(&[changed], &empty).is_ok());
+        assert!(bulk_order(std::slice::from_ref(&edge), &empty).is_err());
+        let labels = LpgStringList {
+            values: vec!["Node".into()],
+        };
+        let mut endpoints = HashMap::from([("a".into(), labels.clone()), ("b".into(), labels)]);
+        assert_eq!(bulk_order(std::slice::from_ref(&edge), &endpoints).unwrap(), [0]);
+        endpoints.get_mut("b").unwrap().values = vec!["Other".into()];
+        assert!(bulk_order(&[edge.clone(), node("b")], &endpoints).is_err());
+        for invalid in [vec![], vec!["".into()], vec!["Node".into(), "Node".into()]] {
+            endpoints.get_mut("b").unwrap().values = invalid;
+            assert!(bulk_order(std::slice::from_ref(&edge), &endpoints).is_err());
+        }
     }
 
     #[tokio::test]
-    async fn graph_mutation_locks_and_reserved_marker() {
+    async fn graph_mutation_locks() {
         let pool = sqlx::postgres::PgPoolOptions::new()
             .connect_lazy("postgres://unused@localhost/unused")
             .unwrap();
@@ -2498,18 +1372,6 @@ mod tests {
         assert!(other.try_lock().is_ok());
         drop(guard);
         assert!(same.try_lock().is_ok());
-        let marked = LpgRecord {
-            key: Some(LpgRecordKey {
-                kind: LpgRecordKind::LpgNode as i32,
-                id: "n".into(),
-            }),
-            deleting: true,
-            ..Default::default()
-        };
-        assert_eq!(
-            server.put_locked("one", &marked).await.unwrap_err().code(),
-            tonic::Code::InvalidArgument
-        );
     }
 
     #[test]
@@ -2801,7 +1663,9 @@ mod tests {
         validate_record(&record).unwrap();
         let rid = resource_id("graph", record.key.as_ref().unwrap()).unwrap();
         let resource = project("graph", &record, &rid, Some("v"), "test-fence", None).unwrap();
+        assert!(resource.texts[FIELD].skip_tokenization);
         let field = format!("t/{}", property_path("desc"));
+        assert!(!resource.texts[&field].skip_tokenization);
         let paragraphs = &resource.paragraphs[&field].paragraphs;
         assert!(paragraphs.contains_key(&format!("{rid}/{field}/0-1")));
         assert!(paragraphs.contains_key(&format!("{rid}/{field}/2-6")));
@@ -2846,19 +1710,7 @@ mod tests {
     }
 
     #[test]
-    fn chunk_ids_and_edge_filter_validation() {
-        let candidate = chunk_candidate("123/t/p_64657363/2-6").unwrap();
-        assert_eq!(
-            (
-                candidate.rid.as_str(),
-                candidate.field.as_str(),
-                candidate.start,
-                candidate.end
-            ),
-            ("123", "t/p_64657363", 2, 6)
-        );
-        assert!(chunk_candidate("123/a/lpg/2-6").is_err());
-        assert!(chunk_candidate("123/t/p_x/6-2").is_err());
+    fn edge_filter_validation() {
         let request = FindRecordsRequest {
             kind: LpgRecordKind::LpgEdge as i32,
             incident_node: Some("a".into()),
